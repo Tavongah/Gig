@@ -9,7 +9,7 @@ export const onboardingRouter = Router();
 
 onboardingRouter.post("/complete", requireAuth, validateBody(onboardingSchema), async (req, res, next) => {
   try {
-    const input = req.body;
+    const input = onboardingSchema.parse(req.body);
     const roles = input.role === UserRole.WORKER ? [UserRole.CLIENT, UserRole.WORKER] : [input.role];
 
     const user = await prisma.$transaction(async (tx) => {

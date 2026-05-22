@@ -1,6 +1,15 @@
+import "dotenv/config";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is required to seed the database.");
+}
+
+const adapter = new PrismaPg({ connectionString: databaseUrl });
+const prisma = new PrismaClient({ adapter });
 
 const categories = [
   ["lawn-cutting", "Lawn Cutting", "Mowing, edging, and basic yard cleanup.", "leaf", 3500, 2800, 125, 1],

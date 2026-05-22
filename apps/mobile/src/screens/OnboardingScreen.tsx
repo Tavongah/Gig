@@ -6,7 +6,7 @@ import { api } from "../lib/api";
 import { Screen } from "../components/Screen";
 import { useSessionStore } from "../stores/session.store";
 
-export function OnboardingScreen(): JSX.Element {
+export function OnboardingScreen() {
   const [role, setRole] = useState<"CLIENT" | "WORKER">("CLIENT");
   const [fullName, setFullName] = useState("Demo Founder");
   const [email, setEmail] = useState("founder@gigflow.local");

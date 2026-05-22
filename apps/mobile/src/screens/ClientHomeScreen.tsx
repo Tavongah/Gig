@@ -10,7 +10,7 @@ function cents(value: number): string {
   return `$${(value / 100).toFixed(2)}`;
 }
 
-export function ClientHomeScreen(): JSX.Element {
+export function ClientHomeScreen() {
   const session = useSessionStore((state) => state.session);
   const [title, setTitle] = useState("Clean my apartment before guests arrive");
   const [description, setDescription] = useState("Two bedrooms, one bathroom, kitchen surfaces, floors, and light organizing.");

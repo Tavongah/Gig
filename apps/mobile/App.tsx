@@ -8,7 +8,7 @@ import { useSessionStore } from "./src/stores/session.store";
 
 const queryClient = new QueryClient();
 
-function Shell(): JSX.Element {
+function Shell() {
   const session = useSessionStore((state) => state.session);
   const activeRole = useSessionStore((state) => state.activeRole);
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
@@ -35,7 +35,7 @@ function Shell(): JSX.Element {
   );
 }
 
-export default function App(): JSX.Element {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Shell />

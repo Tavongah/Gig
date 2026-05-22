@@ -1,7 +1,7 @@
 import type { Server } from "socket.io";
 import { createGigSchema, gigEstimateSchema, calculatePriceEstimate } from "@gigflow/shared";
 import type { CreateGigInput, GigEstimateInput } from "@gigflow/shared";
-import { GigStatus, UserRole } from "@prisma/client";
+import { GigStatus, Prisma, UserRole } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { broadcastGigOffer } from "../realtime/realtime.service.js";
 
@@ -65,7 +65,7 @@ export async function createGig(clientId: string, input: CreateGigInput, io: Ser
       latitude: parsed.location.latitude,
       longitude: parsed.location.longitude,
       photoUrls: parsed.photos,
-      priceBreakdown: price,
+      priceBreakdown: price as unknown as Prisma.InputJsonValue,
       totalCents: price.totalCents,
       platformFeeCents: price.platformFeeCents,
       workerPayoutCents: price.workerPayoutCents,

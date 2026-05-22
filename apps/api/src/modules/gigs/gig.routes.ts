@@ -47,7 +47,13 @@ export function createGigRouter(io: Server): Router {
 
   router.post("/:gigId/accept", requireAuth, requireRole(UserRole.WORKER), async (req, res, next) => {
     try {
-      const gig = await acceptGig(req.params.gigId, req.auth!.userId);
+      const { gigId } = req.params;
+      if (!gigId || Array.isArray(gigId)) {
+        res.status(400).json({ error: "GIG_ID_REQUIRED" });
+        return;
+      }
+
+      const gig = await acceptGig(gigId, req.auth!.userId);
       io.to(`gig:${gig.id}`).to(`user:${gig.clientId}`).emit("gig:matched", { gig });
       res.json({ gig });
     } catch (error) {

@@ -9,7 +9,7 @@ function cents(value: number): string {
   return `$${(value / 100).toFixed(2)}`;
 }
 
-export function WorkerHomeScreen(): JSX.Element {
+export function WorkerHomeScreen() {
   const session = useSessionStore((state) => state.session);
   const token = session?.token ?? "";
   const nearbyQuery = useQuery({

@@ -1,7 +1,6 @@
 import cors from "cors";
 import express, { type ErrorRequestHandler } from "express";
 import helmet from "helmet";
-import pinoHttp from "pino-http";
 import rateLimit from "express-rate-limit";
 import type { Server } from "socket.io";
 import { authRouter } from "./modules/auth/auth.routes.js";
@@ -15,7 +14,6 @@ export function createApp(io: Server) {
   app.use(helmet());
   app.use(cors({ origin: true, credentials: true }));
   app.use(express.json({ limit: "1mb" }));
-  app.use(pinoHttp());
   app.use(
     rateLimit({
       windowMs: 60_000,

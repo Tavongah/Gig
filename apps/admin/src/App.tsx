@@ -42,7 +42,7 @@ async function fetchOverview(): Promise<Overview> {
   return response.json() as Promise<Overview>;
 }
 
-export function App(): JSX.Element {
+export function App() {
   const overviewQuery = useQuery({ queryKey: ["admin-overview"], queryFn: fetchOverview, retry: false });
   const overview =
     overviewQuery.data ??
