@@ -1,0 +1,296 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  CLIENT
+  WORKER
+  ADMIN
+}
+
+enum GigStatus {
+  DRAFT
+  OPEN
+  MATCHED
+  EN_ROUTE
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum GigUrgency {
+  STANDARD
+  SOON
+  URGENT
+}
+
+enum GigSize {
+  SMALL
+  MEDIUM
+  LARGE
+  ENTERPRISE
+}
+
+enum PaymentStatus {
+  REQUIRES_PAYMENT_METHOD
+  AUTHORIZED
+  CAPTURED
+  PAID_OUT
+  REFUNDED
+  FAILED
+}
+
+enum TransactionType {
+  CLIENT_CHARGE
+  PLATFORM_COMMISSION
+  WORKER_PAYOUT
+  REFUND
+  ADJUSTMENT
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  EMAIL
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  BUSY
+  OFFLINE
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  firebaseUid        String?             @unique
+  email              String              @unique
+  phoneNumber        String?
+  fullName           String
+  avatarUrl          String?
+  roles              UserRole[]          @default([CLIENT])
+  defaultRole        UserRole            @default(CLIENT)
+  isVerified         Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  workerProfile      WorkerProfile?
+  clientGigs         Gig[]               @relation("ClientGigs")
+  workerAssignments  GigAssignment[]     @relation("WorkerAssignments")
+  reviewsGiven       Review[]            @relation("ReviewsGiven")
+  reviewsReceived    Review[]            @relation("ReviewsReceived")
+  notifications      Notification[]
+  availability       AvailabilityWindow[]
+  chatMessages       ChatMessage[]
+  auditLogs          AuditLog[]
+}
+
+model WorkerProfile {
+  id                       String            @id @default(uuid())
+  userId                   String            @unique
+  user                     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio                      String
+  hasVehicle               Boolean           @default(false)
+  backgroundCheckConsent   Boolean           @default(false)
+  backgroundCheckCompleted Boolean           @default(false)
+  stripeConnectedAccountId String?
+  ratingAverage            Decimal           @default(0) @db.Decimal(3, 2)
+  completedGigCount        Int               @default(0)
+  currentLatitude          Decimal?          @db.Decimal(9, 6)
+  currentLongitude         Decimal?          @db.Decimal(9, 6)
+  availabilityStatus       AvailabilityStatus @default(OFFLINE)
+  serviceCategories        ServiceCategory[] @relation("WorkerCategories")
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+}
+
+model ServiceCategory {
+  id                 String          @id @default(uuid())
+  slug               String          @unique
+  name               String
+  description        String
+  iconName           String
+  baseRateCents      Int
+  hourlyRateCents    Int
+  distanceRateCents  Int             @default(175)
+  multiplier         Decimal         @default(1) @db.Decimal(4, 2)
+  isActive           Boolean         @default(true)
+  gigs               Gig[]
+  workers            WorkerProfile[] @relation("WorkerCategories")
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
+model Gig {
+  id                    String          @id @default(uuid())
+  clientId              String
+  client                User            @relation("ClientGigs", fields: [clientId], references: [id], onDelete: Restrict)
+  serviceCategoryId     String
+  serviceCategory       ServiceCategory @relation(fields: [serviceCategoryId], references: [id], onDelete: Restrict)
+  title                 String
+  description           String
+  status                GigStatus       @default(OPEN)
+  urgency               GigUrgency
+  size                  GigSize
+  estimatedHours        Decimal         @db.Decimal(5, 2)
+  distanceMiles         Decimal         @db.Decimal(7, 2)
+  demandMultiplier      Decimal         @default(1) @db.Decimal(4, 2)
+  startsAt              DateTime
+  addressLine1          String
+  addressLine2          String?
+  city                  String
+  region                String
+  postalCode            String
+  country               String          @default("US")
+  latitude              Decimal         @db.Decimal(9, 6)
+  longitude             Decimal         @db.Decimal(9, 6)
+  photoUrls             String[]        @default([])
+  priceBreakdown        Json
+  totalCents            Int
+  platformFeeCents      Int
+  workerPayoutCents     Int
+  assignments           GigAssignment[]
+  payment               Payment?
+  reviews               Review[]
+  chatThread            ChatThread?
+  notifications         Notification[]
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([status, serviceCategoryId, startsAt])
+  @@index([latitude, longitude])
+}
+
+model GigAssignment {
+  id          String    @id @default(uuid())
+  gigId       String
+  gig         Gig       @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  workerId    String
+  worker      User      @relation("WorkerAssignments", fields: [workerId], references: [id], onDelete: Restrict)
+  acceptedAt  DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  @@unique([gigId, workerId])
+  @@index([workerId, acceptedAt])
+}
+
+model Payment {
+  id                     String        @id @default(uuid())
+  gigId                  String        @unique
+  gig                    Gig           @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  stripePaymentIntentId  String?       @unique
+  status                 PaymentStatus @default(REQUIRES_PAYMENT_METHOD)
+  amountCents            Int
+  platformFeeCents       Int
+  workerPayoutCents      Int
+  currency               String        @default("usd")
+  transactions           Transaction[]
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+}
+
+model Transaction {
+  id          String          @id @default(uuid())
+  paymentId   String
+  payment     Payment         @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  type        TransactionType
+  amountCents Int
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+}
+
+model Review {
+  id          String   @id @default(uuid())
+  gigId       String
+  gig         Gig      @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  reviewerId  String
+  reviewer    User     @relation("ReviewsGiven", fields: [reviewerId], references: [id], onDelete: Restrict)
+  revieweeId  String
+  reviewee    User     @relation("ReviewsReceived", fields: [revieweeId], references: [id], onDelete: Restrict)
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  @@unique([gigId, reviewerId])
+}
+
+model Notification {
+  id        String              @id @default(uuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gigId     String?
+  gig       Gig?                @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  channel   NotificationChannel
+  status    NotificationStatus  @default(PENDING)
+  title     String
+  body      String
+  payload   Json?
+  createdAt DateTime            @default(now())
+  readAt    DateTime?
+}
+
+model AvailabilityWindow {
+  id          String             @id @default(uuid())
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      AvailabilityStatus @default(AVAILABLE)
+  startsAt    DateTime
+  endsAt      DateTime
+  latitude    Decimal?           @db.Decimal(9, 6)
+  longitude   Decimal?           @db.Decimal(9, 6)
+  createdAt   DateTime           @default(now())
+
+  @@index([userId, startsAt, endsAt])
+}
+
+model ChatThread {
+  id        String        @id @default(uuid())
+  gigId     String        @unique
+  gig       Gig           @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model ChatMessage {
+  id        String     @id @default(uuid())
+  threadId  String
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User       @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  body      String
+  createdAt DateTime   @default(now())
+  readAt    DateTime?
+}
+
+model CommissionSetting {
+  id             String   @id @default(uuid())
+  rate           Decimal  @default(0.20) @db.Decimal(4, 3)
+  effectiveFrom  DateTime @default(now())
+  createdById    String?
+  createdAt      DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
