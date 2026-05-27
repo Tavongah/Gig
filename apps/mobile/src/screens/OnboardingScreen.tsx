@@ -7,8 +7,8 @@ import { useSessionStore } from "../stores/session.store";
 
 export function OnboardingScreen() {
   const [role, setRole] = useState<"CLIENT" | "WORKER">("CLIENT");
-  const [fullName, setFullName] = useState("Demo Founder");
-  const [email, setEmail] = useState("founder@gigflow.local");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   const setSession = useSessionStore((state) => state.setSession);
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
 
@@ -27,7 +27,7 @@ export function OnboardingScreen() {
           <Text className="text-sm font-semibold uppercase tracking-[4px] text-brand">GigFlow</Text>
           <Text className="text-4xl font-black text-white">Local gigs, matched in real time.</Text>
           <Text className="text-base leading-6 text-slate-300">
-            Launch as a client posting jobs or as a worker accepting nearby offers. The same app supports both sides of the marketplace.
+            Hire trusted local workers or pick up nearby gigs on your schedule.
           </Text>
         </View>
 
@@ -38,14 +38,20 @@ export function OnboardingScreen() {
               onPress={() => setRole(value)}
               className={`flex-1 rounded-2xl border p-4 ${role === value ? "border-brand bg-brand/20" : "border-slate-700 bg-slate-900"}`}
             >
-              <Text className="text-center font-bold text-white">{value === "CLIENT" ? "Post gigs" : "Find work"}</Text>
+              <Text className="text-center font-bold text-white">{value === "CLIENT" ? "I need help" : "I want work"}</Text>
             </Pressable>
           ))}
         </View>
 
         <View className="gap-4 rounded-3xl bg-white p-5">
-          <Text className="text-xl font-black text-ink">Create your marketplace profile</Text>
-          <TextInput className="rounded-2xl bg-slate-100 px-4 py-4 text-ink" value={fullName} onChangeText={setFullName} placeholder="Full name" />
+          <Text className="text-xl font-black text-ink">Create your account</Text>
+          <TextInput
+            className="rounded-2xl bg-slate-100 px-4 py-4 text-ink"
+            value={fullName}
+            onChangeText={setFullName}
+            placeholder="Full name"
+            placeholderTextColor="#94a3b8"
+          />
           <TextInput
             className="rounded-2xl bg-slate-100 px-4 py-4 text-ink"
             value={email}
@@ -53,9 +59,14 @@ export function OnboardingScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
             placeholder="Email"
+            placeholderTextColor="#94a3b8"
           />
-          <Pressable onPress={() => sessionMutation.mutate()} className="rounded-2xl bg-ink px-5 py-4">
-            <Text className="text-center font-black text-white">{sessionMutation.isPending ? "Creating..." : "Continue"}</Text>
+          <Pressable
+            disabled={!fullName.trim() || !email.trim() || sessionMutation.isPending}
+            onPress={() => sessionMutation.mutate()}
+            className="rounded-2xl bg-ink px-5 py-4"
+          >
+            <Text className="text-center font-black text-white">{sessionMutation.isPending ? "Creating..." : "Get started"}</Text>
           </Pressable>
         </View>
       </View>

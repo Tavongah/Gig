@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:4000/v1";
+const TOKEN_KEY = "gigflow_admin_token";
 
 interface Overview {
   users: number;
@@ -10,6 +12,72 @@ interface Overview {
   grossVolumeCents: number;
   platformRevenueCents: number;
   commissionRate: number;
+}
+
+function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const response = await fetch(`${apiUrl}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers
+    }
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Request failed (${response.status})`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
+  const [email, setEmail] = useState("admin@gigflow.local");
+  const [fullName, setFullName] = useState("GigFlow Admin");
+
+  const loginMutation = useMutation({
+    mutationFn: () =>
+      fetch(`${apiUrl}/auth/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, fullName, role: "ADMIN" })
+      }).then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Login failed");
+        }
+        return response.json() as Promise<{ token: string }>;
+      }),
+    onSuccess: ({ token }) => {
+      localStorage.setItem(TOKEN_KEY, token);
+      onSuccess();
+    }
+  });
+
+  return (
+    <section className="login">
+      <p className="eyebrow">Admin access</p>
+      <h1>Sign in to GigFlow Ops</h1>
+      <p className="notice">Use the seeded admin account or any user promoted to ADMIN in the database.</p>
+      <label>
+        Email
+        <input value={email} onChange={(event) => setEmail(event.target.value)} />
+      </label>
+      <label>
+        Full name
+        <input value={fullName} onChange={(event) => setFullName(event.target.value)} />
+      </label>
+      <button type="button" onClick={() => loginMutation.mutate()} disabled={loginMutation.isPending}>
+        {loginMutation.isPending ? "Signing in..." : "Sign in"}
+      </button>
+      {loginMutation.error ? <p className="notice">{loginMutation.error.message}</p> : null}
+    </section>
+  );
 }
 
 const cards = [
@@ -29,21 +97,31 @@ function formatValue(key: keyof Overview, value: number): string {
   return value.toLocaleString();
 }
 
-async function fetchOverview(): Promise<Overview> {
-  const token = localStorage.getItem("gigflow_admin_token");
-  const response = await fetch(`${apiUrl}/admin/overview`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {}
+export function App() {
+  const queryClient = useQueryClient();
+  const [authenticated, setAuthenticated] = useState(Boolean(getToken()));
+  const [commissionInput, setCommissionInput] = useState("20");
+
+  const overviewQuery = useQuery({
+    queryKey: ["admin-overview"],
+    queryFn: () => apiRequest<Overview>("/admin/overview"),
+    enabled: authenticated,
+    retry: false
   });
 
-  if (!response.ok) {
-    throw new Error("Add an admin JWT to localStorage.gigflow_admin_token to load live data.");
+  const commissionMutation = useMutation({
+    mutationFn: () => apiRequest("/admin/commission", { method: "POST", body: JSON.stringify({ rate: Number(commissionInput) / 100 }) }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-overview"] })
+  });
+
+  if (!authenticated) {
+    return (
+      <main className="login-layout">
+        <LoginPanel onSuccess={() => setAuthenticated(true)} />
+      </main>
+    );
   }
 
-  return response.json() as Promise<Overview>;
-}
-
-export function App() {
-  const overviewQuery = useQuery({ queryKey: ["admin-overview"], queryFn: fetchOverview, retry: false });
   const overview =
     overviewQuery.data ??
     ({
@@ -61,10 +139,20 @@ export function App() {
       <aside>
         <div className="logo">GigFlow</div>
         <nav>
-          {["Users", "Workers", "Disputes", "Analytics", "Revenue", "Categories", "Commission"].map((item) => (
+          {["Overview", "Users", "Categories", "Commission"].map((item) => (
             <a key={item}>{item}</a>
           ))}
         </nav>
+        <button
+          type="button"
+          className="sign-out"
+          onClick={() => {
+            localStorage.removeItem(TOKEN_KEY);
+            setAuthenticated(false);
+          }}
+        >
+          Sign out
+        </button>
       </aside>
       <section className="content">
         <header>
@@ -87,12 +175,23 @@ export function App() {
         </div>
 
         <section className="panel">
-          <h2>MVP control priorities</h2>
+          <h2>Commission settings</h2>
+          <div className="commission-form">
+            <input type="number" min={5} max={35} value={commissionInput} onChange={(event) => setCommissionInput(event.target.value)} />
+            <span>% platform fee</span>
+            <button type="button" onClick={() => commissionMutation.mutate()} disabled={commissionMutation.isPending}>
+              {commissionMutation.isPending ? "Saving..." : "Update commission"}
+            </button>
+          </div>
+        </section>
+
+        <section className="panel">
+          <h2>Launch checklist</h2>
           <ul>
             <li>Monitor worker supply by category and city.</li>
             <li>Review high-urgency gigs and cancellations.</li>
             <li>Tune commission and category pricing before scaling spend.</li>
-            <li>Resolve payment disputes before worker payout release.</li>
+            <li>Connect Stripe Connect before enabling live payouts.</li>
           </ul>
         </section>
       </section>

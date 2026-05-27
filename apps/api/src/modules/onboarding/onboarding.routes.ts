@@ -50,7 +50,12 @@ onboardingRouter.post("/complete", requireAuth, validateBody(onboardingSchema), 
       return updatedUser;
     });
 
-    res.json({ user });
+    const userWithProfile = await prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      include: { workerProfile: { include: { serviceCategories: true } } }
+    });
+
+    res.json({ user: userWithProfile });
   } catch (error) {
     next(error);
   }

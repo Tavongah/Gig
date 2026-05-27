@@ -113,19 +113,33 @@ The pricing service is isolated so future AI pricing prediction can replace or a
 | `POST` | `/v1/gigs` | Client creates a gig and broadcasts it |
 | `GET` | `/v1/gigs/nearby` | Worker fetches nearby open gigs |
 | `POST` | `/v1/gigs/:gigId/accept` | Worker accepts an open gig |
+| `PATCH` | `/v1/gigs/:gigId/status` | Advance gig lifecycle (EN_ROUTE → COMPLETED) |
+| `GET` | `/v1/gigs/mine` | List gigs for current client or worker |
 | `GET` | `/v1/admin/overview` | Admin operational summary |
+| `POST` | `/v1/admin/commission` | Update platform commission rate |
+| `GET` | `/health` | Liveness + Postgres/Redis checks |
 
 ## Local development
 
 ```bash
 npm install
-docker compose up -d
+docker compose up -d postgres redis
 cp .env.example .env
-npm run prisma:generate -w @gigflow/api
+npm run db:migrate
+npm run db:seed
 npm run dev
 ```
 
-## Testing strategy
+## Deployment
+
+**See [DEPLOY.md](./DEPLOY.md) for the full hosting guide** (Render, Railway, Docker, Expo EAS, env vars, and launch checklist).
+
+Quick production build:
+
+```bash
+npm run build:api
+cd apps/api && sh scripts/start.sh
+```
 
 - Shared package: unit tests for schemas and pricing helpers.
 - API: service-level tests for pricing, gig state transitions, auth, and role authorization.
@@ -133,10 +147,4 @@ npm run dev
 - Admin: smoke tests for dashboard rendering and API integration.
 - End-to-end: post gig -> broadcast -> accept -> payment authorization -> completion -> review.
 
-## Deployment notes
-
-- Deploy `apps/api` to Railway, Render, or AWS ECS with PostgreSQL, Redis, and managed secrets.
-- Deploy `apps/admin` to Vercel, Netlify, or CloudFront.
-- Build mobile with Expo Application Services.
-- Store production secrets in platform secret managers, never in git.
-- Configure Stripe Connect webhooks, Firebase Auth, FCM, Google Maps, and S3/Cloudinary before launch.
+## Testing strategy

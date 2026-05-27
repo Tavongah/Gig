@@ -36,7 +36,12 @@ export async function createSession(input: SessionRequest) {
     expiresIn: "7d"
   });
 
-  return { token, user };
+  const userWithProfile = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    include: { workerProfile: { include: { serviceCategories: true } } }
+  });
+
+  return { token, user: userWithProfile };
 }
 
 export async function getAuthenticatedUser(userId: string) {

@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: gigflow-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4000"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: RUN_SEED
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gigflow-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: gigflow-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+
+  - type: redis
+    name: gigflow-redis
+    plan: free
+    ipAllowList: []
+
+  - type: web
+    name: gigflow-admin
+    runtime: static
+    buildCommand: npm ci && npm run build --workspace @gigflow/admin
+    staticPublishPath: apps/admin/dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+
+databases:
+  - name: gigflow-db
+    plan: free

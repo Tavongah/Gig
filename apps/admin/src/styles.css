@@ -114,3 +114,74 @@ article strong {
 li {
   margin: 12px 0;
 }
+
+.login-layout {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.login {
+  width: min(480px, 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 28px;
+  padding: 32px;
+  display: grid;
+  gap: 16px;
+}
+
+.login label {
+  display: grid;
+  gap: 8px;
+  color: #97a6ba;
+  font-size: 14px;
+}
+
+.login input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  color: #fff;
+  padding: 14px 16px;
+}
+
+.login button,
+.commission-form button,
+.sign-out {
+  background: #21c07a;
+  border: 0;
+  border-radius: 16px;
+  color: #07111f;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 14px 18px;
+}
+
+.sign-out {
+  margin-top: auto;
+  width: 100%;
+}
+
+aside {
+  display: flex;
+  flex-direction: column;
+}
+
+.commission-form {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.commission-form input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  color: #fff;
+  padding: 12px 14px;
+  width: 96px;
+}

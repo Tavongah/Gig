@@ -9,10 +9,16 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build --workspace @gigflow/shared && npm run build --workspaces --if-present",
+    "build:api": "npm run build --workspace @gigflow/shared && npm run prisma:generate --workspace @gigflow/api && npm run build --workspace @gigflow/api",
+    "start:api": "npm run start --workspace @gigflow/api",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "db:up": "docker compose up -d postgres redis",
+    "db:migrate": "npm run prisma:migrate --workspace @gigflow/api",
+    "db:seed": "npm run prisma:seed --workspace @gigflow/api",
+    "docker:up": "docker compose up --build"
   },
   "engines": {
     "node": ">=20.0.0",

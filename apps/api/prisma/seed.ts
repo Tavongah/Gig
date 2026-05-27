@@ -33,9 +33,31 @@ async function main(): Promise<void> {
     });
   }
 
-  await prisma.commissionSetting.create({
-    data: { rate: 0.2 }
+  const existingCommission = await prisma.commissionSetting.findFirst();
+  if (!existingCommission) {
+    await prisma.commissionSetting.create({
+      data: { rate: 0.2 }
+    });
+  }
+
+  await prisma.user.upsert({
+    where: { email: "admin@gigflow.local" },
+    update: {
+      fullName: "GigFlow Admin",
+      roles: ["ADMIN", "CLIENT"],
+      defaultRole: "ADMIN",
+      isVerified: true
+    },
+    create: {
+      email: "admin@gigflow.local",
+      fullName: "GigFlow Admin",
+      roles: ["ADMIN", "CLIENT"],
+      defaultRole: "ADMIN",
+      isVerified: true
+    }
   });
+
+  console.log("Seeded service categories, commission rate, and admin user (admin@gigflow.local).");
 }
 
 main()

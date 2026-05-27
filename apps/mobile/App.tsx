@@ -1,51 +1,47 @@
 import "./global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Platform, Pressable, Text, View } from "react-native";
+import { NavigationContainer } from "@react-navigation/native";
+import { Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
-import { ClientHomeScreen } from "./src/screens/ClientHomeScreen";
-import { WorkerHomeScreen } from "./src/screens/WorkerHomeScreen";
+import { ProfileSetupScreen } from "./src/screens/ProfileSetupScreen";
+import { AppNavigator } from "./src/navigation/AppNavigator";
 import { useSessionStore } from "./src/stores/session.store";
 
 const queryClient = new QueryClient();
 
-const rootStyle = Platform.OS === "web" ? ({ flex: 1, minHeight: "100vh" } as const) : ({ flex: 1 } as const);
+const rootStyle = Platform.OS === "web" ? ({ flex: 1, minHeight: "100vh" as unknown as number } as const) : ({ flex: 1 } as const);
 
 function Shell() {
   const session = useSessionStore((state) => state.session);
-  const activeRole = useSessionStore((state) => state.activeRole);
-  const setActiveRole = useSessionStore((state) => state.setActiveRole);
+  const onboardingComplete = useSessionStore((state) => state.onboardingComplete);
 
   if (!session) {
     return <OnboardingScreen />;
   }
 
+  if (!onboardingComplete) {
+    return <ProfileSetupScreen />;
+  }
+
   return (
-    <View className="flex-1 bg-slate-950" style={rootStyle}>
-      <View className="flex-row gap-2 px-5 pt-14">
-        {(["CLIENT", "WORKER"] as const).map((role) => (
-          <Pressable
-            key={role}
-            onPress={() => setActiveRole(role)}
-            className={`flex-1 rounded-full px-4 py-3 ${activeRole === role ? "bg-brand" : "bg-slate-800"}`}
-          >
-            <Text className={`text-center font-black ${activeRole === role ? "text-ink" : "text-white"}`}>{role}</Text>
-          </Pressable>
-        ))}
-      </View>
-      {activeRole === "CLIENT" ? <ClientHomeScreen /> : <WorkerHomeScreen />}
-    </View>
+    <NavigationContainer>
+      <AppNavigator />
+    </NavigationContainer>
   );
 }
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={rootStyle}>
-      <QueryClientProvider client={queryClient}>
-        <View style={rootStyle}>
-          <Shell />
-        </View>
-      </QueryClientProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={rootStyle}>
+        <QueryClientProvider client={queryClient}>
+          <View style={rootStyle}>
+            <Shell />
+          </View>
+        </QueryClientProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }

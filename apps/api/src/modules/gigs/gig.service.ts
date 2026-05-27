@@ -147,3 +147,122 @@ export async function acceptGig(gigId: string, workerId: string) {
     });
   });
 }
+
+const workerTransitions: Partial<Record<GigStatus, GigStatus>> = {
+  MATCHED: GigStatus.EN_ROUTE,
+  EN_ROUTE: GigStatus.IN_PROGRESS,
+  IN_PROGRESS: GigStatus.COMPLETED
+};
+
+export async function updateGigStatus(gigId: string, userId: string, nextStatus: GigStatus) {
+  const gig = await prisma.gig.findUniqueOrThrow({
+    where: { id: gigId },
+    include: { assignments: true }
+  });
+
+  const assignment = gig.assignments.find((item) => item.workerId === userId);
+  const isClient = gig.clientId === userId;
+  const isAssignedWorker = Boolean(assignment);
+
+  if (!isClient && !isAssignedWorker) {
+    throw new Error("FORBIDDEN");
+  }
+
+  if (isAssignedWorker) {
+    const expected = workerTransitions[gig.status];
+    if (expected !== nextStatus) {
+      throw new Error("INVALID_STATUS_TRANSITION");
+    }
+  } else if (nextStatus !== GigStatus.CANCELLED || gig.status === GigStatus.COMPLETED) {
+    throw new Error("INVALID_STATUS_TRANSITION");
+  }
+
+  if (assignment && nextStatus === GigStatus.IN_PROGRESS) {
+    await prisma.gigAssignment.update({
+      where: { id: assignment.id },
+      data: { startedAt: new Date() }
+    });
+  }
+
+  if (assignment && nextStatus === GigStatus.COMPLETED) {
+    await prisma.gigAssignment.update({
+      where: { id: assignment.id },
+      data: { completedAt: new Date() }
+    });
+
+    await prisma.workerProfile.updateMany({
+      where: { userId },
+      data: { completedGigCount: { increment: 1 } }
+    });
+  }
+
+  return prisma.gig.update({
+    where: { id: gigId },
+    data: { status: nextStatus },
+    include: {
+      client: true,
+      serviceCategory: true,
+      assignments: { include: { worker: true } },
+      payment: true
+    }
+  });
+}
+
+export async function listClientGigs(clientId: string) {
+  return prisma.gig.findMany({
+    where: { clientId },
+    include: { serviceCategory: true, assignments: { include: { worker: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 50
+  });
+}
+
+export async function listWorkerGigs(workerId: string) {
+  return prisma.gig.findMany({
+    where: { assignments: { some: { workerId } } },
+    include: { serviceCategory: true, client: true, assignments: { include: { worker: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 50
+  });
+}
+
+const gigDetailInclude = {
+  serviceCategory: true,
+  client: { select: { id: true, fullName: true, email: true, phoneNumber: true } },
+  assignments: { include: { worker: { select: { id: true, fullName: true, email: true, phoneNumber: true } } } },
+  payment: { select: { status: true, amountCents: true } },
+  chatThread: { select: { id: true } }
+} as const;
+
+export async function getGigDetail(gigId: string, userId: string) {
+  const gig = await prisma.gig.findUniqueOrThrow({
+    where: { id: gigId },
+    include: gigDetailInclude
+  });
+
+  const isClient = gig.clientId === userId;
+  const isWorker = gig.assignments.some((assignment) => assignment.workerId === userId);
+
+  if (!isClient && !isWorker) {
+    throw new Error("FORBIDDEN");
+  }
+
+  return gig;
+}
+
+export async function listChatMessages(gigId: string, userId: string) {
+  await getGigDetail(gigId, userId);
+
+  const thread = await prisma.chatThread.findUniqueOrThrow({
+    where: { gigId },
+    include: {
+      messages: {
+        include: { sender: { select: { id: true, fullName: true } } },
+        orderBy: { createdAt: "asc" },
+        take: 200
+      }
+    }
+  });
+
+  return thread.messages;
+}

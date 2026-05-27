@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: gigflow
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d gigflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gigflow
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-jwt-secret-minimum-24-characters
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Gig/package-lock.json
+
+      - name: Install dependencies
+        working-directory: Gig
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: Gig
+        run: npm run typecheck
+
+      - name: Generate Prisma client
+        working-directory: Gig/apps/api
+        run: npx prisma generate
+
+      - name: Run migrations
+        working-directory: Gig/apps/api
+        run: npx prisma migrate deploy
+
+      - name: Build shared + API
+        working-directory: Gig
+        run: npm run build:api
+
+      - name: Build admin
+        working-directory: Gig
+        run: npm run build --workspace @gigflow/admin
+
+      - name: Build mobile typecheck
+        working-directory: Gig
+        run: npm run typecheck --workspace @gigflow/mobile
