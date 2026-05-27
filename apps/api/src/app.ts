@@ -44,9 +44,8 @@ export function createApp(io: Server) {
     })
   );
 
-  app.get("/health", async (_req, res) => {
-    const health = await getHealthStatus();
-    res.status(health.ok ? 200 : 503).json(health);
+  app.get("/health", (_req, res) => {
+    res.json({ ok: true, uptime: process.uptime(), timestamp: new Date().toISOString() });
   });
 
   app.get("/ready", async (_req, res) => {
@@ -55,7 +54,7 @@ export function createApp(io: Server) {
       res.status(503).json({ ready: false, checks: health.checks });
       return;
     }
-    res.json({ ready: true });
+    res.json({ ready: true, checks: health.checks });
   });
 
   app.use("/v1/auth", authRouter);

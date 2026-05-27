@@ -33,14 +33,23 @@ async function shutdown(): Promise<void> {
 }
 
 async function bootstrap(): Promise<void> {
-  await connectRedis();
+  try {
+    await connectRedis();
+    console.log("Redis connected");
+  } catch (error) {
+    console.error("Redis connection failed:", error);
+    throw error;
+  }
 
-  httpServer.listen(env.PORT, () => {
-    console.log(`GigFlow API listening on port ${env.PORT} (${env.NODE_ENV})`);
+  httpServer.listen(env.PORT, "0.0.0.0", () => {
+    console.log(`GigFlow API listening on 0.0.0.0:${env.PORT} (${env.NODE_ENV})`);
   });
 }
 
+bootstrap().catch((error) => {
+  console.error("Failed to start API:", error);
+  process.exit(1);
+});
+
 process.on("SIGTERM", () => void shutdown());
 process.on("SIGINT", () => void shutdown());
-
-void bootstrap();
