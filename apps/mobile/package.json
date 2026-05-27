@@ -2,7 +2,7 @@
   "name": "@gigflow/mobile",
   "version": "0.1.0",
   "private": true,
-  "main": "expo/AppEntry",
+  "main": "./index.js",
   "scripts": {
     "dev": "expo start",
     "android": "expo start --android",
@@ -13,14 +13,19 @@
   "dependencies": {
     "@gigflow/shared": "file:../../packages/shared",
     "@tanstack/react-query": "^5.100.11",
-    "expo": "^56.0.3",
+    "expo": "^56.0.5",
     "expo-constants": "^56.0.14",
     "nativewind": "^4.2.4",
     "react": "^19.2.6",
+    "react-dom": "19.2.3",
     "react-native": "^0.85.3",
     "react-native-gesture-handler": "^2.31.2",
     "react-native-reanimated": "^4.3.1",
+    "react-native-web": "^0.21.2",
     "socket.io-client": "^4.8.3",
     "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.4"
   }
 }

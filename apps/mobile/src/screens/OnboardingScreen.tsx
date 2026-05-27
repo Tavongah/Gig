@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
-import Animated, { FadeInUp } from "react-native-reanimated";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { Screen } from "../components/Screen";
@@ -23,7 +22,7 @@ export function OnboardingScreen() {
 
   return (
     <Screen>
-      <Animated.View entering={FadeInUp.duration(500)} className="gap-8">
+      <View className="gap-8">
         <View className="gap-3">
           <Text className="text-sm font-semibold uppercase tracking-[4px] text-brand">GigFlow</Text>
           <Text className="text-4xl font-black text-white">Local gigs, matched in real time.</Text>
@@ -59,7 +58,7 @@ export function OnboardingScreen() {
             <Text className="text-center font-black text-white">{sessionMutation.isPending ? "Creating..." : "Continue"}</Text>
           </Pressable>
         </View>
-      </Animated.View>
+      </View>
     </Screen>
   );
 }

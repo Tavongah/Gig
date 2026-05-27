@@ -1,12 +1,15 @@
-import "react-native-gesture-handler";
+import "./global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import { ClientHomeScreen } from "./src/screens/ClientHomeScreen";
 import { WorkerHomeScreen } from "./src/screens/WorkerHomeScreen";
 import { useSessionStore } from "./src/stores/session.store";
 
 const queryClient = new QueryClient();
+
+const rootStyle = Platform.OS === "web" ? ({ flex: 1, minHeight: "100vh" } as const) : ({ flex: 1 } as const);
 
 function Shell() {
   const session = useSessionStore((state) => state.session);
@@ -18,7 +21,7 @@ function Shell() {
   }
 
   return (
-    <View className="flex-1 bg-slate-950">
+    <View className="flex-1 bg-slate-950" style={rootStyle}>
       <View className="flex-row gap-2 px-5 pt-14">
         {(["CLIENT", "WORKER"] as const).map((role) => (
           <Pressable
@@ -37,8 +40,12 @@ function Shell() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Shell />
-    </QueryClientProvider>
+    <GestureHandlerRootView style={rootStyle}>
+      <QueryClientProvider client={queryClient}>
+        <View style={rootStyle}>
+          <Shell />
+        </View>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
