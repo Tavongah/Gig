@@ -11,7 +11,9 @@ import { getHealthStatus } from "./lib/health.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { onboardingRouter } from "./modules/onboarding/onboarding.routes.js";
 import { createGigRouter } from "./modules/gigs/gig.routes.js";
+import { workerRouter } from "./modules/workers/worker.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
+import { reviewRouter } from "./modules/reviews/review.routes.js";
 
 export function createApp(io: Server) {
   const app = express();
@@ -60,6 +62,8 @@ export function createApp(io: Server) {
   app.use("/v1/auth", authRouter);
   app.use("/v1/onboarding", onboardingRouter);
   app.use("/v1/gigs", createGigRouter(io));
+  app.use("/v1/workers", workerRouter);
+  app.use("/v1", reviewRouter);
   app.use("/v1/admin", adminRouter);
 
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {

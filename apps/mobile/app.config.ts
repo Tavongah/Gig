@@ -19,9 +19,10 @@ export default {
     android: {
       package: "com.gigflow.mobile",
       adaptiveIcon: {
-        backgroundColor: "#0f172a"
+        backgroundColor: "#070B1A"
       }
     },
+    plugins: ["expo-font"],
     extra: {
       apiUrl,
       eas: {

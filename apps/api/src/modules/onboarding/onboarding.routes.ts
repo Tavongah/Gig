@@ -31,6 +31,9 @@ onboardingRouter.post("/complete", requireAuth, validateBody(onboardingSchema), 
             bio: input.workerProfile.bio,
             hasVehicle: input.workerProfile.hasVehicle,
             backgroundCheckConsent: input.workerProfile.backgroundCheckConsent,
+            travelDistanceMiles: input.workerProfile.travelDistanceMiles,
+            hourlyRateCents: input.workerProfile.hourlyRateCents,
+            minJobAmountCents: input.workerProfile.minJobAmountCents,
             serviceCategories: {
               set: input.workerProfile.serviceCategoryIds.map((id) => ({ id }))
             }
@@ -40,6 +43,9 @@ onboardingRouter.post("/complete", requireAuth, validateBody(onboardingSchema), 
             bio: input.workerProfile.bio,
             hasVehicle: input.workerProfile.hasVehicle,
             backgroundCheckConsent: input.workerProfile.backgroundCheckConsent,
+            travelDistanceMiles: input.workerProfile.travelDistanceMiles,
+            hourlyRateCents: input.workerProfile.hourlyRateCents,
+            minJobAmountCents: input.workerProfile.minJobAmountCents,
             serviceCategories: {
               connect: input.workerProfile.serviceCategoryIds.map((id) => ({ id }))
             }

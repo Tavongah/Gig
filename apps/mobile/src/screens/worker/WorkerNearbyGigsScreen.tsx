@@ -1,0 +1,196 @@
+import { useMemo, useState } from "react";
+import { Alert, ScrollView, View } from "react-native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigation } from "@react-navigation/native";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import type { CompositeNavigationProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { api } from "../../lib/api";
+import { ACTIVE_WORKER_STATUSES, COMPLETED_STATUSES } from "../../lib/gig-status";
+import { TabScreen } from "../../components/TabScreen";
+import { HeroBanner } from "../../components/HeroBanner";
+import { AcceptGigAnimation } from "../../components/AcceptGigAnimation";
+import { NearbyGigCard } from "../../components/NearbyGigCard";
+import { GigCard } from "../../components/GigCard";
+import { EmptyState } from "../../components/EmptyState";
+import { SegmentedTabs } from "../../components/SegmentedTabs";
+import { useSocketEvents } from "../../hooks/useSocket";
+import type { RootStackParamList, WorkerTabParamList } from "../../navigation/types";
+import { useSessionStore } from "../../stores/session.store";
+
+type TabValue = "available" | "accepted" | "completed";
+
+type NavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<WorkerTabParamList, "NearbyGigs">,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
+export function WorkerNearbyGigsScreen() {
+  const session = useSessionStore((state) => state.session)!;
+  const navigation = useNavigation<NavigationProp>();
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState<TabValue>("available");
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [showAcceptAnimation, setShowAcceptAnimation] = useState(false);
+  const [acceptedGigId, setAcceptedGigId] = useState<string | null>(null);
+
+  const nearbyQuery = useQuery({
+    queryKey: ["nearby-gigs"],
+    queryFn: () => api.nearbyGigs(session.token),
+    refetchInterval: 10_000
+  });
+
+  const myGigsQuery = useQuery({
+    queryKey: ["my-gigs", "WORKER"],
+    queryFn: () => api.myGigs(session.token, "WORKER"),
+    refetchInterval: 10_000
+  });
+
+  useSocketEvents(
+    useMemo(
+      () => ({
+        "gig:offer": () => {
+          void nearbyQuery.refetch();
+        },
+        notification: (payload: { title: string; body: string }) => {
+          Alert.alert(payload.title, payload.body);
+        }
+      }),
+      [nearbyQuery]
+    )
+  );
+
+  const acceptMutation = useMutation({
+    mutationFn: (gigId: string) => api.acceptGig(gigId, session.token),
+    onSuccess: ({ gig }) => {
+      void queryClient.invalidateQueries({ queryKey: ["my-gigs"] });
+      void nearbyQuery.refetch();
+      setAcceptedGigId(gig.id);
+      setShowAcceptAnimation(true);
+      setTab("accepted");
+    },
+    onError: (error: Error) => Alert.alert("Could not accept", error.message),
+    onSettled: () => setAcceptingId(null)
+  });
+
+  const availableGigs = nearbyQuery.data?.gigs ?? [];
+  const myGigs = myGigsQuery.data?.gigs ?? [];
+  const acceptedGigs = myGigs.filter((gig) =>
+    ACTIVE_WORKER_STATUSES.includes(gig.status as (typeof ACTIVE_WORKER_STATUSES)[number])
+  );
+  const completedGigs = myGigs.filter((gig) =>
+    COMPLETED_STATUSES.includes(gig.status as (typeof COMPLETED_STATUSES)[number])
+  );
+
+  function confirmAccept(gigId: string, title: string): void {
+    Alert.alert("Accept this gig?", `Are you sure you want to accept "${title}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Accept",
+        onPress: () => {
+          setAcceptingId(gigId);
+          acceptMutation.mutate(gigId);
+        }
+      }
+    ]);
+  }
+
+  const emptyCopy = {
+    available: {
+      emoji: "📡",
+      title: "No available gigs",
+      description: "Go Available Now to receive new gigs matching your services."
+    },
+    accepted: {
+      emoji: "🧰",
+      title: "No accepted gig",
+      description: "Accept a gig from the Available tab to start earning."
+    },
+    completed: {
+      emoji: "✅",
+      title: "No completed gigs",
+      description: "Completed gigs will appear here after you finish jobs."
+    }
+  }[tab];
+
+  return (
+    <TabScreen>
+      <AcceptGigAnimation
+        visible={showAcceptAnimation}
+        onDone={() => {
+          setShowAcceptAnimation(false);
+          if (acceptedGigId) {
+            navigation.navigate("GigDetail", { gigId: acceptedGigId });
+            setAcceptedGigId(null);
+          }
+        }}
+      />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32, gap: 16 }}>
+        <HeroBanner
+          eyebrow="Nearby gigs"
+          title="Your gigs"
+          subtitle="Available gigs stay visible even while you have an active job."
+        />
+
+        <SegmentedTabs
+          tabs={[
+            { value: "available" as const, label: "Available" },
+            { value: "accepted" as const, label: "Accepted" },
+            { value: "completed" as const, label: "Completed" }
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
+
+        {tab === "available" ? (
+          availableGigs.length === 0 ? (
+            <EmptyState {...emptyCopy} />
+          ) : (
+            <View className="gap-4">
+              {availableGigs.map((gig) => (
+                <NearbyGigCard
+                  key={gig.id}
+                  gig={gig}
+                  onView={() => navigation.navigate("GigDetail", { gigId: gig.id })}
+                  onAccept={() => confirmAccept(gig.id, gig.title)}
+                  acceptDisabled={acceptMutation.isPending && acceptingId === gig.id}
+                />
+              ))}
+            </View>
+          )
+        ) : null}
+
+        {tab === "accepted" ? (
+          acceptedGigs.length === 0 ? (
+            <EmptyState {...emptyCopy} />
+          ) : (
+            <View className="gap-4">
+              {acceptedGigs.map((gig) => (
+                <GigCard
+                  key={gig.id}
+                  gig={gig}
+                  subtitle={gig.client ? `Client: ${gig.client.fullName}` : undefined}
+                  actionLabel="Manage gig"
+                  onAction={() => navigation.navigate("GigDetail", { gigId: gig.id })}
+                  onPress={() => navigation.navigate("GigDetail", { gigId: gig.id })}
+                />
+              ))}
+            </View>
+          )
+        ) : null}
+
+        {tab === "completed" ? (
+          completedGigs.length === 0 ? (
+            <EmptyState {...emptyCopy} />
+          ) : (
+            <View className="gap-4">
+              {completedGigs.map((gig) => (
+                <GigCard key={gig.id} gig={gig} onPress={() => navigation.navigate("GigDetail", { gigId: gig.id })} />
+              ))}
+            </View>
+          )
+        ) : null}
+      </ScrollView>
+    </TabScreen>
+  );
+}

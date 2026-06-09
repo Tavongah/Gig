@@ -1,6 +1,7 @@
 import type { Server, Socket } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import jwt from "jsonwebtoken";
+import { haversineMiles } from "@gigflow/shared";
 import type { UserRole } from "@prisma/client";
 import { redis } from "../../config/redis.js";
 import { env } from "../../config/env.js";
@@ -15,11 +16,22 @@ export interface GigOfferPayload {
   gigId: string;
   title: string;
   serviceCategoryId: string;
+  serviceCategoryName: string;
   latitude: number;
   longitude: number;
   totalCents: number;
   workerPayoutCents: number;
   startsAt: string;
+  urgency: string;
+  estimatedHours: number;
+  distanceMiles?: number;
+}
+
+export interface NotificationPayload {
+  type: string;
+  title: string;
+  body: string;
+  gigId?: string;
 }
 
 async function resolveWorkerCategoryIds(userId: string, provided: string[]): Promise<string[]> {
@@ -33,6 +45,14 @@ async function resolveWorkerCategoryIds(userId: string, provided: string[]): Pro
   });
 
   return profile?.serviceCategories.map((category) => category.id) ?? [];
+}
+
+export function notifyUser(io: Server, userId: string, payload: NotificationPayload): void {
+  io.to(`user:${userId}`).emit("notification", payload);
+}
+
+export function broadcastGigStatus(io: Server, gig: { id: string; clientId: string; status: string }, gigPayload: unknown): void {
+  io.to(`gig:${gig.id}`).to(`user:${gig.clientId}`).emit("gig:status", { gig: gigPayload });
 }
 
 export function configureRealtime(io: Server): void {
@@ -104,10 +124,11 @@ export function configureRealtime(io: Server): void {
         }
       });
 
-      socket.to(`gig:${payload.gigId}`).emit("location:updated", {
+      io.to(`gig:${payload.gigId}`).emit("location:updated", {
         workerId: socket.data.userId,
         latitude: payload.latitude,
-        longitude: payload.longitude
+        longitude: payload.longitude,
+        updatedAt: new Date().toISOString()
       });
     });
 
@@ -117,6 +138,11 @@ export function configureRealtime(io: Server): void {
         return;
       }
 
+      const gig = await prisma.gig.findUnique({
+        where: { id: payload.gigId },
+        include: { assignments: { select: { workerId: true } } }
+      });
+
       const message = await prisma.chatMessage.create({
         data: {
           threadId: thread.id,
@@ -124,6 +150,19 @@ export function configureRealtime(io: Server): void {
           body: payload.body
         }
       });
+
+      if (gig) {
+        const recipientId =
+          socket.data.userId === gig.clientId ? gig.assignments[0]?.workerId : gig.clientId;
+        if (recipientId) {
+          notifyUser(io, recipientId, {
+            type: "NEW_MESSAGE",
+            title: "New message",
+            body: payload.body.length > 80 ? `${payload.body.slice(0, 77)}...` : payload.body,
+            gigId: payload.gigId
+          });
+        }
+      }
 
       io.to(`gig:${payload.gigId}`).emit("chat:message", {
         id: message.id,
@@ -142,6 +181,47 @@ export function configureRealtime(io: Server): void {
   });
 }
 
-export function broadcastGigOffer(io: Server, payload: GigOfferPayload): void {
+export async function broadcastGigOffer(io: Server, payload: GigOfferPayload): Promise<void> {
   io.to(`category:${payload.serviceCategoryId}`).emit("gig:offer", payload);
+
+  const workers = await prisma.workerProfile.findMany({
+    where: {
+      availabilityStatus: "AVAILABLE",
+      currentLatitude: { not: null },
+      currentLongitude: { not: null },
+      user: { accountStatus: "APPROVED" },
+      serviceCategories: { some: { id: payload.serviceCategoryId } }
+    },
+    select: {
+      userId: true,
+      currentLatitude: true,
+      currentLongitude: true,
+      travelDistanceMiles: true
+    }
+  });
+
+  for (const worker of workers) {
+    const distanceMiles = haversineMiles(
+      Number(worker.currentLatitude),
+      Number(worker.currentLongitude),
+      payload.latitude,
+      payload.longitude
+    );
+    const travelRadiusMiles = Number(worker.travelDistanceMiles);
+    if (distanceMiles > travelRadiusMiles) {
+      continue;
+    }
+
+    const roundedDistance = Math.round(distanceMiles * 10) / 10;
+    const notificationBody = `$${(payload.workerPayoutCents / 100).toFixed(0)} • ${roundedDistance} miles away`;
+    const offer = { ...payload, distanceMiles: roundedDistance };
+
+    io.to(`user:${worker.userId}`).emit("gig:offer", offer);
+    notifyUser(io, worker.userId, {
+      type: "NEW_GIG_AVAILABLE",
+      title: `New ${payload.serviceCategoryName} Gig Available`,
+      body: notificationBody,
+      gigId: payload.gigId
+    });
+  }
 }

@@ -1,20 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import { useRoute } from "@react-navigation/native";
 import { api } from "../../lib/api";
-import { formatAddress, formatCents, formatStatus } from "../../lib/format";
-import { nextWorkerAction, statusColor } from "../../lib/gig-status";
+import { formatAddress, formatCents } from "../../lib/format";
+import { canClientCancel, isSearching, nextWorkerAction } from "../../lib/gig-status";
 import { StatusTimeline } from "../../components/StatusTimeline";
+import { StatusBadge } from "../../components/StatusBadge";
+import { LoadingButton } from "../../components/LoadingButton";
+import { DutsCard } from "../../components/DutsCard";
+import { VerifiedBadge } from "../../components/VerifiedBadge";
+import { DUTS } from "../../lib/theme";
 import { useSocket, useSocketEvents } from "../../hooks/useSocket";
 import type { RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 
 export function GigDetailScreen() {
   const session = useSessionStore((state) => state.session)!;
+  const userId = session.user.id;
   const activeRole = useSessionStore((state) => state.activeRole);
   const route = useRoute<RouteProp<RootStackParamList, "GigDetail">>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -27,9 +33,16 @@ export function GigDetailScreen() {
     refetchInterval: 10_000
   });
 
+  const reviewsQuery = useQuery({
+    queryKey: ["gig-reviews", route.params.gigId],
+    queryFn: () => api.getGigReviews(route.params.gigId, session.token),
+    enabled: gigQuery.data?.gig.status === "COMPLETED"
+  });
+
   const gig = gigQuery.data?.gig;
   const worker = gig?.assignments?.[0]?.worker;
   const workerAction = gig ? nextWorkerAction(gig.status) : null;
+  const hasReview = (reviewsQuery.data?.reviews ?? []).some((review) => review.reviewer?.id === userId);
 
   const socket = useSocket();
 
@@ -39,30 +52,32 @@ export function GigDetailScreen() {
   }, [gigQuery, queryClient]);
 
   useEffect(() => {
-    if (!socket) {
-      return;
-    }
+    if (!socket) return;
     socket.emit("gig:join", { gigId: route.params.gigId });
   }, [socket, route.params.gigId]);
 
-  const socketEvents = useMemo(
-    () => ({
+  useSocketEvents(
+    useMemo(
+      () => ({
       "gig:matched": invalidate,
+      "gig:assigned": invalidate,
       "gig:status": invalidate,
-      "location:updated": (payload: { latitude: number; longitude: number }) => {
-        setWorkerLocation({ latitude: payload.latitude, longitude: payload.longitude });
-      }
-    }),
-    [invalidate]
+      notification: (payload: { title: string; body: string }) => {
+        Alert.alert(payload.title, payload.body);
+      },
+        "location:updated": (payload: { latitude: number; longitude: number }) => {
+          setWorkerLocation({ latitude: payload.latitude, longitude: payload.longitude });
+        }
+      }),
+      [invalidate]
+    )
   );
-
-  useSocketEvents(socketEvents);
 
   const statusMutation = useMutation({
     mutationFn: (status: string) => api.updateGigStatus(route.params.gigId, status, session.token),
     onSuccess: (_data, status) => {
       invalidate();
-      if (status === "EN_ROUTE" && socket) {
+      if (status === "WORKER_EN_ROUTE" && socket) {
         socket.emit("location:update", {
           gigId: route.params.gigId,
           latitude: 33.751,
@@ -73,71 +88,167 @@ export function GigDetailScreen() {
     onError: (error: Error) => Alert.alert("Update failed", error.message)
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: () => api.cancelGig(route.params.gigId, session.token),
+    onSuccess: () => {
+      invalidate();
+      Alert.alert("Gig cancelled", "This gig has been cancelled.");
+    },
+    onError: (error: Error) => Alert.alert("Could not cancel", error.message)
+  });
+
+  function confirmAccept(): void {
+    if (!gig) return;
+    Alert.alert("Accept this gig?", "Are you sure you want to accept this gig?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Accept",
+        onPress: () => {
+          api
+            .acceptGig(gig.id, session.token)
+            .then(() => invalidate())
+            .catch((error: Error) => Alert.alert("Could not accept", error.message));
+        }
+      }
+    ]);
+  }
+
+  function confirmCancel(): void {
+    Alert.alert("Cancel gig?", "Are you sure you want to cancel this gig?", [
+      { text: "Keep gig", style: "cancel" },
+      { text: "Cancel gig", style: "destructive", onPress: () => cancelMutation.mutate() }
+    ]);
+  }
+
+  useEffect(() => {
+    if (
+      activeRole === "CLIENT" &&
+      gig?.status === "COMPLETED" &&
+      worker &&
+      !hasReview &&
+      !reviewsQuery.isLoading
+    ) {
+      Alert.alert("Leave a review?", `Tell us how ${worker.fullName} did on this gig.`, [
+        { text: "Later", style: "cancel" },
+        {
+          text: "Review",
+          onPress: () => navigation.navigate("Review", { gigId: gig.id, workerName: worker.fullName })
+        }
+      ]);
+    }
+  }, [activeRole, gig?.id, gig?.status, hasReview, navigation, reviewsQuery.isLoading, worker]);
+
   if (!gig) {
     return (
-      <View className="flex-1 items-center justify-center bg-slate-950">
-        <Text className="text-white">{gigQuery.isLoading ? "Loading gig..." : "Gig not found"}</Text>
+      <View className="flex-1 items-center justify-center" style={{ backgroundColor: DUTS.background }}>
+        <Text className="text-ink">{gigQuery.isLoading ? "Loading gig..." : "Gig not found"}</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 16 }}>
+    <ScrollView
+      className="flex-1"
+      style={{ backgroundColor: DUTS.background }}
+      contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 16 }}
+    >
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1 gap-2">
           <Text className="text-sm font-bold uppercase tracking-[3px] text-brand">{gig.serviceCategory?.name ?? "Gig"}</Text>
-          <Text className="text-3xl font-black text-white">{gig.title}</Text>
+          <Text className="text-3xl font-black text-ink">{gig.title}</Text>
         </View>
-        <View className={`rounded-full px-3 py-1 ${statusColor(gig.status)}`}>
-          <Text className="text-xs font-bold text-white">{formatStatus(gig.status)}</Text>
-        </View>
+        <StatusBadge status={gig.status} />
       </View>
 
       <StatusTimeline status={gig.status} />
 
-      <View className="gap-3 rounded-3xl bg-white p-5">
+      <DutsCard className="gap-3 p-5">
         <Text className="text-lg font-black text-ink">{formatCents(gig.totalCents)}</Text>
-        <Text className="text-slate-600">{gig.description}</Text>
-        <Text className="text-slate-500">{formatAddress(gig)}</Text>
-      </View>
+        <Text className="text-muted">{gig.description}</Text>
+        <Text className="text-muted">{formatAddress(gig)}</Text>
+        <Text className="text-sm text-muted">Scheduled: {new Date(gig.startsAt).toLocaleString()}</Text>
+        <Text className="text-sm font-semibold text-orange">Urgency: {gig.urgency}</Text>
+        <View className="rounded-2xl bg-teal/10 px-3 py-2">
+          <Text className="text-xs font-semibold text-teal">Payment status</Text>
+          <Text className="text-sm text-ink">{gig.payment?.status ?? "Payment pending setup"}</Text>
+        </View>
+      </DutsCard>
 
       {worker ? (
-        <View className="gap-2 rounded-3xl bg-slate-900 p-5">
-          <Text className="text-sm font-bold uppercase tracking-wider text-brand">Your worker</Text>
-          <Text className="text-2xl font-black text-white">{worker.fullName}</Text>
-          {worker.phoneNumber ? <Text className="text-slate-400">{worker.phoneNumber}</Text> : null}
-        </View>
+        <DutsCard className="gap-2 p-5">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-sm font-bold uppercase tracking-wider text-brand">Assigned worker</Text>
+            <VerifiedBadge />
+          </View>
+          <Text className="text-2xl font-black text-ink">{worker.fullName}</Text>
+          {worker.phoneNumber ? (
+            <Pressable onPress={() => void Linking.openURL(`tel:${worker.phoneNumber}`)}>
+              <Text className="font-semibold text-brand">{worker.phoneNumber}</Text>
+            </Pressable>
+          ) : null}
+        </DutsCard>
       ) : activeRole === "CLIENT" ? (
-        <View className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/60 p-5">
-          <Text className="text-center text-slate-300">Broadcasting to nearby workers...</Text>
-        </View>
+        <DutsCard className="border border-dashed border-slate-200 p-5">
+          <Text className="text-center text-muted">Broadcasting to nearby workers...</Text>
+        </DutsCard>
       ) : null}
 
       {workerLocation ? (
-        <View className="rounded-3xl bg-brand/15 p-5">
-          <Text className="font-bold text-brand">Worker location updated</Text>
-          <Text className="text-slate-300">
+        <DutsCard className="bg-teal/10 p-5">
+          <Text className="font-bold text-teal">Worker location updated</Text>
+          <Text className="text-muted">
             {workerLocation.latitude.toFixed(4)}, {workerLocation.longitude.toFixed(4)}
           </Text>
-        </View>
+        </DutsCard>
       ) : null}
 
       <View className="gap-3">
-        <Pressable
+        <LoadingButton
+          label={`Message ${activeRole === "CLIENT" ? "worker" : "client"}`}
+          variant="secondary"
           onPress={() => navigation.navigate("Chat", { gigId: gig.id, title: gig.title })}
-          className="rounded-2xl bg-white px-5 py-4"
-        >
-          <Text className="text-center font-black text-ink">Message {activeRole === "CLIENT" ? "worker" : "client"}</Text>
-        </Pressable>
+        />
+
+        {activeRole === "CLIENT" && !isSearching(gig.status) ? (
+          <LoadingButton
+            label="Live tracking"
+            onPress={() => navigation.navigate("GigTracking", { gigId: gig.id })}
+          />
+        ) : null}
+
+        {activeRole === "CLIENT" && isSearching(gig.status) ? (
+          <LoadingButton
+            label="Track search"
+            onPress={() => navigation.navigate("GigTracking", { gigId: gig.id })}
+          />
+        ) : null}
+
+        {activeRole === "WORKER" && isSearching(gig.status) ? (
+          <LoadingButton label="Accept gig" onPress={confirmAccept} />
+        ) : null}
 
         {activeRole === "WORKER" && workerAction ? (
-          <Pressable
-            disabled={statusMutation.isPending}
+          <LoadingButton
+            label={workerAction.label}
             onPress={() => statusMutation.mutate(workerAction.next)}
-            className="rounded-2xl bg-brand px-5 py-4"
-          >
-            <Text className="text-center font-black text-ink">{workerAction.label}</Text>
-          </Pressable>
+            loading={statusMutation.isPending}
+          />
+        ) : null}
+
+        {activeRole === "CLIENT" && canClientCancel(gig.status) ? (
+          <LoadingButton
+            label="Cancel Gig"
+            variant="cancel"
+            onPress={confirmCancel}
+            loading={cancelMutation.isPending}
+          />
+        ) : null}
+
+        {activeRole === "CLIENT" && gig.status === "COMPLETED" && worker && !hasReview ? (
+          <LoadingButton
+            label="Leave a review"
+            onPress={() => navigation.navigate("Review", { gigId: gig.id, workerName: worker.fullName })}
+          />
         ) : null}
       </View>
     </ScrollView>

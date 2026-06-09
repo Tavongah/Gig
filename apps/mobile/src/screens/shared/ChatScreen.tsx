@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { RouteProp } from "@react-navigation/native";
 import { useRoute } from "@react-navigation/native";
 import { api, type ChatMessage } from "../../lib/api";
+import { DUTS } from "../../lib/theme";
 import { useSocket } from "../../hooks/useSocket";
 import { useSessionStore } from "../../stores/session.store";
 
@@ -67,7 +68,8 @@ export function ChatScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-slate-950"
+      className="flex-1"
+      style={{ backgroundColor: DUTS.background }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
     >
@@ -78,33 +80,37 @@ export function ChatScreen() {
         contentContainerStyle={{ padding: 16, gap: 10, flexGrow: 1 }}
         ListEmptyComponent={
           <View className="flex-1 items-center justify-center py-20">
-            <Text className="text-slate-400">Say hi and coordinate the gig details.</Text>
+            <Text className="text-muted">Say hi and coordinate the gig details.</Text>
           </View>
         }
         renderItem={({ item }) => {
           const mine = item.senderId === session.user.id;
           return (
-            <View className={`max-w-[85%] rounded-3xl px-4 py-3 ${mine ? "self-end bg-brand" : "self-start bg-slate-800"}`}>
+            <View
+              className={`max-w-[85%] rounded-3xl px-4 py-3 ${
+                mine ? "self-end bg-brand" : "self-start border border-border bg-card"
+              }`}
+            >
               {!mine && item.sender?.fullName ? (
-                <Text className="mb-1 text-xs font-bold text-slate-400">{item.sender.fullName}</Text>
+                <Text className="mb-1 text-xs font-bold text-muted">{item.sender.fullName}</Text>
               ) : null}
-              <Text className={`text-base ${mine ? "text-ink" : "text-white"}`}>{item.body}</Text>
+              <Text className={`text-base ${mine ? "text-white" : "text-ink"}`}>{item.body}</Text>
             </View>
           );
         }}
       />
 
-      <View className="flex-row items-end gap-3 border-t border-slate-800 bg-slate-950 px-4 py-3">
+      <View className="flex-row items-end gap-3 border-t border-border bg-card px-4 py-3">
         <TextInput
-          className="max-h-28 flex-1 rounded-2xl bg-slate-900 px-4 py-3 text-white"
+          className="max-h-28 flex-1 rounded-2xl border border-border bg-surface px-4 py-3 text-ink"
           value={draft}
           onChangeText={setDraft}
           placeholder="Type a message..."
-          placeholderTextColor="#64748b"
+          placeholderTextColor={DUTS.placeholder}
           multiline
         />
         <Pressable onPress={sendMessage} className="rounded-2xl bg-brand px-5 py-3">
-          <Text className="font-black text-ink">Send</Text>
+          <Text className="font-black text-white">Send</Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>

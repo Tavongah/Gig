@@ -1,268 +1,922 @@
 import type { Server } from "socket.io";
-import { createGigSchema, gigEstimateSchema, calculatePriceEstimate } from "@gigflow/shared";
+
+import {
+
+  GIG_VALIDATION_MESSAGES,
+
+  createGigSchema,
+
+  gigEstimateSchema,
+
+  calculatePriceEstimate,
+
+  haversineMiles,
+
+  estimateResponseMinutes
+
+} from "@gigflow/shared";
+
 import type { CreateGigInput, GigEstimateInput } from "@gigflow/shared";
-import { GigStatus, Prisma, UserRole } from "@prisma/client";
+
+import { AccountStatus, AvailabilityStatus, GigStatus, LaunchPhase, PaymentStatus, Prisma, UserRole } from "@prisma/client";
+
 import { prisma } from "../../config/prisma.js";
-import { broadcastGigOffer } from "../realtime/realtime.service.js";
 
-async function getActiveCommissionRate(): Promise<number> {
-  const setting = await prisma.commissionSetting.findFirst({
-    orderBy: { effectiveFrom: "desc" }
-  });
+import { AppError } from "../../lib/errors.js";
 
-  return setting ? Number(setting.rate) : 0.2;
-}
+import { broadcastGigOffer, notifyUser } from "../realtime/realtime.service.js";
+
+
+
+const SEARCHING_STATUSES: GigStatus[] = [GigStatus.POSTED, GigStatus.SEARCHING_FOR_WORKER];
+
+
 
 export async function listCategories() {
-  return prisma.serviceCategory.findMany({
+
+  const categories = await prisma.serviceCategory.findMany({
+
     where: { isActive: true },
-    orderBy: { name: "asc" }
+
+    orderBy: [{ launchPhase: "asc" }, { name: "asc" }]
+
   });
+
+
+
+  const mvp = categories.filter((category) => category.launchPhase === LaunchPhase.MVP);
+
+  const comingSoon = categories.filter((category) => category.launchPhase === LaunchPhase.PHASE_2);
+
+
+
+  return { categories: mvp, mvp, comingSoon };
+
 }
+
+
+
+async function getMvpCategory(serviceCategoryId: string) {
+
+  const category = await prisma.serviceCategory.findUniqueOrThrow({
+
+    where: { id: serviceCategoryId }
+
+  });
+
+
+
+  if (category.launchPhase !== LaunchPhase.MVP || !category.isActive) {
+
+    throw new AppError("CATEGORY_NOT_AVAILABLE", 422, "CATEGORY_NOT_AVAILABLE", {
+
+      serviceType: GIG_VALIDATION_MESSAGES.serviceType
+
+    });
+
+  }
+
+
+
+  return category;
+
+}
+
+
 
 export async function estimateGig(input: GigEstimateInput) {
-  const parsed = gigEstimateSchema.parse(input);
-  const category = await prisma.serviceCategory.findUniqueOrThrow({
-    where: { id: parsed.serviceCategoryId }
-  });
-  const commissionRate = await getActiveCommissionRate();
 
-  return calculatePriceEstimate(
-    parsed,
-    {
-      baseRateCents: category.baseRateCents,
-      hourlyRateCents: category.hourlyRateCents,
-      distanceRateCents: category.distanceRateCents,
-      multiplier: Number(category.multiplier)
-    },
-    commissionRate
-  );
+  const parsed = gigEstimateSchema.parse(input);
+
+  const category = await getMvpCategory(parsed.serviceCategoryId);
+
+
+
+  return calculatePriceEstimate(parsed, {
+
+    baseRateCents: category.baseRateCents,
+
+    hourlyRateCents: category.hourlyRateCents,
+
+    distanceRateCents: category.distanceRateCents,
+
+    multiplier: Number(category.multiplier)
+
+  });
+
 }
+
+
 
 export async function createGig(clientId: string, input: CreateGigInput, io: Server) {
+
   const parsed = createGigSchema.parse(input);
+
+  const category = await getMvpCategory(parsed.serviceCategoryId);
+
   const price = await estimateGig(parsed);
 
+
+
   const gig = await prisma.gig.create({
+
     data: {
+
       clientId,
+
       serviceCategoryId: parsed.serviceCategoryId,
+
       title: parsed.title,
+
       description: parsed.description,
-      status: GigStatus.OPEN,
+
+      status: GigStatus.SEARCHING_FOR_WORKER,
+
       urgency: parsed.urgency,
+
       size: parsed.size,
+
       estimatedHours: parsed.estimatedHours,
+
       distanceMiles: parsed.distanceMiles,
+
       demandMultiplier: parsed.demandMultiplier,
+
       startsAt: new Date(parsed.startsAt),
+
       addressLine1: parsed.location.addressLine1,
+
       addressLine2: parsed.location.addressLine2,
+
       city: parsed.location.city,
+
       region: parsed.location.region,
+
       postalCode: parsed.location.postalCode,
+
       country: parsed.location.country,
+
       latitude: parsed.location.latitude,
+
       longitude: parsed.location.longitude,
+
       photoUrls: parsed.photos,
+
       priceBreakdown: price as unknown as Prisma.InputJsonValue,
+
       totalCents: price.totalCents,
+
       platformFeeCents: price.platformFeeCents,
+
       workerPayoutCents: price.workerPayoutCents,
+
       payment: {
+
         create: {
+
           amountCents: price.totalCents,
+
           platformFeeCents: price.platformFeeCents,
+
           workerPayoutCents: price.workerPayoutCents
+
         }
+
       },
+
       chatThread: { create: {} }
+
     },
+
     include: { serviceCategory: true }
+
   });
 
-  broadcastGigOffer(io, {
+
+
+  await broadcastGigOffer(io, {
+
     gigId: gig.id,
+
     title: gig.title,
+
     serviceCategoryId: gig.serviceCategoryId,
+
+    serviceCategoryName: category.name,
+
     latitude: Number(gig.latitude),
+
     longitude: Number(gig.longitude),
+
     totalCents: gig.totalCents,
+
     workerPayoutCents: gig.workerPayoutCents,
-    startsAt: gig.startsAt.toISOString()
+
+    startsAt: gig.startsAt.toISOString(),
+
+    urgency: gig.urgency,
+
+    estimatedHours: Number(gig.estimatedHours)
+
   });
+
+
+
+  io.to(`gig:${gig.id}`).to(`user:${clientId}`).emit("gig:status", { gig });
+
+
 
   return gig;
+
 }
 
+
+
 export async function findNearbyGigs(workerId: string) {
+
   const worker = await prisma.user.findUniqueOrThrow({
+
     where: { id: workerId },
+
     include: { workerProfile: { include: { serviceCategories: true } } }
+
   });
 
+
+
   if (!worker.roles.includes(UserRole.WORKER) || !worker.workerProfile) {
+
     return [];
+
   }
+
+  if (worker.accountStatus !== AccountStatus.APPROVED) {
+
+    return [];
+
+  }
+
+  if (worker.workerProfile.availabilityStatus !== AvailabilityStatus.AVAILABLE) {
+
+    return [];
+
+  }
+
+
+
+  const workerLat = Number(worker.workerProfile.currentLatitude ?? 33.749);
+
+  const workerLng = Number(worker.workerProfile.currentLongitude ?? -84.388);
+
+  const travelRadiusMiles = Number(worker.workerProfile.travelDistanceMiles);
 
   const serviceCategoryIds = worker.workerProfile.serviceCategories.map((category) => category.id);
 
-  return prisma.gig.findMany({
+
+
+  const gigs = await prisma.gig.findMany({
+
     where: {
-      status: GigStatus.OPEN,
+
+      status: { in: SEARCHING_STATUSES },
+
       serviceCategoryId: { in: serviceCategoryIds },
+
       startsAt: { gte: new Date(Date.now() - 30 * 60 * 1000) }
+
     },
+
     include: { serviceCategory: true, client: true },
-    orderBy: [{ urgency: "desc" }, { startsAt: "asc" }],
+
+    orderBy: [{ createdAt: "desc" }, { workerPayoutCents: "desc" }],
+
     take: 50
+
   });
+
+
+
+  return gigs
+
+    .map((gig) => {
+
+      const distanceMiles = haversineMiles(workerLat, workerLng, Number(gig.latitude), Number(gig.longitude));
+
+      return {
+
+        ...gig,
+
+        distanceMiles: Math.round(distanceMiles * 10) / 10,
+
+        estimatedResponseMinutes: estimateResponseMinutes(distanceMiles)
+
+      };
+
+    })
+
+    .filter((gig) => gig.distanceMiles <= travelRadiusMiles)
+
+    .sort((left, right) => {
+
+      const createdDiff = right.createdAt.getTime() - left.createdAt.getTime();
+
+      if (createdDiff !== 0) {
+
+        return createdDiff;
+
+      }
+
+      if (right.workerPayoutCents !== left.workerPayoutCents) {
+
+        return right.workerPayoutCents - left.workerPayoutCents;
+
+      }
+
+      return left.distanceMiles - right.distanceMiles;
+
+    });
+
 }
 
-export async function acceptGig(gigId: string, workerId: string) {
-  return prisma.$transaction(async (tx) => {
+
+
+export async function acceptGig(gigId: string, workerId: string, io?: Server) {
+
+  const worker = await prisma.user.findUnique({ where: { id: workerId } });
+  if (!worker || worker.accountStatus !== AccountStatus.APPROVED) {
+    throw new AppError("FORBIDDEN", 403, "WORKER_NOT_APPROVED", { worker: "Worker account is not approved" });
+  }
+
+  const gig = await prisma.$transaction(async (tx) => {
+
     const updated = await tx.gig.updateMany({
-      where: { id: gigId, status: GigStatus.OPEN },
-      data: { status: GigStatus.MATCHED }
+
+      where: { id: gigId, status: { in: SEARCHING_STATUSES } },
+
+      data: { status: GigStatus.WORKER_ASSIGNED }
+
     });
+
+
 
     if (updated.count !== 1) {
+
       throw new Error("GIG_NOT_AVAILABLE");
+
     }
+
+
 
     await tx.gigAssignment.create({
+
       data: {
+
         gigId,
+
         workerId
+
       }
+
     });
+
+
 
     return tx.gig.findUniqueOrThrow({
+
       where: { id: gigId },
+
       include: {
+
         client: true,
+
         serviceCategory: true,
-        assignments: { include: { worker: true } }
+
+        assignments: {
+
+          include: {
+
+            worker: {
+
+              select: {
+
+                id: true,
+
+                fullName: true,
+
+                email: true,
+
+                phoneNumber: true,
+
+                workerProfile: {
+
+                  select: {
+
+                    ratingAverage: true,
+
+                    completedGigCount: true,
+
+                    currentLatitude: true,
+
+                    currentLongitude: true
+
+                  }
+
+                }
+
+              }
+
+            }
+
+          }
+
+        }
+
       }
-    });
-  });
-}
 
-const workerTransitions: Partial<Record<GigStatus, GigStatus>> = {
-  MATCHED: GigStatus.EN_ROUTE,
-  EN_ROUTE: GigStatus.IN_PROGRESS,
-  IN_PROGRESS: GigStatus.COMPLETED
-};
-
-export async function updateGigStatus(gigId: string, userId: string, nextStatus: GigStatus) {
-  const gig = await prisma.gig.findUniqueOrThrow({
-    where: { id: gigId },
-    include: { assignments: true }
-  });
-
-  const assignment = gig.assignments.find((item) => item.workerId === userId);
-  const isClient = gig.clientId === userId;
-  const isAssignedWorker = Boolean(assignment);
-
-  if (!isClient && !isAssignedWorker) {
-    throw new Error("FORBIDDEN");
-  }
-
-  if (isAssignedWorker) {
-    const expected = workerTransitions[gig.status];
-    if (expected !== nextStatus) {
-      throw new Error("INVALID_STATUS_TRANSITION");
-    }
-  } else if (nextStatus !== GigStatus.CANCELLED || gig.status === GigStatus.COMPLETED) {
-    throw new Error("INVALID_STATUS_TRANSITION");
-  }
-
-  if (assignment && nextStatus === GigStatus.IN_PROGRESS) {
-    await prisma.gigAssignment.update({
-      where: { id: assignment.id },
-      data: { startedAt: new Date() }
-    });
-  }
-
-  if (assignment && nextStatus === GigStatus.COMPLETED) {
-    await prisma.gigAssignment.update({
-      where: { id: assignment.id },
-      data: { completedAt: new Date() }
     });
 
-    await prisma.workerProfile.updateMany({
-      where: { userId },
-      data: { completedGigCount: { increment: 1 } }
+  });
+
+
+
+  if (io) {
+
+    notifyUser(io, gig.clientId, {
+
+      type: "WORKER_FOUND",
+
+      title: "Worker assigned",
+
+      body: `${gig.assignments[0]?.worker?.fullName ?? "A worker"} accepted your gig.`,
+
+      gigId: gig.id
+
     });
+
+    io.to(`gig:${gig.id}`).to(`user:${gig.clientId}`).emit("gig:assigned", { gig });
+
+    io.to(`gig:${gig.id}`).to(`user:${gig.clientId}`).emit("gig:status", { gig });
+
   }
 
-  return prisma.gig.update({
-    where: { id: gigId },
-    data: { status: nextStatus },
-    include: {
-      client: true,
-      serviceCategory: true,
-      assignments: { include: { worker: true } },
-      payment: true
-    }
-  });
-}
 
-export async function listClientGigs(clientId: string) {
-  return prisma.gig.findMany({
-    where: { clientId },
-    include: { serviceCategory: true, assignments: { include: { worker: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 50
-  });
-}
-
-export async function listWorkerGigs(workerId: string) {
-  return prisma.gig.findMany({
-    where: { assignments: { some: { workerId } } },
-    include: { serviceCategory: true, client: true, assignments: { include: { worker: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 50
-  });
-}
-
-const gigDetailInclude = {
-  serviceCategory: true,
-  client: { select: { id: true, fullName: true, email: true, phoneNumber: true } },
-  assignments: { include: { worker: { select: { id: true, fullName: true, email: true, phoneNumber: true } } } },
-  payment: { select: { status: true, amountCents: true } },
-  chatThread: { select: { id: true } }
-} as const;
-
-export async function getGigDetail(gigId: string, userId: string) {
-  const gig = await prisma.gig.findUniqueOrThrow({
-    where: { id: gigId },
-    include: gigDetailInclude
-  });
-
-  const isClient = gig.clientId === userId;
-  const isWorker = gig.assignments.some((assignment) => assignment.workerId === userId);
-
-  if (!isClient && !isWorker) {
-    throw new Error("FORBIDDEN");
-  }
 
   return gig;
+
 }
 
-export async function listChatMessages(gigId: string, userId: string) {
-  await getGigDetail(gigId, userId);
 
-  const thread = await prisma.chatThread.findUniqueOrThrow({
-    where: { gigId },
-    include: {
-      messages: {
-        include: { sender: { select: { id: true, fullName: true } } },
-        orderBy: { createdAt: "asc" },
-        take: 200
-      }
-    }
+
+const workerTransitions: Partial<Record<GigStatus, GigStatus>> = {
+
+  WORKER_ASSIGNED: GigStatus.WORKER_EN_ROUTE,
+
+  WORKER_EN_ROUTE: GigStatus.WORKER_ARRIVED,
+
+  WORKER_ARRIVED: GigStatus.IN_PROGRESS,
+
+  IN_PROGRESS: GigStatus.COMPLETED
+
+};
+
+
+
+const CANCELLABLE_STATUSES: GigStatus[] = [
+
+  GigStatus.POSTED,
+
+  GigStatus.SEARCHING_FOR_WORKER,
+
+  GigStatus.WORKER_ASSIGNED
+
+];
+
+
+
+function notificationForStatus(status: GigStatus, gigTitle: string): NotificationPayload | null {
+
+  switch (status) {
+
+    case GigStatus.WORKER_EN_ROUTE:
+
+      return { type: "WORKER_EN_ROUTE", title: "Worker on the way", body: `Your worker is heading to "${gigTitle}".`, gigId: undefined };
+
+    case GigStatus.WORKER_ARRIVED:
+
+      return { type: "WORKER_ARRIVED", title: "Worker arrived", body: `Your worker has arrived for "${gigTitle}".`, gigId: undefined };
+
+    case GigStatus.IN_PROGRESS:
+
+      return { type: "GIG_STARTED", title: "Gig started", body: `Work has started on "${gigTitle}".`, gigId: undefined };
+
+    case GigStatus.COMPLETED:
+
+      return { type: "GIG_COMPLETED", title: "Gig completed", body: `"${gigTitle}" was completed successfully.`, gigId: undefined };
+
+    default:
+
+      return null;
+
+  }
+
+}
+
+
+
+interface NotificationPayload {
+
+  type: string;
+
+  title: string;
+
+  body: string;
+
+  gigId?: string;
+
+}
+
+
+
+export async function updateGigStatus(gigId: string, userId: string, nextStatus: GigStatus, io?: Server) {
+
+  const gig = await prisma.gig.findUniqueOrThrow({
+
+    where: { id: gigId },
+
+    include: { assignments: true }
+
   });
 
-  return thread.messages;
+
+
+  const assignment = gig.assignments.find((item) => item.workerId === userId);
+
+  const isClient = gig.clientId === userId;
+
+  const isAssignedWorker = Boolean(assignment);
+
+
+
+  if (!isClient && !isAssignedWorker) {
+
+    throw new Error("FORBIDDEN");
+
+  }
+
+
+
+  if (isAssignedWorker) {
+
+    const expected = workerTransitions[gig.status];
+
+    if (expected !== nextStatus) {
+
+      throw new Error("INVALID_STATUS_TRANSITION");
+
+    }
+
+  } else if (nextStatus === GigStatus.CANCELLED) {
+
+    if (!CANCELLABLE_STATUSES.includes(gig.status)) {
+
+      throw new AppError("CANCEL_NOT_ALLOWED", 409, "CANCEL_NOT_ALLOWED", {
+
+        status: "This gig can no longer be cancelled."
+
+      });
+
+    }
+
+  } else {
+
+    throw new Error("INVALID_STATUS_TRANSITION");
+
+  }
+
+
+
+  if (isClient && nextStatus === GigStatus.CANCELLED && gig.assignments[0]) {
+
+    await prisma.gigAssignment.update({
+
+      where: { id: gig.assignments[0]!.id },
+
+      data: { cancelledAt: new Date() }
+
+    });
+
+
+
+    if (io) {
+
+      for (const item of gig.assignments) {
+
+        notifyUser(io, item.workerId, {
+
+          type: "GIG_CANCELLED",
+
+          title: "Gig cancelled",
+
+          body: `The client cancelled "${gig.title}".`,
+
+          gigId: gig.id
+
+        });
+
+      }
+
+    }
+
+  }
+
+
+
+  if (assignment && nextStatus === GigStatus.IN_PROGRESS) {
+
+    await prisma.gigAssignment.update({
+
+      where: { id: assignment.id },
+
+      data: { startedAt: new Date() }
+
+    });
+
+  }
+
+
+
+  if (assignment && nextStatus === GigStatus.COMPLETED) {
+
+    await prisma.gigAssignment.update({
+
+      where: { id: assignment.id },
+
+      data: { completedAt: new Date() }
+
+    });
+
+
+
+    await prisma.workerProfile.updateMany({
+
+      where: { userId },
+
+      data: { completedGigCount: { increment: 1 } }
+
+    });
+
+  }
+
+
+
+  if (isClient && nextStatus === GigStatus.CANCELLED) {
+
+    await prisma.payment.updateMany({
+
+      where: { gigId },
+
+      data: { status: PaymentStatus.REFUNDED }
+
+    });
+
+  }
+
+
+
+  const updatedGig = await prisma.gig.update({
+
+    where: { id: gigId },
+
+    data: { status: nextStatus },
+
+    include: {
+
+      client: true,
+
+      serviceCategory: true,
+
+      assignments: {
+
+        include: {
+
+          worker: {
+
+            select: {
+
+              id: true,
+
+              fullName: true,
+
+              email: true,
+
+              phoneNumber: true,
+
+              workerProfile: {
+
+                select: {
+
+                  ratingAverage: true,
+
+                  completedGigCount: true,
+
+                  currentLatitude: true,
+
+                  currentLongitude: true
+
+                }
+
+              }
+
+            }
+
+          }
+
+        }
+
+      },
+
+      payment: true
+
+    }
+
+  });
+
+
+
+  if (io) {
+
+    const notice = notificationForStatus(nextStatus, updatedGig.title);
+
+    if (notice) {
+
+      notifyUser(io, updatedGig.clientId, { ...notice, gigId: updatedGig.id });
+
+    }
+
+    io.to(`gig:${updatedGig.id}`).to(`user:${updatedGig.clientId}`).emit("gig:status", { gig: updatedGig });
+
+  }
+
+
+
+  return updatedGig;
+
 }
+
+
+
+export async function listClientGigs(clientId: string) {
+
+  return prisma.gig.findMany({
+
+    where: { clientId },
+
+    include: { serviceCategory: true, assignments: { include: { worker: true } } },
+
+    orderBy: { createdAt: "desc" },
+
+    take: 50
+
+  });
+
+}
+
+
+
+export async function listWorkerGigs(workerId: string) {
+
+  return prisma.gig.findMany({
+
+    where: { assignments: { some: { workerId } } },
+
+    include: { serviceCategory: true, client: true, assignments: { include: { worker: true } } },
+
+    orderBy: { createdAt: "desc" },
+
+    take: 50
+
+  });
+
+}
+
+
+
+const gigDetailInclude = {
+
+  serviceCategory: true,
+
+  client: { select: { id: true, fullName: true, email: true, phoneNumber: true } },
+
+  assignments: {
+
+    include: {
+
+      worker: {
+
+        select: {
+
+          id: true,
+
+          fullName: true,
+
+          email: true,
+
+          phoneNumber: true,
+
+          workerProfile: {
+
+            select: {
+
+              ratingAverage: true,
+
+              completedGigCount: true,
+
+              currentLatitude: true,
+
+              currentLongitude: true
+
+            }
+
+          }
+
+        }
+
+      }
+
+    }
+
+  },
+
+  payment: { select: { status: true, amountCents: true } },
+
+  chatThread: { select: { id: true } }
+
+} as const;
+
+
+
+export async function getGigDetail(gigId: string, userId: string) {
+
+  const gig = await prisma.gig.findUniqueOrThrow({
+
+    where: { id: gigId },
+
+    include: gigDetailInclude
+
+  });
+
+
+
+  const isClient = gig.clientId === userId;
+
+  const isWorker = gig.assignments.some((assignment) => assignment.workerId === userId);
+
+
+
+  if (!isClient && !isWorker) {
+
+    throw new Error("FORBIDDEN");
+
+  }
+
+
+
+  return gig;
+
+}
+
+
+
+export async function listChatMessages(gigId: string, userId: string) {
+
+  await getGigDetail(gigId, userId);
+
+
+
+  const thread = await prisma.chatThread.findUniqueOrThrow({
+
+    where: { gigId },
+
+    include: {
+
+      messages: {
+
+        include: { sender: { select: { id: true, fullName: true } } },
+
+        orderBy: { createdAt: "asc" },
+
+        take: 200
+
+      }
+
+    }
+
+  });
+
+
+
+  return thread.messages;
+
+}
+
+

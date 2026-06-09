@@ -1,4 +1,6 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { AppButton } from "./AppButton";
+import { DutsCard } from "./DutsCard";
 
 interface EmptyStateProps {
   emoji: string;
@@ -10,15 +12,15 @@ interface EmptyStateProps {
 
 export function EmptyState({ emoji, title, description, actionLabel, onAction }: EmptyStateProps) {
   return (
-    <View className="items-center gap-4 rounded-3xl border border-dashed border-slate-700 bg-slate-900/50 px-6 py-10">
+    <DutsCard className="items-center gap-4 border border-dashed border-border px-6 py-10">
       <Text className="text-5xl">{emoji}</Text>
-      <Text className="text-center text-xl font-black text-white">{title}</Text>
-      <Text className="text-center text-base leading-6 text-slate-400">{description}</Text>
+      <Text className="text-center text-xl font-black text-ink">{title}</Text>
+      <Text className="text-center text-sm leading-5 text-muted">{description}</Text>
       {actionLabel && onAction ? (
-        <Pressable onPress={onAction} className="mt-2 rounded-2xl bg-brand px-6 py-3">
-          <Text className="font-black text-ink">{actionLabel}</Text>
-        </Pressable>
+        <View className="w-full">
+          <AppButton label={actionLabel} onPress={onAction} variant="primary" size="md" />
+        </View>
       ) : null}
-    </View>
+    </DutsCard>
   );
 }

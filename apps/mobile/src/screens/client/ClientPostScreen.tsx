@@ -1,168 +1,333 @@
-import { useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import type { CompositeNavigationProp, RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
-import type { CreateGigInput } from "@gigflow/shared";
-import { api } from "../../lib/api";
-import { formatCents } from "../../lib/format";
+import {
+  ALLOWED_PHOTO_MIME_TYPES,
+  GIG_VALIDATION_MESSAGES,
+  MAX_GIG_PHOTOS,
+  type GigUrgency,
+  type PostGigFormValues,
+  type PostGigPhoto,
+  validatePhotoFile,
+  validatePostGigForm
+} from "@gigflow/shared";
+import { api, ApiValidationError } from "../../lib/api";
 import { TabScreen } from "../../components/TabScreen";
-import { SectionHeader } from "../../components/SectionHeader";
-import type { RootStackParamList } from "../../navigation/types";
+import { HeroBanner } from "../../components/HeroBanner";
+import { DutsCard } from "../../components/DutsCard";
+import { ServiceCategoryPicker } from "../../components/ServiceCategoryPicker";
+import { FormInput } from "../../components/FormInput";
+import { TextAreaInput } from "../../components/TextAreaInput";
+import { SelectButtonGroup } from "../../components/SelectButtonGroup";
+import { LoadingButton } from "../../components/LoadingButton";
+import { PriceEstimateCard } from "../../components/PriceEstimateCard";
+import { ErrorMessage } from "../../components/ErrorMessage";
+import type { ClientTabParamList, RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 
-const URGENCIES = ["STANDARD", "SOON", "URGENT"] as const;
+const URGENCIES = [
+  { value: "STANDARD" as const, label: "Standard", hint: "Normal price" },
+  { value: "SOON" as const, label: "Soon", hint: "1.15x" },
+  { value: "URGENT" as const, label: "Urgent", hint: "1.30x" }
+];
+
+const EMPTY_ERRORS: Record<string, string> = {};
+
+type NavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<ClientTabParamList, "PostGig">,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
+function clearFieldError(errors: Record<string, string>, field: string): Record<string, string> {
+  if (!errors[field]) return errors;
+  const next = { ...errors };
+  delete next[field];
+  return next;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error("Could not read photo."));
+    reader.readAsDataURL(file);
+  });
+}
 
 export function ClientPostScreen() {
   const session = useSessionStore((state) => state.session)!;
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<ClientTabParamList, "PostGig">>();
+  const navigation = useNavigation<NavigationProp>();
   const queryClient = useQueryClient();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [estimatedHours, setEstimatedHours] = useState("2");
-  const [urgency, setUrgency] = useState<(typeof URGENCIES)[number]>("SOON");
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [urgency, setUrgency] = useState<GigUrgency>("STANDARD");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    route.params?.serviceCategoryId ?? null
+  );
+  const [locationAddress, setLocationAddress] = useState("");
+  const [preferredDate, setPreferredDate] = useState("");
+  const [preferredTime, setPreferredTime] = useState("");
+  const [photos, setPhotos] = useState<PostGigPhoto[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>(EMPTY_ERRORS);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: api.listCategories });
+  const allowedCategoryIds = useMemo(
+    () => (categoriesQuery.data?.mvp ?? []).map((category) => category.id),
+    [categoriesQuery.data?.mvp]
+  );
 
-  const categoryId = selectedCategoryId ?? categoriesQuery.data?.categories[0]?.id ?? null;
+  useEffect(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setPreferredDate(tomorrow.toISOString().slice(0, 10));
+    setPreferredTime("14:00");
+  }, []);
 
-  const draftGig = useMemo<CreateGigInput | null>(() => {
-    if (!categoryId || !title.trim() || !description.trim()) {
-      return null;
+  useEffect(() => {
+    if (route.params?.serviceCategoryId) {
+      setSelectedCategoryId(route.params.serviceCategoryId);
     }
+  }, [route.params?.serviceCategoryId]);
 
-    return {
-      title: title.trim(),
-      description: description.trim(),
-      serviceCategoryId: categoryId,
-      estimatedHours: Number(estimatedHours) || 1,
-      distanceMiles: 4.5,
+  const formValues = useMemo<PostGigFormValues>(
+    () => ({
+      serviceCategoryId: selectedCategoryId,
+      title,
+      description,
+      estimatedHours,
+      locationAddress,
       urgency,
-      startsAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-      demandMultiplier: urgency === "URGENT" ? 1.3 : urgency === "SOON" ? 1.1 : 1,
-      size: "MEDIUM",
-      photos: [],
-      location: {
-        latitude: 33.749,
-        longitude: -84.388,
-        addressLine1: "100 Peachtree St",
-        city: "Atlanta",
-        region: "GA",
-        postalCode: "30303",
-        country: "US"
-      }
-    };
-  }, [categoryId, description, estimatedHours, title, urgency]);
+      preferredDate,
+      preferredTime,
+      photos
+    }),
+    [description, estimatedHours, locationAddress, photos, preferredDate, preferredTime, selectedCategoryId, title, urgency]
+  );
 
-  const estimateMutation = useMutation({
-    mutationFn: () => api.estimateGig(draftGig!, session.token)
+  const validation = useMemo(() => validatePostGigForm(formValues, allowedCategoryIds), [allowedCategoryIds, formValues]);
+  const visibleErrors = submitAttempted ? { ...validation.errors, ...fieldErrors } : fieldErrors;
+
+  const { mutate: runEstimate, isPending: isEstimating, data: estimateData } = useMutation({
+    mutationFn: () => api.estimateGig(validation.payload!, session.token)
   });
+
+  useEffect(() => {
+    if (!validation.success || !validation.payload) return;
+    const timer = setTimeout(() => runEstimate(), 500);
+    return () => clearTimeout(timer);
+  }, [runEstimate, validation.payload, validation.success]);
 
   const createMutation = useMutation({
-    mutationFn: () => api.createGig(draftGig!, session.token),
+    mutationFn: () => api.createGig(validation.payload!, session.token),
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ["my-gigs"] });
-      Alert.alert("Gig posted", "We're matching you with nearby workers.", [
-        { text: "Track gig", onPress: () => navigation.navigate("GigDetail", { gigId: result.gig.id }) }
-      ]);
+      navigation.navigate("GigTracking", { gigId: result.gig.id });
     },
-    onError: (error: Error) => Alert.alert("Could not post gig", error.message)
+    onError: (error: Error) => {
+      if (error instanceof ApiValidationError) {
+        setFieldErrors(error.fieldErrors);
+        setSubmitAttempted(true);
+        return;
+      }
+      Alert.alert("Could not post gig", error.message);
+    }
   });
+
+  function handleEstimatedHoursChange(value: string): void {
+    setFieldErrors((current) => clearFieldError(current, "estimatedHours"));
+    if (value === "") {
+      setEstimatedHours("");
+      return;
+    }
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return;
+    setEstimatedHours(String(Math.min(12, Math.max(1, parsed))));
+  }
+
+  async function pickPhotos(): Promise<void> {
+    if (photos.length >= MAX_GIG_PHOTOS) {
+      setFieldErrors((current) => ({ ...current, photos: GIG_VALIDATION_MESSAGES.photoCount }));
+      return;
+    }
+    if (Platform.OS !== "web") {
+      Alert.alert("Photos", "Photo upload is available on web in this MVP build.");
+      return;
+    }
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ALLOWED_PHOTO_MIME_TYPES.join(",");
+    input.multiple = true;
+    input.onchange = async () => {
+      const files = Array.from(input.files ?? []);
+      const selectedFiles = files.slice(0, MAX_GIG_PHOTOS - photos.length);
+      const nextPhotos: PostGigPhoto[] = [];
+      for (const file of selectedFiles) {
+        const fileError = validatePhotoFile({ type: file.type, size: file.size });
+        if (fileError) {
+          setFieldErrors((current) => ({ ...current, photos: fileError }));
+          return;
+        }
+        nextPhotos.push({
+          uri: await readFileAsDataUrl(file),
+          name: file.name,
+          mimeType: file.type,
+          sizeBytes: file.size
+        });
+      }
+      setFieldErrors((current) => clearFieldError(current, "photos"));
+      setPhotos((current) => [...current, ...nextPhotos]);
+    };
+    input.click();
+  }
+
+  function handleSubmit(): void {
+    setSubmitAttempted(true);
+    setFieldErrors(EMPTY_ERRORS);
+    const result = validatePostGigForm(formValues, allowedCategoryIds);
+    if (!result.success || !result.payload) {
+      setFieldErrors(result.errors);
+      return;
+    }
+    createMutation.mutate();
+  }
 
   return (
     <TabScreen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-        <SectionHeader
+        <HeroBanner
           eyebrow="Post a gig"
           title="What do you need done?"
           subtitle="Get an instant price estimate and broadcast to verified workers nearby."
         />
 
-        <View className="gap-4 rounded-3xl bg-white p-5">
-          <Text className="text-sm font-bold uppercase tracking-wider text-slate-500">Service type</Text>
-          <View className="flex-row flex-wrap gap-2">
-            {(categoriesQuery.data?.categories ?? []).map((category) => {
-              const selected = categoryId === category.id;
-              return (
-                <Pressable
-                  key={category.id}
-                  onPress={() => setSelectedCategoryId(category.id)}
-                  className={`rounded-full px-4 py-2 ${selected ? "bg-brand" : "bg-slate-100"}`}
-                >
-                  <Text className={`font-bold ${selected ? "text-ink" : "text-slate-700"}`}>{category.name}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+        <DutsCard className="mt-2 gap-4 p-5">
+          <ServiceCategoryPicker
+            mvp={categoriesQuery.data?.mvp ?? []}
+            comingSoon={categoriesQuery.data?.comingSoon}
+            selectedId={selectedCategoryId}
+            onSelect={(categoryId) => {
+              setSelectedCategoryId(categoryId);
+              setFieldErrors((current) => clearFieldError(current, "serviceType"));
+            }}
+          />
+          <ErrorMessage message={visibleErrors.serviceType} />
 
-          <TextInput
-            className="rounded-2xl bg-slate-100 px-4 py-4 text-ink"
+          <FormInput
+            label="Job title"
             value={title}
-            onChangeText={setTitle}
-            placeholder="Gig title"
-            placeholderTextColor="#94a3b8"
+            onChangeText={(value) => {
+              setTitle(value);
+              setFieldErrors((current) => clearFieldError(current, "title"));
+            }}
+            placeholder="e.g. Help move couch to second floor"
+            maxLength={80}
+            error={visibleErrors.title}
           />
-          <TextInput
-            className="min-h-24 rounded-2xl bg-slate-100 px-4 py-4 text-ink"
+
+          <TextAreaInput
+            label="Job description"
             value={description}
-            onChangeText={setDescription}
-            placeholder="Describe the job..."
-            placeholderTextColor="#94a3b8"
-            multiline
+            onChangeText={(value) => {
+              setDescription(value);
+              setFieldErrors((current) => clearFieldError(current, "description"));
+            }}
+            placeholder="Describe the job, tools needed, and access details..."
+            maxLength={1000}
+            error={visibleErrors.description}
           />
-          <TextInput
-            className="rounded-2xl bg-slate-100 px-4 py-4 text-ink"
+
+          <FormInput
+            label="Estimated hours"
             value={estimatedHours}
-            onChangeText={setEstimatedHours}
-            placeholder="Estimated hours"
-            placeholderTextColor="#94a3b8"
-            keyboardType="decimal-pad"
+            onChangeText={handleEstimatedHoursChange}
+            placeholder="2"
+            keyboardType="number-pad"
+            error={visibleErrors.estimatedHours}
           />
 
-          <Text className="text-sm font-bold uppercase tracking-wider text-slate-500">Urgency</Text>
-          <View className="flex-row gap-2">
-            {URGENCIES.map((value) => (
-              <Pressable
-                key={value}
-                onPress={() => setUrgency(value)}
-                className={`flex-1 rounded-2xl px-3 py-3 ${urgency === value ? "bg-ink" : "bg-slate-100"}`}
-              >
-                <Text className={`text-center text-xs font-black ${urgency === value ? "text-white" : "text-slate-700"}`}>
-                  {value}
-                </Text>
-              </Pressable>
-            ))}
+          <FormInput
+            label="Location / address"
+            value={locationAddress}
+            onChangeText={(value) => {
+              setLocationAddress(value);
+              setFieldErrors((current) => clearFieldError(current, "location"));
+            }}
+            placeholder="Street address or full job location"
+            maxLength={150}
+            error={visibleErrors.location}
+          />
+
+          <SelectButtonGroup
+            label="Urgency"
+            options={URGENCIES}
+            value={urgency}
+            onChange={(value) => {
+              setUrgency(value);
+              setFieldErrors((current) => clearFieldError(current, "urgency"));
+            }}
+            error={visibleErrors.urgency}
+          />
+
+          <View className="gap-2">
+            <Text className="text-sm font-bold uppercase tracking-wider text-muted">Preferred date and time</Text>
+            <View className="flex-row gap-2">
+              <FormInput
+                label=""
+                value={preferredDate}
+                onChangeText={(value) => {
+                  setPreferredDate(value);
+                  setFieldErrors((current) => clearFieldError(current, "preferredDateTime"));
+                }}
+                placeholder="YYYY-MM-DD"
+                className="flex-1"
+              />
+              <FormInput
+                label=""
+                value={preferredTime}
+                onChangeText={(value) => {
+                  setPreferredTime(value);
+                  setFieldErrors((current) => clearFieldError(current, "preferredDateTime"));
+                }}
+                placeholder="HH:MM"
+                className="w-28"
+              />
+            </View>
+            <ErrorMessage message={visibleErrors.preferredDateTime} />
           </View>
 
-          <View className="rounded-2xl bg-slate-950 p-4">
-            <Text className="text-slate-400">Estimated price</Text>
-            <Text className="text-3xl font-black text-white">
-              {estimateMutation.data ? formatCents(estimateMutation.data.estimate.totalCents) : "Tap calculate"}
-            </Text>
-            {estimateMutation.data ? (
-              <Text className="text-slate-300">Worker receives {formatCents(estimateMutation.data.estimate.workerPayoutCents)}</Text>
-            ) : null}
+          <View className="gap-2">
+            <Text className="text-sm font-bold uppercase tracking-wider text-muted">Photos</Text>
+            <Pressable onPress={() => void pickPhotos()} className="rounded-2xl border border-dashed border-slate-300 px-4 py-4">
+              <Text className="text-center font-bold text-muted">
+                {photos.length > 0 ? `${photos.length} photo(s) added` : "Add photos (optional)"}
+              </Text>
+              <Text className="mt-1 text-center text-xs text-muted">JPG, PNG, or WEBP up to 5MB each</Text>
+            </Pressable>
+            <ErrorMessage message={visibleErrors.photos} />
           </View>
 
-          <Pressable
-            disabled={!draftGig || estimateMutation.isPending}
-            onPress={() => estimateMutation.mutate()}
-            className="rounded-2xl bg-slate-200 px-5 py-4"
-          >
-            <Text className="text-center font-black text-ink">{estimateMutation.isPending ? "Calculating..." : "Calculate price"}</Text>
-          </Pressable>
-          <Pressable
-            disabled={!draftGig || createMutation.isPending}
-            onPress={() => createMutation.mutate()}
-            className="rounded-2xl bg-brand px-5 py-4"
-          >
-            <Text className="text-center font-black text-ink">
-              {createMutation.isPending ? "Posting..." : "Post & find workers"}
-            </Text>
-          </Pressable>
-        </View>
+          <PriceEstimateCard
+            estimate={estimateData?.estimate}
+            isLoading={isEstimating}
+            isComplete={validation.success}
+          />
+
+          <LoadingButton
+            label="Post Gig"
+            loadingLabel="Posting..."
+            onPress={handleSubmit}
+            disabled={!validation.success}
+            loading={createMutation.isPending}
+          />
+        </DutsCard>
       </ScrollView>
     </TabScreen>
   );

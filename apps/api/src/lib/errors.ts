@@ -2,18 +2,26 @@ export class AppError extends Error {
   constructor(
     message: string,
     readonly statusCode: number = 500,
-    readonly code?: string
+    readonly code?: string,
+    readonly errors?: Record<string, string>
   ) {
     super(message);
     this.name = "AppError";
   }
 }
 
-export function mapErrorToResponse(error: unknown): { status: number; body: { error: string; code?: string } } {
+export function mapErrorToResponse(error: unknown): {
+  status: number;
+  body: { success?: boolean; error: string; code?: string; errors?: Record<string, string> };
+} {
   if (error instanceof AppError) {
     return {
       status: error.statusCode,
-      body: { error: error.message, ...(error.code ? { code: error.code } : {}) }
+      body: {
+        ...(error.errors ? { success: false, errors: error.errors } : {}),
+        error: error.message,
+        ...(error.code ? { code: error.code } : {})
+      }
     };
   }
 
@@ -25,7 +33,11 @@ export function mapErrorToResponse(error: unknown): { status: number; body: { er
       FORBIDDEN: 403,
       NOT_FOUND: 404,
       VALIDATION_ERROR: 400,
-      INVALID_STATUS_TRANSITION: 409
+      INVALID_STATUS_TRANSITION: 409,
+      CATEGORY_NOT_AVAILABLE: 400,
+      GIG_NOT_REVIEWABLE: 400,
+      WORKER_NOT_ASSIGNED: 400,
+      CANCEL_NOT_ALLOWED: 409
     };
 
     const status = known[error.message] ?? 500;

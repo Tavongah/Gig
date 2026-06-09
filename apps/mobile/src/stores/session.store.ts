@@ -1,30 +1,76 @@
 import { create } from "zustand";
-import type { ApiSession, ApiUser } from "../lib/api";
+import { api, type ApiSession, type ApiUser } from "../lib/api";
+import { authStorage } from "../lib/auth-storage";
+import { defaultActiveRole } from "../lib/auth";
 
 interface SessionState {
   session: ApiSession | null;
   profile: ApiUser | null;
   activeRole: "CLIENT" | "WORKER";
   onboardingComplete: boolean;
+  hydrated: boolean;
+  bootstrap: () => Promise<void>;
   setSession: (session: ApiSession) => void;
   setProfile: (profile: ApiUser) => void;
   setActiveRole: (role: "CLIENT" | "WORKER") => void;
   setOnboardingComplete: (complete: boolean) => void;
-  signOut: () => void;
+  signOut: () => Promise<void>;
 }
 
-export const useSessionStore = create<SessionState>((set) => ({
+export const useSessionStore = create<SessionState>((set, get) => ({
   session: null,
   profile: null,
   activeRole: "CLIENT",
   onboardingComplete: false,
-  setSession: (session) => set({ session, profile: session.user, onboardingComplete: session.user.isVerified ?? false }),
+  hydrated: false,
+  bootstrap: async () => {
+    const token = await authStorage.getToken();
+    if (!token) {
+      set({ hydrated: true });
+      return;
+    }
+
+    try {
+      const { user } = await api.getMe(token);
+      set({
+        session: { token, user },
+        profile: user,
+        activeRole: defaultActiveRole(user),
+        onboardingComplete: true,
+        hydrated: true
+      });
+    } catch {
+      await authStorage.clearToken();
+      set({ session: null, profile: null, hydrated: true });
+    }
+  },
+  setSession: (session) => {
+    void authStorage.setToken(session.token);
+    set({
+      session,
+      profile: session.user,
+      onboardingComplete: true,
+      activeRole: defaultActiveRole(session.user)
+    });
+  },
   setProfile: (profile) =>
     set({
       profile,
-      onboardingComplete: profile.isVerified ?? false
+      session: get().session ? { ...get().session!, user: profile } : null,
+      onboardingComplete: true
     }),
   setActiveRole: (activeRole) => set({ activeRole }),
   setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
-  signOut: () => set({ session: null, profile: null, activeRole: "CLIENT", onboardingComplete: false })
+  signOut: async () => {
+    const token = get().session?.token;
+    if (token) {
+      try {
+        await api.logout(token);
+      } catch {
+        // ignore network errors on logout
+      }
+    }
+    await authStorage.clearToken();
+    set({ session: null, profile: null, activeRole: "CLIENT", onboardingComplete: false });
+  }
 }));

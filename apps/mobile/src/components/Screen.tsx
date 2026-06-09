@@ -1,10 +1,11 @@
 import type { PropsWithChildren } from "react";
 import { Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, View } from "react-native";
+import { DUTS } from "../lib/theme";
 
 const styles = StyleSheet.create({
   root: Platform.select({
-    web: { flex: 1, height: "100%", width: "100%" },
-    default: { flex: 1 }
+    web: { flex: 1, height: "100%", width: "100%", backgroundColor: DUTS.background },
+    default: { flex: 1, backgroundColor: DUTS.background }
   }),
   content: {
     flexGrow: 1,
@@ -26,10 +27,8 @@ export function Screen({ children }: PropsWithChildren) {
 
   return (
     <SafeAreaView style={styles.root}>
-      <StatusBar barStyle="light-content" />
-      <ScrollView contentContainerStyle={styles.content}>
-        {children}
-      </ScrollView>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView contentContainerStyle={styles.content}>{children}</ScrollView>
     </SafeAreaView>
   );
 }

@@ -13,14 +13,24 @@ enum UserRole {
   ADMIN
 }
 
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
 enum GigStatus {
-  DRAFT
-  OPEN
-  MATCHED
-  EN_ROUTE
+  POSTED
+  SEARCHING_FOR_WORKER
+  WORKER_ASSIGNED
+  WORKER_EN_ROUTE
+  WORKER_ARRIVED
   IN_PROGRESS
   COMPLETED
   CANCELLED
+  DRAFT
   DISPUTED
 }
 
@@ -74,19 +84,27 @@ enum AvailabilityStatus {
   OFFLINE
 }
 
+enum LaunchPhase {
+  MVP
+  PHASE_2
+}
+
 model User {
   id                 String              @id @default(uuid())
   firebaseUid        String?             @unique
   email              String              @unique
   phoneNumber        String?
+  passwordHash       String?
   fullName           String
   avatarUrl          String?
   roles              UserRole[]          @default([CLIENT])
   defaultRole        UserRole            @default(CLIENT)
+  accountStatus      AccountStatus       @default(ACTIVE)
   isVerified         Boolean             @default(false)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   workerProfile      WorkerProfile?
+  passwordResetTokens PasswordResetToken[]
   clientGigs         Gig[]               @relation("ClientGigs")
   workerAssignments  GigAssignment[]     @relation("WorkerAssignments")
   reviewsGiven       Review[]            @relation("ReviewsGiven")
@@ -97,20 +115,44 @@ model User {
   auditLogs          AuditLog[]
 }
 
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
 model WorkerProfile {
   id                       String            @id @default(uuid())
   userId                   String            @unique
   user                     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   bio                      String
+  city                     String?
+  serviceArea              String?
+  workExperience           String?
   hasVehicle               Boolean           @default(false)
   backgroundCheckConsent   Boolean           @default(false)
   backgroundCheckCompleted Boolean           @default(false)
+  governmentIdAcknowledged Boolean           @default(false)
+  proofOfAddressAcknowledged Boolean         @default(false)
+  platformRulesAgreed      Boolean           @default(false)
+  reviewedAt               DateTime?
+  reviewedById             String?
+  rejectionReason          String?
   stripeConnectedAccountId String?
   ratingAverage            Decimal           @default(0) @db.Decimal(3, 2)
   completedGigCount        Int               @default(0)
   currentLatitude          Decimal?          @db.Decimal(9, 6)
   currentLongitude         Decimal?          @db.Decimal(9, 6)
   availabilityStatus       AvailabilityStatus @default(OFFLINE)
+  travelDistanceMiles      Decimal           @default(10) @db.Decimal(5, 2)
+  hourlyRateCents          Int?
+  minJobAmountCents        Int               @default(5000)
   serviceCategories        ServiceCategory[] @relation("WorkerCategories")
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
@@ -126,6 +168,7 @@ model ServiceCategory {
   hourlyRateCents    Int
   distanceRateCents  Int             @default(175)
   multiplier         Decimal         @default(1) @db.Decimal(4, 2)
+  launchPhase        LaunchPhase     @default(MVP)
   isActive           Boolean         @default(true)
   gigs               Gig[]
   workers            WorkerProfile[] @relation("WorkerCategories")
@@ -141,7 +184,7 @@ model Gig {
   serviceCategory       ServiceCategory @relation(fields: [serviceCategoryId], references: [id], onDelete: Restrict)
   title                 String
   description           String
-  status                GigStatus       @default(OPEN)
+  status                GigStatus       @default(SEARCHING_FOR_WORKER)
   urgency               GigUrgency
   size                  GigSize
   estimatedHours        Decimal         @db.Decimal(5, 2)

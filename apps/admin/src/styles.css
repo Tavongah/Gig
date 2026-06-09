@@ -33,16 +33,107 @@ nav {
   margin-top: 40px;
 }
 
-nav a {
+nav a,
+nav button {
+  background: transparent;
+  border: 0;
   border-radius: 18px;
   color: #b8c4d8;
+  cursor: pointer;
+  font: inherit;
   padding: 14px 16px;
+  text-align: left;
 }
 
 nav a:first-child,
-nav a:hover {
+nav a:hover,
+nav button.nav-active,
+nav button:hover {
   background: rgba(33, 192, 122, 0.14);
   color: #fff;
+}
+
+nav button {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.nav-badge {
+  background: #f7941d;
+  border-radius: 999px;
+  color: #07111f;
+  font-size: 11px;
+  font-weight: 900;
+  min-width: 22px;
+  padding: 2px 8px;
+  text-align: center;
+}
+
+.alert-panel {
+  border-color: rgba(247, 148, 29, 0.45);
+}
+
+.alert-panel button {
+  background: #f7941d;
+  border: 0;
+  border-radius: 16px;
+  color: #07111f;
+  cursor: pointer;
+  font-weight: 800;
+  margin-top: 8px;
+  padding: 12px 18px;
+}
+
+.highlight-card {
+  border-color: rgba(247, 148, 29, 0.45);
+}
+
+.highlight-card strong {
+  color: #f7941d;
+}
+
+.data-table {
+  border-collapse: collapse;
+  margin-top: 16px;
+  width: 100%;
+}
+
+.data-table th,
+.data-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 10px;
+  text-align: left;
+}
+
+.data-table th {
+  color: #97a6ba;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.actions button {
+  background: rgba(33, 192, 122, 0.2);
+  border: 1px solid rgba(33, 192, 122, 0.35);
+  border-radius: 12px;
+  color: #21c07a;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 8px 12px;
+}
+
+.actions button:last-child {
+  background: rgba(255, 99, 99, 0.12);
+  border-color: rgba(255, 99, 99, 0.35);
+  color: #ff8f8f;
 }
 
 .content {

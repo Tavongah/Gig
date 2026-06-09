@@ -1,26 +1,35 @@
 import { z } from "zod";
 
 export const userRoles = ["CLIENT", "WORKER", "ADMIN"] as const;
+export const launchPhases = ["MVP", "PHASE_2"] as const;
 export const gigStatuses = [
-  "DRAFT",
-  "OPEN",
-  "MATCHED",
-  "EN_ROUTE",
+  "POSTED",
+  "SEARCHING_FOR_WORKER",
+  "WORKER_ASSIGNED",
+  "WORKER_EN_ROUTE",
+  "WORKER_ARRIVED",
   "IN_PROGRESS",
   "COMPLETED",
   "CANCELLED",
+  "DRAFT",
   "DISPUTED"
 ] as const;
 
 export const defaultCommissionRate = 0.2;
+export const urgencyMultipliers = {
+  STANDARD: 1,
+  SOON: 1.15,
+  URGENT: 1.3
+} as const;
 
 export type UserRole = (typeof userRoles)[number];
+export type LaunchPhase = (typeof launchPhases)[number];
 export type GigStatus = (typeof gigStatuses)[number];
 
 export const geoPointSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
-  addressLine1: z.string().min(3).max(160),
+  addressLine1: z.string().min(5).max(150),
   addressLine2: z.string().max(160).optional(),
   city: z.string().min(2).max(80),
   region: z.string().min(2).max(80),
@@ -37,46 +46,99 @@ export const onboardingSchema = z.object({
       serviceCategoryIds: z.array(z.string().uuid()).min(1),
       bio: z.string().min(20).max(500),
       hasVehicle: z.boolean(),
-      backgroundCheckConsent: z.boolean()
+      backgroundCheckConsent: z.boolean(),
+      travelDistanceMiles: z.number().min(1).max(50).default(10),
+      hourlyRateCents: z.number().int().min(1000).max(50000).optional(),
+      minJobAmountCents: z.number().int().min(1000).max(100000).default(5000)
     })
     .optional()
 });
 
-export const gigEstimateSchema = z.object({
-  serviceCategoryId: z.string().uuid(),
-  location: geoPointSchema,
-  estimatedHours: z.number().positive().max(24),
-  distanceMiles: z.number().nonnegative().max(250),
-  urgency: z.enum(["STANDARD", "SOON", "URGENT"]),
-  startsAt: z.string().datetime(),
-  demandMultiplier: z.number().min(1).max(3).default(1)
+export const workerAvailabilitySchema = z.object({
+  serviceCategoryIds: z.array(z.string().uuid()).min(1),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  travelDistanceMiles: z.number().min(1).max(50),
+  hourlyRateCents: z.number().int().min(1000).max(50000).optional(),
+  minJobAmountCents: z.number().int().min(1000).max(100000).default(5000)
 });
 
-export const createGigSchema = gigEstimateSchema.extend({
-  title: z.string().min(8).max(120),
-  description: z.string().min(20).max(2000),
-  size: z.enum(["SMALL", "MEDIUM", "LARGE", "ENTERPRISE"]).default("SMALL"),
-  photos: z.array(z.string().url()).max(10).default([])
-});
-
-export type GeoPointInput = z.infer<typeof geoPointSchema>;
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
-export type GigEstimateInput = z.infer<typeof gigEstimateSchema>;
-export type CreateGigInput = z.infer<typeof createGigSchema>;
+export type WorkerAvailabilityInput = z.infer<typeof workerAvailabilitySchema>;
+
+import type { GigEstimateInput } from "./gig-validation.js";
+
+export {
+  ALLOWED_PHOTO_MIME_TYPES,
+  GIG_VALIDATION_MESSAGES,
+  MAX_GIG_PHOTOS,
+  MAX_PHOTO_BYTES,
+  MAX_PREFERRED_DAYS_AHEAD,
+  MVP_SERVICE_SLUGS,
+  buildCreateGigPayload,
+  buildStartsAtIso,
+  createGigSchema,
+  gigEstimateSchema,
+  isPostGigFormComplete,
+  isValidPreferredDateTime,
+  mapValidationPath,
+  postGigLocationSchema,
+  validatePhotoFile,
+  validatePhotoReference,
+  validatePostGigForm,
+  zodErrorsToFieldMap,
+  type CreateGigInput,
+  type GeoPointInput,
+  type GigEstimateInput,
+  type GigUrgency,
+  type PostGigFormValues,
+  type PostGigPhoto,
+  type PostGigValidationResult
+} from "./gig-validation.js";
+
+export { createReviewSchema, type CreateReviewInput } from "./review-validation.js";
+
+export {
+  accountStatuses,
+  customerRegisterSchema,
+  forgotPasswordSchema,
+  loginSchema,
+  resetPasswordSchema,
+  workerRegisterSchema,
+  type AccountStatus,
+  type CustomerRegisterInput,
+  type ForgotPasswordInput,
+  type LoginInput,
+  type ResetPasswordInput,
+  type WorkerRegisterInput
+} from "./auth.js";
 
 export interface PriceBreakdown {
   baseRateCents: number;
   hourlyRateCents: number;
   laborCents: number;
   distanceFeeCents: number;
+  urgencyFeeCents: number;
+  estimatedHours: number;
   serviceMultiplier: number;
-  peakMultiplier: number;
   urgencyMultiplier: number;
   demandMultiplier: number;
   totalCents: number;
   platformFeeCents: number;
   workerPayoutCents: number;
   commissionRate: number;
+}
+
+export function calculateTieredCommissionRate(totalCents: number): number {
+  if (totalCents < 10_000) {
+    return 0.2;
+  }
+
+  if (totalCents <= 30_000) {
+    return 0.15;
+  }
+
+  return 0.1;
 }
 
 export function calculatePriceEstimate(
@@ -86,20 +148,16 @@ export function calculatePriceEstimate(
     hourlyRateCents: number;
     distanceRateCents: number;
     multiplier: number;
-  },
-  commissionRate = defaultCommissionRate
+  }
 ): PriceBreakdown {
-  const startsAt = new Date(input.startsAt);
-  const hour = startsAt.getHours();
-  const isPeak = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 21);
-  const peakMultiplier = isPeak ? 1.2 : 1;
-  const urgencyMultiplier = input.urgency === "URGENT" ? 1.5 : input.urgency === "SOON" ? 1.2 : 1;
+  const urgencyMultiplier = urgencyMultipliers[input.urgency];
   const laborCents = Math.round(category.hourlyRateCents * input.estimatedHours);
   const distanceFeeCents = Math.round(category.distanceRateCents * input.distanceMiles);
   const subtotal = category.baseRateCents + laborCents + distanceFeeCents;
-  const totalCents = Math.round(
-    subtotal * category.multiplier * peakMultiplier * urgencyMultiplier * input.demandMultiplier
-  );
+  const standardTotalCents = Math.round(subtotal * category.multiplier * input.demandMultiplier);
+  const totalCents = Math.round(subtotal * category.multiplier * urgencyMultiplier * input.demandMultiplier);
+  const urgencyFeeCents = Math.max(0, totalCents - standardTotalCents);
+  const commissionRate = calculateTieredCommissionRate(totalCents);
   const platformFeeCents = Math.round(totalCents * commissionRate);
 
   return {
@@ -107,8 +165,9 @@ export function calculatePriceEstimate(
     hourlyRateCents: category.hourlyRateCents,
     laborCents,
     distanceFeeCents,
+    urgencyFeeCents,
+    estimatedHours: input.estimatedHours,
     serviceMultiplier: category.multiplier,
-    peakMultiplier,
     urgencyMultiplier,
     demandMultiplier: input.demandMultiplier,
     totalCents,
@@ -116,4 +175,25 @@ export function calculatePriceEstimate(
     workerPayoutCents: totalCents - platformFeeCents,
     commissionRate
   };
+}
+
+export function haversineMiles(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const earthRadiusMiles = 3958.8;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+
+  return earthRadiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export function estimateResponseMinutes(distanceMiles: number): number {
+  return Math.max(5, Math.round(distanceMiles * 4 + 8));
 }

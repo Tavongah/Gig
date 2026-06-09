@@ -2,7 +2,12 @@ import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import { DUTS } from "../lib/theme";
 import { Screen } from "../components/Screen";
+import { TrustBadges } from "../components/TrustBadges";
+import { HeroBanner } from "../components/HeroBanner";
+import { AppButton } from "../components/AppButton";
+import { DutsCard } from "../components/DutsCard";
 import { useSessionStore } from "../stores/session.store";
 
 export function OnboardingScreen() {
@@ -22,53 +27,56 @@ export function OnboardingScreen() {
 
   return (
     <Screen>
-      <View className="gap-8">
-        <View className="gap-3">
-          <Text className="text-sm font-semibold uppercase tracking-[4px] text-brand">GigFlow</Text>
-          <Text className="text-4xl font-black text-white">Local gigs, matched in real time.</Text>
-          <Text className="text-base leading-6 text-slate-300">
-            Hire trusted local workers or pick up nearby gigs on your schedule.
-          </Text>
-        </View>
+      <View className="gap-6">
+        <HeroBanner
+          eyebrow="GigFlow"
+          title="Need an extra pair of hands today?"
+          subtitle="Post a local gig and get matched with verified workers nearby."
+        />
 
         <View className="flex-row gap-3">
           {(["CLIENT", "WORKER"] as const).map((value) => (
             <Pressable
               key={value}
               onPress={() => setRole(value)}
-              className={`flex-1 rounded-2xl border p-4 ${role === value ? "border-brand bg-brand/20" : "border-slate-700 bg-slate-900"}`}
+              className={`flex-1 rounded-2xl border p-4 ${
+                role === value ? "border-brand bg-hero" : "border-border bg-card"
+              }`}
             >
-              <Text className="text-center font-bold text-white">{value === "CLIENT" ? "I need help" : "I want work"}</Text>
+              <Text className={`text-center font-bold ${role === value ? "text-brand" : "text-label"}`}>
+                {value === "CLIENT" ? "I need help" : "I want work"}
+              </Text>
             </Pressable>
           ))}
         </View>
 
-        <View className="gap-4 rounded-3xl bg-white p-5">
+        <TrustBadges />
+
+        <DutsCard className="gap-4 p-5">
           <Text className="text-xl font-black text-ink">Create your account</Text>
           <TextInput
-            className="rounded-2xl bg-slate-100 px-4 py-4 text-ink"
+            className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
             value={fullName}
             onChangeText={setFullName}
             placeholder="Full name"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={DUTS.placeholder}
           />
           <TextInput
-            className="rounded-2xl bg-slate-100 px-4 py-4 text-ink"
+            className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
             placeholder="Email"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={DUTS.placeholder}
           />
-          <Pressable
-            disabled={!fullName.trim() || !email.trim() || sessionMutation.isPending}
+          <AppButton
+            label={sessionMutation.isPending ? "Creating..." : "Get started"}
             onPress={() => sessionMutation.mutate()}
-            className="rounded-2xl bg-ink px-5 py-4"
-          >
-            <Text className="text-center font-black text-white">{sessionMutation.isPending ? "Creating..." : "Get started"}</Text>
-          </Pressable>
-        </View>
+            disabled={!fullName.trim() || !email.trim() || sessionMutation.isPending}
+            loading={sessionMutation.isPending}
+          />
+        </DutsCard>
       </View>
     </Screen>
   );
