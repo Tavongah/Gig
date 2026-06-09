@@ -1,6 +1,18 @@
-import type { PropsWithChildren } from "react";
-import { View } from "react-native";
+import { StyleSheet, View, type ViewProps } from "react-native";
 
-export function TabScreen({ children }: PropsWithChildren) {
-  return <View className="flex-1 bg-slate-950 px-5 pt-2">{children}</View>;
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#020617",
+    paddingHorizontal: 20,
+    paddingTop: 8
+  }
+});
+
+export function TabScreen({ children, style, ...props }: ViewProps) {
+  return (
+    <View style={[styles.root, style]} {...props}>
+      {children}
+    </View>
+  );
 }
