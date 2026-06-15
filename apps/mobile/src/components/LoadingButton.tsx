@@ -1,4 +1,4 @@
-import { AppButton } from "./AppButton";
+import { AppButton, type AppButtonVariantInput } from "./AppButton";
 
 interface LoadingButtonProps {
   label: string;
@@ -6,7 +6,7 @@ interface LoadingButtonProps {
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
-  variant?: "primary" | "secondary" | "accept" | "urgent" | "cancel" | "danger";
+  variant?: AppButtonVariantInput;
 }
 
 export function LoadingButton({

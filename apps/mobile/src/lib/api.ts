@@ -26,6 +26,8 @@ export interface ApiUser {
     travelDistanceMiles?: number | string;
     hourlyRateCents?: number | null;
     minJobAmountCents?: number;
+    currentLatitude?: number | string | null;
+    currentLongitude?: number | string | null;
     serviceCategories: Array<{ id: string; name: string }>;
   } | null;
 }
@@ -93,6 +95,10 @@ export interface GigDetail {
   addressLine1: string;
   city: string;
   region: string;
+  formattedAddress?: string | null;
+  locationSummary?: string;
+  distanceLabel?: string;
+  addressHidden?: boolean;
   latitude: string | number;
   longitude: string | number;
   startsAt: string;
@@ -103,6 +109,7 @@ export interface GigDetail {
   serviceCategory?: { id: string; name: string };
   client?: GigPerson;
   assignments?: GigAssignment[];
+  paymentStatus?: string;
   payment?: { status: string; amountCents: number };
   chatThread?: { id: string };
 }
@@ -130,16 +137,51 @@ export interface PriceEstimate {
 
 export interface WorkerEarnings {
   totalEarningsCents: number;
+  availableBalanceCents: number;
+  withdrawnBalanceCents: number;
   pendingEarningsCents: number;
   completedGigCount: number;
   platformFeesCents: number;
   payoutStatus: string;
+  stripeConnect?: {
+    connected: boolean;
+    accountId: string | null;
+    payoutsEnabled: boolean;
+    detailsSubmitted: boolean;
+  };
+  transactions: Array<{
+    id: string;
+    type: string;
+    label: string;
+    status: string;
+    amountCents: number;
+    gigId: string | null;
+    gigTitle: string | null;
+    failureReason: string | null;
+    createdAt: string;
+  }>;
   recentPayouts: Array<{
     gigId: string;
     title: string;
     workerPayoutCents: number;
     completedAt: string;
   }>;
+}
+
+export interface PaymentStatusResponse {
+  id: string;
+  paymentStatus: string;
+  lifecycleStatus: string;
+  status?: string;
+  amountCents: number;
+  platformFeeCents: number;
+  workerPayoutCents: number;
+  estimatedPrice?: number;
+  platformFee?: number;
+  workerPayout?: number;
+  isPaid: boolean;
+  isAuthorized?: boolean;
+  checkoutUrl?: string | null;
 }
 
 export interface GigReview {
@@ -175,6 +217,7 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
     const body = (await response.json().catch(() => null)) as {
       success?: boolean;
       error?: string;
+      code?: string;
       errors?: Record<string, string>;
       details?: { fieldErrors?: Record<string, string[]>; formErrors?: string[] };
     } | null;
@@ -186,11 +229,27 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
     const fieldMessages = body?.details?.fieldErrors
       ? Object.values(body.details.fieldErrors).flat().filter(Boolean)
       : [];
+    const apiErrorMessages: Record<string, string> = {
+      FORBIDDEN: "Your account cannot post gigs. Log in as a customer or switch to client mode in Profile.",
+      AUTH_REQUIRED: "Your session expired. Please log in again.",
+      INVALID_TOKEN: "Your session expired. Please log in again.",
+      STRIPE_CONNECT_REQUIRED: "Connect Stripe in Earnings before withdrawing.",
+      WORKER_NOT_APPROVED: "Your worker account must be approved before you can accept gigs.",
+      PAYMENT_REQUIRED: "This gig is not paid yet. The customer must complete payment first."
+    };
     const message =
       fieldMessages.length > 0
         ? fieldMessages.join(". ")
-        : (body?.error ?? `Request failed with status ${response.status}`);
-    throw new Error(message);
+        : (apiErrorMessages[body?.code ?? body?.error ?? ""] ??
+            apiErrorMessages[body?.error ?? ""] ??
+            body?.errors?.stripe ??
+            body?.errors?.worker ??
+            body?.errors?.payment ??
+            body?.error ??
+            `Request failed with status ${response.status}`);
+    const error = new Error(message) as Error & { code?: string };
+    error.code = body?.code;
+    throw error;
   }
 
   return response.json() as Promise<T>;
@@ -225,6 +284,25 @@ export const api = {
     request<{ estimate: PriceEstimate }>("/gigs/estimate", { method: "POST", body: JSON.stringify(payload) }, token),
   createGig: (payload: CreateGigInput, token: string) =>
     request<{ gig: GigDetail }>("/gigs", { method: "POST", body: JSON.stringify(payload) }, token),
+  getStripeConfig: () => request<{ stripeConfigured: boolean; publishableKey: string | null }>("/payments/config"),
+  createCheckoutSession: (gigId: string, token: string) =>
+    request<{ checkoutUrl: string | null; alreadyPaid: boolean; payment: PaymentStatusResponse }>(
+      "/payments/checkout-session",
+      { method: "POST", body: JSON.stringify({ gigId }) },
+      token
+    ),
+  getPaymentStatus: (gigId: string, token: string) =>
+    request<{ payment: PaymentStatusResponse }>(`/payments/gigs/${gigId}/status`, {}, token),
+  getConnectStatus: (token: string) =>
+    request<{ connect: { connected: boolean; accountId: string | null; payoutsEnabled: boolean; detailsSubmitted: boolean } }>(
+      "/payments/connect/status",
+      {},
+      token
+    ),
+  createConnectAccountLink: (token: string) =>
+    request<{ url: string; accountId: string }>("/payments/connect/account-link", { method: "POST" }, token),
+  publishGigWithoutPayment: (gigId: string, token: string) =>
+    request<{ gig: GigDetail }>(`/gigs/${gigId}/publish`, { method: "POST" }, token),
   nearbyGigs: (token: string) => request<{ gigs: GigDetail[] }>("/gigs/nearby", {}, token),
   availableWorkersNearby: (latitude: number, longitude: number, token: string, radiusMiles = 20) =>
     request<{ workers: AvailableWorker[] }>(
@@ -251,6 +329,34 @@ export const api = {
   cancelGig: (gigId: string, token: string) =>
     request<{ gig: GigDetail }>(`/gigs/${gigId}/status`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) }, token),
   getWorkerEarnings: (token: string) => request<{ earnings: WorkerEarnings }>("/workers/earnings", {}, token),
+  withdrawWorkerEarnings: (token: string, amountCents?: number) =>
+    request<{ ok: boolean; amountCents: number; transferId: string; transactionId: string }>(
+      "/workers/withdraw",
+      { method: "POST", body: JSON.stringify(amountCents ? { amountCents } : {}) },
+      token
+    ),
+  getWorkerWithdrawOnboardingLink: (token: string) =>
+    request<{ url: string; accountId: string }>("/workers/withdraw/onboarding-link", { method: "POST" }, token),
+  autocompleteAddress: (query: string, token: string) =>
+    request<{ suggestions: Array<{ placeId: string; label: string; formattedAddress: string }> }>(
+      `/location/autocomplete?q=${encodeURIComponent(query)}`,
+      {},
+      token
+    ),
+  geocodeAddress: (
+    payload: { query?: string; placeId?: string; latitude?: number; longitude?: number },
+    token: string
+  ) => request<{ location: import("@gigflow/shared").GeoPointInput }>("/location/geocode", { method: "POST", body: JSON.stringify(payload) }, token),
+  reverseGeocode: (latitude: number, longitude: number, token: string) =>
+    request<{ location: import("@gigflow/shared").GeoPointInput }>(
+      "/location/reverse-geocode",
+      { method: "POST", body: JSON.stringify({ latitude, longitude }) },
+      token
+    ),
+  updateWorkerLocation: (
+    payload: { latitude: number; longitude: number; formattedAddress?: string; query?: string; placeId?: string },
+    token: string
+  ) => request<{ profile: ApiUser["workerProfile"] }>("/workers/location", { method: "PATCH", body: JSON.stringify(payload) }, token),
   createReview: (gigId: string, payload: CreateReviewInput, token: string) =>
     request<{ review: GigReview }>(`/gigs/${gigId}/reviews`, { method: "POST", body: JSON.stringify(payload) }, token),
   getGigReviews: (gigId: string, token: string) =>

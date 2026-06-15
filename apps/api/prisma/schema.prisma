@@ -47,10 +47,20 @@ enum GigSize {
   ENTERPRISE
 }
 
+enum PaymentLifecycle {
+  PAYMENT_PENDING
+  PAYMENT_AUTHORIZED
+  PAYMENT_CAPTURED
+  PAYOUT_PENDING
+  PAYOUT_PAID
+  PAYMENT_FAILED
+}
+
 enum PaymentStatus {
   REQUIRES_PAYMENT_METHOD
   AUTHORIZED
   CAPTURED
+  PAYOUT_PENDING
   PAID_OUT
   REFUNDED
   FAILED
@@ -84,6 +94,19 @@ enum AvailabilityStatus {
   OFFLINE
 }
 
+enum WorkerEarningsTransactionType {
+  GIG_COMPLETED_CREDIT
+  WITHDRAWAL_REQUESTED
+  WITHDRAWAL_SUCCESS
+  WITHDRAWAL_FAILED
+}
+
+enum WorkerEarningsTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
 enum LaunchPhase {
   MVP
   PHASE_2
@@ -101,6 +124,7 @@ model User {
   defaultRole        UserRole            @default(CLIENT)
   accountStatus      AccountStatus       @default(ACTIVE)
   isVerified         Boolean             @default(false)
+  stripeCustomerId   String?             @unique
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   workerProfile      WorkerProfile?
@@ -113,6 +137,7 @@ model User {
   availability       AvailabilityWindow[]
   chatMessages       ChatMessage[]
   auditLogs          AuditLog[]
+  earningsTransactions WorkerEarningsTransaction[]
 }
 
 model PasswordResetToken {
@@ -144,7 +169,15 @@ model WorkerProfile {
   reviewedAt               DateTime?
   reviewedById             String?
   rejectionReason          String?
-  stripeConnectedAccountId String?
+  stripeAccountId          String?
+  stripeOnboardingComplete Boolean           @default(false)
+  stripeChargesEnabled     Boolean           @default(false)
+  stripePayoutsEnabled     Boolean           @default(false)
+  formattedAddress         String?
+  locationUpdatedAt        DateTime?
+  availableBalanceCents    Int               @default(0)
+  withdrawnBalanceCents    Int               @default(0)
+  totalEarnedCents         Int               @default(0)
   ratingAverage            Decimal           @default(0) @db.Decimal(3, 2)
   completedGigCount        Int               @default(0)
   currentLatitude          Decimal?          @db.Decimal(9, 6)
@@ -156,6 +189,8 @@ model WorkerProfile {
   serviceCategories        ServiceCategory[] @relation("WorkerCategories")
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
+
+  @@index([currentLatitude, currentLongitude])
 }
 
 model ServiceCategory {
@@ -184,7 +219,11 @@ model Gig {
   serviceCategory       ServiceCategory @relation(fields: [serviceCategoryId], references: [id], onDelete: Restrict)
   title                 String
   description           String
-  status                GigStatus       @default(SEARCHING_FOR_WORKER)
+  status                GigStatus         @default(DRAFT)
+  paymentStatus         PaymentLifecycle  @default(PAYMENT_PENDING)
+  paymentIntentId       String?
+  checkoutSessionId     String?
+  assignedWorkerId      String?
   urgency               GigUrgency
   size                  GigSize
   estimatedHours        Decimal         @db.Decimal(5, 2)
@@ -197,6 +236,7 @@ model Gig {
   region                String
   postalCode            String
   country               String          @default("US")
+  formattedAddress      String?
   latitude              Decimal         @db.Decimal(9, 6)
   longitude             Decimal         @db.Decimal(9, 6)
   photoUrls             String[]        @default([])
@@ -206,6 +246,7 @@ model Gig {
   workerPayoutCents     Int
   assignments           GigAssignment[]
   payment               Payment?
+  earningsTransactions  WorkerEarningsTransaction[]
   reviews               Review[]
   chatThread            ChatThread?
   notifications         Notification[]
@@ -236,6 +277,8 @@ model Payment {
   gigId                  String        @unique
   gig                    Gig           @relation(fields: [gigId], references: [id], onDelete: Cascade)
   stripePaymentIntentId  String?       @unique
+  stripeCheckoutSessionId String?      @unique
+  stripeTransferId       String?       @unique
   status                 PaymentStatus @default(REQUIRES_PAYMENT_METHOD)
   amountCents            Int
   platformFeeCents       Int
@@ -254,6 +297,25 @@ model Transaction {
   amountCents Int
   metadata    Json?
   createdAt   DateTime        @default(now())
+}
+
+model WorkerEarningsTransaction {
+  id               String                          @id @default(uuid())
+  workerId         String
+  worker           User                            @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  gigId            String?
+  gig              Gig?                            @relation(fields: [gigId], references: [id], onDelete: SetNull)
+  type             WorkerEarningsTransactionType
+  status           WorkerEarningsTransactionStatus @default(PENDING)
+  amountCents      Int
+  stripeTransferId String?
+  failureReason    String?
+  metadata         Json?
+  createdAt        DateTime                        @default(now())
+  updatedAt        DateTime                        @updatedAt
+
+  @@index([workerId, createdAt])
+  @@index([gigId, type])
 }
 
 model Review {

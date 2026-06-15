@@ -1,8 +1,8 @@
 import type { Server, Socket } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import jwt from "jsonwebtoken";
-import { haversineMiles } from "@gigflow/shared";
-import type { UserRole } from "@prisma/client";
+import { getGigMatchingRadiusMiles, haversineMiles, isWithinMatchingRadius } from "@gigflow/shared";
+import type { GigSize, GigUrgency, UserRole } from "@prisma/client";
 import { redis } from "../../config/redis.js";
 import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
@@ -19,12 +19,16 @@ export interface GigOfferPayload {
   serviceCategoryName: string;
   latitude: number;
   longitude: number;
+  city: string;
+  region: string;
+  size: GigSize;
   totalCents: number;
   workerPayoutCents: number;
   startsAt: string;
-  urgency: string;
+  urgency: GigUrgency | string;
   estimatedHours: number;
   distanceMiles?: number;
+  locationSummary?: string;
 }
 
 export interface NotificationPayload {
@@ -94,7 +98,8 @@ export function configureRealtime(io: Server): void {
           ...(payload.latitude !== undefined && payload.longitude !== undefined
             ? {
                 currentLatitude: payload.latitude,
-                currentLongitude: payload.longitude
+                currentLongitude: payload.longitude,
+                locationUpdatedAt: new Date()
               }
             : {})
         }
@@ -120,7 +125,8 @@ export function configureRealtime(io: Server): void {
         where: { userId: socket.data.userId },
         data: {
           currentLatitude: payload.latitude,
-          currentLongitude: payload.longitude
+          currentLongitude: payload.longitude,
+          locationUpdatedAt: new Date()
         }
       });
 
@@ -182,7 +188,8 @@ export function configureRealtime(io: Server): void {
 }
 
 export async function broadcastGigOffer(io: Server, payload: GigOfferPayload): Promise<void> {
-  io.to(`category:${payload.serviceCategoryId}`).emit("gig:offer", payload);
+  const gigRadiusMiles = getGigMatchingRadiusMiles(payload.urgency as GigUrgency, payload.size);
+  const locationSummary = `${payload.city}, ${payload.region}`;
 
   const workers = await prisma.workerProfile.findMany({
     where: {
@@ -208,13 +215,33 @@ export async function broadcastGigOffer(io: Server, payload: GigOfferPayload): P
       payload.longitude
     );
     const travelRadiusMiles = Number(worker.travelDistanceMiles);
-    if (distanceMiles > travelRadiusMiles) {
+
+    if (!isWithinMatchingRadius(
+      Number(worker.currentLatitude),
+      Number(worker.currentLongitude),
+      payload.latitude,
+      payload.longitude,
+      gigRadiusMiles,
+      travelRadiusMiles
+    )) {
       continue;
     }
 
     const roundedDistance = Math.round(distanceMiles * 10) / 10;
-    const notificationBody = `$${(payload.workerPayoutCents / 100).toFixed(0)} • ${roundedDistance} miles away`;
-    const offer = { ...payload, distanceMiles: roundedDistance };
+    const notificationBody = `$${(payload.workerPayoutCents / 100).toFixed(0)} • ${roundedDistance} miles away • ${locationSummary}`;
+    const offer = {
+      gigId: payload.gigId,
+      title: payload.title,
+      serviceCategoryId: payload.serviceCategoryId,
+      serviceCategoryName: payload.serviceCategoryName,
+      totalCents: payload.totalCents,
+      workerPayoutCents: payload.workerPayoutCents,
+      startsAt: payload.startsAt,
+      urgency: payload.urgency,
+      estimatedHours: payload.estimatedHours,
+      distanceMiles: roundedDistance,
+      locationSummary
+    };
 
     io.to(`user:${worker.userId}`).emit("gig:offer", offer);
     notifyUser(io, worker.userId, {

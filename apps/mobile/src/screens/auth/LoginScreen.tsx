@@ -6,6 +6,7 @@ import { api } from "../../lib/api";
 import { defaultActiveRole } from "../../lib/auth";
 import { Screen } from "../../components/Screen";
 import { HeroBanner } from "../../components/HeroBanner";
+import { APP_NAME } from "../../lib/brand";
 import { AppButton } from "../../components/AppButton";
 import { DutsCard } from "../../components/DutsCard";
 import { useSessionStore } from "../../stores/session.store";
@@ -33,7 +34,7 @@ export function LoginScreen({ navigation }: Props) {
   return (
     <Screen>
       <View className="gap-6">
-        <HeroBanner eyebrow="DUTS" title="Welcome back" subtitle="Sign in to post gigs or accept work nearby." />
+        <HeroBanner eyebrow={APP_NAME} title="Welcome back" subtitle="Sign in to post gigs or accept work nearby." />
 
         <DutsCard className="gap-4 p-5">
           <Text className="text-xl font-black text-ink">Log in</Text>
@@ -61,7 +62,7 @@ export function LoginScreen({ navigation }: Props) {
 
         <Pressable onPress={() => navigation.navigate("RegisterSelection")} className="py-2">
           <Text className="text-center text-muted">
-            New to DUTS? <Text className="font-bold text-brand">Create an account</Text>
+            New to {APP_NAME}? <Text className="font-bold text-brand">Create an account</Text>
           </Text>
         </Pressable>
       </View>

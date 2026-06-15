@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
@@ -15,7 +15,10 @@ import { TabScreen } from "../../components/TabScreen";
 import { HeroBanner } from "../../components/HeroBanner";
 import { GigCard } from "../../components/GigCard";
 import { EmptyState } from "../../components/EmptyState";
+import { PendingPaymentCard } from "../../components/PendingPaymentCard";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
+import { gigNeedsPayment } from "../../lib/gig-payment";
+import { useStripeCheckout } from "../../hooks/useStripeCheckout";
 import { useSocketEvents } from "../../hooks/useSocket";
 import type { ClientTabParamList, RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
@@ -39,8 +42,15 @@ export function ClientMyGigsScreen() {
     refetchInterval: 15_000
   });
 
+  const { payWithStripe, isPaying, payingGigId } = useStripeCheckout();
+
+  const unpaidGigs = useMemo(
+    () => (gigsQuery.data?.gigs ?? []).filter(gigNeedsPayment),
+    [gigsQuery.data?.gigs]
+  );
+
   const filteredGigs = useMemo(() => {
-    const gigs = gigsQuery.data?.gigs ?? [];
+    const gigs = (gigsQuery.data?.gigs ?? []).filter((gig) => !gigNeedsPayment(gig));
     if (tab === "active") {
       return gigs.filter((gig) => ACTIVE_CLIENT_STATUSES.includes(gig.status as (typeof ACTIVE_CLIENT_STATUSES)[number]));
     }
@@ -91,9 +101,23 @@ export function ClientMyGigsScreen() {
           onChange={setTab}
         />
 
-        {filteredGigs.length === 0 ? (
+        {unpaidGigs.length > 0 ? (
+          <View className="gap-3">
+            <Text className="text-sm font-bold uppercase tracking-wider text-muted">Awaiting payment</Text>
+            {unpaidGigs.map((gig) => (
+              <PendingPaymentCard
+                key={gig.id}
+                gig={gig}
+                onPay={() => payWithStripe(gig.id)}
+                loading={isPaying && payingGigId === gig.id}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {filteredGigs.length === 0 && unpaidGigs.length === 0 ? (
           <EmptyState {...emptyCopy} />
-        ) : (
+        ) : filteredGigs.length > 0 ? (
           <View className="gap-4">
             {filteredGigs.map((gig) => {
               const worker = gig.assignments?.[0]?.worker;
@@ -107,7 +131,7 @@ export function ClientMyGigsScreen() {
               );
             })}
           </View>
-        )}
+        ) : null}
       </ScrollView>
     </TabScreen>
   );

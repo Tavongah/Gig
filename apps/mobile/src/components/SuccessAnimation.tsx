@@ -8,6 +8,7 @@ import Animated, {
   withTiming
 } from "react-native-reanimated";
 import { DutsCard } from "./DutsCard";
+import { APP_NAME } from "../lib/brand";
 
 export function SuccessAnimation() {
   const scale = useSharedValue(0.5);
@@ -32,7 +33,7 @@ export function SuccessAnimation() {
         <Text className="text-4xl text-white">✓</Text>
       </Animated.View>
       <Text className="text-center text-xl font-black text-ink">Gig completed!</Text>
-      <Text className="text-center text-sm text-muted">Thanks for using GigFlow. Leave a review below.</Text>
+      <Text className="text-center text-sm text-muted">Thanks for using {APP_NAME}. Leave a review below.</Text>
     </DutsCard>
   );
 }

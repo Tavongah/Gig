@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { DUTS } from "../lib/theme";
+import { APP_NAME } from "../lib/brand";
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { RegisterSelectionScreen } from "../screens/auth/RegisterSelectionScreen";
 import { CustomerRegisterScreen } from "../screens/auth/CustomerRegisterScreen";
@@ -21,7 +22,7 @@ export function AuthNavigator() {
       }}
     >
       <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="RegisterSelection" component={RegisterSelectionScreen} options={{ title: "Join DUTS" }} />
+      <Stack.Screen name="RegisterSelection" component={RegisterSelectionScreen} options={{ title: `Join ${APP_NAME}` }} />
       <Stack.Screen name="CustomerRegister" component={CustomerRegisterScreen} options={{ title: "Customer sign up" }} />
       <Stack.Screen name="WorkerRegister" component={WorkerRegisterScreen} options={{ title: "Worker sign up" }} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: "Reset password" }} />

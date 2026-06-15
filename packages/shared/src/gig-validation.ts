@@ -42,7 +42,7 @@ export type PostGigPhoto = {
 
 export type PostGigFormValues = {
   serviceCategoryId: string | null;
-  title: string;
+  serviceCategoryName: string | null;
   description: string;
   estimatedHours: string;
   locationAddress: string;
@@ -76,10 +76,23 @@ function trimmedString(min: number, max: number, message: string) {
 export function buildStartsAtIso(date: string, time: string): string {
   const safeDate = trimText(date);
   const safeTime = trimText(time) || "12:00";
-  return new Date(`${safeDate}T${safeTime}:00`).toISOString();
+  if (!safeDate) {
+    return "";
+  }
+
+  const startsAt = new Date(`${safeDate}T${safeTime}:00`);
+  if (Number.isNaN(startsAt.getTime())) {
+    return "";
+  }
+
+  return startsAt.toISOString();
 }
 
 export function isValidPreferredDateTime(startsAtIso: string, now = new Date()): boolean {
+  if (!startsAtIso) {
+    return false;
+  }
+
   const startsAt = new Date(startsAtIso);
   if (Number.isNaN(startsAt.getTime())) {
     return false;
@@ -162,7 +175,8 @@ export const postGigLocationSchema = z.object({
     (value) => (typeof value === "string" ? trimText(value) : value),
     z.string().min(3).max(20)
   ),
-  country: z.string().length(2).default("US")
+  country: z.string().length(2).default("US"),
+  formattedAddress: trimmedString(8, 240, GIG_VALIDATION_MESSAGES.location)
 });
 
 export const gigEstimateSchema = z.object({
@@ -223,10 +237,10 @@ export function zodErrorsToFieldMap(error: z.ZodError): Record<string, string> {
 
 export function buildCreateGigPayload(
   values: PostGigFormValues,
-  defaults?: { latitude?: number; longitude?: number; city?: string; region?: string; postalCode?: string }
+  geocodedLocation: GeoPointInput
 ): CreateGigInput {
   return {
-    title: trimText(values.title),
+    title: trimText(values.serviceCategoryName ?? ""),
     description: trimText(values.description),
     serviceCategoryId: values.serviceCategoryId ?? "",
     estimatedHours: Number(values.estimatedHours),
@@ -236,28 +250,24 @@ export function buildCreateGigPayload(
     demandMultiplier: 1,
     size: "MEDIUM",
     photos: values.photos.map((photo) => photo.uri),
-    location: {
-      latitude: defaults?.latitude ?? 33.749,
-      longitude: defaults?.longitude ?? -84.388,
-      addressLine1: trimText(values.locationAddress),
-      city: defaults?.city ?? "Local",
-      region: defaults?.region ?? "NA",
-      postalCode: defaults?.postalCode ?? "00000",
-      country: "US"
-    }
+    location: geocodedLocation
   };
 }
 
-export function validatePostGigForm(values: PostGigFormValues, allowedCategoryIds: string[]): PostGigValidationResult {
+export function validatePostGigForm(
+  values: PostGigFormValues,
+  allowedCategoryIds: string[],
+  geocodedLocation?: GeoPointInput | null
+): PostGigValidationResult {
   const errors: Record<string, string> = {};
 
   if (!values.serviceCategoryId || !allowedCategoryIds.includes(values.serviceCategoryId)) {
     errors.serviceType = GIG_VALIDATION_MESSAGES.serviceType;
   }
 
-  const title = trimText(values.title);
-  if (!isNonEmptyTrimmed(values.title) || title.length < 5 || title.length > 80) {
-    errors.title = GIG_VALIDATION_MESSAGES.title;
+  const title = trimText(values.serviceCategoryName ?? "");
+  if (!values.serviceCategoryId || !isNonEmptyTrimmed(title) || title.length < 5 || title.length > 80) {
+    errors.serviceType = errors.serviceType ?? GIG_VALIDATION_MESSAGES.serviceType;
   }
 
   const description = trimText(values.description);
@@ -273,6 +283,10 @@ export function validatePostGigForm(values: PostGigFormValues, allowedCategoryId
   const location = trimText(values.locationAddress);
   if (!isNonEmptyTrimmed(values.locationAddress) || location.length < 5 || location.length > 150) {
     errors.location = GIG_VALIDATION_MESSAGES.location;
+  }
+
+  if (!geocodedLocation) {
+    errors.location = errors.location ?? "Confirm a valid address before posting.";
   }
 
   if (!values.urgency || !["STANDARD", "SOON", "URGENT"].includes(values.urgency)) {
@@ -306,7 +320,7 @@ export function validatePostGigForm(values: PostGigFormValues, allowedCategoryId
     return { success: false, errors };
   }
 
-  const payload = buildCreateGigPayload(values);
+  const payload = buildCreateGigPayload(values, geocodedLocation!);
   const parsed = createGigSchema.safeParse(payload);
   if (!parsed.success) {
     return { success: false, errors: zodErrorsToFieldMap(parsed.error) };
@@ -315,6 +329,10 @@ export function validatePostGigForm(values: PostGigFormValues, allowedCategoryId
   return { success: true, errors: {}, payload: parsed.data };
 }
 
-export function isPostGigFormComplete(values: PostGigFormValues, allowedCategoryIds: string[]): boolean {
-  return validatePostGigForm(values, allowedCategoryIds).success;
+export function isPostGigFormComplete(
+  values: PostGigFormValues,
+  allowedCategoryIds: string[],
+  geocodedLocation?: GeoPointInput | null
+): boolean {
+  return validatePostGigForm(values, allowedCategoryIds, geocodedLocation).success;
 }

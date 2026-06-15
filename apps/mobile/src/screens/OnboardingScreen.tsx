@@ -6,6 +6,7 @@ import { DUTS } from "../lib/theme";
 import { Screen } from "../components/Screen";
 import { TrustBadges } from "../components/TrustBadges";
 import { HeroBanner } from "../components/HeroBanner";
+import { APP_NAME } from "../lib/brand";
 import { AppButton } from "../components/AppButton";
 import { DutsCard } from "../components/DutsCard";
 import { useSessionStore } from "../stores/session.store";
@@ -29,7 +30,7 @@ export function OnboardingScreen() {
     <Screen>
       <View className="gap-6">
         <HeroBanner
-          eyebrow="GigFlow"
+          eyebrow={APP_NAME}
           title="Need an extra pair of hands today?"
           subtitle="Post a local gig and get matched with verified workers nearby."
         />

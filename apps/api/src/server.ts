@@ -4,6 +4,7 @@ import { env, resolveCorsOrigin } from "./config/env.js";
 import { prisma } from "./config/prisma.js";
 import { connectRedis, redis } from "./config/redis.js";
 import { createApp } from "./app.js";
+import { setSocketServer } from "./lib/socket.js";
 import { configureRealtime } from "./modules/realtime/realtime.service.js";
 
 const corsOrigin = resolveCorsOrigin();
@@ -17,6 +18,7 @@ const io = new Server(httpServer, {
 });
 
 configureRealtime(io);
+setSocketServer(io);
 const app = createApp(io);
 httpServer.removeAllListeners("request");
 httpServer.on("request", app);
@@ -42,7 +44,7 @@ async function bootstrap(): Promise<void> {
   }
 
   httpServer.listen(env.PORT, "0.0.0.0", () => {
-    console.log(`GigFlow API listening on 0.0.0.0:${env.PORT} (${env.NODE_ENV})`);
+    console.log(`GIGFLOW API listening on 0.0.0.0:${env.PORT} (${env.NODE_ENV})`);
   });
 }
 

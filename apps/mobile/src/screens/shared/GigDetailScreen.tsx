@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import { useRoute } from "@react-navigation/native";
 import { api } from "../../lib/api";
+import { showAlert, showConfirm } from "../../lib/confirm";
 import { formatAddress, formatCents } from "../../lib/format";
 import { canClientCancel, isSearching, nextWorkerAction } from "../../lib/gig-status";
+import { gigNeedsPayment } from "../../lib/gig-payment";
+import { useStripeCheckout } from "../../hooks/useStripeCheckout";
 import { StatusTimeline } from "../../components/StatusTimeline";
 import { StatusBadge } from "../../components/StatusBadge";
 import { LoadingButton } from "../../components/LoadingButton";
@@ -46,6 +49,8 @@ export function GigDetailScreen() {
 
   const socket = useSocket();
 
+  const { payWithStripe, isPaying } = useStripeCheckout();
+
   const invalidate = useCallback(() => {
     void gigQuery.refetch();
     void queryClient.invalidateQueries({ queryKey: ["my-gigs"] });
@@ -63,7 +68,7 @@ export function GigDetailScreen() {
       "gig:assigned": invalidate,
       "gig:status": invalidate,
       notification: (payload: { title: string; body: string }) => {
-        Alert.alert(payload.title, payload.body);
+        showAlert(payload.title, payload.body);
       },
         "location:updated": (payload: { latitude: number; longitude: number }) => {
           setWorkerLocation({ latitude: payload.latitude, longitude: payload.longitude });
@@ -85,39 +90,39 @@ export function GigDetailScreen() {
         });
       }
     },
-    onError: (error: Error) => Alert.alert("Update failed", error.message)
+    onError: (error: Error) => showAlert("Update failed", error.message)
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: () => api.acceptGig(route.params.gigId, session.token),
+    onSuccess: () => {
+      invalidate();
+      showAlert("Gig accepted", "You are now assigned to this gig.");
+    },
+    onError: (error: Error) => showAlert("Could not accept", error.message)
   });
 
   const cancelMutation = useMutation({
     mutationFn: () => api.cancelGig(route.params.gigId, session.token),
     onSuccess: () => {
       invalidate();
-      Alert.alert("Gig cancelled", "This gig has been cancelled.");
+      showAlert("Gig cancelled", "This gig has been cancelled.");
     },
-    onError: (error: Error) => Alert.alert("Could not cancel", error.message)
+    onError: (error: Error) => showAlert("Could not cancel", error.message)
   });
 
   function confirmAccept(): void {
     if (!gig) return;
-    Alert.alert("Accept this gig?", "Are you sure you want to accept this gig?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Accept",
-        onPress: () => {
-          api
-            .acceptGig(gig.id, session.token)
-            .then(() => invalidate())
-            .catch((error: Error) => Alert.alert("Could not accept", error.message));
-        }
-      }
-    ]);
+    showConfirm("Accept this gig?", "Are you sure you want to accept this gig?", () => acceptMutation.mutate(), {
+      confirmLabel: "Accept"
+    });
   }
 
   function confirmCancel(): void {
-    Alert.alert("Cancel gig?", "Are you sure you want to cancel this gig?", [
-      { text: "Keep gig", style: "cancel" },
-      { text: "Cancel gig", style: "destructive", onPress: () => cancelMutation.mutate() }
-    ]);
+    showConfirm("Cancel gig?", "Are you sure you want to cancel this gig?", () => cancelMutation.mutate(), {
+      confirmLabel: "Cancel gig",
+      destructive: true
+    });
   }
 
   useEffect(() => {
@@ -128,13 +133,9 @@ export function GigDetailScreen() {
       !hasReview &&
       !reviewsQuery.isLoading
     ) {
-      Alert.alert("Leave a review?", `Tell us how ${worker.fullName} did on this gig.`, [
-        { text: "Later", style: "cancel" },
-        {
-          text: "Review",
-          onPress: () => navigation.navigate("Review", { gigId: gig.id, workerName: worker.fullName })
-        }
-      ]);
+      showConfirm("Leave a review?", `Tell us how ${worker.fullName} did on this gig.`, () => {
+        navigation.navigate("Review", { gigId: gig.id, workerName: worker.fullName });
+      }, { confirmLabel: "Review", cancelLabel: "Later" });
     }
   }, [activeRole, gig?.id, gig?.status, hasReview, navigation, reviewsQuery.isLoading, worker]);
 
@@ -166,6 +167,14 @@ export function GigDetailScreen() {
         <Text className="text-lg font-black text-ink">{formatCents(gig.totalCents)}</Text>
         <Text className="text-muted">{gig.description}</Text>
         <Text className="text-muted">{formatAddress(gig)}</Text>
+        {gig.distanceLabel || gig.distanceMiles != null ? (
+          <Text className="text-sm font-semibold text-brand">
+            {gig.distanceLabel ?? `${gig.distanceMiles} mi away`}
+          </Text>
+        ) : null}
+        {gig.addressHidden ? (
+          <Text className="text-xs text-muted">Full street address unlocks after you accept this gig.</Text>
+        ) : null}
         <Text className="text-sm text-muted">Scheduled: {new Date(gig.startsAt).toLocaleString()}</Text>
         <Text className="text-sm font-semibold text-orange">Urgency: {gig.urgency}</Text>
         <View className="rounded-2xl bg-teal/10 px-3 py-2">
@@ -203,6 +212,14 @@ export function GigDetailScreen() {
       ) : null}
 
       <View className="gap-3">
+        {activeRole === "CLIENT" && gigNeedsPayment(gig) ? (
+          <LoadingButton
+            label={isPaying ? "Opening Stripe..." : "Pay with Stripe"}
+            onPress={() => payWithStripe(gig.id)}
+            loading={isPaying}
+          />
+        ) : null}
+
         <LoadingButton
           label={`Message ${activeRole === "CLIENT" ? "worker" : "client"}`}
           variant="secondary"
@@ -224,7 +241,11 @@ export function GigDetailScreen() {
         ) : null}
 
         {activeRole === "WORKER" && isSearching(gig.status) ? (
-          <LoadingButton label="Accept gig" onPress={confirmAccept} />
+          <LoadingButton
+            label="Accept gig"
+            onPress={confirmAccept}
+            loading={acceptMutation.isPending}
+          />
         ) : null}
 
         {activeRole === "WORKER" && workerAction ? (

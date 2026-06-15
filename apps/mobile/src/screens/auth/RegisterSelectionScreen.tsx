@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../../components/Screen";
 import { DutsCard } from "../../components/DutsCard";
+import { APP_NAME } from "../../lib/brand";
 import type { AuthStackParamList } from "../../navigation/auth-types";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "RegisterSelection">;
@@ -10,7 +11,7 @@ export function RegisterSelectionScreen({ navigation }: Props) {
   return (
     <Screen>
       <View className="gap-5">
-        <Text className="text-2xl font-black text-ink">How will you use DUTS?</Text>
+        <Text className="text-2xl font-black text-ink">How will you use {APP_NAME}?</Text>
         <Text className="text-base text-muted">Choose the path that fits you. Workers are reviewed before they can accept gigs.</Text>
 
         <Pressable onPress={() => navigation.navigate("CustomerRegister")}>

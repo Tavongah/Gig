@@ -2,6 +2,11 @@ export type RootStackParamList = {
   MainTabs: undefined;
   GigDetail: { gigId: string };
   GigTracking: { gigId: string };
+  GigPayment: { gigId: string };
+  PaymentSuccess: { gigId?: string } | undefined;
+  PaymentFailed: { gigId?: string } | undefined;
+  WorkerStripeConnect: undefined;
+  WorkerWorkPreferences: undefined;
   Chat: { gigId: string; title: string };
   Review: { gigId: string; workerName: string };
 };
@@ -27,8 +32,6 @@ export type ClientTabParamList = {
 export type WorkerTabParamList = {
 
   Home: undefined;
-
-  AvailableNow: undefined;
 
   NearbyGigs: undefined;
 

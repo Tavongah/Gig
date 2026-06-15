@@ -4,8 +4,6 @@ import { Text, View } from "react-native";
 
 import { WorkerHomeScreen } from "../screens/worker/WorkerHomeScreen";
 
-import { WorkerAvailableNowScreen } from "../screens/worker/WorkerAvailableNowScreen";
-
 import { WorkerNearbyGigsScreen } from "../screens/worker/WorkerNearbyGigsScreen";
 
 import { WorkerEarningsScreen } from "../screens/worker/WorkerEarningsScreen";
@@ -26,8 +24,6 @@ const TAB_ICONS: Record<string, string> = {
 
   Home: "🏠",
 
-  AvailableNow: "⚡",
-
   NearbyGigs: "📍",
 
   Earnings: "💰",
@@ -41,8 +37,6 @@ const TAB_ICONS: Record<string, string> = {
 const TAB_LABELS: Record<string, string> = {
 
   Home: "Home",
-
-  AvailableNow: "Available",
 
   NearbyGigs: "Nearby",
 
@@ -113,8 +107,6 @@ export function WorkerTabs() {
     >
 
       <Tab.Screen name="Home" component={WorkerHomeScreen} />
-
-      <Tab.Screen name="AvailableNow" component={WorkerAvailableNowScreen} />
 
       <Tab.Screen name="NearbyGigs" component={WorkerNearbyGigsScreen} />
 

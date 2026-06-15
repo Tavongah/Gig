@@ -2,6 +2,7 @@ import { Text, View } from "react-native";
 import { Screen } from "../../components/Screen";
 import { DutsCard } from "../../components/DutsCard";
 import { HeroBanner } from "../../components/HeroBanner";
+import { APP_NAME } from "../../lib/brand";
 import { AppButton } from "../../components/AppButton";
 import { disconnectSocket } from "../../hooks/useSocket";
 import { useSessionStore } from "../../stores/session.store";
@@ -18,7 +19,7 @@ export function PendingApprovalScreen() {
   return (
     <Screen>
       <View className="gap-6">
-        <HeroBanner eyebrow="Worker application" title="Pending approval" subtitle="Thanks for applying to DUTS." />
+        <HeroBanner eyebrow="Worker application" title="Pending approval" subtitle={`Thanks for applying to ${APP_NAME}.`} />
         <DutsCard className="gap-4 p-5">
           <Text className="text-base leading-6 text-ink">
             Your worker account has been submitted for review. You&apos;ll be able to accept gigs once your account is

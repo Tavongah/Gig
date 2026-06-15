@@ -16,9 +16,9 @@ export function SegmentedTabs<T extends string>({ tabs, value, onChange }: Segme
           <Pressable
             key={tab.value}
             onPress={() => onChange(tab.value)}
-            className={`flex-1 rounded-xl px-3 py-3 ${selected ? "bg-brand" : "bg-transparent"}`}
+            className={`flex-1 rounded-full px-3 py-3 ${selected ? "bg-brand" : "bg-transparent"}`}
           >
-            <Text className={`text-center text-xs font-black ${selected ? "text-white" : "text-muted"}`}>
+            <Text className={`text-center text-xs font-black ${selected ? "text-white" : "text-brand"}`}>
               {tab.label}
             </Text>
           </Pressable>

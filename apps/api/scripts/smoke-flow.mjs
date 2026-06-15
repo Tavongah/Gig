@@ -50,16 +50,22 @@ const gig = await req("/gigs", {
     location: {
       latitude: 33.749,
       longitude: -84.388,
-      addressLine1: "100 Peachtree St",
+      addressLine1: "100 Peachtree Street NW",
       city: "Atlanta",
       region: "GA",
       postalCode: "30303",
-      country: "US"
+      country: "US",
+      formattedAddress: "100 Peachtree Street NW, Atlanta, GA 30303, USA"
     }
   }
 });
 
 console.log("posted:", gig.gig.status);
+
+await req(`/gigs/${gig.gig.id}/publish`, { method: "POST", token: client.token });
+
+const published = await req(`/gigs/${gig.gig.id}`, { token: client.token });
+console.log("published:", published.gig.status);
 
 const workerPending = await req("/auth/register/worker", {
   method: "POST",

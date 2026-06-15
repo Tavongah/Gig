@@ -17,6 +17,24 @@ export function initials(name: string): string {
     .join("");
 }
 
-export function formatAddress(gig: { addressLine1: string; city: string; region: string }): string {
-  return `${gig.addressLine1}, ${gig.city}, ${gig.region}`;
+export function formatAddress(gig: {
+  addressLine1?: string;
+  city?: string;
+  region?: string;
+  formattedAddress?: string | null;
+  locationSummary?: string;
+}): string {
+  if (gig.formattedAddress && gig.addressLine1) {
+    return gig.formattedAddress;
+  }
+
+  if (gig.addressLine1) {
+    return `${gig.addressLine1}, ${gig.city}, ${gig.region}`;
+  }
+
+  if (gig.locationSummary) {
+    return gig.locationSummary;
+  }
+
+  return `${gig.city ?? ""}${gig.city && gig.region ? ", " : ""}${gig.region ?? ""}`;
 }

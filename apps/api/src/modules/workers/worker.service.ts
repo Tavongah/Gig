@@ -1,7 +1,24 @@
-import { workerAvailabilitySchema, haversineMiles, estimateResponseMinutes } from "@gigflow/shared";
+import { workerAvailabilitySchema, haversineMiles, estimateResponseMinutes, compareWorkersForMatching } from "@gigflow/shared";
 import type { WorkerAvailabilityInput } from "@gigflow/shared";
-import { AccountStatus, AvailabilityStatus } from "@prisma/client";
+import { AccountStatus, AvailabilityStatus, GigStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
+import { getWorkerConnectStatus } from "../payments/payment.service.js";
+import { resolveGeocodedLocation, reverseGeocodeCoordinates } from "../location/geocoding.service.js";
+
+const IN_PROGRESS_GIG_STATUSES: GigStatus[] = [
+  GigStatus.WORKER_ASSIGNED,
+  GigStatus.WORKER_EN_ROUTE,
+  GigStatus.WORKER_ARRIVED,
+  GigStatus.IN_PROGRESS
+];
+
+function formatTransactionType(type: string): string {
+  return type
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 export async function updateWorkerAvailability(userId: string, input: WorkerAvailabilityInput) {
   const parsed = workerAvailabilitySchema.parse(input);
@@ -78,44 +95,124 @@ export async function findAvailableWorkersNearby(latitude: number, longitude: nu
         worker.distanceMiles <= worker.travelRadiusMiles &&
         worker.services.length > 0
     )
-    .sort((left, right) => left.distanceMiles - right.distanceMiles);
+    .sort((left, right) =>
+      compareWorkersForMatching(
+        {
+          userId: left.userId,
+          distanceMiles: left.distanceMiles,
+          ratingAverage: left.ratingAverage,
+          completedGigCount: left.completedGigCount
+        },
+        {
+          userId: right.userId,
+          distanceMiles: right.distanceMiles,
+          ratingAverage: right.ratingAverage,
+          completedGigCount: right.completedGigCount
+        }
+      )
+    );
+}
+
+export async function updateWorkerLocation(
+  userId: string,
+  input: {
+    latitude: number;
+    longitude: number;
+    formattedAddress?: string;
+    query?: string;
+    placeId?: string;
+  }
+) {
+  const address = input.query || input.placeId
+    ? await resolveGeocodedLocation(input)
+    : await reverseGeocodeCoordinates(input.latitude, input.longitude);
+
+  return prisma.workerProfile.update({
+    where: { userId },
+    data: {
+      currentLatitude: address.latitude,
+      currentLongitude: address.longitude,
+      formattedAddress: address.formattedAddress,
+      city: address.city,
+      serviceArea: `${address.city}, ${address.region}`,
+      locationUpdatedAt: new Date()
+    },
+    include: {
+      user: { select: { id: true, fullName: true } },
+      serviceCategories: true
+    }
+  });
 }
 
 export async function getWorkerEarnings(userId: string) {
-  const assignments = await prisma.gigAssignment.findMany({
-    where: { workerId: userId },
-    include: {
-      gig: {
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          workerPayoutCents: true,
-          platformFeeCents: true,
-          totalCents: true,
-          createdAt: true
+  const [profile, assignments, transactions] = await Promise.all([
+    prisma.workerProfile.findUnique({ where: { userId } }),
+    prisma.gigAssignment.findMany({
+      where: { workerId: userId },
+      include: {
+        gig: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            workerPayoutCents: true,
+            platformFeeCents: true,
+            totalCents: true,
+            createdAt: true
+          }
         }
-      }
-    },
-    orderBy: { acceptedAt: "desc" },
-    take: 100
-  });
+      },
+      orderBy: { acceptedAt: "desc" },
+      take: 100
+    }),
+    prisma.workerEarningsTransaction.findMany({
+      where: { workerId: userId },
+      include: {
+        gig: { select: { id: true, title: true } }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50
+    })
+  ]);
 
-  const completed = assignments.filter((assignment) => assignment.gig.status === "COMPLETED");
-  const pending = assignments.filter((assignment) =>
-    ["WORKER_ASSIGNED", "WORKER_EN_ROUTE", "WORKER_ARRIVED", "IN_PROGRESS"].includes(assignment.gig.status)
-  );
+  const connect = await getWorkerConnectStatus(userId);
 
-  const totalEarningsCents = completed.reduce((sum, assignment) => sum + assignment.gig.workerPayoutCents, 0);
+  const completed = assignments.filter((assignment) => assignment.gig.status === GigStatus.COMPLETED);
+  const pending = assignments.filter((assignment) => IN_PROGRESS_GIG_STATUSES.includes(assignment.gig.status));
+
   const pendingEarningsCents = pending.reduce((sum, assignment) => sum + assignment.gig.workerPayoutCents, 0);
   const platformFeesCents = completed.reduce((sum, assignment) => sum + assignment.gig.platformFeeCents, 0);
 
+  const availableBalanceCents = profile?.availableBalanceCents ?? 0;
+  const withdrawnBalanceCents = profile?.withdrawnBalanceCents ?? 0;
+  const totalEarnedCents = profile?.totalEarnedCents ?? 0;
+
   return {
-    totalEarningsCents,
+    totalEarningsCents: totalEarnedCents,
+    availableBalanceCents,
+    withdrawnBalanceCents,
     pendingEarningsCents,
     completedGigCount: completed.length,
     platformFeesCents,
-    payoutStatus: "Payouts coming soon",
+    payoutStatus: connect.payoutsEnabled
+      ? availableBalanceCents > 0
+        ? "Ready to withdraw"
+        : "Stripe connected — earnings credit after gig completion"
+      : connect.accountId
+        ? "Finish Stripe setup to withdraw earnings"
+        : "Connect Stripe to withdraw earnings",
+    stripeConnect: connect,
+    transactions: transactions.map((transaction) => ({
+      id: transaction.id,
+      type: transaction.type,
+      label: formatTransactionType(transaction.type),
+      status: transaction.status,
+      amountCents: transaction.amountCents,
+      gigId: transaction.gigId,
+      gigTitle: transaction.gig?.title ?? null,
+      failureReason: transaction.failureReason,
+      createdAt: transaction.createdAt.toISOString()
+    })),
     recentPayouts: completed.slice(0, 20).map((assignment) => ({
       gigId: assignment.gig.id,
       title: assignment.gig.title,

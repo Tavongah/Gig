@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { Alert, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import type { CompositeNavigationProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../../lib/api";
+import { showAlert, showConfirm } from "../../lib/confirm";
 import { ACTIVE_WORKER_STATUSES, COMPLETED_STATUSES } from "../../lib/gig-status";
 import { TabScreen } from "../../components/TabScreen";
 import { HeroBanner } from "../../components/HeroBanner";
@@ -53,7 +54,7 @@ export function WorkerNearbyGigsScreen() {
           void nearbyQuery.refetch();
         },
         notification: (payload: { title: string; body: string }) => {
-          Alert.alert(payload.title, payload.body);
+          showAlert(payload.title, payload.body);
         }
       }),
       [nearbyQuery]
@@ -69,7 +70,7 @@ export function WorkerNearbyGigsScreen() {
       setShowAcceptAnimation(true);
       setTab("accepted");
     },
-    onError: (error: Error) => Alert.alert("Could not accept", error.message),
+    onError: (error: Error) => showAlert("Could not accept", error.message),
     onSettled: () => setAcceptingId(null)
   });
 
@@ -83,28 +84,22 @@ export function WorkerNearbyGigsScreen() {
   );
 
   function confirmAccept(gigId: string, title: string): void {
-    Alert.alert("Accept this gig?", `Are you sure you want to accept "${title}"?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Accept",
-        onPress: () => {
-          setAcceptingId(gigId);
-          acceptMutation.mutate(gigId);
-        }
-      }
-    ]);
+    showConfirm("Accept this gig?", `Are you sure you want to accept "${title}"?`, () => {
+      setAcceptingId(gigId);
+      acceptMutation.mutate(gigId);
+    }, { confirmLabel: "Accept" });
   }
 
   const emptyCopy = {
     available: {
       emoji: "📡",
       title: "No available gigs",
-      description: "Go Available Now to receive new gigs matching your services."
+      description: "Go online from home to receive new gigs matching your services."
     },
     accepted: {
       emoji: "🧰",
       title: "No accepted gig",
-      description: "Accept a gig from the Available tab to start earning."
+      description: "Accept a gig from home to start earning."
     },
     completed: {
       emoji: "✅",

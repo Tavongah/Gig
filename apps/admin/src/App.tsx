@@ -101,7 +101,7 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
   return (
     <section className="login">
       <p className="eyebrow">Admin access</p>
-      <h1>Sign in to DUTS Ops</h1>
+      <h1>Sign in to GIGFLOW Ops</h1>
       <p className="notice">Use the seeded admin account: admin@gigflow.local / Admin123!</p>
       <label>
         Email
@@ -312,7 +312,7 @@ export function App() {
   return (
     <main>
       <aside>
-        <div className="logo">DUTS</div>
+        <div className="logo">GIGFLOW</div>
         <nav>
           {(
             [

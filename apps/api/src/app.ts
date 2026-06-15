@@ -14,6 +14,9 @@ import { createGigRouter } from "./modules/gigs/gig.routes.js";
 import { workerRouter } from "./modules/workers/worker.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
 import { reviewRouter } from "./modules/reviews/review.routes.js";
+import { paymentRouter } from "./modules/payments/payment.routes.js";
+import { locationRouter } from "./modules/location/location.routes.js";
+import { raw } from "express";
 
 export function createApp(io: Server) {
   const app = express();
@@ -32,7 +35,9 @@ export function createApp(io: Server) {
     })
   );
 
-  app.use(express.json({ limit: "1mb" }));
+  app.use("/v1/payments/webhook", raw({ type: "application/json" }));
+
+  app.use(express.json({ limit: "15mb" }));
 
   app.use(
     rateLimit({
@@ -61,6 +66,8 @@ export function createApp(io: Server) {
 
   app.use("/v1/auth", authRouter);
   app.use("/v1/onboarding", onboardingRouter);
+  app.use("/v1/payments", paymentRouter);
+  app.use("/v1/location", locationRouter);
   app.use("/v1/gigs", createGigRouter(io));
   app.use("/v1/workers", workerRouter);
   app.use("/v1", reviewRouter);

@@ -9,6 +9,7 @@ import {
   ALLOWED_PHOTO_MIME_TYPES,
   GIG_VALIDATION_MESSAGES,
   MAX_GIG_PHOTOS,
+  type GeoPointInput,
   type GigUrgency,
   type PostGigFormValues,
   type PostGigPhoto,
@@ -17,15 +18,15 @@ import {
 } from "@gigflow/shared";
 import { api, ApiValidationError } from "../../lib/api";
 import { TabScreen } from "../../components/TabScreen";
-import { HeroBanner } from "../../components/HeroBanner";
 import { DutsCard } from "../../components/DutsCard";
-import { ServiceCategoryPicker } from "../../components/ServiceCategoryPicker";
+import { ServiceCategorySelect } from "../../components/ServiceCategorySelect";
 import { FormInput } from "../../components/FormInput";
 import { TextAreaInput } from "../../components/TextAreaInput";
 import { SelectButtonGroup } from "../../components/SelectButtonGroup";
 import { LoadingButton } from "../../components/LoadingButton";
 import { PriceEstimateCard } from "../../components/PriceEstimateCard";
-import { ErrorMessage } from "../../components/ErrorMessage";
+import { CollapsibleSection } from "../../components/CollapsibleSection";
+import { AddressAutocomplete } from "../../components/AddressAutocomplete";
 import type { ClientTabParamList, RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 
@@ -64,7 +65,6 @@ export function ClientPostScreen() {
   const navigation = useNavigation<NavigationProp>();
   const queryClient = useQueryClient();
 
-  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [estimatedHours, setEstimatedHours] = useState("2");
   const [urgency, setUrgency] = useState<GigUrgency>("STANDARD");
@@ -72,6 +72,7 @@ export function ClientPostScreen() {
     route.params?.serviceCategoryId ?? null
   );
   const [locationAddress, setLocationAddress] = useState("");
+  const [confirmedLocation, setConfirmedLocation] = useState<GeoPointInput | null>(null);
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
   const [photos, setPhotos] = useState<PostGigPhoto[]>([]);
@@ -97,10 +98,15 @@ export function ClientPostScreen() {
     }
   }, [route.params?.serviceCategoryId]);
 
+  const selectedCategory = useMemo(
+    () => (categoriesQuery.data?.mvp ?? []).find((category) => category.id === selectedCategoryId) ?? null,
+    [categoriesQuery.data?.mvp, selectedCategoryId]
+  );
+
   const formValues = useMemo<PostGigFormValues>(
     () => ({
       serviceCategoryId: selectedCategoryId,
-      title,
+      serviceCategoryName: selectedCategory?.name ?? null,
       description,
       estimatedHours,
       locationAddress,
@@ -109,10 +115,13 @@ export function ClientPostScreen() {
       preferredTime,
       photos
     }),
-    [description, estimatedHours, locationAddress, photos, preferredDate, preferredTime, selectedCategoryId, title, urgency]
+    [description, estimatedHours, locationAddress, photos, preferredDate, preferredTime, selectedCategory, selectedCategoryId, urgency]
   );
 
-  const validation = useMemo(() => validatePostGigForm(formValues, allowedCategoryIds), [allowedCategoryIds, formValues]);
+  const validation = useMemo(
+    () => validatePostGigForm(formValues, allowedCategoryIds, confirmedLocation),
+    [allowedCategoryIds, confirmedLocation, formValues]
+  );
   const visibleErrors = submitAttempted ? { ...validation.errors, ...fieldErrors } : fieldErrors;
 
   const { mutate: runEstimate, isPending: isEstimating, data: estimateData } = useMutation({
@@ -129,7 +138,7 @@ export function ClientPostScreen() {
     mutationFn: () => api.createGig(validation.payload!, session.token),
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ["my-gigs"] });
-      navigation.navigate("GigTracking", { gigId: result.gig.id });
+      navigation.navigate("GigPayment", { gigId: result.gig.id });
     },
     onError: (error: Error) => {
       if (error instanceof ApiValidationError) {
@@ -191,7 +200,7 @@ export function ClientPostScreen() {
   function handleSubmit(): void {
     setSubmitAttempted(true);
     setFieldErrors(EMPTY_ERRORS);
-    const result = validatePostGigForm(formValues, allowedCategoryIds);
+    const result = validatePostGigForm(formValues, allowedCategoryIds, confirmedLocation);
     if (!result.success || !result.payload) {
       setFieldErrors(result.errors);
       return;
@@ -201,15 +210,11 @@ export function ClientPostScreen() {
 
   return (
     <TabScreen>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-        <HeroBanner
-          eyebrow="Post a gig"
-          title="What do you need done?"
-          subtitle="Get an instant price estimate and broadcast to verified workers nearby."
-        />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 28, gap: 12 }}>
+        <Text className="px-1 text-xs font-bold uppercase tracking-[2px] text-brand">Post a gig</Text>
 
-        <DutsCard className="mt-2 gap-4 p-5">
-          <ServiceCategoryPicker
+        <DutsCard className="gap-3 p-4">
+          <ServiceCategorySelect
             mvp={categoriesQuery.data?.mvp ?? []}
             comingSoon={categoriesQuery.data?.comingSoon}
             selectedId={selectedCategoryId}
@@ -217,19 +222,7 @@ export function ClientPostScreen() {
               setSelectedCategoryId(categoryId);
               setFieldErrors((current) => clearFieldError(current, "serviceType"));
             }}
-          />
-          <ErrorMessage message={visibleErrors.serviceType} />
-
-          <FormInput
-            label="Job title"
-            value={title}
-            onChangeText={(value) => {
-              setTitle(value);
-              setFieldErrors((current) => clearFieldError(current, "title"));
-            }}
-            placeholder="e.g. Help move couch to second floor"
-            maxLength={80}
-            error={visibleErrors.title}
+            error={visibleErrors.serviceType}
           />
 
           <TextAreaInput
@@ -239,7 +232,7 @@ export function ClientPostScreen() {
               setDescription(value);
               setFieldErrors((current) => clearFieldError(current, "description"));
             }}
-            placeholder="Describe the job, tools needed, and access details..."
+            placeholder="What needs to be done? Include access details if helpful."
             maxLength={1000}
             error={visibleErrors.description}
           />
@@ -253,66 +246,81 @@ export function ClientPostScreen() {
             error={visibleErrors.estimatedHours}
           />
 
-          <FormInput
-            label="Location / address"
+          <AddressAutocomplete
+            token={session.token}
+            label="Location"
             value={locationAddress}
             onChangeText={(value) => {
               setLocationAddress(value);
               setFieldErrors((current) => clearFieldError(current, "location"));
             }}
-            placeholder="Street address or full job location"
-            maxLength={150}
+            selectedLocation={confirmedLocation}
+            onLocationResolved={(location) => {
+              setConfirmedLocation(location);
+              setFieldErrors((current) => clearFieldError(current, "location"));
+            }}
+            onLocationCleared={() => setConfirmedLocation(null)}
             error={visibleErrors.location}
           />
 
-          <SelectButtonGroup
-            label="Urgency"
-            options={URGENCIES}
-            value={urgency}
-            onChange={(value) => {
-              setUrgency(value);
-              setFieldErrors((current) => clearFieldError(current, "urgency"));
-            }}
-            error={visibleErrors.urgency}
-          />
+          <CollapsibleSection title="More options" subtitle="Urgency, schedule, and photos">
+            <View className="gap-3">
+              <SelectButtonGroup
+                label="Urgency"
+                options={URGENCIES}
+                value={urgency}
+                onChange={(value) => {
+                  setUrgency(value);
+                  setFieldErrors((current) => clearFieldError(current, "urgency"));
+                }}
+                error={visibleErrors.urgency}
+              />
 
-          <View className="gap-2">
-            <Text className="text-sm font-bold uppercase tracking-wider text-muted">Preferred date and time</Text>
-            <View className="flex-row gap-2">
-              <FormInput
-                label=""
-                value={preferredDate}
-                onChangeText={(value) => {
-                  setPreferredDate(value);
-                  setFieldErrors((current) => clearFieldError(current, "preferredDateTime"));
-                }}
-                placeholder="YYYY-MM-DD"
-                className="flex-1"
-              />
-              <FormInput
-                label=""
-                value={preferredTime}
-                onChangeText={(value) => {
-                  setPreferredTime(value);
-                  setFieldErrors((current) => clearFieldError(current, "preferredDateTime"));
-                }}
-                placeholder="HH:MM"
-                className="w-28"
-              />
+              <View className="gap-2">
+                <Text className="text-sm font-bold uppercase tracking-wider text-label">Preferred date & time</Text>
+                <Text className="text-xs text-muted">When would you like the job to start?</Text>
+                <View className="flex-row gap-2">
+                  <FormInput
+                    label=""
+                    value={preferredDate}
+                    onChangeText={(value) => {
+                      setPreferredDate(value);
+                      setFieldErrors((current) => clearFieldError(current, "preferredDateTime"));
+                    }}
+                    placeholder="YYYY-MM-DD"
+                    className="flex-1"
+                  />
+                  <FormInput
+                    label=""
+                    value={preferredTime}
+                    onChangeText={(value) => {
+                      setPreferredTime(value);
+                      setFieldErrors((current) => clearFieldError(current, "preferredDateTime"));
+                    }}
+                    placeholder="HH:MM"
+                    className="w-28"
+                  />
+                </View>
+                {visibleErrors.preferredDateTime ? (
+                  <Text className="text-sm text-orange">{visibleErrors.preferredDateTime}</Text>
+                ) : null}
+              </View>
+
+              <View className="gap-2">
+                <Text className="text-sm font-bold uppercase tracking-wider text-label">Photos</Text>
+                <Text className="text-xs text-muted">Optional—helps workers understand the job.</Text>
+                <Pressable
+                  onPress={() => void pickPhotos()}
+                  className="rounded-2xl border border-dashed border-border px-4 py-3 active:opacity-80"
+                >
+                  <Text className="text-center text-sm font-semibold text-muted">
+                    {photos.length > 0 ? `${photos.length} photo(s) added` : "Add photos"}
+                  </Text>
+                </Pressable>
+                {visibleErrors.photos ? <Text className="text-sm text-orange">{visibleErrors.photos}</Text> : null}
+              </View>
             </View>
-            <ErrorMessage message={visibleErrors.preferredDateTime} />
-          </View>
-
-          <View className="gap-2">
-            <Text className="text-sm font-bold uppercase tracking-wider text-muted">Photos</Text>
-            <Pressable onPress={() => void pickPhotos()} className="rounded-2xl border border-dashed border-slate-300 px-4 py-4">
-              <Text className="text-center font-bold text-muted">
-                {photos.length > 0 ? `${photos.length} photo(s) added` : "Add photos (optional)"}
-              </Text>
-              <Text className="mt-1 text-center text-xs text-muted">JPG, PNG, or WEBP up to 5MB each</Text>
-            </Pressable>
-            <ErrorMessage message={visibleErrors.photos} />
-          </View>
+          </CollapsibleSection>
 
           <PriceEstimateCard
             estimate={estimateData?.estimate}

@@ -27,32 +27,17 @@ export function SelectButtonGroup<T extends string>({
       <View className="flex-row gap-2">
         {options.map((option) => {
           const selected = value === option.value;
-          const isSoon = option.value === "SOON";
-          const isUrgent = option.value === "URGENT";
-
-          let containerClass = "bg-card border border-border";
-          let textClass = "text-ink";
-          let hintClass = "text-muted";
-
-          if (selected && isUrgent) {
-            containerClass = "bg-magenta border border-magenta";
-            textClass = "text-white";
-            hintClass = "text-white/90";
-          } else if (selected && isSoon) {
-            containerClass = "bg-card border-2 border-orange";
-            textClass = "text-orange";
-            hintClass = "text-orange";
-          } else if (selected) {
-            containerClass = "bg-card border-2 border-brand";
-            textClass = "text-brand";
-            hintClass = "text-brand";
-          }
+          const containerClass = selected
+            ? "bg-brand border border-brand"
+            : "bg-card border border-brand";
+          const textClass = selected ? "text-white" : "text-brand";
+          const hintClass = selected ? "text-white/90" : "text-brand/80";
 
           return (
             <Pressable
               key={option.value}
               onPress={() => onChange(option.value)}
-              className={`flex-1 rounded-2xl px-3 py-3 ${containerClass}`}
+              className={`flex-1 rounded-full px-3 py-3 ${containerClass}`}
             >
               <Text className={`text-center text-xs font-black ${textClass}`}>{option.label}</Text>
               {option.hint ? (

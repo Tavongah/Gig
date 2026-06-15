@@ -1,10 +1,21 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import type { CompositeNavigationProp } from "@react-navigation/native";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { AppButton } from "../../components/AppButton";
 import { TabScreen } from "../../components/TabScreen";
 import { DutsCard } from "../../components/DutsCard";
 import { HeroBanner } from "../../components/HeroBanner";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { disconnectSocket } from "../../hooks/useSocket";
+import type { RootStackParamList, WorkerTabParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
+
+type NavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<WorkerTabParamList, "Profile">,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 export function ProfileScreen() {
   const session = useSessionStore((state) => state.session)!;
@@ -12,6 +23,7 @@ export function ProfileScreen() {
   const activeRole = useSessionStore((state) => state.activeRole);
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
   const signOut = useSessionStore((state) => state.signOut);
+  const navigation = useNavigation<NavigationProp>();
 
   function handleSignOut(): void {
     disconnectSocket();
@@ -37,11 +49,11 @@ export function ProfileScreen() {
                   <Pressable
                     key={role}
                     onPress={() => setActiveRole(role)}
-                    className={`flex-1 rounded-2xl px-4 py-4 ${
-                      selected ? "bg-brand" : "border border-border bg-surface"
+                    className={`flex-1 rounded-full px-4 py-4 ${
+                      selected ? "bg-brand" : "border border-brand bg-card"
                     }`}
                   >
-                    <Text className={`text-center font-black ${selected ? "text-white" : "text-label"}`}>
+                    <Text className={`text-center font-black ${selected ? "text-white" : "text-brand"}`}>
                       {role === "CLIENT" ? "Hire" : "Work"}
                     </Text>
                   </Pressable>
@@ -79,12 +91,13 @@ export function ProfileScreen() {
                 </Text>
               </View>
             </View>
+            <Pressable onPress={() => navigation.navigate("WorkerWorkPreferences")}>
+              <Text className="font-bold text-brand">Work preferences →</Text>
+            </Pressable>
           </DutsCard>
         ) : null}
 
-        <Pressable onPress={handleSignOut} className="rounded-2xl border border-danger bg-card px-5 py-4">
-          <Text className="text-center font-black text-danger">Sign out</Text>
-        </Pressable>
+        <AppButton label="Sign out" variant="secondary" onPress={handleSignOut} />
       </ScrollView>
     </TabScreen>
   );

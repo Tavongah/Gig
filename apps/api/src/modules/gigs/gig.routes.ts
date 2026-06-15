@@ -32,6 +32,8 @@ import {
 
   listWorkerGigs,
 
+  publishGigWithoutPayment,
+
   updateGigStatus
 
 } from "./gig.service.js";
@@ -107,6 +109,28 @@ export function createGigRouter(io: Server): Router {
       const gig = await createGig(req.auth!.userId, req.body, io);
 
       res.status(201).json({ gig });
+
+    } catch (error) {
+
+      next(error);
+
+    }
+
+  });
+
+
+
+  router.post("/:gigId/publish", requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN), async (req, res, next) => {
+
+    try {
+
+      const gigId = String(req.params.gigId);
+
+      await publishGigWithoutPayment(gigId, req.auth!.userId);
+
+      const gig = await getGigDetail(gigId, req.auth!.userId);
+
+      res.json({ gig });
 
     } catch (error) {
 

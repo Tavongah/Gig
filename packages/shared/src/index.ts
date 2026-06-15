@@ -67,6 +67,27 @@ export type OnboardingInput = z.infer<typeof onboardingSchema>;
 export type WorkerAvailabilityInput = z.infer<typeof workerAvailabilitySchema>;
 
 import type { GigEstimateInput } from "./gig-validation.js";
+import {
+  estimateResponseMinutes as locationEstimateResponseMinutes,
+  haversineMiles as locationHaversineMiles
+} from "./location.js";
+
+export {
+  DEFAULT_MATCHING_RADIUS_MILES,
+  GIG_SEARCHING_STATUSES,
+  MAX_COORDINATE_DRIFT_MILES,
+  compareWorkersForMatching,
+  coordinatesAreConsistent,
+  formatDistanceMiles,
+  getEffectiveMatchingRadiusMiles,
+  getGigMatchingRadiusMiles,
+  isWithinMatchingRadius,
+  type AddressSuggestion,
+  type GeocodedAddress,
+  type GigSize,
+  type GigUrgency as LocationGigUrgency,
+  type RankedWorkerCandidate
+} from "./location.js";
 
 export {
   ALLOWED_PHOTO_MIME_TYPES,
@@ -97,6 +118,7 @@ export {
 } from "./gig-validation.js";
 
 export { createReviewSchema, type CreateReviewInput } from "./review-validation.js";
+export { paymentLifecycleStatuses, type PaymentLifecycleStatus } from "./payment.js";
 
 export {
   accountStatuses,
@@ -177,23 +199,10 @@ export function calculatePriceEstimate(
   };
 }
 
-export function haversineMiles(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const toRad = (value: number) => (value * Math.PI) / 180;
-  const earthRadiusMiles = 3958.8;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-
-  return earthRadiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+export function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  return locationHaversineMiles(lat1, lon1, lat2, lon2);
 }
 
 export function estimateResponseMinutes(distanceMiles: number): number {
-  return Math.max(5, Math.round(distanceMiles * 4 + 8));
+  return locationEstimateResponseMinutes(distanceMiles);
 }

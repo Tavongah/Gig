@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { FlatList, KeyboardAvoidingView, Platform, Text, TextInput, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import type { RouteProp } from "@react-navigation/native";
 import { useRoute } from "@react-navigation/native";
 import { api, type ChatMessage } from "../../lib/api";
+import { AppButton } from "../../components/AppButton";
 import { DUTS } from "../../lib/theme";
 import { useSocket } from "../../hooks/useSocket";
 import { useSessionStore } from "../../stores/session.store";
@@ -109,9 +110,7 @@ export function ChatScreen() {
           placeholderTextColor={DUTS.placeholder}
           multiline
         />
-        <Pressable onPress={sendMessage} className="rounded-2xl bg-brand px-5 py-3">
-          <Text className="font-black text-white">Send</Text>
-        </Pressable>
+        <AppButton label="Send" onPress={sendMessage} variant="primary" size="md" />
       </View>
     </KeyboardAvoidingView>
   );

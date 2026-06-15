@@ -3,7 +3,8 @@ import { env } from "./env.js";
 
 export const redis = new Redis(env.REDIS_URL, {
   maxRetriesPerRequest: 3,
-  lazyConnect: true
+  lazyConnect: true,
+  family: 0
 });
 
 export async function connectRedis(): Promise<void> {

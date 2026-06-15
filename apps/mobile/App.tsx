@@ -48,6 +48,17 @@ import { SuspendedScreen } from "./src/screens/auth/SuspendedScreen";
 
 import { isWorkerUser, workerGateStatus } from "./src/lib/auth";
 
+const linking = {
+  prefixes: ["http://localhost:8081", "http://localhost:19006", "gigflow://"],
+  config: {
+    screens: {
+      PaymentSuccess: "payment-success",
+      PaymentFailed: "payment-failed",
+      WorkerStripeConnect: "connect-return"
+    }
+  }
+};
+
 
 
 if (Platform.OS === "web") {
@@ -124,7 +135,7 @@ function Shell() {
 
     return (
 
-      <NavigationContainer>
+      <NavigationContainer linking={linking}>
 
         <AuthNavigator />
 
@@ -176,7 +187,7 @@ function Shell() {
 
   return (
 
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
 
       <AppNavigator />
 

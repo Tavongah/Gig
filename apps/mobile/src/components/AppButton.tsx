@@ -1,13 +1,17 @@
 import { ActivityIndicator, Pressable, Text } from "react-native";
 
-type AppButtonVariant = "primary" | "secondary" | "accept" | "urgent" | "cancel" | "danger";
+export type AppButtonVariant = "primary" | "secondary";
+
+type LegacyButtonVariant = "accept" | "urgent" | "cancel" | "danger";
+
+export type AppButtonVariantInput = AppButtonVariant | LegacyButtonVariant;
 
 interface AppButtonProps {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
-  variant?: AppButtonVariant;
+  variant?: AppButtonVariantInput;
   size?: "md" | "lg";
 }
 
@@ -21,28 +25,15 @@ const VARIANTS: Record<AppButtonVariant, { container: string; text: string; disa
     container: "bg-card border border-brand",
     text: "text-brand",
     disabledContainer: "bg-disabled border border-border"
-  },
-  accept: {
-    container: "bg-success",
-    text: "text-white",
-    disabledContainer: "bg-disabled"
-  },
-  urgent: {
-    container: "bg-orange",
-    text: "text-white",
-    disabledContainer: "bg-disabled"
-  },
-  cancel: {
-    container: "bg-card border border-danger",
-    text: "text-danger",
-    disabledContainer: "bg-disabled border border-border"
-  },
-  danger: {
-    container: "bg-danger",
-    text: "text-white",
-    disabledContainer: "bg-disabled"
   }
 };
+
+function resolveVariant(variant: AppButtonVariantInput): AppButtonVariant {
+  if (variant === "secondary" || variant === "cancel") {
+    return "secondary";
+  }
+  return "primary";
+}
 
 export function AppButton({
   label,
@@ -53,7 +44,8 @@ export function AppButton({
   size = "lg"
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
-  const styles = VARIANTS[variant];
+  const resolved = resolveVariant(variant);
+  const styles = VARIANTS[resolved];
   const padding = size === "lg" ? "px-6 py-4" : "px-5 py-3";
   const textSize = size === "lg" ? "text-base" : "text-sm";
 
@@ -61,10 +53,10 @@ export function AppButton({
     <Pressable
       disabled={isDisabled}
       onPress={onPress}
-      className={`rounded-2xl ${padding} ${isDisabled ? styles.disabledContainer : styles.container} active:opacity-90`}
+      className={`rounded-full ${padding} ${isDisabled ? styles.disabledContainer : styles.container} active:opacity-90`}
     >
       {loading ? (
-        <ActivityIndicator color={variant === "secondary" || variant === "cancel" ? "#6A1B9A" : "#FFFFFF"} />
+        <ActivityIndicator color={resolved === "secondary" ? "#6A1B9A" : "#FFFFFF"} />
       ) : (
         <Text
           className={`text-center font-black ${textSize} ${isDisabled ? "text-disabled-text" : styles.text}`}

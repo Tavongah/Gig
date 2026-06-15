@@ -96,7 +96,7 @@ async function main(): Promise<void> {
   await prisma.user.upsert({
     where: { email: "admin@gigflow.local" },
     update: {
-      fullName: "GigFlow Admin",
+      fullName: "GIGFLOW Admin",
       roles: ["ADMIN", "CLIENT"],
       defaultRole: "ADMIN",
       accountStatus: AccountStatus.ACTIVE,
@@ -105,7 +105,7 @@ async function main(): Promise<void> {
     },
     create: {
       email: "admin@gigflow.local",
-      fullName: "GigFlow Admin",
+      fullName: "GIGFLOW Admin",
       roles: ["ADMIN", "CLIENT"],
       defaultRole: "ADMIN",
       accountStatus: AccountStatus.ACTIVE,

@@ -12,19 +12,33 @@ import {
 
   haversineMiles,
 
-  estimateResponseMinutes
+  estimateResponseMinutes,
+
+  getGigMatchingRadiusMiles,
+
+  isWithinMatchingRadius
 
 } from "@gigflow/shared";
 
 import type { CreateGigInput, GigEstimateInput } from "@gigflow/shared";
 
-import { AccountStatus, AvailabilityStatus, GigStatus, LaunchPhase, PaymentStatus, Prisma, UserRole } from "@prisma/client";
+import { AccountStatus, AvailabilityStatus, GigStatus, LaunchPhase, PaymentLifecycle, PaymentStatus, Prisma, UserRole } from "@prisma/client";
 
 import { prisma } from "../../config/prisma.js";
 
 import { AppError } from "../../lib/errors.js";
+import { isStripeConfigured } from "../../lib/stripe.js";
 
 import { broadcastGigOffer, notifyUser } from "../realtime/realtime.service.js";
+import {
+  assertGigIsPaid,
+  assertWorkerCanAcceptGigs,
+  processWorkerPayout,
+  publishGigDevWithoutPayment,
+  releaseAuthorizedPayment
+} from "../payments/payment.service.js";
+import { resolveGeocodedLocation } from "../location/geocoding.service.js";
+import { sanitizeGigForViewer, toGeoPointInput } from "../location/gig-privacy.js";
 
 
 
@@ -90,6 +104,20 @@ export async function estimateGig(input: GigEstimateInput) {
 
   const category = await getMvpCategory(parsed.serviceCategoryId);
 
+  const validatedLocation = await resolveGeocodedLocation({
+    latitude: parsed.location.latitude,
+    longitude: parsed.location.longitude,
+    formattedAddress: parsed.location.formattedAddress,
+    addressLine1: parsed.location.addressLine1,
+    city: parsed.location.city,
+    region: parsed.location.region,
+    postalCode: parsed.location.postalCode,
+    country: parsed.location.country,
+    query: parsed.location.formattedAddress
+  });
+
+  parsed.location = toGeoPointInput(validatedLocation);
+
 
 
   return calculatePriceEstimate(parsed, {
@@ -108,15 +136,27 @@ export async function estimateGig(input: GigEstimateInput) {
 
 
 
-export async function createGig(clientId: string, input: CreateGigInput, io: Server) {
+export async function createGig(clientId: string, input: CreateGigInput, _io: Server) {
 
   const parsed = createGigSchema.parse(input);
 
-  const category = await getMvpCategory(parsed.serviceCategoryId);
+  await getMvpCategory(parsed.serviceCategoryId);
+
+  const validatedLocation = await resolveGeocodedLocation({
+    latitude: parsed.location.latitude,
+    longitude: parsed.location.longitude,
+    formattedAddress: parsed.location.formattedAddress,
+    addressLine1: parsed.location.addressLine1,
+    city: parsed.location.city,
+    region: parsed.location.region,
+    postalCode: parsed.location.postalCode,
+    country: parsed.location.country,
+    query: parsed.location.formattedAddress
+  });
+
+  parsed.location = toGeoPointInput(validatedLocation);
 
   const price = await estimateGig(parsed);
-
-
 
   const gig = await prisma.gig.create({
 
@@ -130,7 +170,9 @@ export async function createGig(clientId: string, input: CreateGigInput, io: Ser
 
       description: parsed.description,
 
-      status: GigStatus.SEARCHING_FOR_WORKER,
+      status: GigStatus.DRAFT,
+
+      paymentStatus: PaymentLifecycle.PAYMENT_PENDING,
 
       urgency: parsed.urgency,
 
@@ -155,6 +197,8 @@ export async function createGig(clientId: string, input: CreateGigInput, io: Ser
       postalCode: parsed.location.postalCode,
 
       country: parsed.location.country,
+
+      formattedAddress: parsed.location.formattedAddress,
 
       latitude: parsed.location.latitude,
 
@@ -188,46 +232,15 @@ export async function createGig(clientId: string, input: CreateGigInput, io: Ser
 
     },
 
-    include: { serviceCategory: true }
+    include: { serviceCategory: true, payment: true }
 
   });
-
-
-
-  await broadcastGigOffer(io, {
-
-    gigId: gig.id,
-
-    title: gig.title,
-
-    serviceCategoryId: gig.serviceCategoryId,
-
-    serviceCategoryName: category.name,
-
-    latitude: Number(gig.latitude),
-
-    longitude: Number(gig.longitude),
-
-    totalCents: gig.totalCents,
-
-    workerPayoutCents: gig.workerPayoutCents,
-
-    startsAt: gig.startsAt.toISOString(),
-
-    urgency: gig.urgency,
-
-    estimatedHours: Number(gig.estimatedHours)
-
-  });
-
-
-
-  io.to(`gig:${gig.id}`).to(`user:${clientId}`).emit("gig:status", { gig });
-
-
 
   return gig;
+}
 
+export async function publishGigWithoutPayment(gigId: string, clientId: string): Promise<void> {
+  await publishGigDevWithoutPayment(gigId, clientId);
 }
 
 
@@ -264,9 +277,12 @@ export async function findNearbyGigs(workerId: string) {
 
 
 
-  const workerLat = Number(worker.workerProfile.currentLatitude ?? 33.749);
+  const workerLat = Number(worker.workerProfile.currentLatitude);
+  const workerLng = Number(worker.workerProfile.currentLongitude);
 
-  const workerLng = Number(worker.workerProfile.currentLongitude ?? -84.388);
+  if (!Number.isFinite(workerLat) || !Number.isFinite(workerLng)) {
+    return [];
+  }
 
   const travelRadiusMiles = Number(worker.workerProfile.travelDistanceMiles);
 
@@ -279,6 +295,8 @@ export async function findNearbyGigs(workerId: string) {
     where: {
 
       status: { in: SEARCHING_STATUSES },
+
+      ...(isStripeConfigured() ? { paymentStatus: PaymentLifecycle.PAYMENT_AUTHORIZED } : {}),
 
       serviceCategoryId: { in: serviceCategoryIds },
 
@@ -301,40 +319,48 @@ export async function findNearbyGigs(workerId: string) {
     .map((gig) => {
 
       const distanceMiles = haversineMiles(workerLat, workerLng, Number(gig.latitude), Number(gig.longitude));
+      const gigRadiusMiles = getGigMatchingRadiusMiles(gig.urgency, gig.size);
+      const roundedDistance = Math.round(distanceMiles * 10) / 10;
 
       return {
-
-        ...gig,
-
-        distanceMiles: Math.round(distanceMiles * 10) / 10,
-
+        gig,
+        distanceMiles: roundedDistance,
+        gigRadiusMiles,
         estimatedResponseMinutes: estimateResponseMinutes(distanceMiles)
-
       };
 
     })
 
-    .filter((gig) => gig.distanceMiles <= travelRadiusMiles)
+    .filter((item) =>
+      isWithinMatchingRadius(
+        workerLat,
+        workerLng,
+        Number(item.gig.latitude),
+        Number(item.gig.longitude),
+        item.gigRadiusMiles,
+        travelRadiusMiles
+      )
+    )
 
     .sort((left, right) => {
 
-      const createdDiff = right.createdAt.getTime() - left.createdAt.getTime();
-
-      if (createdDiff !== 0) {
-
-        return createdDiff;
-
+      if (left.distanceMiles !== right.distanceMiles) {
+        return left.distanceMiles - right.distanceMiles;
       }
 
-      if (right.workerPayoutCents !== left.workerPayoutCents) {
-
-        return right.workerPayoutCents - left.workerPayoutCents;
-
+      if (right.gig.workerPayoutCents !== left.gig.workerPayoutCents) {
+        return right.gig.workerPayoutCents - left.gig.workerPayoutCents;
       }
 
-      return left.distanceMiles - right.distanceMiles;
+      return right.gig.createdAt.getTime() - left.gig.createdAt.getTime();
 
-    });
+    })
+
+    .map((item) => ({
+      ...sanitizeGigForViewer(item.gig, workerId, { distanceMiles: item.distanceMiles }),
+      distanceMiles: item.distanceMiles,
+      estimatedResponseMinutes: item.estimatedResponseMinutes
+    }));
 
 }
 
@@ -342,10 +368,47 @@ export async function findNearbyGigs(workerId: string) {
 
 export async function acceptGig(gigId: string, workerId: string, io?: Server) {
 
-  const worker = await prisma.user.findUnique({ where: { id: workerId } });
+  const worker = await prisma.user.findUnique({
+    where: { id: workerId },
+    include: { workerProfile: true }
+  });
   if (!worker || worker.accountStatus !== AccountStatus.APPROVED) {
     throw new AppError("FORBIDDEN", 403, "WORKER_NOT_APPROVED", { worker: "Worker account is not approved" });
   }
+
+  const gigBeforeAccept = await prisma.gig.findUnique({ where: { id: gigId } });
+  if (!gigBeforeAccept) {
+    throw new AppError("NOT_FOUND", 404, "NOT_FOUND", { gig: "Gig not found" });
+  }
+
+  const workerLat = Number(worker.workerProfile?.currentLatitude);
+  const workerLng = Number(worker.workerProfile?.currentLongitude);
+  const travelRadiusMiles = Number(worker.workerProfile?.travelDistanceMiles ?? 10);
+
+  if (!Number.isFinite(workerLat) || !Number.isFinite(workerLng)) {
+    throw new AppError("WORKER_LOCATION_REQUIRED", 400, "WORKER_LOCATION_REQUIRED", {
+      location: "Set your current location before accepting gigs."
+    });
+  }
+
+  const gigRadiusMiles = getGigMatchingRadiusMiles(gigBeforeAccept.urgency, gigBeforeAccept.size);
+  if (
+    !isWithinMatchingRadius(
+      workerLat,
+      workerLng,
+      Number(gigBeforeAccept.latitude),
+      Number(gigBeforeAccept.longitude),
+      gigRadiusMiles,
+      travelRadiusMiles
+    )
+  ) {
+    throw new AppError("GIG_TOO_FAR", 403, "GIG_TOO_FAR", {
+      location: "This gig is outside your travel radius."
+    });
+  }
+
+  await assertGigIsPaid(gigId);
+  await assertWorkerCanAcceptGigs(workerId);
 
   const gig = await prisma.$transaction(async (tx) => {
 
@@ -377,6 +440,11 @@ export async function acceptGig(gigId: string, workerId: string, io?: Server) {
 
       }
 
+    });
+
+    await tx.gig.update({
+      where: { id: gigId },
+      data: { assignedWorkerId: workerId }
     });
 
 
@@ -670,15 +738,7 @@ export async function updateGigStatus(gigId: string, userId: string, nextStatus:
 
 
   if (isClient && nextStatus === GigStatus.CANCELLED) {
-
-    await prisma.payment.updateMany({
-
-      where: { gigId },
-
-      data: { status: PaymentStatus.REFUNDED }
-
-    });
-
+    await releaseAuthorizedPayment(gigId);
   }
 
 
@@ -743,6 +803,12 @@ export async function updateGigStatus(gigId: string, userId: string, nextStatus:
 
 
 
+  if (nextStatus === GigStatus.COMPLETED) {
+    await processWorkerPayout(gigId);
+  }
+
+
+
   if (io) {
 
     const notice = notificationForStatus(nextStatus, updatedGig.title);
@@ -771,7 +837,7 @@ export async function listClientGigs(clientId: string) {
 
     where: { clientId },
 
-    include: { serviceCategory: true, assignments: { include: { worker: true } } },
+    include: { serviceCategory: true, payment: { select: { status: true, amountCents: true } }, assignments: { include: { worker: true } } },
 
     orderBy: { createdAt: "desc" },
 
@@ -869,19 +935,70 @@ export async function getGigDetail(gigId: string, userId: string) {
 
   const isClient = gig.clientId === userId;
 
-  const isWorker = gig.assignments.some((assignment) => assignment.workerId === userId);
+  const isAssignedWorker = gig.assignments.some((assignment) => assignment.workerId === userId);
+
+  const isSearchingGig = SEARCHING_STATUSES.includes(gig.status);
+
+  const viewer = await prisma.user.findUnique({
+
+    where: { id: userId },
+
+    include: { workerProfile: true }
+
+  });
+
+  const isApprovedWorker =
+    Boolean(viewer?.roles.includes(UserRole.WORKER)) &&
+    viewer?.accountStatus === AccountStatus.APPROVED &&
+    Boolean(viewer.workerProfile);
 
 
 
-  if (!isClient && !isWorker) {
+  if (!isClient && !isAssignedWorker) {
 
-    throw new Error("FORBIDDEN");
+    if (!(isApprovedWorker && isSearchingGig)) {
+
+      throw new Error("FORBIDDEN");
+
+    }
+
+    const workerLat = Number(viewer!.workerProfile!.currentLatitude);
+    const workerLng = Number(viewer!.workerProfile!.currentLongitude);
+    const travelRadiusMiles = Number(viewer!.workerProfile!.travelDistanceMiles);
+
+    if (!Number.isFinite(workerLat) || !Number.isFinite(workerLng)) {
+      throw new AppError("WORKER_LOCATION_REQUIRED", 400, "WORKER_LOCATION_REQUIRED", {
+        location: "Set your current location before viewing nearby gigs."
+      });
+    }
+
+    const gigRadiusMiles = getGigMatchingRadiusMiles(gig.urgency, gig.size);
+    if (
+      !isWithinMatchingRadius(
+        workerLat,
+        workerLng,
+        Number(gig.latitude),
+        Number(gig.longitude),
+        gigRadiusMiles,
+        travelRadiusMiles
+      )
+    ) {
+      throw new AppError("GIG_TOO_FAR", 403, "GIG_TOO_FAR", {
+        location: "This gig is outside your travel radius."
+      });
+    }
+
+    const distanceMiles = Math.round(
+      haversineMiles(workerLat, workerLng, Number(gig.latitude), Number(gig.longitude)) * 10
+    ) / 10;
+
+    return sanitizeGigForViewer(gig, userId, { distanceMiles });
 
   }
 
 
 
-  return gig;
+  return sanitizeGigForViewer(gig, userId);
 
 }
 
