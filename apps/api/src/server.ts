@@ -34,18 +34,29 @@ async function shutdown(): Promise<void> {
   process.exit(0);
 }
 
-async function bootstrap(): Promise<void> {
-  try {
-    await connectRedis();
-    console.log("Redis connected");
-  } catch (error) {
-    console.error("Redis connection failed:", error);
-    throw error;
+async function connectRedisWithRetry(maxAttempts = 30, delayMs = 5000): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await connectRedis();
+      console.log("Redis connected");
+      return;
+    } catch (error) {
+      console.error(`Redis connection failed (attempt ${attempt}/${maxAttempts}):`, error);
+      if (attempt === maxAttempts) {
+        console.error("Continuing without Redis — rate limiting and realtime may be degraded.");
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
   }
+}
 
+async function bootstrap(): Promise<void> {
   httpServer.listen(env.PORT, "0.0.0.0", () => {
     console.log(`GIGFLOW API listening on 0.0.0.0:${env.PORT} (${env.NODE_ENV})`);
   });
+
+  void connectRedisWithRetry();
 }
 
 bootstrap().catch((error) => {

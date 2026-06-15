@@ -6,6 +6,7 @@ services:
     name: gigflow-api
     runtime: docker
     plan: free
+    branch: main
     dockerfilePath: ./apps/api/Dockerfile
     dockerContext: .
     healthCheckPath: /health
@@ -42,6 +43,8 @@ services:
   - type: web
     name: gigflow-admin
     runtime: static
+    plan: free
+    branch: main
     buildCommand: npm ci && npm run build --workspace @gigflow/admin
     staticPublishPath: apps/admin/dist
     envVars:
