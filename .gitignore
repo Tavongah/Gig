@@ -7,6 +7,7 @@ build
 .env
 .env.*
 !.env.example
+!deploy/digitalocean/.env.production.example
 coverage
 *.log
 .DS_Store
