@@ -9,6 +9,9 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
+    "dev:api": "npm run build --workspace @gigflow/shared && npm run dev --workspace @gigflow/api",
+    "dev:admin": "npm run dev --workspace @gigflow/admin",
+    "dev:mobile": "npm run build --workspace @gigflow/shared && npm run dev --workspace @gigflow/mobile",
     "build": "npm run build --workspace @gigflow/shared && npm run build --workspaces --if-present",
     "build:api": "npm run build --workspace @gigflow/shared && npm run prisma:generate --workspace @gigflow/api && npm run build --workspace @gigflow/api",
     "start:api": "npm run start --workspace @gigflow/api",
@@ -18,6 +21,9 @@
     "db:up": "docker compose up -d postgres redis",
     "db:migrate": "npm run prisma:migrate --workspace @gigflow/api",
     "db:seed": "npm run prisma:seed --workspace @gigflow/api",
+    "stripe:listen": "stripe listen --forward-to localhost:4000/v1/payments/webhook",
+    "setup:firebase": "node scripts/import-firebase-env.mjs",
+    "firebase:config": "node scripts/generate-firebase-native-config.mjs",
     "docker:up": "docker compose up --build"
   },
   "engines": {

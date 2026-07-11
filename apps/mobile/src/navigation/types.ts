@@ -2,7 +2,10 @@ export type RootStackParamList = {
   MainTabs: undefined;
   GigDetail: { gigId: string };
   GigTracking: { gigId: string };
-  GigPayment: { gigId: string };
+  GigSelectWorkers: { gigId: string };
+  GigWorkerSummary: { gigId: string; workerId: string };
+  GigPayment: { gigId: string; workerId?: string };
+  GigCompletionReview: { gigId: string };
   PaymentSuccess: { gigId?: string } | undefined;
   PaymentFailed: { gigId?: string } | undefined;
   WorkerStripeConnect: undefined;

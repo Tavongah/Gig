@@ -25,7 +25,12 @@ const envSchema = z.object({
   S3_BUCKET: z.string().optional(),
   AWS_REGION: z.string().optional(),
   AWS_ACCESS_KEY_ID: z.string().optional(),
-  AWS_SECRET_ACCESS_KEY: z.string().optional()
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  /** Beta only: log email verification links and phone OTP codes to API stdout (no SendGrid/Twilio yet). */
+  LOG_VERIFICATION_TO_CONSOLE: z
+    .string()
+    .optional()
+    .transform((value) => value === "true" || value === "1")
 });
 
 export const env = envSchema.parse(process.env);

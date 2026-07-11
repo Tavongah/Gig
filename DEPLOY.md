@@ -172,13 +172,15 @@ See `.env.example` at the monorepo root. Per-app overrides:
 - [x] Chat message persistence
 
 ### Phase 2 (before taking live payments)
-- [ ] Stripe Connect onboarding + payment intents
-- [ ] Firebase Auth (replace dev JWT sessions)
+- [x] Stripe authorize-then-capture payment flow
+- [x] Worker interest → select → pay-after-select
+- [x] GPS verification for worker arrive/start
+- [x] Dev payment bypass blocked in production
+- [ ] Stripe Connect onboarding + live keys + webhooks configured in hosting env
+- [ ] Firebase Auth configured (API + mobile) — see `FIREBASE_SETUP.md`
 - [ ] Firebase Cloud Messaging push notifications
-- [ ] Google Maps integration + geo matching
 - [ ] S3/Cloudinary photo uploads
-- [ ] Reviews API + mobile UI
-- [ ] CI/CD with automated tests
+- [ ] CI/CD with automated E2E tests
 
 ---
 

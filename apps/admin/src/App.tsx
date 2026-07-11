@@ -72,8 +72,8 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
 }
 
 function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
-  const [email, setEmail] = useState("admin@gigflow.local");
-  const [password, setPassword] = useState("Admin123!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const loginMutation = useMutation({
     mutationFn: () =>
@@ -102,7 +102,7 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
     <section className="login">
       <p className="eyebrow">Admin access</p>
       <h1>Sign in to GIGFLOW Ops</h1>
-      <p className="notice">Use the seeded admin account: admin@gigflow.local / Admin123!</p>
+      <p className="notice">Sign in with your admin account. After seeding, use admin@gigflow.local (rotate the password before public launch).</p>
       <label>
         Email
         <input value={email} onChange={(event) => setEmail(event.target.value)} />

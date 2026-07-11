@@ -48,32 +48,27 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: Gig/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: Gig
         run: npm ci
 
       - name: Typecheck
-        working-directory: Gig
         run: npm run typecheck
 
       - name: Generate Prisma client
-        working-directory: Gig/apps/api
+        working-directory: apps/api
         run: npx prisma generate
 
       - name: Run migrations
-        working-directory: Gig/apps/api
+        working-directory: apps/api
         run: npx prisma migrate deploy
 
       - name: Build shared + API
-        working-directory: Gig
         run: npm run build:api
 
       - name: Build admin
-        working-directory: Gig
         run: npm run build --workspace @gigflow/admin
 
       - name: Build mobile typecheck
-        working-directory: Gig
         run: npm run typecheck --workspace @gigflow/mobile

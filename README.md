@@ -117,20 +117,58 @@ The pricing service is isolated so future AI pricing prediction can replace or a
 | `GET` | `/v1/gigs/mine` | List gigs for current client or worker |
 | `GET` | `/v1/admin/overview` | Admin operational summary |
 | `POST` | `/v1/admin/commission` | Update platform commission rate |
-| `GET` | `/health` | Liveness + Postgres/Redis checks |
+| `GET` | `/health` | Liveness probe (process up) |
+| `GET` | `/ready` | Readiness probe (Postgres + Redis) |
+| `GET` | `/` | API metadata and health links |
 
 ## Local development
+
+Use **three terminals** (or `npm run dev:api`, `dev:admin`, `dev:mobile` separately):
 
 ```bash
 npm install
 docker compose up -d postgres redis
 cp .env.example .env
+cp apps/admin/.env.example apps/admin/.env
+cp apps/mobile/.env.example apps/mobile/.env
+
 npm run db:migrate
 npm run db:seed
-npm run dev
 ```
 
+Terminal 1 — API:
+
+```bash
+npm run dev:api
+```
+
+Terminal 2 — Admin (http://localhost:5173):
+
+```bash
+npm run dev:admin
+```
+
+Terminal 3 — Mobile (http://localhost:8081, press `w` for web):
+
+```bash
+npm run dev:mobile
+```
+
+**Seeded accounts** (after `db:seed`):
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@gigflow.local | Set via `ADMIN_SEED_PASSWORD` in API env |
+| Client | client@gigflow.local | Demo123! |
+| Worker | worker@gigflow.local | Demo123! |
+
+For phone/email verification in local dev, check the **API terminal** for OTP codes and verification links. On hosted beta without SendGrid/Twilio, set `LOG_VERIFICATION_TO_CONSOLE=true` on the API.
+
+**Physical device testing:** set `EXPO_PUBLIC_API_URL=http://<your-lan-ip>:4000/v1` in `apps/mobile/.env`.
+
 ## Deployment
+
+**See [LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md) for the pre-launch checklist.**
 
 **See [DEPLOY.md](./DEPLOY.md) for the full hosting guide** (Render, Railway, Docker, Expo EAS, env vars, and launch checklist).
 
@@ -141,10 +179,10 @@ npm run build:api
 cd apps/api && sh scripts/start.sh
 ```
 
+## Testing strategy
+
 - Shared package: unit tests for schemas and pricing helpers.
 - API: service-level tests for pricing, gig state transitions, auth, and role authorization.
 - Mobile: component tests for onboarding and gig posting forms.
 - Admin: smoke tests for dashboard rendering and API integration.
 - End-to-end: post gig -> broadcast -> accept -> payment authorization -> completion -> review.
-
-## Testing strategy

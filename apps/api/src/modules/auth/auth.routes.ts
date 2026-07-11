@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
+import { env } from "../../config/env.js";
+import { isFirebaseConfigured } from "../../lib/firebase-admin.js";
 import { requireAuth } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
 import {
@@ -12,9 +14,48 @@ import {
   requestPasswordReset,
   resetPassword
 } from "./auth.service.js";
-import { customerRegisterSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, workerRegisterSchema } from "@gigflow/shared";
+import { completeUserProfile, loginWithSocialProvider } from "./social-auth.service.js";
+import {
+  requestPhoneOtp,
+  resendEmailVerification,
+  sendEmailVerification,
+  verifyEmailToken,
+  verifyPhoneOtp
+} from "./verification.service.js";
+import {
+  completeProfileSchema,
+  customerRegisterSchema,
+  forgotPasswordSchema,
+  loginSchema,
+  phoneOtpRequestSchema,
+  phoneOtpVerifySchema,
+  resetPasswordSchema,
+  socialLoginSchema,
+  workerRegisterSchema
+} from "@gigflow/shared";
 
 export const authRouter = Router();
+
+authRouter.get("/config", (_req, res) => {
+  res.json({
+    firebaseConfigured: isFirebaseConfigured(),
+    socialProviders: {
+      google: isFirebaseConfigured(),
+      apple: isFirebaseConfigured()
+    }
+  });
+});
+
+authRouter.get("/verify-email", async (req, res, next) => {
+  try {
+    const token = typeof req.query.token === "string" ? req.query.token : "";
+    await verifyEmailToken(token);
+    const target = `${env.MOBILE_PUBLIC_URL}/?emailVerified=1`;
+    res.redirect(target);
+  } catch (error) {
+    next(error);
+  }
+});
 
 authRouter.post("/register/customer", validateBody(customerRegisterSchema), async (req, res, next) => {
   try {
@@ -37,6 +78,15 @@ authRouter.post("/register/worker", validateBody(workerRegisterSchema), async (r
 authRouter.post("/login", validateBody(loginSchema), async (req, res, next) => {
   try {
     const session = await login(req.body);
+    res.json(session);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/social", validateBody(socialLoginSchema), async (req, res, next) => {
+  try {
+    const session = await loginWithSocialProvider(req.body);
     res.json(session);
   } catch (error) {
     next(error);
@@ -76,9 +126,58 @@ authRouter.post("/session", validateBody(devSessionSchema), async (req, res, nex
   }
 });
 
-authRouter.get("/me", requireAuth, async (req, res, next) => {
+authRouter.use(requireAuth);
+
+authRouter.get("/me", async (req, res, next) => {
   try {
     const user = await getAuthenticatedUser(req.auth!.userId);
+    res.json({ user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/verify-email/resend", async (req, res, next) => {
+  try {
+    const result = await resendEmailVerification(req.auth!.userId);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/verify-email/send", async (req, res, next) => {
+  try {
+    const user = await getAuthenticatedUser(req.auth!.userId);
+    const result = await sendEmailVerification(user.id, user.email);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/verify-phone/request", validateBody(phoneOtpRequestSchema), async (req, res, next) => {
+  try {
+    const result = await requestPhoneOtp(req.auth!.userId, req.body.phoneNumber);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/verify-phone/confirm", validateBody(phoneOtpVerifySchema), async (req, res, next) => {
+  try {
+    const result = await verifyPhoneOtp(req.auth!.userId, req.body.phoneNumber, req.body.code);
+    const user = await getAuthenticatedUser(req.auth!.userId);
+    res.json({ ...result, user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/complete-profile", validateBody(completeProfileSchema), async (req, res, next) => {
+  try {
+    const user = await completeUserProfile(req.auth!.userId, req.body);
     res.json({ user });
   } catch (error) {
     next(error);

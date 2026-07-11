@@ -17,9 +17,17 @@ export interface ApiUser {
   fullName: string;
   roles: string[];
   defaultRole?: string;
+  authProvider?: "EMAIL" | "GOOGLE" | "APPLE";
   accountStatus?: "ACTIVE" | "SUSPENDED" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
+  profileCompleted?: boolean;
   isVerified?: boolean;
   phoneNumber?: string | null;
+  avatarUrl?: string | null;
+  formattedAddress?: string | null;
+  city?: string | null;
+  region?: string | null;
   workerProfile?: {
     bio: string;
     availabilityStatus: string;
@@ -84,6 +92,45 @@ export interface GigAssignment {
   completedAt?: string | null;
 }
 
+export interface GigWorkerInterest {
+  id: string;
+  status: string;
+  offeredWorkerPayoutCents: number;
+  estimatedHours: number;
+  estimatedArrivalMinutes?: number | null;
+  message?: string | null;
+  distanceMiles?: number | null;
+  worker: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string | null;
+    emailVerified?: boolean;
+    phoneVerified?: boolean;
+    ratingAverage: number;
+    completedGigCount: number;
+    hourlyRateCents?: number | null;
+  };
+}
+
+export interface GigSelectionSummary {
+  gig: {
+    id: string;
+    title: string;
+    serviceCategoryName: string;
+    pricingType: string;
+    estimatedHours: number;
+    paymentStatus: string;
+    status: string;
+  };
+  worker: GigWorkerInterest["worker"];
+  pricing: {
+    workerChargeCents: number;
+    platformFeeCents: number;
+    taxCents: number;
+    estimatedTotalCents: number;
+  };
+}
+
 export interface GigDetail {
   id: string;
   title: string;
@@ -110,6 +157,7 @@ export interface GigDetail {
   client?: GigPerson;
   assignments?: GigAssignment[];
   paymentStatus?: string;
+  pricingType?: string;
   payment?: { status: string; amountCents: number };
   chatThread?: { id: string };
 }
@@ -235,7 +283,21 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       INVALID_TOKEN: "Your session expired. Please log in again.",
       STRIPE_CONNECT_REQUIRED: "Connect Stripe in Earnings before withdrawing.",
       WORKER_NOT_APPROVED: "Your worker account must be approved before you can accept gigs.",
-      PAYMENT_REQUIRED: "This gig is not paid yet. The customer must complete payment first."
+      PAYMENT_REQUIRED: "This gig is not paid yet. The customer must complete payment first.",
+      EMAIL_NOT_VERIFIED: "Verify your email before continuing.",
+      PHONE_NOT_VERIFIED: "Verify your phone number before continuing.",
+      PROFILE_INCOMPLETE: "Complete your profile before continuing.",
+      EMAIL_IN_USE: "That email is already registered.",
+      PHONE_IN_USE: "That phone number is already linked to another account.",
+      OTP_RATE_LIMITED: "Too many code requests. Try again later.",
+      OTP_INVALID: "Invalid verification code.",
+      OTP_EXPIRED: "Verification code expired. Request a new one.",
+      OTP_LOCKED: "Too many failed attempts. Request a new code.",
+      USE_SOCIAL_LOGIN: "This account uses social sign-in instead of a password.",
+      FIREBASE_NOT_CONFIGURED: "Social sign-in is not configured on the server yet.",
+      DEV_PAYMENT_DISABLED: "Payment bypass is disabled in production. Configure Stripe on the server.",
+      GPS_REQUIRED: "Location is required for this action.",
+      GPS_VERIFICATION_FAILED: "Move closer to the customer's address before continuing."
     };
     const message =
       fieldMessages.length > 0
@@ -276,6 +338,29 @@ export const api = {
   createSession: (payload: { email: string; fullName: string; role: "CLIENT" | "WORKER" }) =>
     request<ApiSession>("/auth/session", { method: "POST", body: JSON.stringify(payload) }),
   getMe: (token: string) => request<{ user: ApiUser }>("/auth/me", {}, token),
+  getAuthConfig: () =>
+    request<{ firebaseConfigured: boolean; socialProviders: { google: boolean; apple: boolean } }>("/auth/config"),
+  socialLogin: (payload: { provider: "google" | "apple"; idToken: string; intendedRole: "CLIENT" | "WORKER" }) =>
+    request<ApiSession & { needsProfileCompletion?: boolean }>("/auth/social", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  resendEmailVerification: (token: string) =>
+    request<{ ok: boolean }>("/auth/verify-email/resend", { method: "POST" }, token),
+  requestPhoneOtp: (phoneNumber: string, token: string) =>
+    request<{ ok: boolean; devCode?: string }>(
+      "/auth/verify-phone/request",
+      { method: "POST", body: JSON.stringify({ phoneNumber }) },
+      token
+    ),
+  verifyPhoneOtp: (payload: { phoneNumber: string; code: string }, token: string) =>
+    request<{ ok: boolean; user: ApiUser }>(
+      "/auth/verify-phone/confirm",
+      { method: "POST", body: JSON.stringify(payload) },
+      token
+    ),
+  completeProfile: (payload: Record<string, unknown>, token: string) =>
+    request<{ user: ApiUser }>("/auth/complete-profile", { method: "POST", body: JSON.stringify(payload) }, token),
   completeOnboarding: (payload: OnboardingInput, token: string) =>
     request<{ user: ApiUser }>("/onboarding/complete", { method: "POST", body: JSON.stringify(payload) }, token),
   listCategories: () =>
@@ -288,6 +373,12 @@ export const api = {
   createCheckoutSession: (gigId: string, token: string) =>
     request<{ checkoutUrl: string | null; alreadyPaid: boolean; payment: PaymentStatusResponse }>(
       "/payments/checkout-session",
+      { method: "POST", body: JSON.stringify({ gigId }) },
+      token
+    ),
+  createPaymentIntent: (gigId: string, token: string) =>
+    request<{ clientSecret: string | null; alreadyPaid: boolean; payment: PaymentStatusResponse }>(
+      "/payments/payment-intent",
       { method: "POST", body: JSON.stringify({ gigId }) },
       token
     ),
@@ -324,8 +415,35 @@ export const api = {
     request<{ messages: ChatMessage[] }>(`/gigs/${gigId}/chat`, {}, token),
   acceptGig: (gigId: string, token: string) =>
     request<{ gig: GigDetail }>(`/gigs/${gigId}/accept`, { method: "POST" }, token),
-  updateGigStatus: (gigId: string, status: string, token: string) =>
-    request<{ gig: GigDetail }>(`/gigs/${gigId}/status`, { method: "PATCH", body: JSON.stringify({ status }) }, token),
+  updateGigStatus: (
+    gigId: string,
+    status: string,
+    token: string,
+    location?: { latitude: number; longitude: number }
+  ) =>
+    request<{ gig: GigDetail }>(
+      `/gigs/${gigId}/status`,
+      { method: "PATCH", body: JSON.stringify({ status, ...location }) },
+      token
+    ),
+  listGigInterests: (gigId: string, token: string) =>
+    request<{ interests: GigWorkerInterest[] }>(`/gigs/${gigId}/interests`, {}, token),
+  getWorkerSelectionSummary: (gigId: string, workerId: string, token: string) =>
+    request<GigSelectionSummary>(`/gigs/${gigId}/selection/${workerId}`, {}, token),
+  selectWorker: (gigId: string, workerId: string, token: string) =>
+    request<GigSelectionSummary>(`/gigs/${gigId}/select-worker`, {
+      method: "POST",
+      body: JSON.stringify({ workerId })
+    }, token),
+  authorizeGigWithoutStripe: (gigId: string, token: string) =>
+    request<GigSelectionSummary>(`/gigs/${gigId}/authorize-without-stripe`, { method: "POST" }, token),
+  approveGigCompletion: (gigId: string, token: string) =>
+    request<{ ok: boolean }>(`/gigs/${gigId}/approve-completion`, { method: "POST" }, token),
+  approveExtraTime: (gigId: string, extraMinutes: number, token: string) =>
+    request<{ ok: boolean }>(`/gigs/${gigId}/approve-extra-time`, {
+      method: "POST",
+      body: JSON.stringify({ extraMinutes })
+    }, token),
   cancelGig: (gigId: string, token: string) =>
     request<{ gig: GigDetail }>(`/gigs/${gigId}/status`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) }, token),
   getWorkerEarnings: (token: string) => request<{ earnings: WorkerEarnings }>("/workers/earnings", {}, token),

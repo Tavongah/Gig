@@ -1,0 +1,20 @@
+{
+  "projectId": "REPLACE_WITH_FIREBASE_PROJECT_ID",
+  "projectNumber": "988911956885",
+  "storageBucket": "REPLACE_WITH_FIREBASE_PROJECT_ID.appspot.com",
+  "ios": {
+    "apiKey": "AIzaSyBykNpF7ZHV6wbRqBisrSwTAlxbyLGXEwU",
+    "appId": "1:988911956885:ios:1f0dc4d1fd82befbb93c9c",
+    "bundleId": "com.gigflow.ios"
+  },
+  "android": {
+    "apiKey": "AIzaSyBC6JkWCEmDqSECLK5kXvgRtF-RhqFDK8I",
+    "appId": "1:988911956885:android:345daf55c25809fdb93c9c",
+    "packageName": "com.gigflow.android"
+  },
+  "web": {
+    "apiKey": "",
+    "appId": "",
+    "authDomain": ""
+  }
+}

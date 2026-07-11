@@ -88,3 +88,46 @@ export type CustomerRegisterInput = z.infer<typeof customerRegisterSchema>;
 export type WorkerRegisterInput = z.infer<typeof workerRegisterSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+export const authProviders = ["EMAIL", "GOOGLE", "APPLE"] as const;
+export type AuthProvider = (typeof authProviders)[number];
+
+export const socialLoginSchema = z.object({
+  provider: z.enum(["google", "apple"]),
+  idToken: z.string().min(20, "Missing sign-in token"),
+  intendedRole: z.enum(["CLIENT", "WORKER"]).default("CLIENT")
+});
+
+export const phoneOtpRequestSchema = z.object({
+  phoneNumber: z.string().min(7, "Enter a valid phone number").max(24)
+});
+
+export const phoneOtpVerifySchema = z.object({
+  phoneNumber: z.string().min(7).max(24),
+  code: z.string().regex(/^\d{6}$/, "Enter the 6-digit code")
+});
+
+export const completeProfileSchema = z.object({
+  fullName: z.string().min(2).max(100),
+  email: z.string().email("Enter a valid email").optional(),
+  phoneNumber: z.string().min(7).max(24),
+  defaultRole: z.enum(["CLIENT", "WORKER"]),
+  avatarUrl: z.string().url().optional(),
+  location: z
+    .object({
+      formattedAddress: z.string().min(5).max(200),
+      addressLine1: z.string().min(5).max(150),
+      city: z.string().min(2).max(80),
+      region: z.string().min(2).max(80),
+      postalCode: z.string().min(3).max(20),
+      country: z.string().length(2).default("US"),
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180)
+    })
+    .optional()
+});
+
+export type SocialLoginInput = z.infer<typeof socialLoginSchema>;
+export type PhoneOtpRequestInput = z.infer<typeof phoneOtpRequestSchema>;
+export type PhoneOtpVerifyInput = z.infer<typeof phoneOtpVerifySchema>;
+export type CompleteProfileInput = z.infer<typeof completeProfileSchema>;

@@ -42,7 +42,7 @@ const TAB_LABELS: Record<keyof ClientTabParamList, string> = {
 
   Home: "Home",
 
-  PostGig: "Post",
+  PostGig: "Request",
 
   Workers: "Workers",
 

@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { AccountStatus, UserRole } from "@prisma/client";
+import { AccountStatus, AuthProvider, UserRole } from "@prisma/client";
 import {
   customerRegisterSchema,
   forgotPasswordSchema,
@@ -14,8 +14,10 @@ import { prisma } from "../../config/prisma.js";
 import { env } from "../../config/env.js";
 import { AppError } from "../../lib/errors.js";
 import { createResetToken, hashPassword, hashResetToken, verifyPassword } from "../../lib/password.js";
+import { normalizePhoneNumber } from "./access.service.js";
+import { sendEmailVerification } from "./verification.service.js";
 
-const userInclude = {
+export const userInclude = {
   workerProfile: { include: { serviceCategories: true } }
 } as const;
 
@@ -32,35 +34,55 @@ export function issueToken(user: {
   );
 }
 
-function sanitizeUser<T extends { passwordHash?: string | null }>(user: T) {
+export function sanitizeUser<T extends { passwordHash?: string | null }>(user: T) {
   const { passwordHash: _removed, ...safe } = user;
   return safe;
+}
+
+async function assertEmailAvailable(email: string): Promise<void> {
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    throw new AppError("EMAIL_IN_USE", 409, "EMAIL_IN_USE", { email: "Email is already registered" });
+  }
+}
+
+async function assertPhoneAvailable(phoneNumber: string): Promise<void> {
+  const normalized = normalizePhoneNumber(phoneNumber);
+  const existing = await prisma.user.findFirst({ where: { phoneNumber: normalized } });
+  if (existing) {
+    throw new AppError("PHONE_IN_USE", 409, "PHONE_IN_USE", {
+      phoneNumber: "That phone number is already linked to another account."
+    });
+  }
 }
 
 export async function registerCustomer(input: CustomerRegisterInput) {
   const parsed = customerRegisterSchema.parse(input);
   const email = parsed.email.toLowerCase();
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    throw new AppError("EMAIL_IN_USE", 409, "EMAIL_IN_USE", { email: "Email is already registered" });
-  }
+  await assertEmailAvailable(email);
+  await assertPhoneAvailable(parsed.phoneNumber);
 
   const passwordHash = await hashPassword(parsed.password);
   const user = await prisma.user.create({
     data: {
       email,
       fullName: parsed.fullName.trim(),
-      phoneNumber: parsed.phoneNumber.trim(),
+      phoneNumber: normalizePhoneNumber(parsed.phoneNumber),
       passwordHash,
+      authProvider: AuthProvider.EMAIL,
       roles: [UserRole.CLIENT],
       defaultRole: UserRole.CLIENT,
       accountStatus: AccountStatus.ACTIVE,
-      isVerified: true
+      emailVerified: false,
+      phoneVerified: false,
+      profileCompleted: true,
+      isVerified: false
     },
     include: userInclude
   });
 
+  await sendEmailVerification(user.id, user.email);
   const token = issueToken(user);
   return { token, user: sanitizeUser(user) };
 }
@@ -69,22 +91,26 @@ export async function registerWorker(input: WorkerRegisterInput) {
   const parsed = workerRegisterSchema.parse(input);
   const email = parsed.email.toLowerCase();
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    throw new AppError("EMAIL_IN_USE", 409, "EMAIL_IN_USE", { email: "Email is already registered" });
-  }
+  await assertEmailAvailable(email);
+  await assertPhoneAvailable(parsed.phoneNumber);
 
   const passwordHash = await hashPassword(parsed.password);
   const user = await prisma.user.create({
     data: {
       email,
       fullName: parsed.fullName.trim(),
-      phoneNumber: parsed.phoneNumber.trim(),
+      phoneNumber: normalizePhoneNumber(parsed.phoneNumber),
       passwordHash,
+      authProvider: AuthProvider.EMAIL,
       roles: [UserRole.WORKER],
       defaultRole: UserRole.WORKER,
       accountStatus: AccountStatus.PENDING_APPROVAL,
-      isVerified: true,
+      emailVerified: false,
+      phoneVerified: false,
+      profileCompleted: true,
+      isVerified: false,
+      city: parsed.city.trim(),
+      region: parsed.serviceArea.trim(),
       workerProfile: {
         create: {
           bio: parsed.bio.trim(),
@@ -108,6 +134,7 @@ export async function registerWorker(input: WorkerRegisterInput) {
     include: userInclude
   });
 
+  await sendEmailVerification(user.id, user.email);
   const token = issueToken(user);
   return { token, user: sanitizeUser(user) };
 }
@@ -124,6 +151,12 @@ export async function login(input: LoginInput) {
   if (!user?.passwordHash) {
     throw new AppError("INVALID_CREDENTIALS", 401, "INVALID_CREDENTIALS", {
       email: "Invalid email or password"
+    });
+  }
+
+  if (user.authProvider !== AuthProvider.EMAIL) {
+    throw new AppError("USE_SOCIAL_LOGIN", 400, "USE_SOCIAL_LOGIN", {
+      email: `This account uses ${user.authProvider.toLowerCase()} sign-in.`
     });
   }
 
@@ -220,6 +253,9 @@ export async function createDevSession(input: {
       defaultRole: input.role,
       roles: [input.role],
       accountStatus,
+      emailVerified: true,
+      phoneVerified: true,
+      profileCompleted: true,
       isVerified: true
     },
     include: userInclude

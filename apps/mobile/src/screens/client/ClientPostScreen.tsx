@@ -13,6 +13,8 @@ import {
   type GigUrgency,
   type PostGigFormValues,
   type PostGigPhoto,
+  type PricingType,
+  recommendedPricingForService,
   validatePhotoFile,
   validatePostGigForm
 } from "@gigflow/shared";
@@ -27,6 +29,7 @@ import { LoadingButton } from "../../components/LoadingButton";
 import { PriceEstimateCard } from "../../components/PriceEstimateCard";
 import { CollapsibleSection } from "../../components/CollapsibleSection";
 import { AddressAutocomplete } from "../../components/AddressAutocomplete";
+import { PricingTypePicker, estimatedHoursHint, estimatedHoursLabel } from "../../components/PricingTypePicker";
 import type { ClientTabParamList, RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 
@@ -66,6 +69,7 @@ export function ClientPostScreen() {
   const queryClient = useQueryClient();
 
   const [description, setDescription] = useState("");
+  const [pricingType, setPricingType] = useState<PricingType>("FIXED");
   const [estimatedHours, setEstimatedHours] = useState("2");
   const [urgency, setUrgency] = useState<GigUrgency>("STANDARD");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
@@ -103,11 +107,23 @@ export function ClientPostScreen() {
     [categoriesQuery.data?.mvp, selectedCategoryId]
   );
 
+  const recommendedPricing = useMemo(
+    () => recommendedPricingForService(selectedCategory?.slug),
+    [selectedCategory?.slug]
+  );
+
+  useEffect(() => {
+    if (!selectedCategory?.slug) return;
+    setPricingType(recommendedPricingForService(selectedCategory.slug));
+    setFieldErrors((current) => clearFieldError(current, "pricingType"));
+  }, [selectedCategory?.slug]);
+
   const formValues = useMemo<PostGigFormValues>(
     () => ({
       serviceCategoryId: selectedCategoryId,
       serviceCategoryName: selectedCategory?.name ?? null,
       description,
+      pricingType,
       estimatedHours,
       locationAddress,
       urgency,
@@ -115,7 +131,7 @@ export function ClientPostScreen() {
       preferredTime,
       photos
     }),
-    [description, estimatedHours, locationAddress, photos, preferredDate, preferredTime, selectedCategory, selectedCategoryId, urgency]
+    [description, estimatedHours, locationAddress, photos, preferredDate, preferredTime, pricingType, selectedCategory, selectedCategoryId, urgency]
   );
 
   const validation = useMemo(
@@ -138,7 +154,11 @@ export function ClientPostScreen() {
     mutationFn: () => api.createGig(validation.payload!, session.token),
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ["my-gigs"] });
-      navigation.navigate("GigPayment", { gigId: result.gig.id });
+      Alert.alert(
+        "Request sent",
+        "Your request has been sent to nearby verified workers.",
+        [{ text: "View matches", onPress: () => navigation.navigate("GigSelectWorkers", { gigId: result.gig.id }) }]
+      );
     },
     onError: (error: Error) => {
       if (error instanceof ApiValidationError) {
@@ -146,7 +166,7 @@ export function ClientPostScreen() {
         setSubmitAttempted(true);
         return;
       }
-      Alert.alert("Could not post gig", error.message);
+      Alert.alert("Could not send request", error.message);
     }
   });
 
@@ -211,7 +231,7 @@ export function ClientPostScreen() {
   return (
     <TabScreen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 28, gap: 12 }}>
-        <Text className="px-1 text-xs font-bold uppercase tracking-[2px] text-brand">Post a gig</Text>
+        <Text className="px-1 text-xs font-bold uppercase tracking-[2px] text-brand">Request a gig</Text>
 
         <DutsCard className="gap-3 p-4">
           <ServiceCategorySelect
@@ -237,14 +257,27 @@ export function ClientPostScreen() {
             error={visibleErrors.description}
           />
 
-          <FormInput
-            label="Estimated hours"
-            value={estimatedHours}
-            onChangeText={handleEstimatedHoursChange}
-            placeholder="2"
-            keyboardType="number-pad"
-            error={visibleErrors.estimatedHours}
+          <PricingTypePicker
+            value={pricingType}
+            recommendedPricing={recommendedPricing}
+            onChange={(value) => {
+              setPricingType(value);
+              setFieldErrors((current) => clearFieldError(current, "pricingType"));
+            }}
+            error={visibleErrors.pricingType}
           />
+
+          <View className="gap-1">
+            <FormInput
+              label={estimatedHoursLabel(pricingType)}
+              value={estimatedHours}
+              onChangeText={handleEstimatedHoursChange}
+              placeholder="2"
+              keyboardType="number-pad"
+              error={visibleErrors.estimatedHours}
+            />
+            <Text className="text-xs text-muted">{estimatedHoursHint(pricingType)}</Text>
+          </View>
 
           <AddressAutocomplete
             token={session.token}
@@ -326,11 +359,14 @@ export function ClientPostScreen() {
             estimate={estimateData?.estimate}
             isLoading={isEstimating}
             isComplete={validation.success}
+            pricingType={pricingType}
           />
 
+          <Text className="text-center text-xs text-muted">No payment now. You only pay after you choose a worker and approve completion.</Text>
+
           <LoadingButton
-            label="Post Gig"
-            loadingLabel="Posting..."
+            label="Request Gig"
+            loadingLabel="Sending request..."
             onPress={handleSubmit}
             disabled={!validation.success}
             loading={createMutation.isPending}

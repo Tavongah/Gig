@@ -22,23 +22,29 @@ import {
 
 import type { CreateGigInput, GigEstimateInput } from "@gigflow/shared";
 
-import { AccountStatus, AvailabilityStatus, GigStatus, LaunchPhase, PaymentLifecycle, PaymentStatus, Prisma, UserRole } from "@prisma/client";
+import { AccountStatus, AvailabilityStatus, GigStatus, LaunchPhase, PaymentLifecycle, PricingType, Prisma, UserRole } from "@prisma/client";
 
 import { prisma } from "../../config/prisma.js";
 
 import { AppError } from "../../lib/errors.js";
-import { isStripeConfigured } from "../../lib/stripe.js";
-
 import { broadcastGigOffer, notifyUser } from "../realtime/realtime.service.js";
 import {
-  assertGigIsPaid,
-  assertWorkerCanAcceptGigs,
   processWorkerPayout,
   publishGigDevWithoutPayment,
-  releaseAuthorizedPayment
+  publishPostedGig,
+  releaseAuthorizedPayment,
+  assertGigPaymentAuthorized
 } from "../payments/payment.service.js";
+import {
+  approveExtraTime,
+  approveGigCompletion,
+  assertWorkerNearGig,
+  checkTimerThreshold,
+  expressWorkerInterest
+} from "./gig-workflow.service.js";
 import { resolveGeocodedLocation } from "../location/geocoding.service.js";
 import { sanitizeGigForViewer, toGeoPointInput } from "../location/gig-privacy.js";
+import { assertClientCanPostGigs } from "../auth/access.service.js";
 
 
 
@@ -140,6 +146,9 @@ export async function createGig(clientId: string, input: CreateGigInput, _io: Se
 
   const parsed = createGigSchema.parse(input);
 
+  const client = await prisma.user.findUniqueOrThrow({ where: { id: clientId } });
+  assertClientCanPostGigs(client);
+
   await getMvpCategory(parsed.serviceCategoryId);
 
   const validatedLocation = await resolveGeocodedLocation({
@@ -170,9 +179,13 @@ export async function createGig(clientId: string, input: CreateGigInput, _io: Se
 
       description: parsed.description,
 
-      status: GigStatus.DRAFT,
+      status: GigStatus.POSTED,
 
       paymentStatus: PaymentLifecycle.PAYMENT_PENDING,
+
+      publishedAt: new Date(),
+
+      pricingType: parsed.pricingType as PricingType,
 
       urgency: parsed.urgency,
 
@@ -236,6 +249,8 @@ export async function createGig(clientId: string, input: CreateGigInput, _io: Se
 
   });
 
+  await publishPostedGig(gig.id);
+
   return gig;
 }
 
@@ -295,8 +310,6 @@ export async function findNearbyGigs(workerId: string) {
     where: {
 
       status: { in: SEARCHING_STATUSES },
-
-      ...(isStripeConfigured() ? { paymentStatus: PaymentLifecycle.PAYMENT_AUTHORIZED } : {}),
 
       serviceCategoryId: { in: serviceCategoryIds },
 
@@ -367,170 +380,7 @@ export async function findNearbyGigs(workerId: string) {
 
 
 export async function acceptGig(gigId: string, workerId: string, io?: Server) {
-
-  const worker = await prisma.user.findUnique({
-    where: { id: workerId },
-    include: { workerProfile: true }
-  });
-  if (!worker || worker.accountStatus !== AccountStatus.APPROVED) {
-    throw new AppError("FORBIDDEN", 403, "WORKER_NOT_APPROVED", { worker: "Worker account is not approved" });
-  }
-
-  const gigBeforeAccept = await prisma.gig.findUnique({ where: { id: gigId } });
-  if (!gigBeforeAccept) {
-    throw new AppError("NOT_FOUND", 404, "NOT_FOUND", { gig: "Gig not found" });
-  }
-
-  const workerLat = Number(worker.workerProfile?.currentLatitude);
-  const workerLng = Number(worker.workerProfile?.currentLongitude);
-  const travelRadiusMiles = Number(worker.workerProfile?.travelDistanceMiles ?? 10);
-
-  if (!Number.isFinite(workerLat) || !Number.isFinite(workerLng)) {
-    throw new AppError("WORKER_LOCATION_REQUIRED", 400, "WORKER_LOCATION_REQUIRED", {
-      location: "Set your current location before accepting gigs."
-    });
-  }
-
-  const gigRadiusMiles = getGigMatchingRadiusMiles(gigBeforeAccept.urgency, gigBeforeAccept.size);
-  if (
-    !isWithinMatchingRadius(
-      workerLat,
-      workerLng,
-      Number(gigBeforeAccept.latitude),
-      Number(gigBeforeAccept.longitude),
-      gigRadiusMiles,
-      travelRadiusMiles
-    )
-  ) {
-    throw new AppError("GIG_TOO_FAR", 403, "GIG_TOO_FAR", {
-      location: "This gig is outside your travel radius."
-    });
-  }
-
-  await assertGigIsPaid(gigId);
-  await assertWorkerCanAcceptGigs(workerId);
-
-  const gig = await prisma.$transaction(async (tx) => {
-
-    const updated = await tx.gig.updateMany({
-
-      where: { id: gigId, status: { in: SEARCHING_STATUSES } },
-
-      data: { status: GigStatus.WORKER_ASSIGNED }
-
-    });
-
-
-
-    if (updated.count !== 1) {
-
-      throw new Error("GIG_NOT_AVAILABLE");
-
-    }
-
-
-
-    await tx.gigAssignment.create({
-
-      data: {
-
-        gigId,
-
-        workerId
-
-      }
-
-    });
-
-    await tx.gig.update({
-      where: { id: gigId },
-      data: { assignedWorkerId: workerId }
-    });
-
-
-
-    return tx.gig.findUniqueOrThrow({
-
-      where: { id: gigId },
-
-      include: {
-
-        client: true,
-
-        serviceCategory: true,
-
-        assignments: {
-
-          include: {
-
-            worker: {
-
-              select: {
-
-                id: true,
-
-                fullName: true,
-
-                email: true,
-
-                phoneNumber: true,
-
-                workerProfile: {
-
-                  select: {
-
-                    ratingAverage: true,
-
-                    completedGigCount: true,
-
-                    currentLatitude: true,
-
-                    currentLongitude: true
-
-                  }
-
-                }
-
-              }
-
-            }
-
-          }
-
-        }
-
-      }
-
-    });
-
-  });
-
-
-
-  if (io) {
-
-    notifyUser(io, gig.clientId, {
-
-      type: "WORKER_FOUND",
-
-      title: "Worker assigned",
-
-      body: `${gig.assignments[0]?.worker?.fullName ?? "A worker"} accepted your gig.`,
-
-      gigId: gig.id
-
-    });
-
-    io.to(`gig:${gig.id}`).to(`user:${gig.clientId}`).emit("gig:assigned", { gig });
-
-    io.to(`gig:${gig.id}`).to(`user:${gig.clientId}`).emit("gig:status", { gig });
-
-  }
-
-
-
-  return gig;
-
+  return expressWorkerInterest(gigId, workerId, undefined, io);
 }
 
 
@@ -543,7 +393,7 @@ const workerTransitions: Partial<Record<GigStatus, GigStatus>> = {
 
   WORKER_ARRIVED: GigStatus.IN_PROGRESS,
 
-  IN_PROGRESS: GigStatus.COMPLETED
+  IN_PROGRESS: GigStatus.WAITING_CUSTOMER_CONFIRMATION
 
 };
 
@@ -554,6 +404,8 @@ const CANCELLABLE_STATUSES: GigStatus[] = [
   GigStatus.POSTED,
 
   GigStatus.SEARCHING_FOR_WORKER,
+
+  GigStatus.WORKER_SELECTED,
 
   GigStatus.WORKER_ASSIGNED
 
@@ -576,6 +428,14 @@ function notificationForStatus(status: GigStatus, gigTitle: string): Notificatio
     case GigStatus.IN_PROGRESS:
 
       return { type: "GIG_STARTED", title: "Gig started", body: `Work has started on "${gigTitle}".`, gigId: undefined };
+
+    case GigStatus.WAITING_CUSTOMER_CONFIRMATION:
+
+      return { type: "GIG_REVIEW", title: "Review completion", body: `Please review and approve completion for "${gigTitle}".`, gigId: undefined };
+
+    case GigStatus.WAITING_EXTRA_TIME_APPROVAL:
+
+      return { type: "ESTIMATED_TIME_REACHED", title: "Booked time reached", body: `Approve extra time or finish "${gigTitle}".`, gigId: undefined };
 
     case GigStatus.COMPLETED:
 
@@ -605,7 +465,13 @@ interface NotificationPayload {
 
 
 
-export async function updateGigStatus(gigId: string, userId: string, nextStatus: GigStatus, io?: Server) {
+export async function updateGigStatus(
+  gigId: string,
+  userId: string,
+  nextStatus: GigStatus,
+  io?: Server,
+  location?: { latitude: number; longitude: number }
+) {
 
   const gig = await prisma.gig.findUniqueOrThrow({
 
@@ -641,6 +507,17 @@ export async function updateGigStatus(gigId: string, userId: string, nextStatus:
 
       throw new Error("INVALID_STATUS_TRANSITION");
 
+    }
+
+    if (nextStatus === GigStatus.WORKER_EN_ROUTE) {
+      await assertGigPaymentAuthorized(gigId);
+    }
+
+    if (nextStatus === GigStatus.WORKER_ARRIVED || nextStatus === GigStatus.IN_PROGRESS) {
+      if (!location) {
+        throw new AppError("GPS_REQUIRED", 400, "GPS_REQUIRED", { location: "Location is required for this action." });
+      }
+      await assertWorkerNearGig(gigId, location.latitude, location.longitude, nextStatus === GigStatus.WORKER_ARRIVED ? "arrive" : "start");
     }
 
   } else if (nextStatus === GigStatus.CANCELLED) {
@@ -699,14 +576,56 @@ export async function updateGigStatus(gigId: string, userId: string, nextStatus:
 
 
 
+  if (assignment && nextStatus === GigStatus.WORKER_EN_ROUTE) {
+    await prisma.gigAssignment.update({
+      where: { id: assignment.id },
+      data: { enRouteAt: new Date() }
+    });
+  }
+
+  if (assignment && nextStatus === GigStatus.WORKER_ARRIVED) {
+    await prisma.gigAssignment.update({
+      where: { id: assignment.id },
+      data: { arrivedAt: new Date() }
+    });
+  }
+
   if (assignment && nextStatus === GigStatus.IN_PROGRESS) {
 
     await prisma.gigAssignment.update({
 
       where: { id: assignment.id },
 
-      data: { startedAt: new Date() }
+      data: {
+        startedAt: new Date(),
+        startLatitude: location?.latitude,
+        startLongitude: location?.longitude
+      }
 
+    });
+
+  }
+
+
+
+  if (assignment && nextStatus === GigStatus.WAITING_CUSTOMER_CONFIRMATION) {
+
+    await prisma.gigAssignment.update({
+
+      where: { id: assignment.id },
+
+      data: {
+        endedAt: new Date(),
+        completedAt: new Date(),
+        endLatitude: location?.latitude,
+        endLongitude: location?.longitude
+      }
+
+    });
+
+    await prisma.gig.update({
+      where: { id: gigId },
+      data: { autoApproveAt: new Date(Date.now() + 24 * 60 * 60 * 1000) }
     });
 
   }
@@ -808,6 +727,10 @@ export async function updateGigStatus(gigId: string, userId: string, nextStatus:
   }
 
 
+
+  if (nextStatus === GigStatus.IN_PROGRESS && io) {
+    void checkTimerThreshold(gigId, io);
+  }
 
   if (io) {
 

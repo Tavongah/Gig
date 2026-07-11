@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { UserRole } from "@prisma/client";
+import { GigStatus, UserRole } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { requireAuth, requireRole } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
@@ -24,7 +24,23 @@ adminRouter.get("/overview", async (_req, res, next) => {
       prisma.user.count(),
       prisma.workerProfile.count(),
       prisma.user.count({ where: { accountStatus: "PENDING_APPROVAL", roles: { has: UserRole.WORKER } } }),
-      prisma.gig.count({ where: { status: "SEARCHING_FOR_WORKER" } }),
+      prisma.gig.count({
+        where: {
+          status: {
+            in: [
+              GigStatus.POSTED,
+              GigStatus.SEARCHING_FOR_WORKER,
+              GigStatus.WORKER_SELECTED,
+              GigStatus.WORKER_ASSIGNED,
+              GigStatus.WORKER_EN_ROUTE,
+              GigStatus.WORKER_ARRIVED,
+              GigStatus.IN_PROGRESS,
+              GigStatus.WAITING_EXTRA_TIME_APPROVAL,
+              GigStatus.WAITING_CUSTOMER_CONFIRMATION
+            ]
+          }
+        }
+      }),
       prisma.gig.count({ where: { status: "COMPLETED" } }),
       prisma.payment.aggregate({ _sum: { platformFeeCents: true, amountCents: true } }),
       prisma.commissionSetting.findFirst({ orderBy: { effectiveFrom: "desc" } })

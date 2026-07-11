@@ -27,9 +27,9 @@ export function SearchingIndicator() {
           <Text className="text-2xl">📡</Text>
         </View>
       </View>
-      <Text className="text-center text-lg font-black text-ink">Finding a worker near you...</Text>
+      <Text className="text-center text-lg font-black text-ink">Matching workers near you...</Text>
       <Text className="text-center text-sm leading-5 text-muted">
-        Broadcasting your gig to verified workers who are available now.
+        Your request was sent to nearby verified workers who can accept or submit offers.
       </Text>
       <View className="flex-row gap-2">
         {[0, 1, 2].map((dot) => (

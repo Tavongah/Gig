@@ -4,6 +4,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../lib/api";
 import { getCurrentCoordinates } from "../lib/location";
+import { canWorkerGoOnline } from "../lib/auth";
 import { hasWorkerPreferencesConfigured, workerPreferencesFromProfile } from "../components/WorkerPreferencesForm";
 import { useSocket } from "./useSocket";
 import type { RootStackParamList } from "../navigation/types";
@@ -35,6 +36,14 @@ export function useWorkerOnline() {
   }
 
   async function goOnline(): Promise<void> {
+    if (!profile || !canWorkerGoOnline(profile)) {
+      Alert.alert(
+        "Verification required",
+        "Verify your email and phone, complete your profile, and get admin approval before going online."
+      );
+      return;
+    }
+
     if (!preferencesReady) {
       Alert.alert(
         "Set up work preferences",

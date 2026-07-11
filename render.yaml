@@ -34,6 +34,24 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_CONNECT_CLIENT_ID
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: ADMIN_SEED_PASSWORD
+        sync: false
+      - key: LOG_VERIFICATION_TO_CONSOLE
+        sync: false
 
   - type: keyvalue
     name: gigflow-redis

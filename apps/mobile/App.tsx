@@ -39,6 +39,7 @@ import { AppNavigator } from "./src/navigation/AppNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 
 import { useSessionStore } from "./src/stores/session.store";
+import { api } from "./src/lib/api";
 
 import { PendingApprovalScreen } from "./src/screens/auth/PendingApprovalScreen";
 
@@ -46,10 +47,15 @@ import { RejectedScreen } from "./src/screens/auth/RejectedScreen";
 
 import { SuspendedScreen } from "./src/screens/auth/SuspendedScreen";
 
-import { isWorkerUser, workerGateStatus } from "./src/lib/auth";
+import { isWorkerUser, workerGateStatus, needsEmailVerification, needsPhoneVerification, needsProfileCompletion } from "./src/lib/auth";
+import { EmailVerificationScreen } from "./src/screens/auth/EmailVerificationScreen";
+import { PhoneVerificationScreen } from "./src/screens/auth/PhoneVerificationScreen";
+import { CompleteProfileScreen } from "./src/screens/auth/CompleteProfileScreen";
+
+import { appLinkingPrefixes } from "./src/lib/linking";
 
 const linking = {
-  prefixes: ["http://localhost:8081", "http://localhost:19006", "gigflow://"],
+  prefixes: appLinkingPrefixes,
   config: {
     screens: {
       PaymentSuccess: "payment-success",
@@ -116,10 +122,20 @@ function Shell() {
 
 
   useEffect(() => {
-
     void bootstrap();
-
   }, [bootstrap]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("emailVerified") !== "1") return;
+    const token = session?.token;
+    if (!token) return;
+    void api.getMe(token).then(({ user }) => {
+      useSessionStore.getState().setProfile(user);
+      window.history.replaceState({}, "", window.location.pathname);
+    });
+  }, [session?.token]);
 
 
 
@@ -157,7 +173,17 @@ function Shell() {
 
   }
 
+  if (needsEmailVerification(user)) {
+    return <EmailVerificationScreen />;
+  }
 
+  if (needsPhoneVerification(user)) {
+    return <PhoneVerificationScreen />;
+  }
+
+  if (needsProfileCompletion(user)) {
+    return <CompleteProfileScreen />;
+  }
 
   if (activeRole === "WORKER" && isWorkerUser(user)) {
 
@@ -218,9 +244,7 @@ export default function App() {
 
 
   if (!fontsLoaded) {
-
-    return null;
-
+    return <LoadingShell />;
   }
 
 

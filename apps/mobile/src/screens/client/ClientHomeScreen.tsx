@@ -17,7 +17,6 @@ import { DutsCard } from "../../components/DutsCard";
 import { api } from "../../lib/api";
 import { getCurrentCoordinates } from "../../lib/location";
 import { gigNeedsPayment } from "../../lib/gig-payment";
-import { useStripeCheckout } from "../../hooks/useStripeCheckout";
 import type { ClientTabParamList, RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 
@@ -27,9 +26,9 @@ type NavigationProp = CompositeNavigationProp<
 >;
 
 const STEPS = [
-  { step: "1", title: "Post your gig", body: "Describe the job and get an instant price estimate." },
-  { step: "2", title: "Get matched", body: "Nearby verified workers accept and head your way." },
-  { step: "3", title: "Track live", body: "Follow your worker from acceptance to completion." }
+  { step: "1", title: "Request a gig", body: "Describe what you need — no payment required." },
+  { step: "2", title: "Choose your worker", body: "Compare verified workers who accept or submit offers." },
+  { step: "3", title: "Confirm & track live", body: "Secure payment, then follow your worker to completion." }
 ] as const;
 
 export function ClientHomeScreen() {
@@ -56,8 +55,6 @@ export function ClientHomeScreen() {
     refetchInterval: 20_000
   });
 
-  const { payWithStripe, isPaying, payingGigId } = useStripeCheckout();
-
   const unpaidGigs = useMemo(
     () => (myGigsQuery.data?.gigs ?? []).filter(gigNeedsPayment),
     [myGigsQuery.data?.gigs]
@@ -78,13 +75,13 @@ export function ClientHomeScreen() {
 
           title="Need an extra pair of hands today?"
 
-          subtitle="Post a local gig and get matched with verified workers nearby — tracked live from start to finish."
+          subtitle="Request help from verified workers nearby — match, confirm, pay, and track live to completion."
 
         >
 
           <View className="mt-2 gap-3">
 
-            <AppButton label="Post a Gig" onPress={() => navigation.navigate("PostGig")} variant="primary" />
+            <AppButton label="Request a Gig" onPress={() => navigation.navigate("PostGig")} variant="primary" />
 
             <AppButton label="Find Available Workers" onPress={() => navigation.navigate("Workers")} variant="secondary" />
 
@@ -94,13 +91,17 @@ export function ClientHomeScreen() {
 
         {unpaidGigs.length > 0 ? (
           <View className="gap-3">
-            <Text className="text-sm font-bold uppercase tracking-wider text-muted">Finish payment</Text>
+            <Text className="text-sm font-bold uppercase tracking-wider text-muted">Confirm your booking</Text>
             {unpaidGigs.map((gig) => (
               <PendingPaymentCard
                 key={gig.id}
                 gig={gig}
-                onPay={() => payWithStripe(gig.id)}
-                loading={isPaying && payingGigId === gig.id}
+                onPay={() =>
+                  navigation.navigate("GigPayment", {
+                    gigId: gig.id,
+                    workerId: gig.assignments?.[0]?.worker?.id
+                  })
+                }
               />
             ))}
           </View>
@@ -150,7 +151,7 @@ export function ClientHomeScreen() {
 
               <Text className="text-sm leading-5 text-muted">
 
-                No workers online nearby right now. Post a gig to broadcast your job instantly.
+                No workers online nearby right now. Request a gig to notify verified workers instantly.
 
               </Text>
 

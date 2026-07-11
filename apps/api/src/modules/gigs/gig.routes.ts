@@ -9,6 +9,7 @@ import { UserRole } from "@prisma/client";
 import { requireApprovedWorker, requireAuth, requireRole } from "../../middleware/auth.js";
 
 import { validateBody } from "../../middleware/validate.js";
+import { assertDevOnlyPaymentBypass } from "../../lib/production-guards.js";
 
 import { z } from "zod";
 
@@ -38,6 +39,15 @@ import {
 
 } from "./gig.service.js";
 
+import {
+  approveExtraTime,
+  approveGigCompletion,
+  authorizeWorkerSelectionWithoutStripe,
+  getWorkerSelectionSummary,
+  listGigInterests,
+  selectWorkerForGig
+} from "./gig-workflow.service.js";
+
 
 
 const statusUpdateSchema = z.object({
@@ -50,13 +60,25 @@ const statusUpdateSchema = z.object({
 
     "IN_PROGRESS",
 
+    "WAITING_CUSTOMER_CONFIRMATION",
+
     "COMPLETED",
 
     "CANCELLED"
 
-  ])
+  ]),
+
+  latitude: z.number().min(-90).max(90).optional(),
+
+  longitude: z.number().min(-180).max(180).optional()
 
 });
+
+
+
+const selectWorkerSchema = z.object({ workerId: z.string().uuid() });
+
+const approveExtraTimeSchema = z.object({ extraMinutes: z.number().int().min(15).max(480) });
 
 
 
@@ -123,6 +145,8 @@ export function createGigRouter(io: Server): Router {
   router.post("/:gigId/publish", requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN), async (req, res, next) => {
 
     try {
+
+      assertDevOnlyPaymentBypass("Publish without payment");
 
       const gigId = String(req.params.gigId);
 
@@ -328,7 +352,15 @@ export function createGigRouter(io: Server): Router {
 
 
 
-      const gig = await updateGigStatus(gigId, req.auth!.userId, req.body.status, io);
+      const gig = await updateGigStatus(
+        gigId,
+        req.auth!.userId,
+        req.body.status,
+        io,
+        req.body.latitude !== undefined && req.body.longitude !== undefined
+          ? { latitude: req.body.latitude, longitude: req.body.longitude }
+          : undefined
+      );
 
       res.json({ gig });
 
@@ -338,6 +370,64 @@ export function createGigRouter(io: Server): Router {
 
     }
 
+  });
+
+
+
+  router.get("/:gigId/interests", requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN), async (req, res, next) => {
+    try {
+      const gigId = String(req.params.gigId);
+      const interests = await listGigInterests(gigId, req.auth!.userId);
+      res.json({ interests });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/:gigId/selection/:workerId", requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN), async (req, res, next) => {
+    try {
+      const summary = await getWorkerSelectionSummary(String(req.params.gigId), req.auth!.userId, String(req.params.workerId));
+      res.json(summary);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/:gigId/select-worker", requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN), validateBody(selectWorkerSchema), async (req, res, next) => {
+    try {
+      const summary = await selectWorkerForGig(String(req.params.gigId), req.auth!.userId, req.body.workerId, io);
+      res.json(summary);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/:gigId/authorize-without-stripe", requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN), async (req, res, next) => {
+    try {
+      assertDevOnlyPaymentBypass("Authorize without Stripe");
+      const summary = await authorizeWorkerSelectionWithoutStripe(String(req.params.gigId), req.auth!.userId, io);
+      res.json(summary);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/:gigId/approve-completion", requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN), async (req, res, next) => {
+    try {
+      const result = await approveGigCompletion(String(req.params.gigId), req.auth!.userId, io);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/:gigId/approve-extra-time", requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN), validateBody(approveExtraTimeSchema), async (req, res, next) => {
+    try {
+      const result = await approveExtraTime(String(req.params.gigId), req.auth!.userId, req.body.extraMinutes, io);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
   });
 
 

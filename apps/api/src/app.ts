@@ -55,6 +55,16 @@ export function createApp(io: Server) {
     res.json({ ok: true, uptime: process.uptime(), timestamp: new Date().toISOString() });
   });
 
+  app.get("/", (_req, res) => {
+    res.json({
+      name: "GigFlow API",
+      version: "0.1.0",
+      health: "/health",
+      ready: "/ready",
+      docs: "https://github.com/gigflow/gigflow/blob/main/README.md"
+    });
+  });
+
   app.get("/ready", async (_req, res) => {
     const health = await getHealthStatus();
     if (!health.ok) {

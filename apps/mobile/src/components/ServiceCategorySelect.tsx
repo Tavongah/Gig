@@ -1,9 +1,15 @@
 import { useMemo, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import type { ServiceCategory } from "../lib/api";
 import { DUTS } from "../lib/theme";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { ErrorMessage } from "./ErrorMessage";
+
+const ROW_HEIGHT = 48;
+/** Show every service without an inner scroll when the list is this short. */
+const SHOW_ALL_COUNT = 10;
+/** Cap inner scroll height when there are many services. */
+const SCROLL_LIST_MAX_HEIGHT = 320;
 
 interface ServiceCategorySelectProps {
   mvp: ServiceCategory[];
@@ -32,6 +38,13 @@ export function ServiceCategorySelect({
     if (!normalized) return mvp;
     return mvp.filter((category) => category.name.toLowerCase().includes(normalized));
   }, [mvp, query]);
+
+  const listMaxHeight =
+    filtered.length === 0
+      ? ROW_HEIGHT
+      : filtered.length <= SHOW_ALL_COUNT
+        ? filtered.length * ROW_HEIGHT
+        : SCROLL_LIST_MAX_HEIGHT;
 
   function handleSelect(categoryId: string): void {
     onSelect(categoryId);
@@ -67,7 +80,12 @@ export function ServiceCategorySelect({
             className="border-b border-border bg-surface px-4 py-3 text-ink"
             autoFocus
           />
-          <View className="max-h-48">
+          <ScrollView
+            nestedScrollEnabled
+            showsVerticalScrollIndicator
+            keyboardShouldPersistTaps="handled"
+            style={{ maxHeight: listMaxHeight }}
+          >
             {filtered.length === 0 ? (
               <Text className="px-4 py-3 text-sm text-muted">No matching services.</Text>
             ) : (
@@ -77,14 +95,14 @@ export function ServiceCategorySelect({
                   <Pressable
                     key={category.id}
                     onPress={() => handleSelect(category.id)}
-                    className={`border-b border-border px-4 py-3 active:bg-surface ${selected ? "bg-hero" : ""}`}
+                    className={`min-h-12 justify-center border-b border-border px-4 py-3 active:bg-surface ${selected ? "bg-hero" : ""}`}
                   >
                     <Text className={`text-sm ${selected ? "font-bold text-brand" : "text-ink"}`}>{category.name}</Text>
                   </Pressable>
                 );
               })
             )}
-          </View>
+          </ScrollView>
         </View>
       ) : null}
 

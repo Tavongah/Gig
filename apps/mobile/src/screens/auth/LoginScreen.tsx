@@ -8,11 +8,16 @@ import { Screen } from "../../components/Screen";
 import { HeroBanner } from "../../components/HeroBanner";
 import { APP_NAME } from "../../lib/brand";
 import { AppButton } from "../../components/AppButton";
+import { AuthOrDivider } from "../../components/AuthOrDivider";
+import { SocialAuthButtons } from "../../components/SocialAuthButtons";
 import { DutsCard } from "../../components/DutsCard";
 import { useSessionStore } from "../../stores/session.store";
 import type { AuthStackParamList } from "../../navigation/auth-types";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
+
+const inputClassName =
+  "rounded-2xl border border-border bg-[#EFF6FF] px-4 py-4 text-base text-ink";
 
 export function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState("");
@@ -31,6 +36,8 @@ export function LoginScreen({ navigation }: Props) {
     onError: (err: Error) => setError(err.message)
   });
 
+  const isBusy = loginMutation.isPending;
+
   return (
     <Screen>
       <View className="gap-6">
@@ -38,29 +45,43 @@ export function LoginScreen({ navigation }: Props) {
 
         <DutsCard className="gap-4 p-5">
           <Text className="text-xl font-black text-ink">Log in</Text>
+
+          <SocialAuthButtons intendedRole="CLIENT" disabled={isBusy} layout="row" />
+
+          <AuthOrDivider />
+
           <TextInput
-            className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
+            className={inputClassName}
             value={email}
             onChangeText={setEmail}
             placeholder="Email"
+            placeholderTextColor="#94A3B8"
             autoCapitalize="none"
             keyboardType="email-address"
+            editable={!isBusy}
           />
           <TextInput
-            className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
+            className={inputClassName}
             value={password}
             onChangeText={setPassword}
             placeholder="Password"
+            placeholderTextColor="#94A3B8"
             secureTextEntry
+            editable={!isBusy}
           />
           {error ? <Text className="text-sm text-danger">{error}</Text> : null}
-          <AppButton label={loginMutation.isPending ? "Signing in..." : "Log in"} onPress={() => loginMutation.mutate()} />
-          <Pressable onPress={() => navigation.navigate("ForgotPassword")}>
+          <AppButton
+            label={isBusy ? "Signing in..." : "Log in"}
+            onPress={() => loginMutation.mutate()}
+            disabled={isBusy}
+            loading={isBusy}
+          />
+          <Pressable onPress={() => navigation.navigate("ForgotPassword")} disabled={isBusy}>
             <Text className="text-center text-sm font-semibold text-brand">Forgot password?</Text>
           </Pressable>
         </DutsCard>
 
-        <Pressable onPress={() => navigation.navigate("RegisterSelection")} className="py-2">
+        <Pressable onPress={() => navigation.navigate("RegisterSelection")} className="py-2" disabled={isBusy}>
           <Text className="text-center text-muted">
             New to {APP_NAME}? <Text className="font-bold text-brand">Create an account</Text>
           </Text>

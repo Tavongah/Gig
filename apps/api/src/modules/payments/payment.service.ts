@@ -1,11 +1,13 @@
 import { GigStatus, PaymentLifecycle, PaymentStatus, TransactionType, UserRole } from "@prisma/client";
+import type { Server } from "socket.io";
 import type Stripe from "stripe";
 import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
+import { assertDevOnlyPaymentBypass } from "../../lib/production-guards.js";
 import { getSocketServer } from "../../lib/socket.js";
 import { getStripe, isStripeConfigured } from "../../lib/stripe.js";
-import { broadcastGigOffer } from "../realtime/realtime.service.js";
+import { broadcastGigOffer, notifyUser } from "../realtime/realtime.service.js";
 import {
   formatPaymentStatusResponse,
   isAuthorizedForWorkerAccept,
@@ -13,7 +15,7 @@ import {
   lifecycleToPaymentStatus
 } from "./payment-status.js";
 
-const AWAITING_PAYMENT_GIG_STATUSES: GigStatus[] = [GigStatus.DRAFT, GigStatus.POSTED];
+const AWAITING_PAYMENT_GIG_STATUSES: GigStatus[] = [GigStatus.DRAFT, GigStatus.POSTED, GigStatus.WORKER_SELECTED];
 
 function logPayment(event: string, details: Record<string, unknown>): void {
   console.info(`[stripe] ${event}`, details);
@@ -87,7 +89,17 @@ function formatCentsLabel(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-export async function createCheckoutSession(gigId: string, clientId: string) {
+type GigWithPayment = NonNullable<
+  Awaited<
+    ReturnType<
+      typeof prisma.gig.findFirst<{
+        include: { payment: true; serviceCategory: true };
+      }>
+    >
+  >
+>;
+
+async function loadGigAwaitingClientPayment(gigId: string, clientId: string): Promise<GigWithPayment> {
   if (!isStripeConfigured()) {
     throw new AppError("STRIPE_NOT_CONFIGURED", 503, "STRIPE_NOT_CONFIGURED", {
       stripe: "Stripe is not configured"
@@ -111,21 +123,7 @@ export async function createCheckoutSession(gigId: string, clientId: string) {
 
   if (gig.paymentStatus !== PaymentLifecycle.PAYMENT_PENDING && gig.paymentStatus !== PaymentLifecycle.PAYMENT_FAILED) {
     if (isPaidLifecycle(gig.paymentStatus)) {
-      return {
-        alreadyPaid: true,
-        payment: formatPaymentStatusResponse({
-          id: gig.payment.id,
-          paymentStatus: gig.paymentStatus,
-          amountCents: gig.totalCents,
-          platformFeeCents: gig.platformFeeCents,
-          workerPayoutCents: gig.workerPayoutCents,
-          paymentIntentId: gig.paymentIntentId,
-          checkoutSessionId: gig.checkoutSessionId,
-          stripeTransferId: gig.payment.stripeTransferId,
-          gigStatus: gig.status
-        }),
-        checkoutUrl: null
-      };
+      throw new AppError("This gig is already paid", 409, "ALREADY_PAID", { gig: "This gig is already paid" });
     }
 
     throw new AppError("INVALID_STATE", 409, "INVALID_GIG_STATE", {
@@ -142,6 +140,102 @@ export async function createCheckoutSession(gigId: string, clientId: string) {
       }
     });
     logPayment("payment_retry_reset", { gigId, clientId });
+    gig.paymentStatus = PaymentLifecycle.PAYMENT_PENDING;
+  }
+
+  return gig;
+}
+
+function formatGigPaymentResponse(gig: GigWithPayment) {
+  return formatPaymentStatusResponse({
+    id: gig.payment!.id,
+    paymentStatus: gig.paymentStatus,
+    amountCents: gig.totalCents,
+    platformFeeCents: gig.platformFeeCents,
+    workerPayoutCents: gig.workerPayoutCents,
+    paymentIntentId: gig.paymentIntentId,
+    checkoutSessionId: gig.checkoutSessionId,
+    stripeTransferId: gig.payment!.stripeTransferId,
+    gigStatus: gig.status
+  });
+}
+
+export async function createPaymentIntentForGig(gigId: string, clientId: string) {
+  try {
+    const gig = await loadGigAwaitingClientPayment(gigId, clientId);
+    const stripe = getStripe();
+    const customerId = await getOrCreateStripeCustomer(clientId);
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: gig.totalCents,
+      currency: "usd",
+      customer: customerId,
+      capture_method: "manual",
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        gigId: gig.id,
+        clientId,
+        platformFeeCents: String(gig.platformFeeCents),
+        workerPayoutCents: String(gig.workerPayoutCents),
+        totalCents: String(gig.totalCents)
+      }
+    });
+
+    await syncGigPaymentState(gigId, PaymentLifecycle.PAYMENT_PENDING, {
+      paymentIntentId: paymentIntent.id,
+      paymentRecord: {
+        paymentId: gig.payment!.id,
+        stripePaymentIntentId: paymentIntent.id,
+        stripeCheckoutSessionId: null
+      }
+    });
+
+    logPayment("payment_intent_created", { gigId, paymentIntentId: paymentIntent.id, amountCents: gig.totalCents, clientId });
+
+    return {
+      alreadyPaid: false,
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      payment: formatGigPaymentResponse({ ...gig, paymentIntentId: paymentIntent.id })
+    };
+  } catch (error) {
+    if (error instanceof AppError && error.code === "ALREADY_PAID") {
+      const paidGig = await prisma.gig.findFirst({
+        where: { id: gigId, clientId },
+        include: { payment: true, serviceCategory: true }
+      });
+      if (!paidGig?.payment) throw error;
+
+      return {
+        alreadyPaid: true,
+        clientSecret: null,
+        payment: formatGigPaymentResponse(paidGig)
+      };
+    }
+    throw error;
+  }
+}
+
+export async function createCheckoutSession(gigId: string, clientId: string) {
+  let gig: GigWithPayment;
+
+  try {
+    gig = await loadGigAwaitingClientPayment(gigId, clientId);
+  } catch (error) {
+    if (error instanceof AppError && error.code === "ALREADY_PAID") {
+      const paidGig = await prisma.gig.findFirst({
+        where: { id: gigId, clientId },
+        include: { payment: true, serviceCategory: true }
+      });
+      if (!paidGig?.payment) throw error;
+
+      return {
+        alreadyPaid: true,
+        payment: formatGigPaymentResponse(paidGig),
+        checkoutUrl: null
+      };
+    }
+    throw error;
   }
 
   const stripe = getStripe();
@@ -186,7 +280,7 @@ export async function createCheckoutSession(gigId: string, clientId: string) {
     paymentIntentId,
     checkoutSessionId: session.id,
     paymentRecord: {
-      paymentId: gig.payment.id,
+      paymentId: gig.payment!.id,
       stripePaymentIntentId: paymentIntentId,
       stripeCheckoutSessionId: session.id
     }
@@ -198,16 +292,7 @@ export async function createCheckoutSession(gigId: string, clientId: string) {
     alreadyPaid: false,
     sessionId: session.id,
     checkoutUrl: session.url,
-    payment: formatPaymentStatusResponse({
-      id: gig.payment.id,
-      paymentStatus: PaymentLifecycle.PAYMENT_PENDING,
-      amountCents: gig.totalCents,
-      platformFeeCents: gig.platformFeeCents,
-      workerPayoutCents: gig.workerPayoutCents,
-      paymentIntentId,
-      checkoutSessionId: session.id,
-      gigStatus: gig.status
-    })
+    payment: formatGigPaymentResponse({ ...gig, paymentIntentId, checkoutSessionId: session.id })
   };
 }
 
@@ -243,7 +328,14 @@ export async function activateGigAfterPayment(gigId: string): Promise<void> {
     include: { serviceCategory: true, payment: true }
   });
 
-  if (!gig?.payment || gig.status !== GigStatus.DRAFT) return;
+  if (!gig?.payment) return;
+
+  if (gig.status === GigStatus.WORKER_SELECTED && gig.assignedWorkerId) {
+    await activateGigAfterWorkerPayment(gigId);
+    return;
+  }
+
+  if (gig.status !== GigStatus.DRAFT) return;
 
   const ready = !isStripeConfigured() || gig.paymentStatus === PaymentLifecycle.PAYMENT_AUTHORIZED;
   if (!ready) return;
@@ -281,6 +373,93 @@ export async function activateGigAfterPayment(gigId: string): Promise<void> {
   io.to(`user:${gig.clientId}`).emit("gig:payment_authorized", { gigId: gig.id });
 }
 
+export async function activateGigAfterWorkerPayment(gigId: string, io?: Server): Promise<void> {
+  const gig = await prisma.gig.findUnique({
+    where: { id: gigId },
+    include: { serviceCategory: true, payment: true }
+  });
+
+  if (!gig?.payment || !gig.assignedWorkerId || gig.status !== GigStatus.WORKER_SELECTED) return;
+  if (gig.paymentStatus !== PaymentLifecycle.PAYMENT_AUTHORIZED && isStripeConfigured()) return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.gigAssignment.upsert({
+      where: { gigId_workerId: { gigId, workerId: gig.assignedWorkerId! } },
+      create: { gigId, workerId: gig.assignedWorkerId! },
+      update: {}
+    });
+
+    await tx.gig.update({
+      where: { id: gigId },
+      data: {
+        status: GigStatus.WORKER_ASSIGNED,
+        authorizedAt: gig.authorizedAt ?? new Date()
+      }
+    });
+  });
+
+  const socket = io ?? getSocketServer();
+  notifyUser(socket, gig.assignedWorkerId, {
+    type: "PAYMENT_SECURED",
+    title: "Payment secured",
+    body: `Payment is secured for "${gig.title}". You can head to the customer.`,
+    gigId
+  });
+  notifyUser(socket, gig.clientId, {
+    type: "PAYMENT_AUTHORIZED",
+    title: "Payment reserved",
+    body: "Your payment has been securely reserved and will only be charged after the work is completed.",
+    gigId
+  });
+  socket.to(`user:${gig.clientId}`).to(`user:${gig.assignedWorkerId}`).emit("gig:payment_authorized", { gigId });
+  logPayment("worker_payment_authorized", { gigId, workerId: gig.assignedWorkerId });
+}
+
+async function broadcastPostedGig(gigId: string): Promise<void> {
+  const gig = await prisma.gig.findUnique({
+    where: { id: gigId },
+    include: { serviceCategory: true }
+  });
+  if (!gig) return;
+
+  const io = getSocketServer();
+  await broadcastGigOffer(io, {
+    gigId: gig.id,
+    title: gig.title,
+    serviceCategoryId: gig.serviceCategoryId,
+    serviceCategoryName: gig.serviceCategory.name,
+    latitude: Number(gig.latitude),
+    longitude: Number(gig.longitude),
+    city: gig.city,
+    region: gig.region,
+    size: gig.size,
+    totalCents: gig.totalCents,
+    workerPayoutCents: gig.workerPayoutCents,
+    startsAt: gig.startsAt.toISOString(),
+    urgency: gig.urgency,
+    estimatedHours: Number(gig.estimatedHours)
+  });
+}
+
+export async function publishPostedGig(gigId: string): Promise<void> {
+  await broadcastPostedGig(gigId);
+}
+
+export async function assertGigPaymentAuthorized(gigId: string): Promise<void> {
+  if (!isStripeConfigured()) return;
+
+  const gig = await prisma.gig.findUnique({ where: { id: gigId } });
+  if (!gig) {
+    throw new AppError("PAYMENT_REQUIRED", 402, "PAYMENT_REQUIRED", { payment: "Gig not found" });
+  }
+
+  if (!isAuthorizedForWorkerAccept(gig.paymentStatus)) {
+    throw new AppError("PAYMENT_REQUIRED", 402, "PAYMENT_REQUIRED", {
+      payment: "Payment must be authorized before the worker can begin."
+    });
+  }
+}
+
 export async function handlePaymentIntentAuthorized(paymentIntent: Stripe.PaymentIntent): Promise<void> {
   const gigId = paymentIntent.metadata.gigId;
   if (!gigId) return;
@@ -300,6 +479,11 @@ export async function handlePaymentIntentAuthorized(paymentIntent: Stripe.Paymen
       stripePaymentIntentId: paymentIntent.id,
       stripeCheckoutSessionId: gig.checkoutSessionId
     }
+  });
+
+  await prisma.gig.update({
+    where: { id: gigId },
+    data: { authorizedAt: new Date() }
   });
 
   await recordTransaction(gig.payment.id, TransactionType.CLIENT_CHARGE, gig.totalCents, {
@@ -505,8 +689,10 @@ export async function releaseAuthorizedPayment(gigId: string): Promise<void> {
   });
 }
 
-export async function assertWorkerCanAcceptGigs(_workerId: string): Promise<void> {
-  // Stripe Connect is only required when withdrawing earnings, not when accepting gigs.
+export async function assertWorkerCanAcceptGigs(workerId: string): Promise<void> {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: workerId } });
+  const { assertWorkerCanAcceptGigs: assertAccess } = await import("../auth/access.service.js");
+  assertAccess(user);
 }
 
 export async function assertGigIsPaid(gigId: string): Promise<void> {
@@ -525,6 +711,7 @@ export async function assertGigIsPaid(gigId: string): Promise<void> {
 }
 
 export async function publishGigDevWithoutPayment(gigId: string, clientId: string): Promise<void> {
+  assertDevOnlyPaymentBypass("Publish without payment");
   if (isStripeConfigured()) {
     throw new AppError("STRIPE_REQUIRED", 400, "STRIPE_REQUIRED", {
       payment: "Use Stripe checkout when payments are enabled."

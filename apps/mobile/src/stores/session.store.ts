@@ -36,7 +36,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         session: { token, user },
         profile: user,
         activeRole: defaultActiveRole(user),
-        onboardingComplete: true,
+        onboardingComplete: Boolean(user.profileCompleted),
         hydrated: true
       });
     } catch {
@@ -49,7 +49,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({
       session,
       profile: session.user,
-      onboardingComplete: true,
+      onboardingComplete: Boolean(session.user.profileCompleted),
       activeRole: defaultActiveRole(session.user)
     });
   },
@@ -57,7 +57,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({
       profile,
       session: get().session ? { ...get().session!, user: profile } : null,
-      onboardingComplete: true
+      onboardingComplete: Boolean(profile.profileCompleted)
     }),
   setActiveRole: (activeRole) => set({ activeRole }),
   setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),

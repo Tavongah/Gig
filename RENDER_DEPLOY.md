@@ -1,5 +1,7 @@
 # Deploy GIGFLOW to Render (step-by-step)
 
+**Full pre-launch checklist:** [LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md)
+
 Most Render failures happen because **GitHub is out of date** or **env vars were not set** after the first Blueprint deploy.
 
 ---
@@ -105,7 +107,7 @@ If `/ready` is 503:
 ### Admin
 
 Open `https://gigflow-admin.onrender.com`  
-Login: `admin@gigflow.local` / `Admin123!` (seeded on first deploy)
+Login: `admin@gigflow.local` with the password from `ADMIN_SEED_PASSWORD` (seeded on first deploy)
 
 ### Mobile (testers)
 

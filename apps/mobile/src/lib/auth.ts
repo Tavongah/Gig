@@ -2,6 +2,8 @@ import type { ApiUser } from "./api";
 
 export type AccountStatus = "ACTIVE" | "SUSPENDED" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
 
+export type AuthStep = "account" | "email" | "phone" | "profile" | "ready";
+
 export function isWorkerUser(user: ApiUser): boolean {
   return user.roles.includes("WORKER");
 }
@@ -37,4 +39,40 @@ export function defaultActiveRole(user: ApiUser): "CLIENT" | "WORKER" {
     return "WORKER";
   }
   return "CLIENT";
+}
+
+export function needsEmailVerification(user: ApiUser): boolean {
+  return user.authProvider === "EMAIL" && !user.emailVerified;
+}
+
+export function needsPhoneVerification(user: ApiUser): boolean {
+  return !user.phoneVerified;
+}
+
+export function isApplePlaceholderEmail(email: string): boolean {
+  return email.endsWith("@apple.private.gigflow.local");
+}
+
+export function needsProfileCompletion(user: ApiUser): boolean {
+  return !user.profileCompleted || isApplePlaceholderEmail(user.email);
+}
+
+export function getAuthStep(user: ApiUser): AuthStep {
+  if (needsEmailVerification(user)) return "email";
+  if (needsPhoneVerification(user)) return "phone";
+  if (needsProfileCompletion(user)) return "profile";
+  return "ready";
+}
+
+export function canCustomerPostGigs(user: ApiUser): boolean {
+  return Boolean(user.emailVerified && user.phoneVerified);
+}
+
+export function canWorkerGoOnline(user: ApiUser): boolean {
+  return Boolean(
+    user.emailVerified &&
+      user.phoneVerified &&
+      user.profileCompleted &&
+      user.accountStatus === "APPROVED"
+  );
 }

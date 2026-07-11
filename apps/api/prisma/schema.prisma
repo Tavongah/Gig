@@ -23,15 +23,31 @@ enum AccountStatus {
 
 enum GigStatus {
   POSTED
+  WORKER_SELECTED
   SEARCHING_FOR_WORKER
   WORKER_ASSIGNED
   WORKER_EN_ROUTE
   WORKER_ARRIVED
   IN_PROGRESS
+  WAITING_EXTRA_TIME_APPROVAL
+  WAITING_CUSTOMER_CONFIRMATION
   COMPLETED
   CANCELLED
   DRAFT
   DISPUTED
+}
+
+enum PricingType {
+  FIXED
+  HOURLY
+  ESTIMATE_TIMER
+}
+
+enum GigInterestStatus {
+  INTERESTED
+  SELECTED
+  REJECTED
+  WITHDRAWN
 }
 
 enum GigUrgency {
@@ -112,25 +128,45 @@ enum LaunchPhase {
   PHASE_2
 }
 
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  APPLE
+}
+
 model User {
-  id                 String              @id @default(uuid())
-  firebaseUid        String?             @unique
-  email              String              @unique
-  phoneNumber        String?
-  passwordHash       String?
-  fullName           String
-  avatarUrl          String?
-  roles              UserRole[]          @default([CLIENT])
-  defaultRole        UserRole            @default(CLIENT)
-  accountStatus      AccountStatus       @default(ACTIVE)
-  isVerified         Boolean             @default(false)
-  stripeCustomerId   String?             @unique
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  workerProfile      WorkerProfile?
-  passwordResetTokens PasswordResetToken[]
+  id                   String              @id @default(uuid())
+  firebaseUid          String?             @unique
+  authProvider         AuthProvider        @default(EMAIL)
+  email                String              @unique
+  phoneNumber          String?             @unique
+  passwordHash         String?
+  fullName             String
+  avatarUrl            String?
+  roles                UserRole[]          @default([CLIENT])
+  defaultRole          UserRole            @default(CLIENT)
+  accountStatus        AccountStatus       @default(ACTIVE)
+  emailVerified        Boolean             @default(false)
+  phoneVerified        Boolean             @default(false)
+  profileCompleted     Boolean             @default(false)
+  isVerified           Boolean             @default(false)
+  formattedAddress     String?
+  addressLine1         String?
+  city                 String?
+  region               String?
+  postalCode           String?
+  country              String?             @default("US")
+  latitude             Decimal?            @db.Decimal(9, 6)
+  longitude            Decimal?            @db.Decimal(9, 6)
+  stripeCustomerId     String?             @unique
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  workerProfile        WorkerProfile?
+  passwordResetTokens  PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
   clientGigs         Gig[]               @relation("ClientGigs")
   workerAssignments  GigAssignment[]     @relation("WorkerAssignments")
+  workerInterests    GigInterest[]       @relation("WorkerInterests")
   reviewsGiven       Review[]            @relation("ReviewsGiven")
   reviewsReceived    Review[]            @relation("ReviewsReceived")
   notifications      Notification[]
@@ -141,6 +177,18 @@ model User {
 }
 
 model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model EmailVerificationToken {
   id        String    @id @default(uuid())
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -219,11 +267,18 @@ model Gig {
   serviceCategory       ServiceCategory @relation(fields: [serviceCategoryId], references: [id], onDelete: Restrict)
   title                 String
   description           String
-  status                GigStatus         @default(DRAFT)
+  status                GigStatus         @default(POSTED)
   paymentStatus         PaymentLifecycle  @default(PAYMENT_PENDING)
+  pricingType           PricingType       @default(HOURLY)
   paymentIntentId       String?
   checkoutSessionId     String?
   assignedWorkerId      String?
+  publishedAt           DateTime?
+  authorizedAt          DateTime?
+  customerApprovedAt    DateTime?
+  autoApproveAt         DateTime?
+  taxCents              Int               @default(0)
+  finalTotalCents       Int?
   urgency               GigUrgency
   size                  GigSize
   estimatedHours        Decimal         @db.Decimal(5, 2)
@@ -245,6 +300,7 @@ model Gig {
   platformFeeCents      Int
   workerPayoutCents     Int
   assignments           GigAssignment[]
+  interests             GigInterest[]
   payment               Payment?
   earningsTransactions  WorkerEarningsTransaction[]
   reviews               Review[]
@@ -257,16 +313,46 @@ model Gig {
   @@index([latitude, longitude])
 }
 
+model GigInterest {
+  id                       String            @id @default(uuid())
+  gigId                    String
+  gig                      Gig               @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  workerId                 String
+  worker                   User              @relation("WorkerInterests", fields: [workerId], references: [id], onDelete: Restrict)
+  status                   GigInterestStatus @default(INTERESTED)
+  offeredWorkerPayoutCents Int?
+  estimatedArrivalMinutes  Int?
+  estimatedHours           Decimal?          @db.Decimal(5, 2)
+  message                  String?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+
+  @@unique([gigId, workerId])
+  @@index([gigId, status])
+}
+
 model GigAssignment {
-  id          String    @id @default(uuid())
-  gigId       String
-  gig         Gig       @relation(fields: [gigId], references: [id], onDelete: Cascade)
-  workerId    String
-  worker      User      @relation("WorkerAssignments", fields: [workerId], references: [id], onDelete: Restrict)
-  acceptedAt  DateTime  @default(now())
-  startedAt   DateTime?
-  completedAt DateTime?
-  cancelledAt DateTime?
+  id                       String    @id @default(uuid())
+  gigId                    String
+  gig                      Gig       @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  workerId                 String
+  worker                   User      @relation("WorkerAssignments", fields: [workerId], references: [id], onDelete: Restrict)
+  acceptedAt               DateTime  @default(now())
+  enRouteAt                DateTime?
+  arrivedAt                DateTime?
+  startedAt                DateTime?
+  completedAt              DateTime?
+  endedAt                  DateTime?
+  cancelledAt              DateTime?
+  startLatitude            Decimal?  @db.Decimal(9, 6)
+  startLongitude           Decimal?  @db.Decimal(9, 6)
+  endLatitude              Decimal?  @db.Decimal(9, 6)
+  endLongitude             Decimal?  @db.Decimal(9, 6)
+  billableMinutes          Int?
+  timerPausedAt            DateTime?
+  extraTimeApprovedMinutes Int       @default(0)
+  completionNotes          String?
+  completionPhotoUrls      String[]  @default([])
 
   @@unique([gigId, workerId])
   @@index([workerId, acceptedAt])

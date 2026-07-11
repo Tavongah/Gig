@@ -4,6 +4,7 @@ import { AccountStatus, AvailabilityStatus, GigStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { getWorkerConnectStatus } from "../payments/payment.service.js";
 import { resolveGeocodedLocation, reverseGeocodeCoordinates } from "../location/geocoding.service.js";
+import { assertWorkerCanGoOnline } from "../auth/access.service.js";
 
 const IN_PROGRESS_GIG_STATUSES: GigStatus[] = [
   GigStatus.WORKER_ASSIGNED,
@@ -22,6 +23,8 @@ function formatTransactionType(type: string): string {
 
 export async function updateWorkerAvailability(userId: string, input: WorkerAvailabilityInput) {
   const parsed = workerAvailabilitySchema.parse(input);
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  assertWorkerCanGoOnline(user);
 
   return prisma.workerProfile.update({
     where: { userId },

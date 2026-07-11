@@ -17,8 +17,8 @@ import { GigCard } from "../../components/GigCard";
 import { EmptyState } from "../../components/EmptyState";
 import { PendingPaymentCard } from "../../components/PendingPaymentCard";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
-import { gigNeedsPayment } from "../../lib/gig-payment";
-import { useStripeCheckout } from "../../hooks/useStripeCheckout";
+import { gigAwaitingWorkerSelection, gigNeedsPayment } from "../../lib/gig-payment";
+import { needsClientReview } from "../../lib/gig-status";
 import { useSocketEvents } from "../../hooks/useSocket";
 import type { ClientTabParamList, RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
@@ -41,8 +41,6 @@ export function ClientMyGigsScreen() {
     queryFn: () => api.myGigs(session.token, "CLIENT"),
     refetchInterval: 15_000
   });
-
-  const { payWithStripe, isPaying, payingGigId } = useStripeCheckout();
 
   const unpaidGigs = useMemo(
     () => (gigsQuery.data?.gigs ?? []).filter(gigNeedsPayment),
@@ -70,8 +68,8 @@ export function ClientMyGigsScreen() {
     active: {
       emoji: "📍",
       title: "No active gigs",
-      description: "Post your first gig and get help from nearby workers.",
-      actionLabel: "Post a Gig",
+      description: "Request your first gig and get matched with nearby workers.",
+      actionLabel: "Request a Gig",
       onAction: () => navigation.navigate("PostGig")
     },
     completed: {
@@ -89,7 +87,7 @@ export function ClientMyGigsScreen() {
   return (
     <TabScreen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32, gap: 16 }}>
-        <HeroBanner eyebrow="My gigs" title="Your gigs" subtitle="Track active, completed, and cancelled jobs." />
+        <HeroBanner eyebrow="My bookings" title="Your requests" subtitle="Track matching, live jobs, and completed work." />
 
         <SegmentedTabs
           tabs={[
@@ -103,13 +101,17 @@ export function ClientMyGigsScreen() {
 
         {unpaidGigs.length > 0 ? (
           <View className="gap-3">
-            <Text className="text-sm font-bold uppercase tracking-wider text-muted">Awaiting payment</Text>
+            <Text className="text-sm font-bold uppercase tracking-wider text-muted">Confirm your booking</Text>
             {unpaidGigs.map((gig) => (
               <PendingPaymentCard
                 key={gig.id}
                 gig={gig}
-                onPay={() => payWithStripe(gig.id)}
-                loading={isPaying && payingGigId === gig.id}
+                onPay={() =>
+                  navigation.navigate("GigPayment", {
+                    gigId: gig.id,
+                    workerId: gig.assignments?.[0]?.worker?.id
+                  })
+                }
               />
             ))}
           </View>
@@ -126,7 +128,17 @@ export function ClientMyGigsScreen() {
                   key={gig.id}
                   gig={gig}
                   subtitle={worker ? `Worker: ${worker.fullName}` : undefined}
-                  onPress={() => navigation.navigate("GigTracking", { gigId: gig.id })}
+                  onPress={() => {
+                    if (gigAwaitingWorkerSelection(gig)) {
+                      navigation.navigate("GigSelectWorkers", { gigId: gig.id });
+                      return;
+                    }
+                    if (needsClientReview(gig.status)) {
+                      navigation.navigate("GigCompletionReview", { gigId: gig.id });
+                      return;
+                    }
+                    navigation.navigate("GigTracking", { gigId: gig.id });
+                  }}
                 />
               );
             })}

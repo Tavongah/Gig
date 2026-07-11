@@ -14,13 +14,13 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://your-api.onrender.com/v1"
+        "EXPO_PUBLIC_API_URL": "https://gigflow-api.onrender.com/v1"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://your-api.onrender.com/v1"
+        "EXPO_PUBLIC_API_URL": "https://gigflow-api.onrender.com/v1"
       }
     }
   },

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
+    "@expo/vector-icons": "^15.0.2",
     "@gigflow/shared": "file:../../packages/shared",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-navigation/bottom-tabs": "^7.3.14",

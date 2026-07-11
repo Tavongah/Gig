@@ -9,6 +9,7 @@ import { getStripe, getStripePublishableKey, isStripeConfigured } from "../../li
 import {
   createCheckoutSession,
   createConnectAccountLink,
+  createPaymentIntentForGig,
   getPaymentStatusForGig,
   getWorkerConnectStatus,
   handleAccountUpdated,
@@ -93,6 +94,15 @@ paymentRouter.use(requireAuth);
 paymentRouter.post("/checkout-session", validateBody(gigIdSchema), async (req, res, next) => {
   try {
     const result = await createCheckoutSession(req.body.gigId, req.auth!.userId);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+paymentRouter.post("/payment-intent", validateBody(gigIdSchema), async (req, res, next) => {
+  try {
+    const result = await createPaymentIntentForGig(req.body.gigId, req.auth!.userId);
     res.json(result);
   } catch (error) {
     next(error);

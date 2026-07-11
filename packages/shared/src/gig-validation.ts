@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PricingType } from "./gig-flow.js";
 
 export const MVP_SERVICE_SLUGS = [
   "moving-assistance",
@@ -44,6 +45,7 @@ export type PostGigFormValues = {
   serviceCategoryId: string | null;
   serviceCategoryName: string | null;
   description: string;
+  pricingType: PricingType;
   estimatedHours: string;
   locationAddress: string;
   urgency: GigUrgency | "";
@@ -189,13 +191,15 @@ export const gigEstimateSchema = z.object({
   distanceMiles: z.number().nonnegative().max(250).default(0),
   urgency: z.enum(["STANDARD", "SOON", "URGENT"], { message: GIG_VALIDATION_MESSAGES.urgency }),
   startsAt: startsAtSchema,
-  demandMultiplier: z.number().min(1).max(3).default(1)
+  demandMultiplier: z.number().min(1).max(3).default(1),
+  pricingType: z.enum(["FIXED", "HOURLY", "ESTIMATE_TIMER"]).default("FIXED")
 });
 
 export const createGigSchema = gigEstimateSchema.extend({
   title: trimmedString(5, 80, GIG_VALIDATION_MESSAGES.title),
   description: trimmedString(20, 1000, GIG_VALIDATION_MESSAGES.description),
   size: z.enum(["SMALL", "MEDIUM", "LARGE", "ENTERPRISE"]).default("MEDIUM"),
+  pricingType: z.enum(["FIXED", "HOURLY", "ESTIMATE_TIMER"]).default("FIXED"),
   photos: z.array(gigPhotoSchema).max(MAX_GIG_PHOTOS, GIG_VALIDATION_MESSAGES.photoCount).default([])
 });
 
@@ -207,6 +211,7 @@ const FIELD_PATH_MAP: Record<string, string> = {
   serviceCategoryId: "serviceType",
   title: "title",
   description: "description",
+  pricingType: "pricingType",
   estimatedHours: "estimatedHours",
   urgency: "urgency",
   startsAt: "preferredDateTime",
@@ -249,6 +254,7 @@ export function buildCreateGigPayload(
     startsAt: buildStartsAtIso(values.preferredDate, values.preferredTime),
     demandMultiplier: 1,
     size: "MEDIUM",
+    pricingType: values.pricingType,
     photos: values.photos.map((photo) => photo.uri),
     location: geocodedLocation
   };
@@ -291,6 +297,10 @@ export function validatePostGigForm(
 
   if (!values.urgency || !["STANDARD", "SOON", "URGENT"].includes(values.urgency)) {
     errors.urgency = GIG_VALIDATION_MESSAGES.urgency;
+  }
+
+  if (!values.pricingType || !["FIXED", "HOURLY", "ESTIMATE_TIMER"].includes(values.pricingType)) {
+    errors.pricingType = "Choose how this gig should be priced.";
   }
 
   const startsAt = buildStartsAtIso(values.preferredDate, values.preferredTime);

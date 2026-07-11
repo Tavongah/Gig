@@ -4,11 +4,14 @@ export const userRoles = ["CLIENT", "WORKER", "ADMIN"] as const;
 export const launchPhases = ["MVP", "PHASE_2"] as const;
 export const gigStatuses = [
   "POSTED",
+  "WORKER_SELECTED",
   "SEARCHING_FOR_WORKER",
   "WORKER_ASSIGNED",
   "WORKER_EN_ROUTE",
   "WORKER_ARRIVED",
   "IN_PROGRESS",
+  "WAITING_EXTRA_TIME_APPROVAL",
+  "WAITING_CUSTOMER_CONFIRMATION",
   "COMPLETED",
   "CANCELLED",
   "DRAFT",
@@ -119,6 +122,37 @@ export {
 
 export { createReviewSchema, type CreateReviewInput } from "./review-validation.js";
 export { paymentLifecycleStatuses, type PaymentLifecycleStatus } from "./payment.js";
+export {
+  formatMoney,
+  gigFlowStatuses,
+  gigNeedsCompletionApproval,
+  gigNeedsExtraTimeApproval,
+  gigNeedsPaymentAfterWorkerSelection,
+  gigNeedsWorkerSelection,
+  pricingTypes,
+  roundBillableMinutes,
+  type GigFlowStatus,
+  type PricingType
+} from "./gig-flow.js";
+
+export {
+  isRequestGigPricingType,
+  recommendedPricingForService,
+  REQUEST_GIG_PRICING_TYPES,
+  SERVICE_PRICING_RECOMMENDATIONS,
+  type RequestGigPricingType
+} from "./pricing-recommendations.js";
+
+export {
+  CUSTOMER_JOURNEY_PROGRESS,
+  customerJourneyHeadline,
+  customerJourneyProgressIndex,
+  customerJourneyStageLabel,
+  customerJourneyStages,
+  liveTrackingWorkerStatus,
+  resolveCustomerJourneyStage,
+  type CustomerJourneyStage
+} from "./customer-journey.js";
 
 export {
   accountStatuses,
@@ -127,11 +161,20 @@ export {
   loginSchema,
   resetPasswordSchema,
   workerRegisterSchema,
+  socialLoginSchema,
+  phoneOtpRequestSchema,
+  phoneOtpVerifySchema,
+  completeProfileSchema,
   type AccountStatus,
+  type AuthProvider,
+  type CompleteProfileInput,
   type CustomerRegisterInput,
   type ForgotPasswordInput,
   type LoginInput,
+  type PhoneOtpRequestInput,
+  type PhoneOtpVerifyInput,
   type ResetPasswordInput,
+  type SocialLoginInput,
   type WorkerRegisterInput
 } from "./auth.js";
 
@@ -173,7 +216,9 @@ export function calculatePriceEstimate(
   }
 ): PriceBreakdown {
   const urgencyMultiplier = urgencyMultipliers[input.urgency];
-  const laborCents = Math.round(category.hourlyRateCents * input.estimatedHours);
+  const pricingType = input.pricingType ?? "FIXED";
+  const laborCents =
+    pricingType === "FIXED" ? 0 : Math.round(category.hourlyRateCents * input.estimatedHours);
   const distanceFeeCents = Math.round(category.distanceRateCents * input.distanceMiles);
   const subtotal = category.baseRateCents + laborCents + distanceFeeCents;
   const standardTotalCents = Math.round(subtotal * category.multiplier * input.demandMultiplier);

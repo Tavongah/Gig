@@ -1,4 +1,4 @@
-import { Linking } from "react-native";
+import { Linking, Platform } from "react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -34,6 +34,10 @@ export function useStripeCheckout() {
 
   function payWithStripe(gigId: string): void {
     if (!configQuery.data?.stripeConfigured) {
+      navigation.navigate("GigPayment", { gigId });
+      return;
+    }
+    if (Platform.OS === "web") {
       navigation.navigate("GigPayment", { gigId });
       return;
     }

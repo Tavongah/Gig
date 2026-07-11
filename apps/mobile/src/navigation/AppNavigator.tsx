@@ -5,6 +5,9 @@ import { WorkerTabs } from "./WorkerTabs";
 import { GigDetailScreen } from "../screens/shared/GigDetailScreen";
 import { GigTrackingScreen } from "../screens/shared/GigTrackingScreen";
 import { GigPaymentScreen } from "../screens/shared/GigPaymentScreen";
+import { GigSelectWorkersScreen } from "../screens/shared/GigSelectWorkersScreen";
+import { GigWorkerSummaryScreen } from "../screens/shared/GigWorkerSummaryScreen";
+import { GigCompletionReviewScreen } from "../screens/shared/GigCompletionReviewScreen";
 import { PaymentSuccessScreen } from "../screens/shared/PaymentSuccessScreen";
 import { PaymentFailedScreen } from "../screens/shared/PaymentFailedScreen";
 import { WorkerStripeConnectScreen } from "../screens/worker/WorkerStripeConnectScreen";
@@ -35,7 +38,10 @@ export function AppNavigator() {
     >
       <Stack.Screen name="MainTabs" component={RoleTabs} options={{ headerShown: false }} />
       <Stack.Screen name="GigDetail" component={GigDetailScreen} options={{ title: "Gig details" }} />
-      <Stack.Screen name="GigPayment" component={GigPaymentScreen} options={{ title: "Confirm & pay" }} />
+      <Stack.Screen name="GigSelectWorkers" component={GigSelectWorkersScreen} options={{ title: "Choose your worker" }} />
+      <Stack.Screen name="GigWorkerSummary" component={GigWorkerSummaryScreen} options={{ title: "Worker summary" }} />
+      <Stack.Screen name="GigPayment" component={GigPaymentScreen} options={{ title: "Confirm booking" }} />
+      <Stack.Screen name="GigCompletionReview" component={GigCompletionReviewScreen} options={{ title: "Review completion" }} />
       <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} options={{ title: "Payment success" }} />
       <Stack.Screen name="PaymentFailed" component={PaymentFailedScreen} options={{ title: "Payment failed" }} />
       <Stack.Screen name="GigTracking" component={GigTrackingScreen} options={{ title: "Live tracking" }} />

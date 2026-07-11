@@ -4,6 +4,7 @@ import { env, resolveCorsOrigin } from "./config/env.js";
 import { prisma } from "./config/prisma.js";
 import { connectRedis, redis } from "./config/redis.js";
 import { createApp } from "./app.js";
+import { logProductionReadinessWarnings } from "./lib/production-guards.js";
 import { setSocketServer } from "./lib/socket.js";
 import { configureRealtime } from "./modules/realtime/realtime.service.js";
 
@@ -52,11 +53,17 @@ async function connectRedisWithRetry(maxAttempts = 30, delayMs = 5000): Promise<
 }
 
 async function bootstrap(): Promise<void> {
+  logProductionReadinessWarnings();
+
   httpServer.listen(env.PORT, "0.0.0.0", () => {
     console.log(`GIGFLOW API listening on 0.0.0.0:${env.PORT} (${env.NODE_ENV})`);
   });
 
   void connectRedisWithRetry();
+
+  setInterval(() => {
+    void import("./modules/gigs/gig-workflow.service.js").then(({ autoApproveStaleGigs }) => autoApproveStaleGigs());
+  }, 60 * 60 * 1000);
 }
 
 bootstrap().catch((error) => {

@@ -9,6 +9,7 @@ import { api } from "../../lib/api";
 import { showAlert, showConfirm } from "../../lib/confirm";
 import { formatAddress, formatCents } from "../../lib/format";
 import { canClientCancel, isSearching, nextWorkerAction } from "../../lib/gig-status";
+import { getCurrentCoordinates } from "../../lib/location";
 import { gigNeedsPayment } from "../../lib/gig-payment";
 import { useStripeCheckout } from "../../hooks/useStripeCheckout";
 import { StatusTimeline } from "../../components/StatusTimeline";
@@ -79,14 +80,26 @@ export function GigDetailScreen() {
   );
 
   const statusMutation = useMutation({
-    mutationFn: (status: string) => api.updateGigStatus(route.params.gigId, status, session.token),
-    onSuccess: (_data, status) => {
+    mutationFn: async ({
+      status,
+      requiresLocation
+    }: {
+      status: string;
+      requiresLocation?: boolean;
+    }) => {
+      const needsGps =
+        requiresLocation || status === "WORKER_EN_ROUTE" || status === "WAITING_CUSTOMER_CONFIRMATION";
+      const location = needsGps ? await getCurrentCoordinates() : undefined;
+      const result = await api.updateGigStatus(route.params.gigId, status, session.token, location);
+      return { result, status, location };
+    },
+    onSuccess: ({ status, location }) => {
       invalidate();
-      if (status === "WORKER_EN_ROUTE" && socket) {
+      if (status === "WORKER_EN_ROUTE" && location && socket) {
         socket.emit("location:update", {
           gigId: route.params.gigId,
-          latitude: 33.751,
-          longitude: -84.39
+          latitude: location.latitude,
+          longitude: location.longitude
         });
       }
     },
@@ -161,7 +174,7 @@ export function GigDetailScreen() {
         <StatusBadge status={gig.status} />
       </View>
 
-      <StatusTimeline status={gig.status} />
+      <StatusTimeline status={gig.status} paymentStatus={gig.paymentStatus} />
 
       <DutsCard className="gap-3 p-5">
         <Text className="text-lg font-black text-ink">{formatCents(gig.totalCents)}</Text>
@@ -251,7 +264,19 @@ export function GigDetailScreen() {
         {activeRole === "WORKER" && workerAction ? (
           <LoadingButton
             label={workerAction.label}
-            onPress={() => statusMutation.mutate(workerAction.next)}
+            loadingLabel={
+              workerAction.requiresLocation ||
+              workerAction.next === "WORKER_EN_ROUTE" ||
+              workerAction.next === "WAITING_CUSTOMER_CONFIRMATION"
+                ? "Getting location..."
+                : "Updating..."
+            }
+            onPress={() =>
+              statusMutation.mutate({
+                status: workerAction.next,
+                requiresLocation: workerAction.requiresLocation
+              })
+            }
             loading={statusMutation.isPending}
           />
         ) : null}

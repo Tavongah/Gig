@@ -101,9 +101,11 @@ try {
 }
 console.log("pending_worker_blocked:", acceptBlocked);
 
+const adminPassword = process.env.ADMIN_SEED_PASSWORD ?? "Admin123!";
+
 const admin = await req("/auth/login", {
   method: "POST",
-  body: { email: "admin@gigflow.local", password: "Admin123!" }
+  body: { email: "admin@gigflow.local", password: adminPassword }
 });
 
 await req(`/admin/workers/${workerPending.user.id}/approve`, { method: "POST", token: admin.token });

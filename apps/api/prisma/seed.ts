@@ -92,7 +92,12 @@ async function main(): Promise<void> {
     });
   }
 
-  const adminPasswordHash = await hashPassword("Admin123!");
+  const adminPassword = process.env.ADMIN_SEED_PASSWORD;
+  if (!adminPassword || adminPassword.length < 12) {
+    throw new Error("Set ADMIN_SEED_PASSWORD (min 12 characters) in apps/api/.env before seeding.");
+  }
+
+  const adminPasswordHash = await hashPassword(adminPassword);
   await prisma.user.upsert({
     where: { email: "admin@gigflow.local" },
     update: {
@@ -101,6 +106,9 @@ async function main(): Promise<void> {
       defaultRole: "ADMIN",
       accountStatus: AccountStatus.ACTIVE,
       passwordHash: adminPasswordHash,
+      emailVerified: true,
+      phoneVerified: true,
+      profileCompleted: true,
       isVerified: true
     },
     create: {
@@ -110,11 +118,139 @@ async function main(): Promise<void> {
       defaultRole: "ADMIN",
       accountStatus: AccountStatus.ACTIVE,
       passwordHash: adminPasswordHash,
+      emailVerified: true,
+      phoneVerified: true,
+      profileCompleted: true,
       isVerified: true
     }
   });
 
-  console.log("Seeded MVP categories, Phase 2 services, commission rate, and admin user.");
+  const demoPasswordHash = await hashPassword("Demo123!");
+  const lawnCategory = await prisma.serviceCategory.findUnique({ where: { slug: "lawn-cutting" } });
+  const cleaningCategory = await prisma.serviceCategory.findUnique({ where: { slug: "house-cleaning" } });
+  const categoryIds = [lawnCategory?.id, cleaningCategory?.id].filter((id): id is string => Boolean(id));
+
+  await prisma.user.upsert({
+    where: { email: "client@gigflow.local" },
+    update: {
+      fullName: "Demo Client",
+      roles: ["CLIENT"],
+      defaultRole: "CLIENT",
+      accountStatus: AccountStatus.ACTIVE,
+      passwordHash: demoPasswordHash,
+      phoneNumber: "+15550100001",
+      emailVerified: true,
+      phoneVerified: true,
+      profileCompleted: true,
+      isVerified: true,
+      formattedAddress: "100 Market St, San Francisco, CA",
+      city: "San Francisco",
+      region: "CA",
+      postalCode: "94105",
+      country: "US",
+      latitude: 37.7937,
+      longitude: -122.3965
+    },
+    create: {
+      email: "client@gigflow.local",
+      fullName: "Demo Client",
+      roles: ["CLIENT"],
+      defaultRole: "CLIENT",
+      accountStatus: AccountStatus.ACTIVE,
+      passwordHash: demoPasswordHash,
+      phoneNumber: "+15550100001",
+      emailVerified: true,
+      phoneVerified: true,
+      profileCompleted: true,
+      isVerified: true,
+      formattedAddress: "100 Market St, San Francisco, CA",
+      city: "San Francisco",
+      region: "CA",
+      postalCode: "94105",
+      country: "US",
+      latitude: 37.7937,
+      longitude: -122.3965
+    }
+  });
+
+  const demoWorker = await prisma.user.upsert({
+    where: { email: "worker@gigflow.local" },
+    update: {
+      fullName: "Demo Worker",
+      roles: ["WORKER", "CLIENT"],
+      defaultRole: "WORKER",
+      accountStatus: AccountStatus.APPROVED,
+      passwordHash: demoPasswordHash,
+      phoneNumber: "+15550100002",
+      emailVerified: true,
+      phoneVerified: true,
+      profileCompleted: true,
+      isVerified: true,
+      formattedAddress: "200 Mission St, San Francisco, CA",
+      city: "San Francisco",
+      region: "CA",
+      postalCode: "94105",
+      country: "US",
+      latitude: 37.7912,
+      longitude: -122.392
+    },
+    create: {
+      email: "worker@gigflow.local",
+      fullName: "Demo Worker",
+      roles: ["WORKER", "CLIENT"],
+      defaultRole: "WORKER",
+      accountStatus: AccountStatus.APPROVED,
+      passwordHash: demoPasswordHash,
+      phoneNumber: "+15550100002",
+      emailVerified: true,
+      phoneVerified: true,
+      profileCompleted: true,
+      isVerified: true,
+      formattedAddress: "200 Mission St, San Francisco, CA",
+      city: "San Francisco",
+      region: "CA",
+      postalCode: "94105",
+      country: "US",
+      latitude: 37.7912,
+      longitude: -122.392
+    }
+  });
+
+  if (categoryIds.length > 0) {
+    await prisma.workerProfile.upsert({
+      where: { userId: demoWorker.id },
+      update: {
+        bio: "Demo worker for launch smoke tests. Reliable local help for cleaning and yard work.",
+        city: "San Francisco",
+        serviceArea: "SF Bay Area",
+        hasVehicle: true,
+        backgroundCheckConsent: true,
+        platformRulesAgreed: true,
+        reviewedAt: new Date(),
+        serviceCategories: { set: categoryIds.map((id) => ({ id })) },
+        currentLatitude: 37.7912,
+        currentLongitude: -122.392
+      },
+      create: {
+        userId: demoWorker.id,
+        bio: "Demo worker for launch smoke tests. Reliable local help for cleaning and yard work.",
+        city: "San Francisco",
+        serviceArea: "SF Bay Area",
+        hasVehicle: true,
+        backgroundCheckConsent: true,
+        platformRulesAgreed: true,
+        reviewedAt: new Date(),
+        serviceCategories: { connect: categoryIds.map((id) => ({ id })) },
+        currentLatitude: 37.7912,
+        currentLongitude: -122.392
+      }
+    });
+  }
+
+  console.log("Seeded MVP categories, commission, admin, and demo client/worker accounts.");
+  console.log("  admin@gigflow.local — password from ADMIN_SEED_PASSWORD in apps/api/.env");
+  console.log("  client@gigflow.local / Demo123!");
+  console.log("  worker@gigflow.local / Demo123! (approved worker)");
 }
 
 main()
