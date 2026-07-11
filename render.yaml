@@ -29,11 +29,13 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: API_PUBLIC_URL
-        sync: false
+        value: https://gigflow-api.onrender.com
       - key: MOBILE_PUBLIC_URL
-        sync: false
+        value: https://gigflow-admin.onrender.com
       - key: CORS_ORIGINS
-        sync: false
+        value: https://gigflow-admin.onrender.com,http://localhost:8081,http://localhost:5173,http://localhost:19006
+      - key: LOG_VERIFICATION_TO_CONSOLE
+        value: "true"
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_PUBLISHABLE_KEY
@@ -50,8 +52,6 @@ services:
         sync: false
       - key: ADMIN_SEED_PASSWORD
         sync: false
-      - key: LOG_VERIFICATION_TO_CONSOLE
-        sync: false
 
   - type: keyvalue
     name: gigflow-redis
@@ -67,7 +67,7 @@ services:
     staticPublishPath: apps/admin/dist
     envVars:
       - key: VITE_API_URL
-        sync: false
+        value: https://gigflow-api.onrender.com/v1
 
 databases:
   - name: gigflow-db
