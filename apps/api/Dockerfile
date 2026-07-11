@@ -22,6 +22,7 @@ RUN npm run build --workspace @gigflow/api
 
 FROM base AS runner
 ENV NODE_ENV=production
+RUN apk add --no-cache wget
 WORKDIR /app
 
 COPY --from=build /app/node_modules ./node_modules

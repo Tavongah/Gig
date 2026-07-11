@@ -170,13 +170,23 @@ For phone/email verification in local dev, check the **API terminal** for OTP co
 
 **See [LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md) for the pre-launch checklist.**
 
-**See [DEPLOY.md](./DEPLOY.md) for the full hosting guide** (Render, Railway, Docker, Expo EAS, env vars, and launch checklist).
+| Platform | Guide |
+|----------|--------|
+| **DigitalOcean (recommended production)** | [deploy/digitalocean/DIGITALOCEAN_DEPLOY.md](./deploy/digitalocean/DIGITALOCEAN_DEPLOY.md) |
+| Render / Railway / Docker | [DEPLOY.md](./DEPLOY.md) |
+| Render step-by-step | [RENDER_DEPLOY.md](./RENDER_DEPLOY.md) |
 
 Quick production build:
 
 ```bash
 npm run build:api
 cd apps/api && sh scripts/start.sh
+```
+
+DigitalOcean one-command deploy (on server):
+
+```bash
+/opt/gigflow/deploy/digitalocean/scripts/deploy.sh
 ```
 
 ## Testing strategy

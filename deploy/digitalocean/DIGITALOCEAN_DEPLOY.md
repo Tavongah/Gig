@@ -1,0 +1,293 @@
+# GigFlow on DigitalOcean — Production Deployment Guide
+
+Launch architecture for **Connecticut MVP** with a path to **nationwide scale**. Target: **under $50/month** at launch on a single Droplet.
+
+---
+
+## Architecture overview
+
+```txt
+                    Internet
+                        │
+                   [ Cloudflare DNS ]  (optional, recommended)
+                        │
+              ┌─────────▼─────────┐
+              │  Ubuntu 24.04 LTS │
+              │  UFW + Fail2Ban   │
+              │  Docker Compose   │
+              └─────────┬─────────┘
+        ┌───────────────┼───────────────┐
+        │               │               │
+   ┌────▼────┐    ┌─────▼─────┐   ┌─────▼─────┐
+   │  Nginx  │    │    API    │   │  (admin   │
+   │  :443   │───▶│  :4000    │   │  static)  │
+   └─────────┘    └─────┬─────┘   └───────────┘
+                        │
+              ┌─────────┴─────────┐
+              │                   │
+        ┌─────▼─────┐       ┌─────▼─────┐
+        │ Postgres  │       │   Redis   │
+        │    16     │       │     7     │
+        └───────────┘       └───────────┘
+
+   Uploads ──▶ DigitalOcean Spaces (S3-compatible, private + signed URLs)
+   Payments ──▶ Stripe Connect webhooks → api.gigflow.com/v1/payments/webhook
+   Push (FCM) ─▶ Firebase (configure when enabling notifications)
+```
+
+| Component | Launch | Scale path |
+|-----------|--------|------------|
+| Compute | 1× Droplet 4GB ($24/mo) | Multiple Droplets + load balancer |
+| Database | Postgres in Docker | Managed Postgres + read replicas |
+| Cache | Redis in Docker | Managed Redis / Redis Cluster |
+| Files | DO Spaces ($5/mo) | CDN in front of Spaces |
+| Admin | Nginx static | Same or separate CDN |
+| Mobile | Expo/EAS (not on Droplet) | Point `EXPO_PUBLIC_API_URL` at API domain |
+
+---
+
+## Recommended launch cost (Connecticut)
+
+| Resource | Spec | ~Monthly |
+|----------|------|----------|
+| Droplet | 4 GB / 2 vCPU, NYC3 | $24 |
+| Spaces | 250 GB incl. | $5 |
+| Droplet backup | Optional | $4.80 |
+| Domain | External registrar | ~$1 |
+| **Total** | | **~$35–45** |
+
+See [COST_OPTIMIZATION.md](./COST_OPTIMIZATION.md) for tuning.
+
+---
+
+## Prerequisites
+
+- Domain (e.g. `gigflow.com`)
+- DigitalOcean account
+- GitHub repo access
+- Stripe account (test mode first)
+- Firebase project (auth; FCM when ready)
+- SSH key pair
+
+---
+
+## 1. Create infrastructure
+
+### Droplet
+
+1. DigitalOcean → **Create Droplet**
+2. **Ubuntu 24.04 LTS**, NYC3 (close to Connecticut)
+3. **4 GB RAM / 2 vCPU** (minimum recommended)
+4. SSH key only (disable password auth)
+5. Enable **backups** (recommended)
+
+### Spaces
+
+1. Create Space: `gigflow-uploads` in **nyc3**
+2. Enable **CDN** (optional, set `SPACES_CDN_URL`)
+3. Create **Spaces access keys** → save for `.env.production`
+
+### DNS
+
+| Type | Name | Value |
+|------|------|-------|
+| A | `api` | Droplet IP |
+| A | `admin` | Droplet IP |
+
+Optional: Cloudflare proxy (orange cloud) for DDoS; use **Full (strict)** SSL.
+
+---
+
+## 2. Server bootstrap
+
+SSH as root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Tavongah/Gig/main/deploy/digitalocean/scripts/server-bootstrap.sh | bash
+```
+
+Or clone first and run locally:
+
+```bash
+git clone https://github.com/Tavongah/Gig.git /opt/gigflow
+bash /opt/gigflow/deploy/digitalocean/scripts/server-bootstrap.sh
+```
+
+Installs: Docker, UFW (22/80/443), Fail2Ban, swap, log rotation, Netdata, backup cron.
+
+---
+
+## 3. Configure environment
+
+As `deploy` user:
+
+```bash
+cp /opt/gigflow/deploy/digitalocean/.env.production.example /opt/gigflow/.env.production
+chmod 600 /opt/gigflow/.env.production
+nano /opt/gigflow/.env.production
+```
+
+**Required before first deploy:**
+
+- `API_DOMAIN`, `ADMIN_DOMAIN`, `LETSENCRYPT_EMAIL`
+- `VITE_API_URL=https://api.YOURDOMAIN.com/v1`
+- `POSTGRES_PASSWORD`, `JWT_SECRET`, `ADMIN_SEED_PASSWORD`
+- `API_PUBLIC_URL`, `CORS_ORIGINS`, `MOBILE_PUBLIC_URL`
+- Stripe test/live keys
+- Firebase service account vars (for social login)
+
+Set `RUN_SEED=true` for first deploy only, then `false`.
+
+---
+
+## 4. SSL certificates
+
+After DNS propagates:
+
+```bash
+chmod +x /opt/gigflow/deploy/digitalocean/scripts/*.sh
+/opt/gigflow/deploy/digitalocean/scripts/issue-ssl-certs.sh
+```
+
+Enable auto-renewal:
+
+```bash
+docker compose --env-file /opt/gigflow/.env.production \
+  -f /opt/gigflow/deploy/digitalocean/docker-compose.prod.yml \
+  --profile certbot up -d certbot
+```
+
+---
+
+## 5. Deploy stack
+
+```bash
+/opt/gigflow/deploy/digitalocean/scripts/deploy.sh
+```
+
+Verify:
+
+```bash
+curl https://api.YOURDOMAIN.com/health
+curl https://api.YOURDOMAIN.com/ready
+```
+
+Admin: `https://admin.YOURDOMAIN.com` → `admin@gigflow.local`
+
+---
+
+## 6. Stripe webhook
+
+Stripe Dashboard → Webhooks:
+
+```txt
+https://api.YOURDOMAIN.com/v1/payments/webhook
+```
+
+Events: `checkout.session.completed`, `payment_intent.*`, `account.updated`
+
+Set `STRIPE_WEBHOOK_SECRET` in `.env.production` and redeploy.
+
+---
+
+## 7. GitHub Actions CI/CD
+
+Workflow: `.github/workflows/deploy-digitalocean.yml`
+
+**GitHub repository secrets:**
+
+| Secret | Example |
+|--------|---------|
+| `DO_HOST` | Droplet IP |
+| `DO_SSH_USER` | `deploy` |
+| `DO_SSH_KEY` | Private SSH key |
+| `API_DOMAIN` | `api.gigflow.com` |
+
+**GitHub environment:** `production` (optional approval gate)
+
+On push to `main`: typecheck → build → SSH deploy → smoke test `/health` and `/ready`.
+
+Rollback: `deploy.sh` resets git to previous commit on failure.
+
+---
+
+## 8. Backups
+
+**Automatic:** cron runs `backup-postgres.sh` daily at 03:15 UTC.
+
+**Manual:**
+
+```bash
+/opt/gigflow/deploy/digitalocean/scripts/backup-postgres.sh
+```
+
+**Restore:**
+
+```bash
+/opt/gigflow/deploy/digitalocean/scripts/restore-postgres.sh \
+  /opt/gigflow/deploy/digitalocean/backups/gigflow_YYYYMMDD_HHMMSS.sql.gz
+```
+
+Off-site: install `awscli` on host; backups upload to Spaces when `SPACES_*` is set.
+
+---
+
+## 9. Monitoring
+
+- **Netdata** (installed by bootstrap): `http://DROPLET_IP:19999` — restrict with UFW or SSH tunnel
+- **Docker:** `docker compose ps`, `docker stats`
+- **Logs:** `docker compose logs -f api nginx`
+- **SSL expiry:** certbot container renews; alert if Netdata/email monitoring configured
+
+---
+
+## 10. Scaling (without rebuild)
+
+| Stage | Action |
+|-------|--------|
+| 10k users | Upgrade Droplet to 8GB; tune Postgres `shared_buffers` |
+| 50k users | Move Postgres to DO Managed Database; add PgBouncer |
+| 100k+ users | Second API Droplet + DO Load Balancer; Redis managed |
+| National | CDN for admin/mobile assets; Kubernetes when team size justifies |
+
+API is stateless (JWT + Redis). Socket.IO scales with Redis adapter already in codebase.
+
+---
+
+## 11. Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| 502 from Nginx | `docker compose logs api`; check migrations |
+| `/ready` 503 | Wait for Postgres/Redis; `docker compose ps` |
+| SSL error | Re-run `issue-ssl-certs.sh`; check DNS |
+| CORS errors | Update `CORS_ORIGINS` in `.env.production` |
+| Deploy OOM | Enable swap; use 4GB+ Droplet |
+| Webhook fails | Verify URL + `STRIPE_WEBHOOK_SECRET` |
+
+---
+
+## Related docs
+
+- [SERVER_HARDENING.md](./SERVER_HARDENING.md)
+- [SECURITY_CHECKLIST.md](./SECURITY_CHECKLIST.md)
+- [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md)
+- [COST_OPTIMIZATION.md](./COST_OPTIMIZATION.md)
+- [DISASTER_RECOVERY.md](./DISASTER_RECOVERY.md)
+- [../../LAUNCH_CHECKLIST.md](../../LAUNCH_CHECKLIST.md)
+- [../../FIREBASE_SETUP.md](../../FIREBASE_SETUP.md)
+- [../../STRIPE_WEBHOOK.md](../../STRIPE_WEBHOOK.md)
+
+---
+
+## File reference
+
+| Path | Purpose |
+|------|---------|
+| `deploy/digitalocean/docker-compose.prod.yml` | Production stack |
+| `deploy/nginx/` | Nginx + admin build |
+| `deploy/postgres/postgresql.conf` | DB tuning |
+| `deploy/redis/redis.conf` | Redis tuning |
+| `deploy/digitalocean/scripts/` | Bootstrap, deploy, backup, SSL |
+| `apps/api/Dockerfile` | API image |
+| `apps/api/src/lib/spaces.ts` | Signed upload URLs for Spaces |

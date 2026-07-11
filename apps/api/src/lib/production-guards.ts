@@ -32,6 +32,9 @@ export function logProductionReadinessWarnings(): void {
   if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) {
     warnings.push("Firebase Admin incomplete — Google/Apple sign-in will fail.");
   }
+  if (!process.env.SPACES_BUCKET && !env.S3_BUCKET) {
+    warnings.push("Object storage not configured — uploads will fail.");
+  }
   if (env.CORS_ORIGINS === "*") {
     warnings.push('CORS_ORIGINS is "*" — set explicit admin and mobile origins.');
   }
