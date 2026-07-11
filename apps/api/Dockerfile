@@ -11,6 +11,8 @@ COPY packages/shared/package.json ./packages/shared/
 RUN npm ci --workspace @gigflow/shared --workspace @gigflow/api --include-workspace-root
 
 FROM deps AS build
+# prisma.config.ts reads DATABASE_URL during `prisma generate`; no DB exists at image build time.
+ENV DATABASE_URL="postgresql://build:build@127.0.0.1:5432/build?schema=public"
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
