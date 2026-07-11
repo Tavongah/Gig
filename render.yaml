@@ -61,7 +61,6 @@ services:
   - type: web
     name: gigflow-admin
     runtime: static
-    plan: free
     branch: main
     buildCommand: npm ci && npm run build --workspace @gigflow/admin
     staticPublishPath: apps/admin/dist
