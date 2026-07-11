@@ -31,7 +31,7 @@ done
 
 if [ "${RUN_SEED:-false}" = "true" ]; then
   echo "Seeding database..."
-  npx tsx prisma/seed.ts || echo "Seed skipped or failed (non-fatal on redeploy)."
+  npx prisma db seed || echo "Seed skipped or failed (non-fatal on redeploy)."
 fi
 
 echo "Migrations complete. API running (pid ${SERVER_PID})."

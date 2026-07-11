@@ -39,18 +39,7 @@ export function createApp(io: Server) {
 
   app.use(express.json({ limit: "15mb" }));
 
-  app.use(
-    rateLimit({
-      windowMs: 60_000,
-      limit: env.NODE_ENV === "production" ? 120 : 300,
-      standardHeaders: true,
-      legacyHeaders: false,
-      store: new RedisStore({
-        sendCommand: (command: string, ...args: string[]) => redis.call(command, ...args) as Promise<number>
-      })
-    })
-  );
-
+  // Register before rate limiting so Render health checks pass while Redis is still connecting.
   app.get("/health", (_req, res) => {
     res.json({ ok: true, uptime: process.uptime(), timestamp: new Date().toISOString() });
   });
@@ -73,6 +62,18 @@ export function createApp(io: Server) {
     }
     res.json({ ready: true, checks: health.checks });
   });
+
+  app.use(
+    rateLimit({
+      windowMs: 60_000,
+      limit: env.NODE_ENV === "production" ? 120 : 300,
+      standardHeaders: true,
+      legacyHeaders: false,
+      store: new RedisStore({
+        sendCommand: (command: string, ...args: string[]) => redis.call(command, ...args) as Promise<number>
+      })
+    })
+  );
 
   app.use("/v1/auth", authRouter);
   app.use("/v1/onboarding", onboardingRouter);
