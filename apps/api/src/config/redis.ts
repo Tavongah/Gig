@@ -9,6 +9,10 @@ export const redis = new Redis(env.REDIS_URL, {
   retryStrategy: (times) => Math.min(times * 500, 5_000)
 });
 
+redis.on("error", (error) => {
+  console.error("Redis client error:", error.message);
+});
+
 export async function connectRedis(): Promise<void> {
   if (redis.status === "wait") {
     await redis.connect();
