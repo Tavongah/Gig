@@ -2,7 +2,7 @@
 # Render nginx site config from template. Run on the server after setting domains in .env.production.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="${GIGFLOW_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
 ENV_FILE="${GIGFLOW_ENV_FILE:-/opt/gigflow/.env.production}"
 TEMPLATE="$ROOT/deploy/nginx/conf.d/gigflow.conf.template"
 OUTPUT="$ROOT/deploy/nginx/conf.d/gigflow.conf"

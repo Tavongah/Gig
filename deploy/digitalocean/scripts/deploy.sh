@@ -10,8 +10,10 @@ PREVIOUS_COMMIT=""
 cd "$ROOT"
 export GIGFLOW_ENV_FILE="$ENV_FILE"
 
-git fetch origin main
-git reset --hard origin/main
+if [[ -d .git ]]; then
+  git -c safe.directory="$ROOT" fetch origin main
+  git -c safe.directory="$ROOT" reset --hard origin/main
+fi
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Missing $ENV_FILE — copy deploy/digitalocean/.env.production.example"
@@ -21,11 +23,16 @@ fi
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 
-PREVIOUS_COMMIT="$(git rev-parse HEAD)"
+PREVIOUS_COMMIT=""
+if [[ -d .git ]]; then
+  PREVIOUS_COMMIT="$(git -c safe.directory="$ROOT" rev-parse HEAD)"
+fi
 
 rollback() {
   echo "Deploy failed — rolling back to $PREVIOUS_COMMIT"
-  git checkout --force "$PREVIOUS_COMMIT"
+  if [[ -n "$PREVIOUS_COMMIT" && -d .git ]]; then
+    git -c safe.directory="$ROOT" checkout --force "$PREVIOUS_COMMIT"
+  fi
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build --remove-orphans
 }
 trap rollback ERR
