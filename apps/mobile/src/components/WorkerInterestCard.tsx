@@ -56,15 +56,12 @@ export function WorkerInterestCard({ interest, onChoose, choosing }: WorkerInter
 
       <View className="flex-row flex-wrap gap-2">
         {worker.emailVerified ? <CertificationBadge label="Email verified" /> : null}
-        {worker.phoneVerified ? <CertificationBadge label="Phone verified" /> : null}
-        {worker.hourlyRateCents ? (
-          <CertificationBadge label={`${formatMoney(worker.hourlyRateCents)}/hr`} />
-        ) : null}
+        {worker.emailVerified ? <CertificationBadge label="Email verified" /> : null}
       </View>
 
       <View className="flex-row items-end justify-between gap-3 rounded-2xl bg-surface px-4 py-3">
         <View>
-          <Text className="text-xs font-bold uppercase tracking-wider text-muted">Worker charge</Text>
+          <Text className="text-xs font-bold uppercase tracking-wider text-muted">Estimated total</Text>
           <Text className="text-2xl font-black text-brand">{formatMoney(interest.offeredWorkerPayoutCents)}</Text>
         </View>
         <View className="items-end">

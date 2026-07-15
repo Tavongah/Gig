@@ -10,21 +10,17 @@ export function normalizePhoneNumber(phone: string): string {
   return digits.startsWith("+") ? digits : `+${digits}`;
 }
 
-export function assertClientCanPostGigs(user: Pick<User, "emailVerified" | "phoneVerified">): void {
+/** MVP access gate: email verification only. Phone OTP is deferred until push/SMS is live. */
+export function assertClientCanPostGigs(user: Pick<User, "emailVerified">): void {
   if (!user.emailVerified) {
     throw new AppError("EMAIL_NOT_VERIFIED", 403, "EMAIL_NOT_VERIFIED", {
       email: "Verify your email before posting gigs."
     });
   }
-  if (!user.phoneVerified) {
-    throw new AppError("PHONE_NOT_VERIFIED", 403, "PHONE_NOT_VERIFIED", {
-      phone: "Verify your phone number before posting gigs."
-    });
-  }
 }
 
 export function assertWorkerCanGoOnline(
-  user: Pick<User, "emailVerified" | "phoneVerified" | "profileCompleted" | "accountStatus" | "roles">
+  user: Pick<User, "emailVerified" | "profileCompleted" | "accountStatus" | "roles">
 ): void {
   if (!user.roles.includes(UserRole.WORKER)) {
     throw new AppError("FORBIDDEN", 403, "FORBIDDEN", { role: "Worker account required." });
@@ -32,11 +28,6 @@ export function assertWorkerCanGoOnline(
   if (!user.emailVerified) {
     throw new AppError("EMAIL_NOT_VERIFIED", 403, "EMAIL_NOT_VERIFIED", {
       email: "Verify your email before going online."
-    });
-  }
-  if (!user.phoneVerified) {
-    throw new AppError("PHONE_NOT_VERIFIED", 403, "PHONE_NOT_VERIFIED", {
-      phone: "Verify your phone number before going online."
     });
   }
   if (!user.profileCompleted) {
@@ -62,7 +53,7 @@ export function assertWorkerCanGoOnline(
 }
 
 export function assertWorkerCanAcceptGigs(
-  user: Pick<User, "emailVerified" | "phoneVerified" | "profileCompleted" | "accountStatus" | "roles">
+  user: Pick<User, "emailVerified" | "profileCompleted" | "accountStatus" | "roles">
 ): void {
   assertWorkerCanGoOnline(user);
 }

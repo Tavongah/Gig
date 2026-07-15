@@ -39,7 +39,7 @@ export function useWorkerOnline() {
     if (!profile || !canWorkerGoOnline(profile)) {
       Alert.alert(
         "Verification required",
-        "Verify your email and phone, complete your profile, and get admin approval before going online."
+        "Verify your email, complete your profile, and get admin approval before going online."
       );
       return;
     }

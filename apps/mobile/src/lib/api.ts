@@ -36,6 +36,9 @@ export interface ApiUser {
     minJobAmountCents?: number;
     currentLatitude?: number | string | null;
     currentLongitude?: number | string | null;
+    backgroundCheckCompleted?: boolean;
+    backgroundCheckConsent?: boolean;
+    governmentIdAcknowledged?: boolean;
     serviceCategories: Array<{ id: string; name: string }>;
   } | null;
 }
@@ -252,14 +255,19 @@ export class ApiValidationError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
-  const response = await fetch(`${apiUrl}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers
-    }
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers
+      }
+    });
+  } catch {
+    throw new Error("Unable to reach Duts right now. Check your internet connection and try again.");
+  }
 
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
@@ -284,8 +292,9 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       STRIPE_CONNECT_REQUIRED: "Connect Stripe in Earnings before withdrawing.",
       WORKER_NOT_APPROVED: "Your worker account must be approved before you can accept gigs.",
       PAYMENT_REQUIRED: "This gig is not paid yet. The customer must complete payment first.",
-      EMAIL_NOT_VERIFIED: "Verify your email before continuing.",
-      PHONE_NOT_VERIFIED: "Verify your phone number before continuing.",
+      EMAIL_NOT_VERIFIED: "Please verify your email before continuing. Check your inbox for the link.",
+      PHONE_NOT_VERIFIED: "Phone verification is not required right now. Continue with email verification.",
+      EMAIL_RESEND_RATE_LIMITED: "Too many verification emails sent. Please try again later.",
       PROFILE_INCOMPLETE: "Complete your profile before continuing.",
       EMAIL_IN_USE: "That email is already registered.",
       PHONE_IN_USE: "That phone number is already linked to another account.",
@@ -323,9 +332,10 @@ export const api = {
   registerCustomer: (payload: {
     fullName: string;
     email: string;
-    phoneNumber: string;
+    phoneNumber?: string;
     password: string;
     confirmPassword: string;
+    acceptTerms: true;
   }) => request<ApiSession>("/auth/register/customer", { method: "POST", body: JSON.stringify(payload) }),
   registerWorker: (payload: Record<string, unknown>) =>
     request<ApiSession>("/auth/register/worker", { method: "POST", body: JSON.stringify(payload) }),
@@ -338,6 +348,39 @@ export const api = {
   createSession: (payload: { email: string; fullName: string; role: "CLIENT" | "WORKER" }) =>
     request<ApiSession>("/auth/session", { method: "POST", body: JSON.stringify(payload) }),
   getMe: (token: string) => request<{ user: ApiUser }>("/auth/me", {}, token),
+  updateProfile: (
+    payload: { fullName?: string; phoneNumber?: string | null; avatarUrl?: string | null },
+    token: string
+  ) =>
+    request<{ user: ApiUser }>("/auth/me", { method: "PATCH", body: JSON.stringify(payload) }, token),
+  changePassword: (
+    payload: { currentPassword: string; password: string; confirmPassword: string },
+    token: string
+  ) =>
+    request<{ ok: boolean }>("/auth/change-password", { method: "POST", body: JSON.stringify(payload) }, token),
+  deleteAccount: (token: string) => request<{ ok: boolean }>("/auth/me", { method: "DELETE" }, token),
+  listPaymentMethods: (token: string) =>
+    request<{
+      stripeConfigured: boolean;
+      methods: Array<{
+        id: string;
+        brand: string;
+        last4: string;
+        expMonth: number;
+        expYear: number;
+        isDefault: boolean;
+      }>;
+    }>("/payments/methods", {}, token),
+  removePaymentMethod: (paymentMethodId: string, token: string) =>
+    request<{ ok: boolean }>(`/payments/methods/${paymentMethodId}`, { method: "DELETE" }, token),
+  setDefaultPaymentMethod: (paymentMethodId: string, token: string) =>
+    request<{ ok: boolean }>(
+      "/payments/methods/default",
+      { method: "POST", body: JSON.stringify({ paymentMethodId }) },
+      token
+    ),
+  createPaymentMethodsPortal: (token: string) =>
+    request<{ url: string }>("/payments/methods/portal", { method: "POST" }, token),
   getAuthConfig: () =>
     request<{ firebaseConfigured: boolean; socialProviders: { google: boolean; apple: boolean } }>("/auth/config"),
   socialLogin: (payload: { provider: "google" | "apple"; idToken: string; intendedRole: "CLIENT" | "WORKER" }) =>
