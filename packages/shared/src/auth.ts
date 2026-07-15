@@ -13,20 +13,45 @@ export type AccountStatus = (typeof accountStatuses)[number];
 const passwordSchema = z
   .string()
   .min(8, "Password must be at least 8 characters")
-  .max(128, "Password is too long");
+  .max(128, "Password is too long")
+  .regex(/[A-Za-z]/, "Password must include a letter")
+  .regex(/[0-9]/, "Password must include a number");
+
+const emailSchema = z
+  .string()
+  .trim()
+  .email("Enter a valid email")
+  .transform((value) => value.toLowerCase());
+
+/** Optional for MVP launch; phone verification comes later. */
+const optionalPhoneSchema = z
+  .string()
+  .trim()
+  .max(24)
+  .optional()
+  .transform((value) => {
+    if (!value || value.length === 0) return undefined;
+    return value;
+  })
+  .refine((value) => value === undefined || value.length >= 7, {
+    message: "Enter a valid phone number"
+  });
 
 export const loginSchema = z.object({
-  email: z.string().email("Enter a valid email"),
+  email: emailSchema,
   password: z.string().min(1, "Password is required")
 });
 
 export const customerRegisterSchema = z
   .object({
-    fullName: z.string().min(2, "Full name is required").max(100),
-    email: z.string().email("Enter a valid email"),
-    phoneNumber: z.string().min(7, "Phone number is required").max(24),
+    fullName: z.string().trim().min(2, "Full name is required").max(100),
+    email: emailSchema,
+    phoneNumber: optionalPhoneSchema,
     password: passwordSchema,
-    confirmPassword: z.string()
+    confirmPassword: z.string(),
+    acceptTerms: z.literal(true, {
+      error: "Please accept the Terms of Service and Privacy Policy"
+    })
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords must match",
@@ -35,11 +60,14 @@ export const customerRegisterSchema = z
 
 export const workerRegisterSchema = z
   .object({
-    fullName: z.string().min(2, "Full name is required").max(100),
-    email: z.string().email("Enter a valid email"),
-    phoneNumber: z.string().min(7, "Phone number is required").max(24),
+    fullName: z.string().trim().min(2, "Full name is required").max(100),
+    email: emailSchema,
+    phoneNumber: optionalPhoneSchema,
     password: passwordSchema,
     confirmPassword: z.string(),
+    acceptTerms: z.literal(true, {
+      error: "Please accept the Terms of Service and Privacy Policy"
+    }),
     bio: z.string().min(20, "Bio must be at least 20 characters").max(500),
     serviceCategoryIds: z.array(z.string().uuid()).min(1, "Select at least one service"),
     city: z.string().min(2, "City is required").max(80),
@@ -69,7 +97,7 @@ export const workerRegisterSchema = z
   });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email("Enter a valid email")
+  email: emailSchema
 });
 
 export const resetPasswordSchema = z
@@ -83,11 +111,27 @@ export const resetPasswordSchema = z
     path: ["confirmPassword"]
   });
 
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    password: passwordSchema,
+    confirmPassword: z.string()
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords must match",
+    path: ["confirmPassword"]
+  })
+  .refine((data) => data.currentPassword !== data.password, {
+    message: "New password must be different from your current password",
+    path: ["password"]
+  });
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CustomerRegisterInput = z.infer<typeof customerRegisterSchema>;
 export type WorkerRegisterInput = z.infer<typeof workerRegisterSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 export const authProviders = ["EMAIL", "GOOGLE", "APPLE"] as const;
 export type AuthProvider = (typeof authProviders)[number];
@@ -110,7 +154,7 @@ export const phoneOtpVerifySchema = z.object({
 export const completeProfileSchema = z.object({
   fullName: z.string().min(2).max(100),
   email: z.string().email("Enter a valid email").optional(),
-  phoneNumber: z.string().min(7).max(24),
+  phoneNumber: optionalPhoneSchema,
   defaultRole: z.enum(["CLIENT", "WORKER"]),
   avatarUrl: z.string().url().optional(),
   location: z

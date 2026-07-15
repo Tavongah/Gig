@@ -14,13 +14,13 @@ type Props = NativeStackScreenProps<AuthStackParamList, "WorkerRegister">;
 
 const STEPS = ["Basic Info", "Worker Profile", "Verification", "Review & Submit"] as const;
 
-export function WorkerRegisterScreen(_props: Props) {
+export function WorkerRegisterScreen({ navigation }: Props) {
   const [step, setStep] = useState(0);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [bio, setBio] = useState("");
   const [city, setCity] = useState("");
   const [serviceArea, setServiceArea] = useState("");
@@ -49,9 +49,9 @@ export function WorkerRegisterScreen(_props: Props) {
       api.registerWorker({
         fullName,
         email,
-        phoneNumber,
         password,
         confirmPassword,
+        acceptTerms: true,
         bio,
         city,
         serviceArea,
@@ -88,6 +88,11 @@ export function WorkerRegisterScreen(_props: Props) {
   }
 
   function nextStep(): void {
+    if (step === 0 && !acceptTerms) {
+      setFieldErrors({ acceptTerms: "Please accept the Terms of Service and Privacy Policy" });
+      return;
+    }
+    setFieldErrors({});
     setStep((current) => Math.min(current + 1, STEPS.length - 1));
   }
 
@@ -117,7 +122,6 @@ export function WorkerRegisterScreen(_props: Props) {
             {[
               { label: "Full name", value: fullName, set: setFullName },
               { label: "Email", value: email, set: setEmail, email: true },
-              { label: "Phone number", value: phoneNumber, set: setPhoneNumber, phone: true },
               { label: "Password", value: password, set: setPassword, secure: true },
               { label: "Confirm password", value: confirmPassword, set: setConfirmPassword, secure: true }
             ].map((field) => (
@@ -129,9 +133,35 @@ export function WorkerRegisterScreen(_props: Props) {
                 placeholder={field.label}
                 secureTextEntry={field.secure}
                 autoCapitalize={field.email ? "none" : "words"}
-                keyboardType={field.email ? "email-address" : field.phone ? "phone-pad" : "default"}
+                keyboardType={field.email ? "email-address" : "default"}
               />
             ))}
+            <Pressable
+              onPress={() => setAcceptTerms((current) => !current)}
+              className="min-h-[48px] flex-row items-center gap-3"
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: acceptTerms }}
+            >
+              <View
+                className={`h-6 w-6 items-center justify-center rounded-md border-2 ${
+                  acceptTerms ? "border-brand bg-brand" : "border-border bg-card"
+                }`}
+              >
+                {acceptTerms ? <Text className="text-xs font-black text-white">✓</Text> : null}
+              </View>
+              <Text className="flex-1 text-sm text-muted">
+                I agree to the{" "}
+                <Text className="font-bold text-brand" onPress={() => navigation.navigate("TermsOfService")}>
+                  Terms of Service
+                </Text>{" "}
+                and{" "}
+                <Text className="font-bold text-brand" onPress={() => navigation.navigate("PrivacyPolicy")}>
+                  Privacy Policy
+                </Text>
+                .
+              </Text>
+            </Pressable>
+            {fieldErrors.acceptTerms ? <Text className="text-xs text-danger">{fieldErrors.acceptTerms}</Text> : null}
           </DutsCard>
         ) : null}
 
@@ -207,10 +237,12 @@ export function WorkerRegisterScreen(_props: Props) {
         {step === 2 ? (
           <DutsCard className="gap-4 p-5">
             <Text className="text-xl font-black text-ink">Verification</Text>
-            <Text className="text-sm text-muted">Document uploads are placeholders for now. Confirm each item to submit.</Text>
+            <Text className="text-sm text-muted">
+              Confirm each item so we can review your worker application. Duts may request documents during approval.
+            </Text>
             {[
-              { label: "I will provide government ID", value: governmentIdAcknowledged, set: setGovernmentIdAcknowledged },
-              { label: "I will provide proof of address", value: proofOfAddressAcknowledged, set: setProofOfAddressAcknowledged },
+              { label: "I can provide government ID if requested", value: governmentIdAcknowledged, set: setGovernmentIdAcknowledged },
+              { label: "I can provide proof of address if requested", value: proofOfAddressAcknowledged, set: setProofOfAddressAcknowledged },
               { label: "I agree to platform rules", value: platformRulesAgreed, set: setPlatformRulesAgreed },
               { label: "I consent to a background check", value: backgroundCheckConsent, set: setBackgroundCheckConsent }
             ].map((item) => (
@@ -225,7 +257,7 @@ export function WorkerRegisterScreen(_props: Props) {
         {step === 3 ? (
           <DutsCard className="gap-3 p-5">
             <Text className="text-xl font-black text-ink">Review & submit</Text>
-            <Text className="text-sm text-muted">{fullName} · {email} · {phoneNumber}</Text>
+            <Text className="text-sm text-muted">{fullName} · {email}</Text>
             <Text className="text-sm text-muted">{city} · {serviceArea} · {travelDistanceMiles} mi radius</Text>
             <Text className="text-sm text-muted">{bio}</Text>
             <Text className="text-sm text-muted">Status after submit: pending admin approval</Text>

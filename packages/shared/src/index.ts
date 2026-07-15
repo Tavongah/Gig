@@ -69,11 +69,11 @@ export const workerAvailabilitySchema = z.object({
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
 export type WorkerAvailabilityInput = z.infer<typeof workerAvailabilitySchema>;
 
-import type { GigEstimateInput } from "./gig-validation.js";
+import type { GigEstimateInput } from "./gig-validation";
 import {
   estimateResponseMinutes as locationEstimateResponseMinutes,
   haversineMiles as locationHaversineMiles
-} from "./location.js";
+} from "./location";
 
 export {
   DEFAULT_MATCHING_RADIUS_MILES,
@@ -90,23 +90,29 @@ export {
   type GigSize,
   type GigUrgency as LocationGigUrgency,
   type RankedWorkerCandidate
-} from "./location.js";
+} from "./location";
 
 export {
   ALLOWED_PHOTO_MIME_TYPES,
+  BOOKING_TIME_BUFFER_MINUTES,
   GIG_VALIDATION_MESSAGES,
+  MAX_DESCRIPTION_LENGTH,
   MAX_GIG_PHOTOS,
   MAX_PHOTO_BYTES,
   MAX_PREFERRED_DAYS_AHEAD,
+  MIN_DESCRIPTION_LENGTH,
   MVP_SERVICE_SLUGS,
   buildCreateGigPayload,
   buildStartsAtIso,
   createGigSchema,
+  getBookingWindow,
   gigEstimateSchema,
   isPostGigFormComplete,
   isValidPreferredDateTime,
   mapValidationPath,
   postGigLocationSchema,
+  preferredDateTimeError,
+  sanitizeUserText,
   validatePhotoFile,
   validatePhotoReference,
   validatePostGigForm,
@@ -118,10 +124,10 @@ export {
   type PostGigFormValues,
   type PostGigPhoto,
   type PostGigValidationResult
-} from "./gig-validation.js";
+} from "./gig-validation";
 
-export { createReviewSchema, type CreateReviewInput } from "./review-validation.js";
-export { paymentLifecycleStatuses, type PaymentLifecycleStatus } from "./payment.js";
+export { createReviewSchema, type CreateReviewInput } from "./review-validation";
+export { paymentLifecycleStatuses, type PaymentLifecycleStatus } from "./payment";
 export {
   formatMoney,
   gigFlowStatuses,
@@ -133,15 +139,17 @@ export {
   roundBillableMinutes,
   type GigFlowStatus,
   type PricingType
-} from "./gig-flow.js";
+} from "./gig-flow";
 
 export {
   isRequestGigPricingType,
   recommendedPricingForService,
+  resolvePricingType,
   REQUEST_GIG_PRICING_TYPES,
   SERVICE_PRICING_RECOMMENDATIONS,
+  type PricingDecisionInput,
   type RequestGigPricingType
-} from "./pricing-recommendations.js";
+} from "./pricing-recommendations";
 
 export {
   CUSTOMER_JOURNEY_PROGRESS,
@@ -152,10 +160,11 @@ export {
   liveTrackingWorkerStatus,
   resolveCustomerJourneyStage,
   type CustomerJourneyStage
-} from "./customer-journey.js";
+} from "./customer-journey";
 
 export {
   accountStatuses,
+  changePasswordSchema,
   customerRegisterSchema,
   forgotPasswordSchema,
   loginSchema,
@@ -167,6 +176,7 @@ export {
   completeProfileSchema,
   type AccountStatus,
   type AuthProvider,
+  type ChangePasswordInput,
   type CompleteProfileInput,
   type CustomerRegisterInput,
   type ForgotPasswordInput,
@@ -176,7 +186,7 @@ export {
   type ResetPasswordInput,
   type SocialLoginInput,
   type WorkerRegisterInput
-} from "./auth.js";
+} from "./auth";
 
 export interface PriceBreakdown {
   baseRateCents: number;

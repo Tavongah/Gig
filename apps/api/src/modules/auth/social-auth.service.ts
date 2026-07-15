@@ -115,14 +115,17 @@ function isApplePlaceholderEmail(email: string): boolean {
 
 export async function completeUserProfile(userId: string, input: CompleteProfileInput) {
   const current = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-  const normalizedPhone = normalizePhoneNumber(input.phoneNumber);
-  const existingPhone = await prisma.user.findFirst({
-    where: { phoneNumber: normalizedPhone, NOT: { id: userId } }
-  });
-  if (existingPhone) {
-    throw new AppError("PHONE_IN_USE", 409, "PHONE_IN_USE", {
-      phoneNumber: "That phone number is already linked to another account."
+  let normalizedPhone: string | null = null;
+  if (input.phoneNumber) {
+    normalizedPhone = normalizePhoneNumber(input.phoneNumber);
+    const existingPhone = await prisma.user.findFirst({
+      where: { phoneNumber: normalizedPhone, NOT: { id: userId } }
     });
+    if (existingPhone) {
+      throw new AppError("PHONE_IN_USE", 409, "PHONE_IN_USE", {
+        phoneNumber: "That phone number is already linked to another account."
+      });
+    }
   }
 
   let nextEmail = current.email;

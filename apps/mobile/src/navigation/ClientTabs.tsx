@@ -1,130 +1,81 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-
+import { Ionicons } from "@expo/vector-icons";
 import { Text, View } from "react-native";
-
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ClientHomeScreen } from "../screens/client/ClientHomeScreen";
-
-import { ClientPostScreen } from "../screens/client/ClientPostScreen";
-
-import { AvailableWorkersScreen } from "../screens/client/AvailableWorkersScreen";
-
 import { ClientMyGigsScreen } from "../screens/client/ClientMyGigsScreen";
-
 import { ProfileScreen } from "../screens/shared/ProfileScreen";
-
+import { SupportHomeScreen } from "../screens/support/SupportHomeScreen";
 import type { ClientTabParamList } from "./types";
-
 import { DUTS } from "../lib/theme";
-
-
 
 const Tab = createBottomTabNavigator<ClientTabParamList>();
 
-
-
-const TAB_ICONS: Record<keyof ClientTabParamList, string> = {
-
-  Home: "🏠",
-
-  PostGig: "➕",
-
-  Workers: "👷",
-
-  MyGigs: "📋",
-
-  Profile: "👤"
-
+const TAB_CONFIG: Record<
+  keyof ClientTabParamList,
+  { label: string; icon: keyof typeof Ionicons.glyphMap; iconFocused: keyof typeof Ionicons.glyphMap }
+> = {
+  Home: { label: "Home", icon: "home-outline", iconFocused: "home" },
+  Support: { label: "Support", icon: "help-circle-outline", iconFocused: "help-circle" },
+  MyGigs: { label: "My Gigs", icon: "list-outline", iconFocused: "list" },
+  Profile: { label: "Profile", icon: "person-outline", iconFocused: "person" }
 };
-
-
-
-const TAB_LABELS: Record<keyof ClientTabParamList, string> = {
-
-  Home: "Home",
-
-  PostGig: "Request",
-
-  Workers: "Workers",
-
-  MyGigs: "Gigs",
-
-  Profile: "Profile"
-
-};
-
-
 
 function TabIcon({ routeName, focused }: { routeName: keyof ClientTabParamList; focused: boolean }) {
+  const config = TAB_CONFIG[routeName];
+  const color = focused ? DUTS.purple : DUTS.navInactive;
 
   return (
-
-    <View className="items-center gap-1">
-
-      <View className={`rounded-2xl px-3 py-1 ${focused ? "bg-brand/10" : ""}`}>
-
-        <Text className="text-lg">{TAB_ICONS[routeName]}</Text>
-
-      </View>
-
-      <Text className={`text-[10px] font-bold ${focused ? "text-brand" : "text-nav-muted"}`}>{TAB_LABELS[routeName]}</Text>
-
+    <View
+      accessibilityRole="button"
+      accessibilityLabel={config.label}
+      accessibilityState={{ selected: focused }}
+      className="min-h-[44px] min-w-[64px] items-center justify-center gap-0.5"
+    >
+      <Ionicons name={focused ? config.iconFocused : config.icon} size={22} color={color} />
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.85}
+        allowFontScaling={false}
+        style={{ color, fontSize: 10, fontWeight: "700", textAlign: "center", width: "100%" }}
+      >
+        {config.label}
+      </Text>
     </View>
-
   );
-
 }
-
-
 
 export function ClientTabs() {
+  const insets = useSafeAreaInsets();
+  const bottomPad = Math.max(insets.bottom, 8);
 
   return (
-
     <Tab.Navigator
-
       screenOptions={({ route }) => ({
-
         headerShown: false,
-
         tabBarStyle: {
-
           backgroundColor: DUTS.card,
-
           borderTopColor: DUTS.border,
-
-          height: 76,
-
-          paddingBottom: 10,
-
-          paddingTop: 8
-
+          height: 58 + bottomPad,
+          paddingBottom: bottomPad,
+          paddingTop: 6
         },
-
         tabBarShowLabel: false,
-
+        tabBarItemStyle: {
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center"
+        },
         tabBarIcon: ({ focused }) => (
-
           <TabIcon routeName={route.name as keyof ClientTabParamList} focused={focused} />
-
         )
-
       })}
-
     >
-
-      <Tab.Screen name="Home" component={ClientHomeScreen} />
-
-      <Tab.Screen name="PostGig" component={ClientPostScreen} />
-
-      <Tab.Screen name="Workers" component={AvailableWorkersScreen} />
-
-      <Tab.Screen name="MyGigs" component={ClientMyGigsScreen} />
-
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-
+      <Tab.Screen name="Home" component={ClientHomeScreen} options={{ title: "Home" }} />
+      <Tab.Screen name="Support" component={SupportHomeScreen} options={{ title: "Support" }} />
+      <Tab.Screen name="MyGigs" component={ClientMyGigsScreen} options={{ title: "My Gigs" }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
     </Tab.Navigator>
-
   );
-
 }
-

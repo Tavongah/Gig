@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "988911956885",
+    "project_id": "gigflow-a5943",
+    "storage_bucket": "gigflow-a5943.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:988911956885:android:345daf55c25809fdb93c9c",
+        "android_client_info": {
+          "package_name": "com.gigflow.android"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBC6JkWCEmDqSECLK5kXvgRtF-RhqFDK8I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

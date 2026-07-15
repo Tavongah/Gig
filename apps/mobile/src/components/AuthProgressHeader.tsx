@@ -4,7 +4,6 @@ import type { AuthStep } from "../lib/auth";
 const STEPS: Array<{ id: AuthStep; label: string }> = [
   { id: "account", label: "Create account" },
   { id: "email", label: "Verify email" },
-  { id: "phone", label: "Verify phone" },
   { id: "profile", label: "Complete profile" }
 ];
 

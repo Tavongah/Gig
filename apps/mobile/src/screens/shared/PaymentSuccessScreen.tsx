@@ -19,7 +19,8 @@ export function PaymentSuccessScreen({ navigation, route }: Props) {
     queryKey: ["payment-status", gigId],
     queryFn: () => api.getPaymentStatus(gigId, session.token),
     enabled: Boolean(gigId),
-    refetchInterval: 2000
+    refetchInterval: 2000,
+    retry: 2
   });
 
   useEffect(() => {
@@ -35,14 +36,22 @@ export function PaymentSuccessScreen({ navigation, route }: Props) {
         <DutsCard className="gap-4 p-5">
           <Text className="text-2xl font-black text-ink">Payment received</Text>
           <Text className="text-sm text-muted">
-            Stripe confirmed your payment. We are activating your gig and matching workers.
-          </Text>
-          <Text className="text-sm text-brand">
-            {paymentStatusQuery.data?.payment.lifecycleStatus ?? "Confirming payment..."}
+            {gigId
+              ? "Stripe confirmed your payment. We are activating your gig and matching workers."
+              : "Payment completed. Open My Gigs to continue tracking your booking."}
           </Text>
           {gigId ? (
-            <AppButton label="Go to live tracking" onPress={() => navigation.replace("GigTracking", { gigId })} />
+            <Text className="text-sm text-brand">
+              {paymentStatusQuery.isError
+                ? "Could not refresh status yet. You can continue to live tracking."
+                : (paymentStatusQuery.data?.payment.lifecycleStatus ?? "Confirming payment...")}
+            </Text>
           ) : null}
+          {gigId ? (
+            <AppButton label="Go to live tracking" onPress={() => navigation.replace("GigTracking", { gigId })} />
+          ) : (
+            <AppButton label="Go to My Gigs" onPress={() => navigation.navigate("MainTabs")} />
+          )}
         </DutsCard>
       </View>
     </Screen>

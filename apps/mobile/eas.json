@@ -4,27 +4,66 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "base": {
+      "node": "22.14.0"
+    },
     "development": {
+      "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_API_URL": "http://localhost:4000/v1"
       }
     },
     "preview": {
+      "extends": "base",
       "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://gigflow-api.onrender.com/v1"
+        "EXPO_PUBLIC_API_URL": "https://api.gigflow.ink/v1",
+        "EXPO_PUBLIC_SUPPORT_EMAIL": "support@gigflow.ink",
+        "EXPO_PUBLIC_SUPPORT_PHONE": "+12036769717",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyAChCdpg5SRT4w2FhEoZu0W2KgRc-kfeMQ",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "gigflow-a5943.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "gigflow-a5943",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:988911956885:web:64c7d8961544df9ab93c9c"
       }
     },
     "production": {
+      "extends": "base",
       "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "resourceClass": "m-medium",
+        "image": "latest"
+      },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://gigflow-api.onrender.com/v1"
+        "EXPO_PUBLIC_API_URL": "https://api.gigflow.ink/v1",
+        "EXPO_PUBLIC_SUPPORT_EMAIL": "support@gigflow.ink",
+        "EXPO_PUBLIC_SUPPORT_PHONE": "+12036769717",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyAChCdpg5SRT4w2FhEoZu0W2KgRc-kfeMQ",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "gigflow-a5943.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "gigflow-a5943",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:988911956885:web:64c7d8961544df9ab93c9c"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      },
+      "ios": {
+        "appleTeamId": "DUSL7Z8ZQH"
+      }
+    }
   }
 }

@@ -437,7 +437,8 @@ export async function calculateFinalGigAmount(gigId: string) {
       urgency: gig.urgency,
       startsAt: gig.startsAt.toISOString(),
       demandMultiplier: Number(gig.demandMultiplier),
-      pricingType: gig.pricingType
+      pricingType: gig.pricingType,
+      size: gig.size ?? "MEDIUM"
     },
     {
       baseRateCents: gig.serviceCategory.baseRateCents,

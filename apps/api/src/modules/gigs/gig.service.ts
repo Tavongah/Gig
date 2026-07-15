@@ -16,7 +16,9 @@ import {
 
   getGigMatchingRadiusMiles,
 
-  isWithinMatchingRadius
+  isWithinMatchingRadius,
+
+  resolvePricingType
 
 } from "@gigflow/shared";
 
@@ -110,6 +112,13 @@ export async function estimateGig(input: GigEstimateInput) {
 
   const category = await getMvpCategory(parsed.serviceCategoryId);
 
+  parsed.pricingType = resolvePricingType({
+    slug: category.slug,
+    description: parsed.description,
+    estimatedHours: parsed.estimatedHours,
+    size: parsed.size
+  });
+
   const validatedLocation = await resolveGeocodedLocation({
     latitude: parsed.location.latitude,
     longitude: parsed.location.longitude,
@@ -123,8 +132,6 @@ export async function estimateGig(input: GigEstimateInput) {
   });
 
   parsed.location = toGeoPointInput(validatedLocation);
-
-
 
   return calculatePriceEstimate(parsed, {
 
@@ -149,7 +156,14 @@ export async function createGig(clientId: string, input: CreateGigInput, _io: Se
   const client = await prisma.user.findUniqueOrThrow({ where: { id: clientId } });
   assertClientCanPostGigs(client);
 
-  await getMvpCategory(parsed.serviceCategoryId);
+  const category = await getMvpCategory(parsed.serviceCategoryId);
+
+  parsed.pricingType = resolvePricingType({
+    slug: category.slug,
+    description: parsed.description,
+    estimatedHours: parsed.estimatedHours,
+    size: parsed.size
+  });
 
   const validatedLocation = await resolveGeocodedLocation({
     latitude: parsed.location.latitude,

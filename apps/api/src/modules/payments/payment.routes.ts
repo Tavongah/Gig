@@ -9,13 +9,17 @@ import { getStripe, getStripePublishableKey, isStripeConfigured } from "../../li
 import {
   createCheckoutSession,
   createConnectAccountLink,
+  createCustomerBillingPortalSession,
   createPaymentIntentForGig,
+  detachCustomerPaymentMethod,
   getPaymentStatusForGig,
   getWorkerConnectStatus,
   handleAccountUpdated,
   handleCheckoutSessionCompleted,
   handlePaymentIntentAuthorized,
-  handlePaymentIntentFailed
+  handlePaymentIntentFailed,
+  listCustomerPaymentMethods,
+  setDefaultCustomerPaymentMethod
 } from "./payment.service.js";
 
 const gigIdSchema = z.object({ gigId: z.string().uuid() });
@@ -31,14 +35,17 @@ paymentRouter.get("/config", (_req, res) => {
 
 paymentRouter.get("/return/success", (req, res) => {
   const gigId = typeof req.query.gigId === "string" ? req.query.gigId : "";
-  const target = `${env.MOBILE_PUBLIC_URL}/payment-success?gigId=${encodeURIComponent(gigId)}`;
-  res.redirect(target);
+  const encoded = encodeURIComponent(gigId);
+  const deepLink = `gigflow://payment-success?gigId=${encoded}`;
+  const webFallback = `${env.MOBILE_PUBLIC_URL}/payment-success?gigId=${encoded}`;
+  // Prefer opening the app via custom scheme; browsers that cannot handle it stay on webFallback when configured.
+  res.redirect(deepLink || webFallback);
 });
 
 paymentRouter.get("/return/cancel", (req, res) => {
   const gigId = typeof req.query.gigId === "string" ? req.query.gigId : "";
-  const target = `${env.MOBILE_PUBLIC_URL}/payment-failed?gigId=${encodeURIComponent(gigId)}`;
-  res.redirect(target);
+  const encoded = encodeURIComponent(gigId);
+  res.redirect(`gigflow://payment-failed?gigId=${encoded}`);
 });
 
 paymentRouter.get("/connect/return/refresh", (_req, res) => {
@@ -113,6 +120,46 @@ paymentRouter.get("/gigs/:gigId/status", async (req, res, next) => {
   try {
     const payment = await getPaymentStatusForGig(String(req.params.gigId), req.auth!.userId);
     res.json({ payment });
+  } catch (error) {
+    next(error);
+  }
+});
+
+paymentRouter.get("/methods", async (req, res, next) => {
+  try {
+    const result = await listCustomerPaymentMethods(req.auth!.userId);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+paymentRouter.delete("/methods/:paymentMethodId", async (req, res, next) => {
+  try {
+    const result = await detachCustomerPaymentMethod(req.auth!.userId, String(req.params.paymentMethodId));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+paymentRouter.post(
+  "/methods/default",
+  validateBody(z.object({ paymentMethodId: z.string().min(1) })),
+  async (req, res, next) => {
+    try {
+      const result = await setDefaultCustomerPaymentMethod(req.auth!.userId, req.body.paymentMethodId);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+paymentRouter.post("/methods/portal", async (req, res, next) => {
+  try {
+    const result = await createCustomerBillingPortalSession(req.auth!.userId);
+    res.json(result);
   } catch (error) {
     next(error);
   }

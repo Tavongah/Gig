@@ -103,11 +103,6 @@ export function GigWorkerSummaryScreen({ navigation, route }: Props) {
         <DutsCard className="gap-3 p-5">
           <Text className="text-sm font-bold uppercase tracking-wider text-brand">Booking summary</Text>
           <LineItem label="Service" value={gig.serviceCategoryName} />
-          <LineItem label="Worker charge" value={formatMoney(summary.pricing.workerChargeCents)} />
-          <LineItem label="Platform fee" value={formatMoney(summary.pricing.platformFeeCents)} />
-          {summary.pricing.taxCents > 0 ? (
-            <LineItem label="Taxes" value={formatMoney(summary.pricing.taxCents)} />
-          ) : null}
           <LineItem label="Estimated duration" value={`${gig.estimatedHours} hr${gig.estimatedHours === 1 ? "" : "s"}`} />
           <View className="mt-1 border-t border-border pt-3">
             <LineItem label="Estimated total" value={formatMoney(summary.pricing.estimatedTotalCents)} />

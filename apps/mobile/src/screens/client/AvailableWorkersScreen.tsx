@@ -2,19 +2,26 @@ import { Alert, ScrollView, Text, View } from "react-native";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
+import type { CompositeNavigationProp } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { TabScreen } from "../../components/TabScreen";
 import { SectionHeader } from "../../components/SectionHeader";
 import { WorkerCard } from "../../components/WorkerCard";
 import { EmptyState } from "../../components/EmptyState";
 import { api } from "../../lib/api";
 import { getCurrentCoordinates } from "../../lib/location";
-import type { ClientTabParamList } from "../../navigation/types";
+import type { ClientTabParamList, RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
+
+type NavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<ClientTabParamList>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 export function AvailableWorkersScreen() {
   const session = useSessionStore((state) => state.session)!;
-  const navigation = useNavigation<BottomTabNavigationProp<ClientTabParamList>>();
+  const navigation = useNavigation<NavigationProp>();
   const [clientCoords, setClientCoords] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {

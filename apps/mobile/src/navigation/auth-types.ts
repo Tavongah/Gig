@@ -4,4 +4,6 @@ export type AuthStackParamList = {
   CustomerRegister: undefined;
   WorkerRegister: undefined;
   ForgotPassword: undefined;
+  PrivacyPolicy: undefined;
+  TermsOfService: undefined;
 };

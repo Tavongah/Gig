@@ -112,9 +112,6 @@ export function GigPaymentScreen({ navigation, route }: Props) {
           {worker ? <LineItem label="Worker" value={worker.fullName} /> : null}
           {pricing ? (
             <>
-              <LineItem label="Worker charge" value={formatMoney(pricing.workerChargeCents)} />
-              <LineItem label="Platform fee" value={formatMoney(pricing.platformFeeCents)} />
-              {pricing.taxCents > 0 ? <LineItem label="Taxes" value={formatMoney(pricing.taxCents)} /> : null}
               {summary?.gig.estimatedHours ? (
                 <LineItem
                   label="Estimated duration"

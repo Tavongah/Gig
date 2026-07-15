@@ -24,10 +24,11 @@
     "stripe:listen": "stripe listen --forward-to localhost:4000/v1/payments/webhook",
     "setup:firebase": "node scripts/import-firebase-env.mjs",
     "firebase:config": "node scripts/generate-firebase-native-config.mjs",
-    "docker:up": "docker compose up --build"
+    "docker:up": "docker compose up --build",
+    "eas-build-pre-install": "node apps/mobile/scripts/eas-pre-install.js"
   },
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.13.0",
     "npm": ">=10.0.0"
   },
   "devDependencies": {

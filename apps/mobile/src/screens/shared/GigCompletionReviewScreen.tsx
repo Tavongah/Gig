@@ -54,7 +54,6 @@ export function GigCompletionReviewScreen({ navigation, route }: Props) {
 
   const gig = gigQuery.data?.gig;
   const worker = gig?.assignments?.[0]?.worker;
-  const platformFee = gig ? gig.totalCents - gig.workerPayoutCents : 0;
 
   if (!gig) {
     return (
@@ -88,9 +87,10 @@ export function GigCompletionReviewScreen({ navigation, route }: Props) {
           {gig.estimatedHours ? (
             <LineItem label="Estimated duration" amount={`${gig.estimatedHours} hrs`} />
           ) : null}
-          <LineItem label="Worker charge" amount={formatMoney(gig.workerPayoutCents)} />
-          <LineItem label="Platform fee" amount={formatMoney(platformFee)} />
-          <LineItem label="Estimated total" amount={formatMoney(gig.totalCents)} />
+          <View className="border-t border-border pt-3">
+            <Text className="text-xs font-bold uppercase tracking-wider text-muted">Total</Text>
+            <Text className="text-3xl font-black text-ink">{formatMoney(gig.totalCents)}</Text>
+          </View>
         </DutsCard>
 
         {gig.status === "WAITING_EXTRA_TIME_APPROVAL" ? (

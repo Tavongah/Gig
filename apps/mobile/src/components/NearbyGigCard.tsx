@@ -36,7 +36,7 @@ export function NearbyGigCard({ gig, onView, onAccept, onDecline, acceptDisabled
           </View>
         ) : null}
         <View className="rounded-full bg-hero px-3 py-1.5">
-          <Text className="text-xs font-bold text-brand">Payout {formatCents(gig.workerPayoutCents)}</Text>
+          <Text className="text-xs font-bold text-brand">Your earnings {formatCents(gig.workerPayoutCents)}</Text>
         </View>
         {gig.estimatedHours ? (
           <View className="rounded-full border border-border bg-surface px-3 py-1.5">

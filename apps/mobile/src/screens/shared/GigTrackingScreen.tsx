@@ -19,6 +19,7 @@ import { CustomerJourneyProgress } from "../../components/CustomerJourneyProgres
 import { useSocket, useSocketEvents } from "../../hooks/useSocket";
 import type { RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
+import { APP_NAME } from "../../lib/brand";
 import { DUTS } from "../../lib/theme";
 
 export function GigTrackingScreen() {
@@ -217,7 +218,7 @@ export function GigTrackingScreen() {
           <DutsCard className="gap-2 p-5">
             <Text className="text-sm text-muted">Final amount</Text>
             <Text className="text-3xl font-black text-brand">{formatMoney(gig.totalCents)}</Text>
-            <Text className="text-sm text-muted">Thank you for booking with GIGFLOW.</Text>
+            <Text className="text-sm text-muted">Thank you for booking with {APP_NAME}.</Text>
           </DutsCard>
           {worker ? (
             <LoadingButton

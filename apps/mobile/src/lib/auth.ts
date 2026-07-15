@@ -45,8 +45,9 @@ export function needsEmailVerification(user: ApiUser): boolean {
   return user.authProvider === "EMAIL" && !user.emailVerified;
 }
 
-export function needsPhoneVerification(user: ApiUser): boolean {
-  return !user.phoneVerified;
+/** Phone verification is deferred for MVP launch. Kept for a later release. */
+export function needsPhoneVerification(_user: ApiUser): boolean {
+  return false;
 }
 
 export function isApplePlaceholderEmail(email: string): boolean {
@@ -59,20 +60,14 @@ export function needsProfileCompletion(user: ApiUser): boolean {
 
 export function getAuthStep(user: ApiUser): AuthStep {
   if (needsEmailVerification(user)) return "email";
-  if (needsPhoneVerification(user)) return "phone";
   if (needsProfileCompletion(user)) return "profile";
   return "ready";
 }
 
 export function canCustomerPostGigs(user: ApiUser): boolean {
-  return Boolean(user.emailVerified && user.phoneVerified);
+  return Boolean(user.emailVerified);
 }
 
 export function canWorkerGoOnline(user: ApiUser): boolean {
-  return Boolean(
-    user.emailVerified &&
-      user.phoneVerified &&
-      user.profileCompleted &&
-      user.accountStatus === "APPROVED"
-  );
+  return Boolean(user.emailVerified && user.profileCompleted && user.accountStatus === "APPROVED");
 }

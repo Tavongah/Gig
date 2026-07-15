@@ -47,9 +47,8 @@ import { RejectedScreen } from "./src/screens/auth/RejectedScreen";
 
 import { SuspendedScreen } from "./src/screens/auth/SuspendedScreen";
 
-import { isWorkerUser, workerGateStatus, needsEmailVerification, needsPhoneVerification, needsProfileCompletion } from "./src/lib/auth";
+import { isWorkerUser, workerGateStatus, needsEmailVerification, needsProfileCompletion } from "./src/lib/auth";
 import { EmailVerificationScreen } from "./src/screens/auth/EmailVerificationScreen";
-import { PhoneVerificationScreen } from "./src/screens/auth/PhoneVerificationScreen";
 import { CompleteProfileScreen } from "./src/screens/auth/CompleteProfileScreen";
 
 import { appLinkingPrefixes } from "./src/lib/linking";
@@ -58,8 +57,18 @@ const linking = {
   prefixes: appLinkingPrefixes,
   config: {
     screens: {
-      PaymentSuccess: "payment-success",
-      PaymentFailed: "payment-failed",
+      PaymentSuccess: {
+        path: "payment-success",
+        parse: {
+          gigId: (value: string) => value
+        }
+      },
+      PaymentFailed: {
+        path: "payment-failed",
+        parse: {
+          gigId: (value: string) => value
+        }
+      },
       WorkerStripeConnect: "connect-return"
     }
   }
@@ -175,10 +184,6 @@ function Shell() {
 
   if (needsEmailVerification(user)) {
     return <EmailVerificationScreen />;
-  }
-
-  if (needsPhoneVerification(user)) {
-    return <PhoneVerificationScreen />;
   }
 
   if (needsProfileCompletion(user)) {

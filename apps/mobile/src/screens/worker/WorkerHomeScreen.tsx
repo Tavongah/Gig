@@ -15,7 +15,7 @@ import { AppButton } from "../../components/AppButton";
 import { EmptyState } from "../../components/EmptyState";
 import { AcceptGigAnimation } from "../../components/AcceptGigAnimation";
 import { NearbyGigCard } from "../../components/NearbyGigCard";
-import { APP_NAME } from "../../lib/brand";
+import { BrandLogo } from "../../components/BrandLogo";
 import { useWorkerOnline } from "../../hooks/useWorkerOnline";
 import { useSocketEvents } from "../../hooks/useSocket";
 import type { RootStackParamList, WorkerTabParamList } from "../../navigation/types";
@@ -123,8 +123,8 @@ export function WorkerHomeScreen() {
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36, gap: 16 }}>
-        <View className="gap-1 px-1">
-          <Text className="text-xs font-bold uppercase tracking-[2px] text-brand">{APP_NAME}</Text>
+        <View className="gap-2 px-1">
+          <BrandLogo size={48} />
           <Text className="text-2xl font-black text-ink">Hey {profile?.fullName?.split(" ")[0] ?? "there"} 👋</Text>
         </View>
 

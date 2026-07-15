@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import type { ServiceCategory } from "../lib/api";
 import { DUTS } from "../lib/theme";
-import { CollapsibleSection } from "./CollapsibleSection";
 import { ErrorMessage } from "./ErrorMessage";
 
 const ROW_HEIGHT = 48;
@@ -13,7 +12,6 @@ const SCROLL_LIST_MAX_HEIGHT = 320;
 
 interface ServiceCategorySelectProps {
   mvp: ServiceCategory[];
-  comingSoon?: ServiceCategory[];
   selectedId: string | null;
   onSelect: (categoryId: string) => void;
   error?: string | null;
@@ -22,7 +20,6 @@ interface ServiceCategorySelectProps {
 
 export function ServiceCategorySelect({
   mvp,
-  comingSoon = [],
   selectedId,
   onSelect,
   error,
@@ -107,21 +104,6 @@ export function ServiceCategorySelect({
       ) : null}
 
       <ErrorMessage message={error} />
-
-      {comingSoon.length > 0 ? (
-        <CollapsibleSection title="Coming soon services" subtitle="Not available to book yet">
-          <View className="gap-2">
-            <Text className="text-xs leading-5 text-muted">
-              These services need stronger trust and safety systems before launch.
-            </Text>
-            {comingSoon.map((category) => (
-              <View key={category.id} className="rounded-xl bg-disabled px-3 py-2">
-                <Text className="text-sm font-medium text-disabled-text">{category.name}</Text>
-              </View>
-            ))}
-          </View>
-        </CollapsibleSection>
-      ) : null}
     </View>
   );
 }

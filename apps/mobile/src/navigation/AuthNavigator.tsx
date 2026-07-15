@@ -6,6 +6,8 @@ import { RegisterSelectionScreen } from "../screens/auth/RegisterSelectionScreen
 import { CustomerRegisterScreen } from "../screens/auth/CustomerRegisterScreen";
 import { WorkerRegisterScreen } from "../screens/auth/WorkerRegisterScreen";
 import { ForgotPasswordScreen } from "../screens/auth/ForgotPasswordScreen";
+import { PrivacyPolicyScreen } from "../screens/support/PrivacyPolicyScreen";
+import { TermsOfServiceScreen } from "../screens/support/TermsOfServiceScreen";
 import type { AuthStackParamList } from "./auth-types";
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
@@ -26,6 +28,8 @@ export function AuthNavigator() {
       <Stack.Screen name="CustomerRegister" component={CustomerRegisterScreen} options={{ title: "Customer sign up" }} />
       <Stack.Screen name="WorkerRegister" component={WorkerRegisterScreen} options={{ title: "Worker sign up" }} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: "Reset password" }} />
+      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ title: "Privacy Policy" }} />
+      <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ title: "Terms of Service" }} />
     </Stack.Navigator>
   );
 }

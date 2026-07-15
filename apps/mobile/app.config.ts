@@ -8,23 +8,22 @@ loadEnv({ path: path.resolve(__dirname, ".env") });
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000/v1";
 const googleServicesJson = "./firebase/google-services.json";
 const googleServicesPlist = "./firebase/GoogleService-Info.plist";
-const hasNativeFirebaseFiles =
-  existsSync(path.resolve(__dirname, googleServicesJson)) &&
-  existsSync(path.resolve(__dirname, googleServicesPlist));
+const hasIosFirebase = existsSync(path.resolve(__dirname, googleServicesPlist));
+const hasAndroidFirebase = existsSync(path.resolve(__dirname, googleServicesJson));
 
 export default {
   expo: {
-    name: "GIGFLOW",
+    name: "Duts",
     slug: "gigflow",
     scheme: "gigflow",
-    version: "0.1.0",
+    version: "1.0.0",
     orientation: "portrait",
     userInterfaceStyle: "automatic",
     icon: "./assets/icon.png",
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
-      backgroundColor: "#1A1033"
+      backgroundColor: "#FFFFFF"
     },
     web: {
       bundler: "metro",
@@ -34,26 +33,63 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.gigflow.ios",
+      usesAppleSignIn: true,
       icon: "./assets/icon.png",
-      ...(hasNativeFirebaseFiles ? { googleServicesFile: googleServicesPlist } : {})
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription:
+          "Duts uses your location to show nearby gigs and match you with local workers.",
+        ITSAppUsesNonExemptEncryption: false
+      },
+      ...(hasIosFirebase ? { googleServicesFile: googleServicesPlist } : {})
     },
     android: {
       package: "com.gigflow.android",
+      versionCode: 1,
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#1A1033"
+        backgroundColor: "#FFFFFF"
       },
-      ...(hasNativeFirebaseFiles ? { googleServicesFile: googleServicesJson } : {})
+      permissions: [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      ...(hasAndroidFirebase ? { googleServicesFile: googleServicesJson } : {})
     },
-    plugins: ["expo-font"],
+    plugins: [
+      "expo-font",
+      "expo-apple-authentication",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          photosPermission: "Duts uses your photos so you can set a profile picture."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          locationWhenInUsePermission:
+            "Duts uses your location to show nearby gigs and match you with local workers.",
+          isIosBackgroundLocationEnabled: false,
+          isAndroidBackgroundLocationEnabled: false
+        }
+      ]
+    ],
     extra: {
       apiUrl,
+      supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? "support@gigflow.ink",
+      supportPhone: process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? "+12036769717",
+      supportHours:
+        process.env.EXPO_PUBLIC_SUPPORT_HOURS ??
+        "Monday – Saturday · 8:00 AM – 8:00 PM (Eastern Time)",
       firebaseApiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? "",
       firebaseAuthDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "",
       firebaseProjectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "",
       firebaseAppId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? "",
       eas: {
-        projectId: process.env.EAS_PROJECT_ID ?? ""
+        projectId: process.env.EAS_PROJECT_ID || "7b30aedd-9b50-43d0-af22-3fee6842c372"
       }
     }
   }

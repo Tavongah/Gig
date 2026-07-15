@@ -7,6 +7,7 @@ import { AuthProgressHeader } from "../../components/AuthProgressHeader";
 import { AppButton } from "../../components/AppButton";
 import { DutsCard } from "../../components/DutsCard";
 import { Screen } from "../../components/Screen";
+import { APP_NAME } from "../../lib/brand";
 import { useSessionStore } from "../../stores/session.store";
 
 export function CompleteProfileScreen() {
@@ -28,7 +29,7 @@ export function CompleteProfileScreen() {
         {
           fullName,
           ...(email.trim() ? { email: email.trim() } : {}),
-          phoneNumber,
+          ...(phoneNumber.trim() ? { phoneNumber: phoneNumber.trim() } : {}),
           defaultRole: userType,
           ...(address.trim()
             ? {
@@ -61,7 +62,7 @@ export function CompleteProfileScreen() {
         <AuthProgressHeader currentStep="profile" />
         <DutsCard className="gap-4 p-5">
           <Text className="text-2xl font-black text-ink">Complete your profile</Text>
-          <Text className="text-sm text-muted">Tell us a little more before you start using GIGFLOW.</Text>
+          <Text className="text-sm text-muted">Tell us a little more before you start using {APP_NAME}.</Text>
           <TextInput
             className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
             value={fullName}
@@ -82,9 +83,10 @@ export function CompleteProfileScreen() {
             className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
             value={phoneNumber}
             onChangeText={setPhoneNumber}
-            placeholder="Phone number"
+            placeholder="Phone number (optional)"
             keyboardType="phone-pad"
           />
+          <Text className="text-xs text-muted">Phone verification will be available in a future update.</Text>
           <View className="flex-row gap-3">
             <AppButton
               label="Customer"
@@ -107,7 +109,7 @@ export function CompleteProfileScreen() {
           />
           {error ? <Text className="text-sm text-danger">{error}</Text> : null}
           <AppButton
-            label={completeMutation.isPending ? "Saving..." : "Continue to GIGFLOW"}
+            label={completeMutation.isPending ? "Saving..." : `Continue to ${APP_NAME}`}
             onPress={() => completeMutation.mutate()}
             disabled={completeMutation.isPending}
           />

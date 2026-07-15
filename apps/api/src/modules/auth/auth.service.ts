@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { AccountStatus, AuthProvider, UserRole } from "@prisma/client";
 import {
+  changePasswordSchema,
   customerRegisterSchema,
   forgotPasswordSchema,
   loginSchema,
@@ -61,14 +62,16 @@ export async function registerCustomer(input: CustomerRegisterInput) {
   const email = parsed.email.toLowerCase();
 
   await assertEmailAvailable(email);
-  await assertPhoneAvailable(parsed.phoneNumber);
+  if (parsed.phoneNumber) {
+    await assertPhoneAvailable(parsed.phoneNumber);
+  }
 
   const passwordHash = await hashPassword(parsed.password);
   const user = await prisma.user.create({
     data: {
       email,
       fullName: parsed.fullName.trim(),
-      phoneNumber: normalizePhoneNumber(parsed.phoneNumber),
+      phoneNumber: parsed.phoneNumber ? normalizePhoneNumber(parsed.phoneNumber) : null,
       passwordHash,
       authProvider: AuthProvider.EMAIL,
       roles: [UserRole.CLIENT],
@@ -92,14 +95,16 @@ export async function registerWorker(input: WorkerRegisterInput) {
   const email = parsed.email.toLowerCase();
 
   await assertEmailAvailable(email);
-  await assertPhoneAvailable(parsed.phoneNumber);
+  if (parsed.phoneNumber) {
+    await assertPhoneAvailable(parsed.phoneNumber);
+  }
 
   const passwordHash = await hashPassword(parsed.password);
   const user = await prisma.user.create({
     data: {
       email,
       fullName: parsed.fullName.trim(),
-      phoneNumber: normalizePhoneNumber(parsed.phoneNumber),
+      phoneNumber: parsed.phoneNumber ? normalizePhoneNumber(parsed.phoneNumber) : null,
       passwordHash,
       authProvider: AuthProvider.EMAIL,
       roles: [UserRole.WORKER],
@@ -170,6 +175,12 @@ export async function login(input: LoginInput) {
   if (user.accountStatus === AccountStatus.SUSPENDED) {
     throw new AppError("ACCOUNT_SUSPENDED", 403, "ACCOUNT_SUSPENDED", {
       status: "Your account has been suspended. Contact support."
+    });
+  }
+
+  if (!user.emailVerified) {
+    throw new AppError("EMAIL_NOT_VERIFIED", 403, "EMAIL_NOT_VERIFIED", {
+      email: "Please verify your email before signing in. Check your inbox for the verification link."
     });
   }
 
@@ -275,4 +286,111 @@ export async function getAuthenticatedUser(userId: string) {
 
 export async function getCurrentUser(userId: string) {
   return getAuthenticatedUser(userId);
+}
+
+export async function updateAuthenticatedProfile(
+  userId: string,
+  input: { fullName?: string; phoneNumber?: string | null; avatarUrl?: string | null }
+) {
+  const data: {
+    fullName?: string;
+    phoneNumber?: string | null;
+    avatarUrl?: string | null;
+  } = {};
+
+  if (typeof input.fullName === "string") {
+    const fullName = input.fullName.trim();
+    if (fullName.length < 2 || fullName.length > 100) {
+      throw new AppError("VALIDATION_ERROR", 400, "INVALID_NAME", { fullName: "Enter a valid name." });
+    }
+    data.fullName = fullName;
+  }
+
+  if (input.phoneNumber !== undefined) {
+    if (input.phoneNumber === null || input.phoneNumber.trim() === "") {
+      data.phoneNumber = null;
+    } else {
+      const normalized = normalizePhoneNumber(input.phoneNumber);
+      const existing = await prisma.user.findFirst({
+        where: { phoneNumber: normalized, NOT: { id: userId } }
+      });
+      if (existing) {
+        throw new AppError("PHONE_IN_USE", 409, "PHONE_IN_USE", {
+          phoneNumber: "That phone number is already linked to another account."
+        });
+      }
+      data.phoneNumber = normalized;
+    }
+  }
+
+  if (input.avatarUrl !== undefined) {
+    data.avatarUrl = input.avatarUrl;
+  }
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data,
+    include: userInclude
+  });
+
+  return sanitizeUser(user);
+}
+
+export async function changePassword(
+  userId: string,
+  input: { currentPassword: string; password: string; confirmPassword: string }
+) {
+  const parsed = changePasswordSchema.parse(input);
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+
+  if (!user) {
+    throw new AppError("NOT_FOUND", 404, "NOT_FOUND", { user: "User not found" });
+  }
+
+  if (!user.passwordHash) {
+    throw new AppError("USE_SOCIAL_LOGIN", 400, "USE_SOCIAL_LOGIN", {
+      password: "This account uses social sign-in instead of a password."
+    });
+  }
+
+  const valid = await verifyPassword(parsed.currentPassword, user.passwordHash);
+  if (!valid) {
+    throw new AppError("VALIDATION_ERROR", 400, "INVALID_PASSWORD", {
+      currentPassword: "Current password is incorrect."
+    });
+  }
+
+  const passwordHash = await hashPassword(parsed.password);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash }
+  });
+
+  return { ok: true as const };
+}
+
+export async function deleteAuthenticatedAccount(userId: string) {
+  const tombstoneEmail = `deleted+${userId}@deleted.local`;
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      accountStatus: AccountStatus.SUSPENDED,
+      email: tombstoneEmail,
+      fullName: "Deleted User",
+      phoneNumber: null,
+      avatarUrl: null,
+      passwordHash: null,
+      profileCompleted: false,
+      emailVerified: false,
+      phoneVerified: false,
+      isVerified: false
+    }
+  });
+
+  await prisma.workerProfile.updateMany({
+    where: { userId },
+    data: { availabilityStatus: "OFFLINE" }
+  });
+
+  return { ok: true as const };
 }

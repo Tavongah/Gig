@@ -164,6 +164,7 @@ export function WorkerNearbyGigsScreen() {
                 <GigCard
                   key={gig.id}
                   gig={gig}
+                  showWorkerEarnings
                   subtitle={gig.client ? `Client: ${gig.client.fullName}` : undefined}
                   actionLabel="Manage gig"
                   onAction={() => navigation.navigate("GigDetail", { gigId: gig.id })}
@@ -180,7 +181,12 @@ export function WorkerNearbyGigsScreen() {
           ) : (
             <View className="gap-4">
               {completedGigs.map((gig) => (
-                <GigCard key={gig.id} gig={gig} onPress={() => navigation.navigate("GigDetail", { gigId: gig.id })} />
+                <GigCard
+                  key={gig.id}
+                  gig={gig}
+                  showWorkerEarnings
+                  onPress={() => navigation.navigate("GigDetail", { gigId: gig.id })}
+                />
               ))}
             </View>
           )

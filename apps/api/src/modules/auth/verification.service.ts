@@ -7,6 +7,8 @@ import { createResetToken, hashResetToken } from "../../lib/password.js";
 import { generateOtpCode, hashOtpCode, normalizePhoneNumber } from "./access.service.js";
 
 const EMAIL_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const EMAIL_RESEND_RATE_LIMIT_SECONDS = 60 * 60;
+const EMAIL_RESEND_MAX_PER_HOUR = 5;
 const OTP_TTL_SECONDS = 10 * 60;
 const OTP_RATE_LIMIT_SECONDS = 60 * 60;
 const OTP_MAX_REQUESTS_PER_HOUR = 5;
@@ -55,7 +57,8 @@ export async function verifyEmailToken(rawToken: string): Promise<{ userId: stri
       where: { id: record.userId },
       data: {
         emailVerified: true,
-        isVerified: record.user.phoneVerified
+        // Email verification is the MVP gate; phoneVerified remains available for a later release.
+        isVerified: true
       }
     }),
     prisma.emailVerificationToken.update({
@@ -72,6 +75,18 @@ export async function resendEmailVerification(userId: string): Promise<{ ok: tru
   if (user.emailVerified) {
     return { ok: true };
   }
+
+  const rateKey = `email:verify:rate:${userId}`;
+  const requestCount = await redis.incr(rateKey);
+  if (requestCount === 1) {
+    await redis.expire(rateKey, EMAIL_RESEND_RATE_LIMIT_SECONDS);
+  }
+  if (requestCount > EMAIL_RESEND_MAX_PER_HOUR) {
+    throw new AppError("EMAIL_RESEND_RATE_LIMITED", 429, "EMAIL_RESEND_RATE_LIMITED", {
+      email: "Too many verification emails sent. Please try again in an hour."
+    });
+  }
+
   return sendEmailVerification(userId, user.email);
 }
 

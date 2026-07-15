@@ -3,6 +3,7 @@ import { Alert, Pressable, Text, View } from "react-native";
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import type { PricingType } from "@gigflow/shared";
 import { REQUEST_GIG_PRICING_TYPES } from "@gigflow/shared";
+import { APP_NAME } from "../lib/brand";
 
 export interface PricingTypeOption {
   value: PricingType;
@@ -46,7 +47,7 @@ export const REQUEST_PRICING_OPTIONS: PricingTypeOption[] = [
 ];
 
 const ESTIMATE_TIMER_INFO =
-  "Your worker cannot charge additional time without your approval. If more time is needed, GIGFLOW will ask for your permission before any extra charges are added.";
+  `Your worker cannot charge additional time without your approval. If more time is needed, ${APP_NAME} will ask for your permission before any extra charges are added.`;
 
 interface PricingTypePickerProps {
   value: PricingType;

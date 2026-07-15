@@ -53,7 +53,10 @@ export function AppButton({
     <Pressable
       disabled={isDisabled}
       onPress={onPress}
-      className={`rounded-full ${padding} ${isDisabled ? styles.disabledContainer : styles.container} active:opacity-90`}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      className={`min-h-[48px] justify-center rounded-full ${padding} ${isDisabled ? styles.disabledContainer : styles.container} active:opacity-90`}
     >
       {loading ? (
         <ActivityIndicator color={resolved === "secondary" ? "#6A1B9A" : "#FFFFFF"} />

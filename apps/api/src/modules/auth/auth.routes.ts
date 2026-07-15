@@ -7,12 +7,15 @@ import { requireAuth } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
 import {
   createDevSession,
+  changePassword,
   getAuthenticatedUser,
   login,
   registerCustomer,
   registerWorker,
   requestPasswordReset,
-  resetPassword
+  resetPassword,
+  updateAuthenticatedProfile,
+  deleteAuthenticatedAccount
 } from "./auth.service.js";
 import { completeUserProfile, loginWithSocialProvider } from "./social-auth.service.js";
 import {
@@ -23,6 +26,7 @@ import {
   verifyPhoneOtp
 } from "./verification.service.js";
 import {
+  changePasswordSchema,
   completeProfileSchema,
   customerRegisterSchema,
   forgotPasswordSchema,
@@ -132,6 +136,39 @@ authRouter.get("/me", async (req, res, next) => {
   try {
     const user = await getAuthenticatedUser(req.auth!.userId);
     res.json({ user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const updateProfileSchema = z.object({
+  fullName: z.string().min(2).max(100).optional(),
+  phoneNumber: z.string().min(7).max(24).nullable().optional(),
+  avatarUrl: z.string().max(2_000_000).nullable().optional()
+});
+
+authRouter.patch("/me", validateBody(updateProfileSchema), async (req, res, next) => {
+  try {
+    const user = await updateAuthenticatedProfile(req.auth!.userId, req.body);
+    res.json({ user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/change-password", validateBody(changePasswordSchema), async (req, res, next) => {
+  try {
+    const result = await changePassword(req.auth!.userId, req.body);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.delete("/me", async (req, res, next) => {
+  try {
+    const result = await deleteAuthenticatedAccount(req.auth!.userId);
+    res.json(result);
   } catch (error) {
     next(error);
   }

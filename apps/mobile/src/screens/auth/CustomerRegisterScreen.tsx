@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { api, ApiValidationError } from "../../lib/api";
@@ -7,24 +7,31 @@ import { defaultActiveRole } from "../../lib/auth";
 import { Screen } from "../../components/Screen";
 import { AppButton } from "../../components/AppButton";
 import { DutsCard } from "../../components/DutsCard";
+import { AuthProgressHeader } from "../../components/AuthProgressHeader";
 import { useSessionStore } from "../../stores/session.store";
 import type { AuthStackParamList } from "../../navigation/auth-types";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "CustomerRegister">;
 
-export function CustomerRegisterScreen(_props: Props) {
+export function CustomerRegisterScreen({ navigation }: Props) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const setSession = useSessionStore((state) => state.setSession);
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
 
   const registerMutation = useMutation({
     mutationFn: () =>
-      api.registerCustomer({ fullName, email, phoneNumber, password, confirmPassword }),
+      api.registerCustomer({
+        fullName,
+        email,
+        password,
+        confirmPassword,
+        acceptTerms: true as const
+      }),
     onSuccess: (session) => {
       setSession(session);
       setActiveRole(defaultActiveRole(session.user));
@@ -39,57 +46,101 @@ export function CustomerRegisterScreen(_props: Props) {
     }
   });
 
-  function fieldError(key: string): string | undefined {
-    return fieldErrors[key];
+  function handleSubmit(): void {
+    const errors: Record<string, string> = {};
+    if (fullName.trim().length < 2) errors.fullName = "Full name is required";
+    if (!email.trim()) errors.email = "Email is required";
+    if (password.length < 8) errors.password = "Password must be at least 8 characters";
+    if (password !== confirmPassword) errors.confirmPassword = "Passwords must match";
+    if (!acceptTerms) errors.acceptTerms = "Please accept the Terms of Service and Privacy Policy";
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+    registerMutation.mutate();
   }
 
   return (
     <Screen>
-      <View className="gap-5">
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 16, paddingBottom: 28 }}>
+        <AuthProgressHeader currentStep="account" />
         <DutsCard className="gap-4 p-5">
-          <Text className="text-xl font-black text-ink">Create your customer account</Text>
-          <Text className="text-sm text-muted">Start posting gigs immediately after sign up.</Text>
+          <Text className="text-xl font-black text-ink">Create your account</Text>
+          <Text className="text-sm text-muted">
+            Register with email and password. We’ll send a verification link before you can sign in.
+          </Text>
 
-          {(["fullName", "email", "phoneNumber", "password", "confirmPassword"] as const).map((field) => {
-            const labels: Record<string, string> = {
-              fullName: "Full name",
-              email: "Email",
-              phoneNumber: "Phone number",
-              password: "Password",
-              confirmPassword: "Confirm password"
-            };
-            const secure = field === "password" || field === "confirmPassword";
-            const values: Record<string, string> = { fullName, email, phoneNumber, password, confirmPassword };
-            const setters: Record<string, (v: string) => void> = {
-              fullName: setFullName,
-              email: setEmail,
-              phoneNumber: setPhoneNumber,
-              password: setPassword,
-              confirmPassword: setConfirmPassword
-            };
-            return (
-              <View key={field} className="gap-1">
-                <TextInput
-                  className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
-                  value={values[field]}
-                  onChangeText={setters[field]}
-                  placeholder={labels[field]}
-                  secureTextEntry={secure}
-                  autoCapitalize={field === "email" ? "none" : "words"}
-                  keyboardType={field === "email" ? "email-address" : field === "phoneNumber" ? "phone-pad" : "default"}
-                />
-                {fieldError(field) ? <Text className="text-xs text-danger">{fieldError(field)}</Text> : null}
-              </View>
-            );
-          })}
+          {(
+            [
+              ["fullName", "Full name", fullName, setFullName, false, "default"],
+              ["email", "Email", email, setEmail, false, "email-address"],
+              ["password", "Password", password, setPassword, true, "default"],
+              ["confirmPassword", "Confirm password", confirmPassword, setConfirmPassword, true, "default"]
+            ] as const
+          ).map(([field, label, value, setter, secure, keyboard]) => (
+            <View key={field} className="gap-1">
+              <TextInput
+                className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
+                value={value}
+                onChangeText={(next) => {
+                  setter(next);
+                  setFieldErrors((current) => {
+                    const updated = { ...current };
+                    delete updated[field];
+                    return updated;
+                  });
+                }}
+                placeholder={label}
+                secureTextEntry={secure}
+                autoCapitalize={field === "email" ? "none" : "words"}
+                keyboardType={keyboard}
+              />
+              {fieldErrors[field] ? <Text className="text-xs text-danger">{fieldErrors[field]}</Text> : null}
+            </View>
+          ))}
+
+          <Pressable
+            onPress={() => {
+              setAcceptTerms((current) => !current);
+              setFieldErrors((current) => {
+                const updated = { ...current };
+                delete updated.acceptTerms;
+                return updated;
+              });
+            }}
+            className="min-h-[48px] flex-row items-start gap-3"
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: acceptTerms }}
+          >
+            <View
+              className={`mt-0.5 h-6 w-6 items-center justify-center rounded-md border-2 ${
+                acceptTerms ? "border-brand bg-brand" : "border-border bg-card"
+              }`}
+            >
+              {acceptTerms ? <Text className="text-xs font-black text-white">✓</Text> : null}
+            </View>
+            <Text className="flex-1 text-sm leading-5 text-muted">
+              I agree to the{" "}
+              <Text className="font-bold text-brand" onPress={() => navigation.navigate("TermsOfService")}>
+                Terms of Service
+              </Text>{" "}
+              and{" "}
+              <Text className="font-bold text-brand" onPress={() => navigation.navigate("PrivacyPolicy")}>
+                Privacy Policy
+              </Text>
+              .
+            </Text>
+          </Pressable>
+          {fieldErrors.acceptTerms ? <Text className="text-xs text-danger">{fieldErrors.acceptTerms}</Text> : null}
 
           {fieldErrors.form ? <Text className="text-sm text-danger">{fieldErrors.form}</Text> : null}
           <AppButton
             label={registerMutation.isPending ? "Creating account..." : "Create account"}
-            onPress={() => registerMutation.mutate()}
+            onPress={handleSubmit}
+            disabled={registerMutation.isPending}
           />
         </DutsCard>
-      </View>
+      </ScrollView>
     </Screen>
   );
 }

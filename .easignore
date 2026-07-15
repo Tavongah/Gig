@@ -1,0 +1,15 @@
+# Mobile EAS builds only need apps/mobile + packages/*.
+# Excluding API/admin avoids npm ci trying to mkdir apps/api/node_modules (EACCES on EAS).
+
+/apps/api
+/apps/admin
+/deploy
+/.github
+/node_modules
+/apps/mobile/node_modules
+**/.env
+**/.env.*
+**/.expo
+**/coverage
+**/dist
+**/build

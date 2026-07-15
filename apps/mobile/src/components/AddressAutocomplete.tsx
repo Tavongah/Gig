@@ -126,7 +126,9 @@ export function AddressAutocomplete({
               className="border-b border-border px-4 py-3 active:bg-surface"
               onPress={() => void resolveSuggestion(suggestion)}
             >
-              <Text className="text-sm text-ink">{suggestion.label}</Text>
+          <Text className="text-sm text-ink" style={{ flexShrink: 1 }}>
+            {suggestion.label}
+          </Text>
             </Pressable>
           ))}
         </View>
@@ -136,8 +138,10 @@ export function AddressAutocomplete({
         <AppButton label="Verify address" variant="secondary" size="md" onPress={() => void verifyTypedAddress()} />
       ) : (
         <View className="rounded-2xl border border-success/30 bg-success/5 px-4 py-3">
-          <Text className="text-xs font-bold uppercase tracking-wider text-success">Confirmed address</Text>
-          <Text className="mt-1 text-sm text-ink">{formatLocationSummary(selectedLocation)}</Text>
+          <Text className="text-xs font-bold uppercase tracking-wider text-success">Verified address</Text>
+          <Text className="mt-1 text-sm leading-5 text-ink" style={{ flexShrink: 1 }}>
+            {formatLocationSummary(selectedLocation)}
+          </Text>
         </View>
       )}
     </View>

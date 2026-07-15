@@ -4,6 +4,7 @@ import { DutsCard } from "../../components/DutsCard";
 import { HeroBanner } from "../../components/HeroBanner";
 import { APP_NAME } from "../../lib/brand";
 import { AppButton } from "../../components/AppButton";
+import { DeleteAccountButton } from "../../components/DeleteAccountButton";
 import { disconnectSocket } from "../../hooks/useSocket";
 import { useSessionStore } from "../../stores/session.store";
 
@@ -34,6 +35,7 @@ export function PendingApprovalScreen() {
             </View>
           ) : null}
           <AppButton label="Sign out" variant="secondary" onPress={handleSignOut} />
+          <DeleteAccountButton />
         </DutsCard>
       </View>
     </Screen>

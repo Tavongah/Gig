@@ -171,6 +171,7 @@ export async function createPaymentIntentForGig(gigId: string, clientId: string)
       currency: "usd",
       customer: customerId,
       capture_method: "manual",
+      setup_future_usage: "off_session",
       automatic_payment_methods: { enabled: true },
       metadata: {
         gigId: gig.id,
@@ -260,6 +261,7 @@ export async function createCheckoutSession(gigId: string, clientId: string) {
     ],
     payment_intent_data: {
       capture_method: "manual",
+      setup_future_usage: "off_session",
       metadata: {
         gigId: gig.id,
         clientId,
@@ -729,4 +731,101 @@ export async function publishGigDevWithoutPayment(gigId: string, clientId: strin
 
   logPayment("dev_publish_without_stripe", { gigId, clientId });
   await activateGigAfterPayment(gigId);
+}
+
+export type CustomerPaymentMethod = {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  isDefault: boolean;
+};
+
+export async function listCustomerPaymentMethods(userId: string): Promise<{
+  methods: CustomerPaymentMethod[];
+  stripeConfigured: boolean;
+}> {
+  if (!isStripeConfigured()) {
+    return { methods: [], stripeConfigured: false };
+  }
+
+  const customerId = await getOrCreateStripeCustomer(userId);
+  const stripe = getStripe();
+  const [customer, listed] = await Promise.all([
+    stripe.customers.retrieve(customerId),
+    stripe.paymentMethods.list({ customer: customerId, type: "card" })
+  ]);
+
+  const defaultId =
+    !customer.deleted && typeof customer.invoice_settings?.default_payment_method === "string"
+      ? customer.invoice_settings.default_payment_method
+      : null;
+
+  return {
+    stripeConfigured: true,
+    methods: listed.data.map((method) => ({
+      id: method.id,
+      brand: method.card?.brand ?? "card",
+      last4: method.card?.last4 ?? "••••",
+      expMonth: method.card?.exp_month ?? 0,
+      expYear: method.card?.exp_year ?? 0,
+      isDefault: method.id === defaultId
+    }))
+  };
+}
+
+export async function detachCustomerPaymentMethod(userId: string, paymentMethodId: string) {
+  if (!isStripeConfigured()) {
+    throw new AppError("STRIPE_REQUIRED", 503, "STRIPE_REQUIRED", {
+      payment: "Card management is unavailable until Stripe is configured."
+    });
+  }
+
+  const customerId = await getOrCreateStripeCustomer(userId);
+  const stripe = getStripe();
+  const method = await stripe.paymentMethods.retrieve(paymentMethodId);
+  if (method.customer !== customerId) {
+    throw new AppError("FORBIDDEN", 403, "FORBIDDEN", { paymentMethod: "Card not found for this account." });
+  }
+
+  await stripe.paymentMethods.detach(paymentMethodId);
+  return { ok: true as const };
+}
+
+export async function setDefaultCustomerPaymentMethod(userId: string, paymentMethodId: string) {
+  if (!isStripeConfigured()) {
+    throw new AppError("STRIPE_REQUIRED", 503, "STRIPE_REQUIRED", {
+      payment: "Card management is unavailable until Stripe is configured."
+    });
+  }
+
+  const customerId = await getOrCreateStripeCustomer(userId);
+  const stripe = getStripe();
+  const method = await stripe.paymentMethods.retrieve(paymentMethodId);
+  if (method.customer !== customerId) {
+    throw new AppError("FORBIDDEN", 403, "FORBIDDEN", { paymentMethod: "Card not found for this account." });
+  }
+
+  await stripe.customers.update(customerId, {
+    invoice_settings: { default_payment_method: paymentMethodId }
+  });
+  return { ok: true as const };
+}
+
+export async function createCustomerBillingPortalSession(userId: string) {
+  if (!isStripeConfigured()) {
+    throw new AppError("STRIPE_REQUIRED", 503, "STRIPE_REQUIRED", {
+      payment: "Card management is unavailable until Stripe is configured."
+    });
+  }
+
+  const customerId = await getOrCreateStripeCustomer(userId);
+  const stripe = getStripe();
+  const session = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url: `${env.MOBILE_PUBLIC_URL}/`
+  });
+
+  return { url: session.url };
 }
