@@ -69,11 +69,11 @@ export const workerAvailabilitySchema = z.object({
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
 export type WorkerAvailabilityInput = z.infer<typeof workerAvailabilitySchema>;
 
-import type { GigEstimateInput } from "./gig-validation";
+import type { GigEstimateInput } from "./gig-validation.js";
 import {
   estimateResponseMinutes as locationEstimateResponseMinutes,
   haversineMiles as locationHaversineMiles
-} from "./location";
+} from "./location.js";
 
 export {
   DEFAULT_MATCHING_RADIUS_MILES,
@@ -90,7 +90,7 @@ export {
   type GigSize,
   type GigUrgency as LocationGigUrgency,
   type RankedWorkerCandidate
-} from "./location";
+} from "./location.js";
 
 export {
   ALLOWED_PHOTO_MIME_TYPES,
@@ -124,10 +124,10 @@ export {
   type PostGigFormValues,
   type PostGigPhoto,
   type PostGigValidationResult
-} from "./gig-validation";
+} from "./gig-validation.js";
 
-export { createReviewSchema, type CreateReviewInput } from "./review-validation";
-export { paymentLifecycleStatuses, type PaymentLifecycleStatus } from "./payment";
+export { createReviewSchema, type CreateReviewInput } from "./review-validation.js";
+export { paymentLifecycleStatuses, type PaymentLifecycleStatus } from "./payment.js";
 export {
   formatMoney,
   gigFlowStatuses,
@@ -139,7 +139,7 @@ export {
   roundBillableMinutes,
   type GigFlowStatus,
   type PricingType
-} from "./gig-flow";
+} from "./gig-flow.js";
 
 export {
   isRequestGigPricingType,
@@ -149,7 +149,7 @@ export {
   SERVICE_PRICING_RECOMMENDATIONS,
   type PricingDecisionInput,
   type RequestGigPricingType
-} from "./pricing-recommendations";
+} from "./pricing-recommendations.js";
 
 export {
   CUSTOMER_JOURNEY_PROGRESS,
@@ -160,7 +160,7 @@ export {
   liveTrackingWorkerStatus,
   resolveCustomerJourneyStage,
   type CustomerJourneyStage
-} from "./customer-journey";
+} from "./customer-journey.js";
 
 export {
   accountStatuses,
@@ -186,7 +186,7 @@ export {
   type ResetPasswordInput,
   type SocialLoginInput,
   type WorkerRegisterInput
-} from "./auth";
+} from "./auth.js";
 
 export interface PriceBreakdown {
   baseRateCents: number;

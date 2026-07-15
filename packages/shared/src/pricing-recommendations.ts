@@ -1,4 +1,4 @@
-import type { PricingType } from "./gig-flow";
+import type { PricingType } from "./gig-flow.js";
 
 /** V1 Request Gig pricing options (Hourly hidden until later launch). */
 export const REQUEST_GIG_PRICING_TYPES = ["FIXED", "ESTIMATE_TIMER"] as const;

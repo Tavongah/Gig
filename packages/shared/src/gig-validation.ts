@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PricingType } from "./gig-flow";
+import type { PricingType } from "./gig-flow.js";
 
 export const MVP_SERVICE_SLUGS = [
   "moving-assistance",
