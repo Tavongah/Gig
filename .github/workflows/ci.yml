@@ -53,12 +53,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
       - name: Generate Prisma client
         working-directory: apps/api
         run: npx prisma generate
+
+      - name: Typecheck
+        run: npm run typecheck
 
       - name: Run migrations
         working-directory: apps/api

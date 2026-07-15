@@ -48,6 +48,9 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
+      - name: Generate Prisma client
+        working-directory: apps/api
+        run: npx prisma generate
       - run: npm run typecheck
       - run: npm run build:api
       - run: npm run build --workspace @gigflow/admin
