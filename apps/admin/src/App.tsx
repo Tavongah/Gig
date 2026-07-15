@@ -21,6 +21,8 @@ interface PendingWorker {
   fullName: string;
   phoneNumber: string | null;
   accountStatus: string;
+  city?: string | null;
+  region?: string | null;
   createdAt: string;
   workerProfile: {
     city: string | null;
@@ -64,8 +66,14 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
   });
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string; message?: string } | null;
-    throw new Error(body?.message ?? body?.error ?? `Request failed (${response.status})`);
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+      message?: string;
+      code?: string;
+      errors?: Record<string, string>;
+    } | null;
+    const fieldMessage = body?.errors ? Object.values(body.errors).filter(Boolean).join(". ") : null;
+    throw new Error(fieldMessage || body?.message || body?.error || `Request failed (${response.status})`);
   }
 
   return response.json() as Promise<T>;
@@ -177,8 +185,18 @@ function PendingWorkersTable({
             <td>{worker.fullName}</td>
             <td>{worker.email}</td>
             <td>{worker.phoneNumber ?? "—"}</td>
-            <td>{worker.workerProfile?.serviceCategories.map((c) => c.name).join(", ") ?? "—"}</td>
-            <td>{worker.workerProfile?.city ?? worker.workerProfile?.serviceArea ?? "—"}</td>
+            <td>
+              {worker.workerProfile?.serviceCategories?.length
+                ? worker.workerProfile.serviceCategories.map((c) => c.name).join(", ")
+                : "—"}
+            </td>
+            <td>
+              {worker.workerProfile?.city ??
+                worker.workerProfile?.serviceArea ??
+                worker.city ??
+                worker.region ??
+                "—"}
+            </td>
             <td>{new Date(worker.createdAt).toLocaleDateString()}</td>
             <td className="actions">
               <button type="button" onClick={() => onApprove(worker.id)} disabled={actionsDisabled}>
@@ -260,6 +278,7 @@ export function App() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin-pending-workers"] });
       void queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-users"] });
     }
   });
 
@@ -269,6 +288,7 @@ export function App() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin-pending-workers"] });
       void queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-users"] });
     }
   });
 
@@ -374,6 +394,8 @@ export function App() {
             {pendingWorkers.length > 0 ? (
               <section className="panel">
                 <h2>Pending worker applications</h2>
+                {approveMutation.error ? <p className="notice">{approveMutation.error.message}</p> : null}
+                {rejectMutation.error ? <p className="notice">{rejectMutation.error.message}</p> : null}
                 <PendingWorkersTable
                   workers={pendingWorkers}
                   isLoading={pendingQuery.isLoading}
@@ -401,6 +423,8 @@ export function App() {
           <section className="panel">
             <h2>Pending worker applications</h2>
             {pendingQuery.error ? <p className="notice">{pendingQuery.error.message}</p> : null}
+            {approveMutation.error ? <p className="notice">{approveMutation.error.message}</p> : null}
+            {rejectMutation.error ? <p className="notice">{rejectMutation.error.message}</p> : null}
             <PendingWorkersTable
               workers={pendingWorkers}
               isLoading={pendingQuery.isLoading}
