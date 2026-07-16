@@ -9,11 +9,11 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "eas:login": "eas login",
-    "eas:build:android": "eas build --platform android --profile production",
-    "eas:build:ios": "eas build --platform ios --profile production",
-    "eas:submit:android": "eas submit --platform android --profile production",
-    "eas:submit:ios": "eas submit --platform ios --profile production"
+    "eas:login": "npx eas-cli login",
+    "eas:build:android": "npx eas-cli build --platform android --profile production",
+    "eas:build:ios": "npx eas-cli build --platform ios --profile production",
+    "eas:submit:android": "npx eas-cli submit --platform android --profile production",
+    "eas:submit:ios": "npx eas-cli submit --platform ios --profile production"
   },
   "engines": {
     "node": ">=22.13.0"

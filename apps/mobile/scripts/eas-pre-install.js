@@ -1,7 +1,9 @@
 /**
  * Runs on EAS before dependency install.
- * Narrow workspaces so npm does not touch apps/api or apps/admin (EACCES on OneDrive uploads).
+ * Narrow workspaces so npm does not touch apps/api or apps/admin,
+ * then regenerate package-lock.json so the following `npm ci` stays in sync.
  */
+const { execSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -22,9 +24,23 @@ const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
 pkg.workspaces = ["apps/mobile", "packages/*"];
 fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 
-// npm ci uses the lockfile workspace list; drop it so install respects the narrowed workspaces.
+// Drop the full-monorepo lockfile; regenerate one that matches narrowed workspaces.
 rmSafe(path.join(root, "package-lock.json"));
 rmSafe(path.join(root, "node_modules"));
 
 console.log("[eas-pre-install] repo root:", root);
 console.log("[eas-pre-install] workspaces:", pkg.workspaces.join(", "));
+console.log("[eas-pre-install] regenerating package-lock.json for EAS npm ci...");
+
+execSync("npm install --package-lock-only --ignore-scripts --no-audit --no-fund", {
+  cwd: root,
+  stdio: "inherit",
+  env: process.env
+});
+
+if (!fs.existsSync(path.join(root, "package-lock.json"))) {
+  console.error("[eas-pre-install] failed to create package-lock.json");
+  process.exit(1);
+}
+
+console.log("[eas-pre-install] package-lock.json ready");
