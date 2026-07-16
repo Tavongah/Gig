@@ -1,19 +1,21 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Linking, Platform, ScrollView, Text, View } from "react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { formatMoney } from "@gigflow/shared";
+import { formatMoney, isTimeBasedPricing } from "@gigflow/shared";
 import { api, apiUrl } from "../../lib/api";
 import { showAlert } from "../../lib/confirm";
 import { Screen } from "../../components/Screen";
 import { DutsCard } from "../../components/DutsCard";
 import { AppButton } from "../../components/AppButton";
-import { StripeCardForm } from "../../components/StripeCardForm";
 import { CustomerJourneyProgress } from "../../components/CustomerJourneyProgress";
 import { useSessionStore } from "../../stores/session.store";
 import type { RootStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<RootStackParamList, "GigPayment">;
+
+const FRIENDLY_PAYMENT_ERROR =
+  "We couldn’t prepare the secure payment. Please try again or contact Duts Support.";
 
 function LineItem({ label, value }: { label: string; value: string }) {
   return (
@@ -24,9 +26,18 @@ function LineItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+function toFriendlyPaymentMessage(message: string): string {
+  if (/sk_(test|live)_|REPLACE_|Invalid API Key|STRIPE_/i.test(message)) {
+    return FRIENDLY_PAYMENT_ERROR;
+  }
+  return message || FRIENDLY_PAYMENT_ERROR;
+}
+
 export function GigPaymentScreen({ navigation, route }: Props) {
   const session = useSessionStore((state) => state.session)!;
   const { gigId, workerId: routeWorkerId } = route.params;
+  const openingCheckout = useRef(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const gigQuery = useQuery({
     queryKey: ["gig", gigId],
@@ -47,24 +58,27 @@ export function GigPaymentScreen({ navigation, route }: Props) {
     queryFn: () => api.getStripeConfig()
   });
 
-  const paymentIntentQuery = useQuery({
-    queryKey: ["payment-intent", gigId],
-    queryFn: () => api.createPaymentIntent(gigId, session.token),
-    enabled: Boolean(configQuery.data?.stripeConfigured)
-  });
-
   const checkoutMutation = useMutation({
     mutationFn: () => api.createCheckoutSession(gigId, session.token),
     onSuccess: async (result) => {
+      openingCheckout.current = false;
+      setCheckoutError(null);
       if (result.alreadyPaid) {
         navigation.replace("GigTracking", { gigId });
         return;
       }
       if (result.checkoutUrl) {
         await Linking.openURL(result.checkoutUrl);
+        return;
       }
+      setCheckoutError(FRIENDLY_PAYMENT_ERROR);
     },
-    onError: (error: Error) => showAlert("Payment failed", error.message)
+    onError: (error: Error) => {
+      openingCheckout.current = false;
+      const message = toFriendlyPaymentMessage(error.message);
+      setCheckoutError(message);
+      showAlert("Payment failed", message);
+    }
   });
 
   const devPublishMutation = useMutation({
@@ -80,26 +94,44 @@ export function GigPaymentScreen({ navigation, route }: Props) {
 
   const summary = summaryQuery.data;
   const stripeReady = configQuery.data?.stripeConfigured;
-  const publishableKey = configQuery.data?.publishableKey;
-  const clientSecret = paymentIntentQuery.data?.clientSecret;
-  const paymentAuthorized =
+  const paymentConfirmed =
     paymentStatusQuery.data?.payment.isAuthorized || paymentStatusQuery.data?.payment.isPaid;
 
   useEffect(() => {
-    if (paymentAuthorized || paymentIntentQuery.data?.alreadyPaid) {
+    if (paymentConfirmed) {
       navigation.replace("GigTracking", { gigId });
     }
-  }, [paymentAuthorized, paymentIntentQuery.data?.alreadyPaid, gigId, navigation]);
+  }, [paymentConfirmed, gigId, navigation]);
 
   const pricing = summary?.pricing;
   const worker = summary?.worker;
+  const checkoutBusy = checkoutMutation.isPending || openingCheckout.current;
+  const pricingType = summary?.gig.pricingType ?? gig?.pricingType ?? "FIXED";
+  const timed = isTimeBasedPricing(pricingType);
+  const maxAuthorized = pricing?.maximumAuthorizedAmountCents ?? pricing?.estimatedTotalCents;
+  const bufferCents = pricing?.authorizationBufferCents ?? 0;
+  const hourlyRate = pricing?.hourlyRateCents;
+  const billingIncrement = pricing?.billingIncrementMinutes ?? summary?.gig.billingIncrementMinutes ?? 15;
+
+  const startCheckout = () => {
+    if (checkoutBusy) return;
+    openingCheckout.current = true;
+    setCheckoutError(null);
+    checkoutMutation.mutate();
+  };
 
   return (
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 32 }}>
         <View className="gap-2">
-          <Text className="text-2xl font-black text-ink">Confirm your booking</Text>
-          <Text className="text-sm text-muted">Secure your worker with a card authorization — not a charge.</Text>
+          <Text className="text-2xl font-black text-ink">
+            {timed ? "Confirm Payment Method" : "Confirm and Pay"}
+          </Text>
+          <Text className="text-sm text-muted">
+            {timed
+              ? "Your card will be authorized for the displayed maximum amount. Your final charge will be based on the approved work time after the gig is completed."
+              : "You will be charged the displayed total to confirm your booking. The worker is paid after the gig is completed."}
+          </Text>
         </View>
 
         {gig ? (
@@ -112,15 +144,29 @@ export function GigPaymentScreen({ navigation, route }: Props) {
           {worker ? <LineItem label="Worker" value={worker.fullName} /> : null}
           {pricing ? (
             <>
+              {timed && hourlyRate != null ? (
+                <LineItem label="Hourly rate" value={`${formatMoney(hourlyRate)}/hr`} />
+              ) : null}
               {summary?.gig.estimatedHours ? (
                 <LineItem
                   label="Estimated duration"
                   value={`${summary.gig.estimatedHours} hr${summary.gig.estimatedHours === 1 ? "" : "s"}`}
                 />
               ) : null}
-              <View className="border-t border-border pt-3">
-                <LineItem label="Estimated total" value={formatMoney(pricing.estimatedTotalCents)} />
-              </View>
+              <LineItem label={timed ? "Estimated amount" : "Total"} value={formatMoney(pricing.estimatedTotalCents)} />
+              {timed ? (
+                <>
+                  <LineItem label="Authorization buffer" value={formatMoney(bufferCents)} />
+                  <LineItem
+                    label="Maximum authorization"
+                    value={formatMoney(maxAuthorized ?? pricing.estimatedTotalCents)}
+                  />
+                  <LineItem label="Billing increment" value={`${billingIncrement} minutes`} />
+                  <Text className="pt-1 text-xs leading-4 text-muted">
+                    Overtime requires your approval before additional billable time continues.
+                  </Text>
+                </>
+              ) : null}
             </>
           ) : gig ? (
             <LineItem label="Estimated total" value={formatMoney(gig.totalCents)} />
@@ -130,59 +176,48 @@ export function GigPaymentScreen({ navigation, route }: Props) {
         <DutsCard className="gap-2 border border-brand/20 bg-brand/5 p-4">
           <Text className="text-sm font-bold text-ink">Important</Text>
           <Text className="text-sm leading-5 text-muted">
-            Your payment will only be captured after your gig is successfully completed.
+            {timed
+              ? `Your card will be authorized for up to ${formatMoney(maxAuthorized ?? pricing?.estimatedTotalCents ?? 0)}. You will only be charged for the final approved work time and applicable fees.`
+              : "Your payment is collected securely when the booking is confirmed. The worker is paid after the gig is completed."}
           </Text>
         </DutsCard>
 
         {!stripeReady ? (
           <DutsCard className="gap-4 p-5">
             <Text className="text-sm text-danger">
-              Stripe is not configured on the server. Add STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY to enable card
-              payments.
+              Secure payments are temporarily unavailable. Please try again later or contact Duts Support.
             </Text>
             {apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1") ? (
               <AppButton
-                label={devPublishMutation.isPending ? "Authorizing..." : "Continue without payment (dev only)"}
+                label={devPublishMutation.isPending ? "Continuing..." : "Continue without payment (dev only)"}
                 variant="secondary"
                 onPress={() => devPublishMutation.mutate()}
                 disabled={devPublishMutation.isPending}
               />
-            ) : (
-              <Text className="text-xs text-muted">
-                Payment bypass is disabled for hosted environments. Configure Stripe before launch.
-              </Text>
-            )}
+            ) : null}
           </DutsCard>
         ) : null}
 
-        {stripeReady && publishableKey && clientSecret && gig && (pricing || gig.totalCents) ? (
-          <DutsCard className="gap-4 p-5">
-            <StripeCardForm
-              publishableKey={publishableKey}
-              clientSecret={clientSecret}
-              amountLabel={formatMoney(pricing?.estimatedTotalCents ?? gig.totalCents)}
-              onSuccess={() => navigation.replace("GigTracking", { gigId })}
-              onError={(message) => showAlert("Payment failed", message)}
-              onUseCheckout={() => checkoutMutation.mutate()}
-            />
-          </DutsCard>
-        ) : null}
+        {checkoutError ? <Text className="text-center text-sm text-danger">{checkoutError}</Text> : null}
 
-        {stripeReady && paymentIntentQuery.isLoading ? (
-          <Text className="text-center text-sm text-muted">Preparing secure checkout...</Text>
-        ) : null}
-
-        {paymentIntentQuery.error ? (
-          <Text className="text-center text-sm text-danger">{paymentIntentQuery.error.message}</Text>
-        ) : null}
-
-        {stripeReady && Platform.OS !== "web" ? (
+        {stripeReady ? (
           <AppButton
-            label={checkoutMutation.isPending ? "Opening Stripe..." : "Confirm & Secure Payment in Stripe"}
-            variant="secondary"
-            onPress={() => checkoutMutation.mutate()}
-            disabled={checkoutMutation.isPending}
+            label={
+              checkoutBusy
+                ? "Opening secure checkout..."
+                : timed
+                  ? "Authorize Payment Securely"
+                  : "Confirm & Pay Securely"
+            }
+            onPress={startCheckout}
+            disabled={checkoutBusy}
           />
+        ) : null}
+
+        {Platform.OS === "web" && stripeReady ? (
+          <Text className="text-center text-xs text-muted">
+            You’ll complete payment in Stripe Checkout, then return to track your booking.
+          </Text>
         ) : null}
       </ScrollView>
     </Screen>

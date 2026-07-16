@@ -93,6 +93,8 @@ export interface GigAssignment {
   acceptedAt?: string;
   startedAt?: string | null;
   completedAt?: string | null;
+  endedAt?: string | null;
+  billableMinutes?: number | null;
 }
 
 export interface GigWorkerInterest {
@@ -124,6 +126,7 @@ export interface GigSelectionSummary {
     estimatedHours: number;
     paymentStatus: string;
     status: string;
+    billingIncrementMinutes?: number;
   };
   worker: GigWorkerInterest["worker"];
   pricing: {
@@ -131,6 +134,11 @@ export interface GigSelectionSummary {
     platformFeeCents: number;
     taxCents: number;
     estimatedTotalCents: number;
+    hourlyRateCents?: number;
+    authorizationBufferCents?: number;
+    maximumAuthorizedAmountCents?: number;
+    billingIncrementMinutes?: number;
+    isTimeBased?: boolean;
   };
 }
 
@@ -156,11 +164,13 @@ export interface GigDetail {
   estimatedHours?: number | string;
   distanceMiles?: number;
   estimatedResponseMinutes?: number;
+  assignedWorkerId?: string | null;
   serviceCategory?: { id: string; name: string };
   client?: GigPerson;
   assignments?: GigAssignment[];
   paymentStatus?: string;
   pricingType?: string;
+  finalTotalCents?: number | null;
   payment?: { status: string; amountCents: number };
   chatThread?: { id: string };
 }
@@ -457,7 +467,66 @@ export const api = {
   getChatMessages: (gigId: string, token: string) =>
     request<{ messages: ChatMessage[] }>(`/gigs/${gigId}/chat`, {}, token),
   acceptGig: (gigId: string, token: string) =>
-    request<{ gig: GigDetail }>(`/gigs/${gigId}/accept`, { method: "POST" }, token),
+    request<{ gig: GigDetail & { gigId?: string }; interest?: { gigId: string } }>(
+      `/gigs/${gigId}/accept`,
+      { method: "POST" },
+      token
+    ),
+  getWorkerMatchingInterest: (gigId: string, token: string) =>
+    request<{
+      interest: {
+        id: string;
+        status: string;
+        offeredWorkerPayoutCents: number;
+        estimatedArrivalMinutes: number | null;
+        estimatedHours: number;
+        createdAt: string;
+      };
+      gig: {
+        id: string;
+        title: string;
+        status: string;
+        paymentStatus: string;
+        city: string;
+        region: string;
+        startsAt: string;
+        estimatedHours: number;
+        workerPayoutCents: number;
+        totalCents: number;
+        urgency: string;
+        size: string;
+        serviceCategory: { id: string; name: string };
+        assignedWorkerId: string | null;
+      };
+    }>(`/gigs/${gigId}/my-interest`, {}, token),
+  listWorkerMatchingInterests: (token: string) =>
+    request<{
+      interests: Array<{
+        id: string;
+        status: string;
+        offeredWorkerPayoutCents: number;
+        gig: {
+          id: string;
+          title: string;
+          status: string;
+          city: string;
+          region: string;
+          startsAt: string;
+          estimatedHours: number;
+          workerPayoutCents: number;
+          serviceCategory: { id: string; name: string };
+          assignedWorkerId: string | null;
+        };
+      }>;
+    }>("/gigs/worker/matching", {}, token),
+  withdrawGigInterest: (gigId: string, token: string) =>
+    request<{ withdrawn: boolean; gigId: string }>(`/gigs/${gigId}/withdraw-interest`, { method: "POST" }, token),
+  cancelGigByWorker: (gigId: string, reason: string, token: string) =>
+    request<{ rematching: boolean; status: string }>(
+      `/gigs/${gigId}/cancel-by-worker`,
+      { method: "POST", body: JSON.stringify({ reason }) },
+      token
+    ),
   updateGigStatus: (
     gigId: string,
     status: string,

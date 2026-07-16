@@ -2,6 +2,7 @@ export type RootStackParamList = {
   MainTabs: undefined;
   PostGig: { serviceCategoryId?: string; preferredWorkerId?: string } | undefined;
   GigDetail: { gigId: string };
+  WorkerMatching: { gigId: string };
   GigTracking: { gigId: string };
   GigSelectWorkers: { gigId: string };
   GigWorkerSummary: { gigId: string; workerId: string };

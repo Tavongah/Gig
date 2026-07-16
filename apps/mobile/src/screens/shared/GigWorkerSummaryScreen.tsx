@@ -108,7 +108,7 @@ export function GigWorkerSummaryScreen({ navigation, route }: Props) {
             <LineItem label="Estimated total" value={formatMoney(summary.pricing.estimatedTotalCents)} />
           </View>
           <Text className="text-xs leading-5 text-muted">
-            Your payment will only be captured after your gig is successfully completed.
+            Your payment is collected when you confirm the booking. The worker is paid after the gig is completed.
           </Text>
         </DutsCard>
 

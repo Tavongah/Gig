@@ -3,7 +3,13 @@ import { Text, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import { DutsCard } from "./DutsCard";
 
-export function SearchingIndicator() {
+export function SearchingIndicator({
+  title = "Matching workers near you...",
+  message = "Your request was sent to nearby verified workers who can accept or submit offers."
+}: {
+  title?: string;
+  message?: string;
+}) {
   const pulse = useSharedValue(0.4);
 
   useEffect(() => {
@@ -27,10 +33,8 @@ export function SearchingIndicator() {
           <Text className="text-2xl">📡</Text>
         </View>
       </View>
-      <Text className="text-center text-lg font-black text-ink">Matching workers near you...</Text>
-      <Text className="text-center text-sm leading-5 text-muted">
-        Your request was sent to nearby verified workers who can accept or submit offers.
-      </Text>
+      <Text className="text-center text-lg font-black text-ink">{title}</Text>
+      <Text className="text-center text-sm leading-5 text-muted">{message}</Text>
       <View className="flex-row gap-2">
         {[0, 1, 2].map((dot) => (
           <View key={dot} className="h-2 w-2 rounded-full bg-brand/40" />

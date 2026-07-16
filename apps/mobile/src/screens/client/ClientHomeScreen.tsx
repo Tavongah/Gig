@@ -13,7 +13,8 @@ import { ActiveGigCard } from "../../components/ActiveGigCard";
 import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
 import { gigNeedsPayment } from "../../lib/gig-payment";
-import { ACTIVE_CLIENT_STATUSES } from "../../lib/gig-status";
+import { ACTIVE_CLIENT_STATUSES, isSearching } from "../../lib/gig-status";
+import { useSocketEvents } from "../../hooks/useSocket";
 import type { ClientTabParamList, RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 
@@ -39,6 +40,26 @@ export function ClientHomeScreen() {
     queryFn: () => api.myGigs(session.token, "CLIENT"),
     refetchInterval: 15_000
   });
+
+  useSocketEvents(
+    useMemo(
+      () => ({
+        gig_rematching: (payload: { gigId?: string }) => {
+          void myGigsQuery.refetch();
+          if (payload.gigId) {
+            navigation.navigate("GigSelectWorkers", { gigId: payload.gigId });
+          }
+        },
+        selected_worker_cancelled: (payload: { gigId?: string; rematching?: boolean }) => {
+          void myGigsQuery.refetch();
+          if (payload.gigId && payload.rematching !== false) {
+            navigation.navigate("GigSelectWorkers", { gigId: payload.gigId });
+          }
+        }
+      }),
+      [myGigsQuery, navigation]
+    )
+  );
 
   const unpaidGigs = useMemo(
     () => (myGigsQuery.data?.gigs ?? []).filter(gigNeedsPayment),
@@ -99,7 +120,12 @@ export function ClientHomeScreen() {
         ) : activeGig ? (
           <ActiveGigCard
             gig={activeGig}
-            onTrack={() => navigation.navigate("GigTracking", { gigId: activeGig.id })}
+            onTrack={() =>
+              navigation.navigate(
+                isSearching(activeGig.status) ? "GigSelectWorkers" : "GigTracking",
+                { gigId: activeGig.id }
+              )
+            }
           />
         ) : null}
 

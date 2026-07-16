@@ -181,3 +181,31 @@ adminRouter.post("/commission", validateBody(commissionSchema), async (req, res,
     next(error);
   }
 });
+
+const refundSchema = z.object({
+  amountCents: z.number().int().positive().optional(),
+  reason: z.string().max(200).optional(),
+  notes: z.string().max(1000).optional()
+});
+
+adminRouter.post("/payments/:paymentId/refund", validateBody(refundSchema), async (req, res, next) => {
+  try {
+    const { createAdminRefund } = await import("../payments/payment.service.js");
+    const payment = await prisma.payment.findUnique({ where: { id: String(req.params.paymentId) } });
+    if (!payment) {
+      res.status(404).json({ error: "NOT_FOUND" });
+      return;
+    }
+
+    const amountCents = req.body.amountCents ?? Math.max(0, payment.amountCents - payment.refundAmountCents);
+    const result = await createAdminRefund(payment.id, {
+      amountCents,
+      reason: req.body.reason,
+      notes: req.body.notes,
+      adminId: req.auth!.userId
+    });
+    res.json({ refund: result });
+  } catch (error) {
+    next(error);
+  }
+});

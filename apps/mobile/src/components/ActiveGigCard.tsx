@@ -1,5 +1,6 @@
 import { Text, View } from "react-native";
 import type { GigDetail } from "../lib/api";
+import { isCustomerRematching } from "@gigflow/shared";
 import { statusLabel } from "../lib/gig-status";
 import { AppButton } from "./AppButton";
 import { DutsCard } from "./DutsCard";
@@ -12,6 +13,8 @@ interface ActiveGigCardProps {
 export function ActiveGigCard({ gig, onTrack }: ActiveGigCardProps) {
   const workerName = gig.assignments?.[0]?.worker?.fullName?.split(" ")[0] ?? null;
   const etaMinutes = gig.estimatedResponseMinutes;
+  const rematching = isCustomerRematching(gig.status, gig.paymentStatus, gig.payment?.status);
+  const searching = gig.status === "SEARCHING_FOR_WORKER" || gig.status === "POSTED";
 
   return (
     <DutsCard className="gap-3 border border-brand/20 p-4">
@@ -30,7 +33,13 @@ export function ActiveGigCard({ gig, onTrack }: ActiveGigCardProps) {
           Worker: <Text className="font-bold text-ink">{workerName}</Text>
         </Text>
       ) : (
-        <Text className="text-sm text-muted">Waiting for worker matches</Text>
+        <Text className="text-sm text-muted">
+          {rematching
+            ? "Your worker cancelled. We’re matching you with another worker."
+            : searching
+              ? "Waiting for worker matches"
+              : "Finding another worker nearby"}
+        </Text>
       )}
 
       {typeof etaMinutes === "number" && etaMinutes > 0 ? (
@@ -39,7 +48,12 @@ export function ActiveGigCard({ gig, onTrack }: ActiveGigCardProps) {
         </Text>
       ) : null}
 
-      <AppButton label="Track Live" onPress={onTrack} variant="primary" size="md" />
+      <AppButton
+        label={searching ? (rematching ? "Find another worker" : "View matches") : "Track Live"}
+        onPress={onTrack}
+        variant="primary"
+        size="md"
+      />
     </DutsCard>
   );
 }

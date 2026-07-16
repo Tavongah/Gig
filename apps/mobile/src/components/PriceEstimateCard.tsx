@@ -14,11 +14,11 @@ interface PriceEstimateCardProps {
 function pricingFootnote(pricingType: PricingType): string {
   switch (pricingType) {
     case "FIXED":
-      return "Final price is confirmed when you select a worker. Payment is captured only after you approve completion.";
+      return "Final price is confirmed when you select a worker. Payment is collected when you confirm the booking.";
     case "ESTIMATE_TIMER":
       return "If work runs past estimated time, billing pauses until you approve extra time.";
     default:
-      return "Payment is captured only after you approve completion.";
+      return "Payment is collected when you confirm the booking. The worker is paid after completion.";
   }
 }
 

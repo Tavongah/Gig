@@ -14,7 +14,7 @@ interface PendingPaymentCardProps {
 export function PendingPaymentCard({
   gig,
   onPay,
-  payLabel = "Confirm & Secure Payment",
+  payLabel = "Confirm & Pay Securely",
   loading = false,
   disabled = false
 }: PendingPaymentCardProps) {
@@ -54,7 +54,7 @@ export function PendingPaymentCard({
           </View>
 
           <Text className="text-xs text-white/60">
-            Your card will be authorized now and only charged after you approve completion.
+            Pay securely to confirm your booking. The worker is paid after the gig is completed.
           </Text>
         </View>
       </View>

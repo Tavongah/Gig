@@ -6,11 +6,13 @@ import {
   WorkerEarningsTransactionStatus,
   WorkerEarningsTransactionType
 } from "@prisma/client";
+import { isTimeBasedPricing } from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { getSocketServer } from "../../lib/socket.js";
 import { getStripe, isStripeConfigured } from "../../lib/stripe.js";
 import { createConnectAccountLink, getWorkerConnectStatus } from "./payment.service.js";
+import { isCapturedLifecycle } from "./payment-status.js";
 
 function logEarnings(event: string, details: Record<string, unknown>): void {
   console.info(`[worker-earnings] ${event}`, details);
@@ -28,6 +30,7 @@ async function recordPaymentTransaction(
 }
 
 async function syncGigPaymentCaptured(gigId: string, paymentId: string, paymentIntentId?: string | null) {
+  const now = new Date();
   await prisma.gig.update({
     where: { id: gigId },
     data: {
@@ -40,57 +43,118 @@ async function syncGigPaymentCaptured(gigId: string, paymentId: string, paymentI
     where: { id: paymentId },
     data: {
       status: PaymentStatus.CAPTURED,
-      stripePaymentIntentId: paymentIntentId ?? undefined
+      stripePaymentIntentId: paymentIntentId ?? undefined,
+      authorizationStatus: "CAPTURED",
+      capturedAt: now
     }
   });
 }
 
-async function captureCompletedGigPayment(gigId: string): Promise<void> {
+/**
+ * Capture after completion.
+ * FIXED: already captured at booking → no-op.
+ * TIME_BASED: capture final amount from authorization hold.
+ */
+async function captureCompletedGigPayment(
+  gigId: string,
+  amountToCaptureCents?: number
+): Promise<{ ok: boolean; captureFailed: boolean }> {
   const gig = await prisma.gig.findUnique({
     where: { id: gigId },
     include: { payment: true }
   });
 
-  if (!gig?.payment) return;
+  if (!gig?.payment) return { ok: false, captureFailed: false };
 
-  if (gig.paymentStatus === PaymentLifecycle.PAYMENT_CAPTURED) return;
+  const amountToCapture = Math.max(0, amountToCaptureCents ?? gig.finalTotalCents ?? gig.totalCents);
+
+  // Fixed bookings (and any already-captured payment) — nothing to capture.
+  if (isCapturedLifecycle(gig.paymentStatus)) {
+    return { ok: true, captureFailed: false };
+  }
 
   if (!isStripeConfigured()) {
     await syncGigPaymentCaptured(gigId, gig.payment.id, gig.payment.stripePaymentIntentId);
-    logEarnings("payment_captured_dev", { gigId });
-    return;
+    await prisma.payment.update({
+      where: { id: gig.payment.id },
+      data: { amountCents: amountToCapture }
+    });
+    logEarnings("payment_captured_dev", { gigId, amountToCapture });
+    return { ok: true, captureFailed: false };
   }
 
   if (!gig.payment.stripePaymentIntentId) {
     logEarnings("payment_capture_skipped_missing_intent", { gigId });
-    return;
+    return { ok: false, captureFailed: true };
   }
 
   const stripe = getStripe();
   let paymentIntent = await stripe.paymentIntents.retrieve(gig.payment.stripePaymentIntentId);
 
+  if (paymentIntent.status === "succeeded") {
+    await syncGigPaymentCaptured(gigId, gig.payment.id, paymentIntent.id);
+    return { ok: true, captureFailed: false };
+  }
+
   if (paymentIntent.status === "requires_capture") {
-    paymentIntent = await stripe.paymentIntents.capture(
-      gig.payment.stripePaymentIntentId,
-      {},
-      { idempotencyKey: `capture-${gig.id}` }
-    );
+    const capturable = paymentIntent.amount_capturable || paymentIntent.amount;
+    const captureAmount = Math.min(amountToCapture, capturable);
+    if (captureAmount <= 0) {
+      return { ok: false, captureFailed: true };
+    }
+
+    try {
+      paymentIntent = await stripe.paymentIntents.capture(
+        gig.payment.stripePaymentIntentId,
+        { amount_to_capture: captureAmount },
+        { idempotencyKey: `capture-final-${gig.id}-${captureAmount}` }
+      );
+    } catch (error) {
+      logEarnings("payment_capture_failed", {
+        gigId,
+        message: error instanceof Error ? error.message : "unknown"
+      });
+      await prisma.payment.update({
+        where: { id: gig.payment.id },
+        data: { authorizationStatus: "CAPTURE_FAILED", status: PaymentStatus.FAILED }
+      });
+      await prisma.gig.update({
+        where: { id: gigId },
+        data: { paymentStatus: PaymentLifecycle.PAYMENT_FAILED }
+      });
+      return { ok: false, captureFailed: true };
+    }
   }
 
   if (paymentIntent.status !== "succeeded") {
     logEarnings("payment_capture_skipped_status", { gigId, status: paymentIntent.status });
-    return;
+    await prisma.payment.update({
+      where: { id: gig.payment.id },
+      data: { authorizationStatus: "CAPTURE_FAILED" }
+    });
+    return { ok: false, captureFailed: true };
   }
 
+  const charged = paymentIntent.amount_received || amountToCapture;
+  const chargeId =
+    typeof paymentIntent.latest_charge === "string"
+      ? paymentIntent.latest_charge
+      : paymentIntent.latest_charge?.id ?? null;
+
   await syncGigPaymentCaptured(gigId, gig.payment.id, paymentIntent.id);
-  await recordPaymentTransaction(gig.payment.id, TransactionType.CLIENT_CHARGE, gig.totalCents, {
+  await prisma.payment.update({
+    where: { id: gig.payment.id },
+    data: { amountCents: charged, stripeChargeId: chargeId ?? undefined }
+  });
+  await recordPaymentTransaction(gig.payment.id, TransactionType.CLIENT_CHARGE, charged, {
     paymentIntentId: paymentIntent.id,
-    state: "captured"
+    state: isTimeBasedPricing(gig.pricingType) ? "captured_final" : "captured"
   });
   await recordPaymentTransaction(gig.payment.id, TransactionType.PLATFORM_COMMISSION, gig.platformFeeCents, {
     paymentIntentId: paymentIntent.id
   });
-  logEarnings("payment_captured", { gigId, paymentIntentId: paymentIntent.id });
+  logEarnings("payment_captured", { gigId, paymentIntentId: paymentIntent.id, charged });
+  return { ok: true, captureFailed: false };
 }
 
 function emitWorkerEarningsUpdated(workerId: string) {
@@ -124,7 +188,11 @@ export async function creditWorkerForCompletedGig(gigId: string): Promise<void> 
     return;
   }
 
-  await captureCompletedGigPayment(gigId);
+  const capture = await captureCompletedGigPayment(gigId, gig.finalTotalCents ?? gig.totalCents);
+  if (capture.captureFailed || !capture.ok) {
+    logEarnings("gig_credit_blocked_capture_failed", { gigId, workerId });
+    return;
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.workerEarningsTransaction.create({

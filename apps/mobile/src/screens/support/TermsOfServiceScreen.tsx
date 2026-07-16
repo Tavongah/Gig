@@ -30,7 +30,7 @@ export function TermsOfServiceScreen() {
 
           <Text className="text-base font-black text-ink">Bookings & payments</Text>
           <Text className="text-sm leading-5 text-muted">
-            Customers authorize payment when confirming a worker. Payments are processed by Stripe. Platform fees may
+            Customers pay when confirming a worker. Payments are processed by Stripe. Platform fees may
             apply. Cancellations, refunds, and disputes depend on gig status and Support review.
           </Text>
 

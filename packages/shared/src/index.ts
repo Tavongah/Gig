@@ -135,8 +135,14 @@ export {
   gigNeedsExtraTimeApproval,
   gigNeedsPaymentAfterWorkerSelection,
   gigNeedsWorkerSelection,
+  isCustomerRematching,
+  isFixedPricing,
+  isTimeBasedPricing,
+  calculateTimeBasedAuthorization,
+  billableSecondsFromWorkWindow,
   pricingTypes,
   roundBillableMinutes,
+  workerCancelOutcome,
   type GigFlowStatus,
   type PricingType
 } from "./gig-flow.js";

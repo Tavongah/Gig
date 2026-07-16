@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import type { CompositeNavigationProp } from "@react-navigation/native";
@@ -18,6 +17,7 @@ import { NearbyGigCard } from "../../components/NearbyGigCard";
 import { BrandLogo } from "../../components/BrandLogo";
 import { useWorkerOnline } from "../../hooks/useWorkerOnline";
 import { useSocketEvents } from "../../hooks/useSocket";
+import { useWorkerFlowRecovery } from "../../hooks/useGigFlowRecovery";
 import type { RootStackParamList, WorkerTabParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 
@@ -33,6 +33,7 @@ export function WorkerHomeScreen() {
   const queryClient = useQueryClient();
 
   const { isOnline, isGoingOnline, preferencesReady, goOnline, goOffline } = useWorkerOnline();
+  const { matchingOffers, activeGig } = useWorkerFlowRecovery();
 
   const [declinedOfferIds, setDeclinedOfferIds] = useState<string[]>([]);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
@@ -65,22 +66,30 @@ export function WorkerHomeScreen() {
             void nearbyQuery.refetch();
           }
         },
+        worker_not_selected: () => {
+          void queryClient.invalidateQueries({ queryKey: ["worker-matching-list"] });
+        },
+        worker_selected: () => {
+          void queryClient.invalidateQueries({ queryKey: ["worker-matching-list"] });
+          void queryClient.invalidateQueries({ queryKey: ["my-gigs"] });
+        },
         notification: (payload: { title: string; body: string }) => {
           if (isOnline) {
             showAlert(payload.title, payload.body);
           }
         }
       }),
-      [isOnline, nearbyQuery]
+      [isOnline, nearbyQuery, queryClient]
     )
   );
 
   const acceptMutation = useMutation({
     mutationFn: (gigId: string) => api.acceptGig(gigId, session.token),
-    onSuccess: ({ gig }) => {
+    onSuccess: (_result, gigId) => {
       void queryClient.invalidateQueries({ queryKey: ["my-gigs"] });
+      void queryClient.invalidateQueries({ queryKey: ["worker-matching-list"] });
       void nearbyQuery.refetch();
-      setAcceptedGigId(gig.id);
+      setAcceptedGigId(gigId);
       setShowAcceptAnimation(true);
     },
     onError: (error: Error) => showAlert("Could not accept", error.message),
@@ -116,7 +125,7 @@ export function WorkerHomeScreen() {
         onDone={() => {
           setShowAcceptAnimation(false);
           if (acceptedGigId) {
-            navigation.navigate("GigDetail", { gigId: acceptedGigId });
+            navigation.replace("WorkerMatching", { gigId: acceptedGigId });
             setAcceptedGigId(null);
           }
         }}
@@ -127,6 +136,37 @@ export function WorkerHomeScreen() {
           <BrandLogo size={48} />
           <Text className="text-2xl font-black text-ink">Hey {profile?.fullName?.split(" ")[0] ?? "there"} 👋</Text>
         </View>
+
+        {activeGig ? (
+          <DutsCard className="gap-3 border border-brand/20 p-4">
+            <Text className="text-xs font-bold uppercase tracking-wider text-brand">Active Gig</Text>
+            <Text className="text-lg font-black text-ink">{activeGig.serviceCategory?.name ?? activeGig.title}</Text>
+            <Text className="text-sm text-muted">Continue your assigned job.</Text>
+            <AppButton
+              label="Continue Active Gig"
+              onPress={() => navigation.navigate("GigDetail", { gigId: activeGig.id })}
+            />
+          </DutsCard>
+        ) : null}
+
+        {matchingOffers.length > 0 ? (
+          <View className="gap-3">
+            <Text className="px-1 text-sm font-bold uppercase tracking-wider text-muted">Matching</Text>
+            {matchingOffers.map((offer) => (
+              <DutsCard key={offer.id} className="gap-3 p-4">
+                <Text className="text-base font-black text-ink">{offer.gig.serviceCategory.name}</Text>
+                <Text className="text-sm text-muted">
+                  {offer.gig.city}, {offer.gig.region} · Waiting for customer
+                </Text>
+                <AppButton
+                  label="Open Matching"
+                  variant="secondary"
+                  onPress={() => navigation.navigate("WorkerMatching", { gigId: offer.gig.id })}
+                />
+              </DutsCard>
+            ))}
+          </View>
+        ) : null}
 
         <DutsCard className="overflow-hidden p-0">
           <View className={`gap-1 px-5 py-4 ${isOnline ? "bg-success/10" : "bg-surface"}`}>

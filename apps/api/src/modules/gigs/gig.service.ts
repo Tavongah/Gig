@@ -1,25 +1,17 @@
 import type { Server } from "socket.io";
 
 import {
-
   GIG_VALIDATION_MESSAGES,
-
-  createGigSchema,
-
-  gigEstimateSchema,
-
   calculatePriceEstimate,
-
+  calculateTimeBasedAuthorization,
+  createGigSchema,
+  gigEstimateSchema,
   haversineMiles,
-
   estimateResponseMinutes,
-
   getGigMatchingRadiusMiles,
-
   isWithinMatchingRadius,
-
+  isTimeBasedPricing,
   resolvePricingType
-
 } from "@gigflow/shared";
 
 import type { CreateGigInput, GigEstimateInput } from "@gigflow/shared";
@@ -181,6 +173,15 @@ export async function createGig(clientId: string, input: CreateGigInput, _io: Se
 
   const price = await estimateGig(parsed);
 
+  const timed = isTimeBasedPricing(String(parsed.pricingType));
+  const auth = timed
+    ? calculateTimeBasedAuthorization({
+        estimatedTotalCents: price.totalCents,
+        estimatedLaborCents: price.laborCents ?? price.workerPayoutCents,
+        hourlyRateCents: price.hourlyRateCents
+      })
+    : { authorizationBufferCents: 0, maximumAuthorizedAmountCents: price.totalCents };
+
   const gig = await prisma.gig.create({
 
     data: {
@@ -233,7 +234,12 @@ export async function createGig(clientId: string, input: CreateGigInput, _io: Se
 
       photoUrls: parsed.photos,
 
-      priceBreakdown: price as unknown as Prisma.InputJsonValue,
+      priceBreakdown: {
+        ...price,
+        authorizationBufferCents: auth.authorizationBufferCents,
+        maximumAuthorizedAmountCents: auth.maximumAuthorizedAmountCents,
+        billingIncrementMinutes: 15
+      } as unknown as Prisma.InputJsonValue,
 
       totalCents: price.totalCents,
 
@@ -241,15 +247,23 @@ export async function createGig(clientId: string, input: CreateGigInput, _io: Se
 
       workerPayoutCents: price.workerPayoutCents,
 
+      authorizationBufferCents: auth.authorizationBufferCents,
+
+      maximumAuthorizedAmountCents: auth.maximumAuthorizedAmountCents,
+
+      billingIncrementMinutes: 15,
+
       payment: {
 
         create: {
 
-          amountCents: price.totalCents,
+          amountCents: timed ? auth.maximumAuthorizedAmountCents : price.totalCents,
 
           platformFeeCents: price.platformFeeCents,
 
-          workerPayoutCents: price.workerPayoutCents
+          workerPayoutCents: price.workerPayoutCents,
+
+          maximumAuthorizedAmountCents: auth.maximumAuthorizedAmountCents
 
         }
 
@@ -774,7 +788,11 @@ export async function listClientGigs(clientId: string) {
 
     where: { clientId },
 
-    include: { serviceCategory: true, payment: { select: { status: true, amountCents: true } }, assignments: { include: { worker: true } } },
+    include: {
+      serviceCategory: true,
+      payment: { select: { status: true, amountCents: true } },
+      assignments: { where: { cancelledAt: null }, include: { worker: true } }
+    },
 
     orderBy: { createdAt: "desc" },
 
@@ -790,9 +808,21 @@ export async function listWorkerGigs(workerId: string) {
 
   return prisma.gig.findMany({
 
-    where: { assignments: { some: { workerId } } },
+    where: {
+      OR: [
+        { assignments: { some: { workerId, cancelledAt: null } } },
+        {
+          assignedWorkerId: workerId,
+          status: { in: [GigStatus.WORKER_SELECTED, GigStatus.WORKER_ASSIGNED, GigStatus.WORKER_EN_ROUTE, GigStatus.WORKER_ARRIVED, GigStatus.IN_PROGRESS, GigStatus.WAITING_EXTRA_TIME_APPROVAL, GigStatus.WAITING_CUSTOMER_CONFIRMATION, GigStatus.COMPLETED, GigStatus.DISPUTED] }
+        }
+      ]
+    },
 
-    include: { serviceCategory: true, client: true, assignments: { include: { worker: true } } },
+    include: {
+      serviceCategory: true,
+      client: true,
+      assignments: { where: { workerId, cancelledAt: null }, include: { worker: true } }
+    },
 
     orderBy: { createdAt: "desc" },
 
@@ -811,6 +841,10 @@ const gigDetailInclude = {
   client: { select: { id: true, fullName: true, email: true, phoneNumber: true } },
 
   assignments: {
+
+    where: { cancelledAt: null },
+
+    orderBy: { acceptedAt: "desc" },
 
     include: {
 

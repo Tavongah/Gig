@@ -8,7 +8,7 @@ import {
   PricingType,
   UserRole
 } from "@prisma/client";
-import { calculatePriceEstimate, estimateResponseMinutes, haversineMiles, isWithinMatchingRadius, getGigMatchingRadiusMiles } from "@gigflow/shared";
+import { calculatePriceEstimate, estimateResponseMinutes, haversineMiles, isWithinMatchingRadius, getGigMatchingRadiusMiles, workerCancelOutcome, billableSecondsFromWorkWindow, calculateTimeBasedAuthorization, isTimeBasedPricing, roundBillableMinutes } from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { assertDevOnlyPaymentBypass } from "../../lib/production-guards.js";
@@ -25,6 +25,8 @@ import { creditWorkerForCompletedGig } from "../payments/worker-earnings.service
 const OPEN_FOR_INTEREST: GigStatus[] = [GigStatus.POSTED, GigStatus.SEARCHING_FOR_WORKER];
 const GPS_ARRIVAL_RADIUS_MILES = 0.3;
 
+export { roundBillableMinutes };
+
 export function isNearGigLocation(
   workerLat: number,
   workerLng: number,
@@ -33,11 +35,6 @@ export function isNearGigLocation(
   radiusMiles = GPS_ARRIVAL_RADIUS_MILES
 ): boolean {
   return haversineMiles(workerLat, workerLng, gigLat, gigLng) <= radiusMiles;
-}
-
-export function roundBillableMinutes(elapsedMinutes: number, minimumMinutes = 60, roundTo = 15): number {
-  const rounded = Math.ceil(Math.max(0, elapsedMinutes) / roundTo) * roundTo;
-  return Math.max(minimumMinutes, rounded);
 }
 
 export function usesTimer(pricingType: PricingType): boolean {
@@ -272,6 +269,20 @@ export async function getWorkerSelectionSummary(gigId: string, clientId: string,
   const platformFeeCents = gig.platformFeeCents;
   const taxCents = gig.taxCents;
   const estimatedTotalCents = workerChargeCents + platformFeeCents + taxCents;
+  const timed = isTimeBasedPricing(gig.pricingType);
+  const auth =
+    timed && gig.maximumAuthorizedAmountCents
+      ? {
+          authorizationBufferCents: gig.authorizationBufferCents,
+          maximumAuthorizedAmountCents: gig.maximumAuthorizedAmountCents
+        }
+      : timed
+        ? calculateTimeBasedAuthorization({
+            estimatedTotalCents,
+            estimatedLaborCents: workerChargeCents,
+            hourlyRateCents: gig.serviceCategory.hourlyRateCents
+          })
+        : { authorizationBufferCents: 0, maximumAuthorizedAmountCents: estimatedTotalCents };
 
   return {
     gig: {
@@ -281,7 +292,8 @@ export async function getWorkerSelectionSummary(gigId: string, clientId: string,
       pricingType: gig.pricingType,
       estimatedHours: Number(interest.estimatedHours ?? gig.estimatedHours),
       paymentStatus: gig.paymentStatus,
-      status: gig.status
+      status: gig.status,
+      billingIncrementMinutes: gig.billingIncrementMinutes
     },
     worker: {
       id: interest.worker.id,
@@ -296,7 +308,12 @@ export async function getWorkerSelectionSummary(gigId: string, clientId: string,
       workerChargeCents,
       platformFeeCents,
       taxCents,
-      estimatedTotalCents
+      estimatedTotalCents,
+      hourlyRateCents: gig.serviceCategory.hourlyRateCents,
+      authorizationBufferCents: auth.authorizationBufferCents,
+      maximumAuthorizedAmountCents: auth.maximumAuthorizedAmountCents,
+      billingIncrementMinutes: gig.billingIncrementMinutes,
+      isTimeBased: timed
     }
   };
 }
@@ -314,6 +331,11 @@ export async function selectWorkerForGig(gigId: string, clientId: string, worker
   if (!interest) {
     throw new AppError("NOT_FOUND", 404, "NOT_FOUND", { worker: "Worker has not expressed interest in this gig." });
   }
+
+  const otherInterests = await prisma.gigInterest.findMany({
+    where: { gigId, workerId: { not: workerId }, status: GigInterestStatus.INTERESTED },
+    select: { workerId: true }
+  });
 
   await prisma.$transaction([
     prisma.gigInterest.updateMany({
@@ -337,10 +359,29 @@ export async function selectWorkerForGig(gigId: string, clientId: string, worker
   if (io) {
     notifyUser(io, workerId, {
       type: "WORKER_SELECTED",
-      title: "You were selected",
-      body: `The customer selected you for "${gig.title}". Waiting for payment authorization.`,
+      title: "You have been selected for this gig.",
+      body: `The customer selected you for "${gig.title}". Complete payment to start.`,
       gigId
     });
+    io.to(`user:${workerId}`).emit("worker_selected", {
+      gigId,
+      workerId,
+      status: "SELECTED"
+    });
+
+    for (const row of otherInterests) {
+      notifyUser(io, row.workerId, {
+        type: "WORKER_NOT_SELECTED",
+        title: "Another worker was selected",
+        body: "Another worker was selected for this gig.",
+        gigId
+      });
+      io.to(`user:${row.workerId}`).emit("worker_not_selected", {
+        gigId,
+        workerId: row.workerId,
+        message: "Another worker was selected for this gig."
+      });
+    }
   }
 
   return getWorkerSelectionSummary(gigId, clientId, workerId);
@@ -362,14 +403,14 @@ export async function authorizeWorkerSelectionWithoutStripe(gigId: string, clien
   await prisma.gig.update({
     where: { id: gigId },
     data: {
-      paymentStatus: PaymentLifecycle.PAYMENT_AUTHORIZED,
+      paymentStatus: PaymentLifecycle.PAYMENT_CAPTURED,
       authorizedAt: new Date()
     }
   });
 
   await prisma.payment.update({
     where: { id: gig.payment.id },
-    data: { status: PaymentStatus.AUTHORIZED }
+    data: { status: PaymentStatus.CAPTURED }
   });
 
   await activateGigAfterWorkerPayment(gigId, io);
@@ -386,7 +427,11 @@ function getElapsedMinutes(startedAt: Date, endedAt: Date, pausedAt: Date | null
 export async function calculateFinalGigAmount(gigId: string) {
   const gig = await prisma.gig.findUniqueOrThrow({
     where: { id: gigId },
-    include: { assignments: { orderBy: { acceptedAt: "desc" }, take: 1 }, serviceCategory: true }
+    include: {
+      assignments: { where: { cancelledAt: null }, orderBy: { acceptedAt: "desc" }, take: 1 },
+      serviceCategory: true,
+      payment: true
+    }
   });
 
   const assignment = gig.assignments[0];
@@ -395,7 +440,13 @@ export async function calculateFinalGigAmount(gigId: string) {
       workerPayoutCents: gig.workerPayoutCents,
       platformFeeCents: gig.platformFeeCents,
       taxCents: gig.taxCents,
-      totalCents: gig.totalCents
+      totalCents: gig.totalCents,
+      billableMinutes: null as number | null,
+      actualWorkedSeconds: null as number | null,
+      billableSeconds: null as number | null,
+      hourlyRateCents: gig.serviceCategory.hourlyRateCents,
+      workStartedAt: null as Date | null,
+      workCompletedAt: null as Date | null
     };
   }
 
@@ -405,20 +456,32 @@ export async function calculateFinalGigAmount(gigId: string) {
       platformFeeCents: gig.platformFeeCents,
       taxCents: gig.taxCents,
       totalCents: gig.totalCents,
-      billableMinutes: null
+      billableMinutes: null as number | null,
+      actualWorkedSeconds: null as number | null,
+      billableSeconds: null as number | null,
+      hourlyRateCents: gig.serviceCategory.hourlyRateCents,
+      workStartedAt: assignment.startedAt,
+      workCompletedAt: assignment.endedAt ?? assignment.completedAt ?? null
     };
   }
 
   const endedAt = assignment.endedAt ?? assignment.completedAt ?? new Date();
-  const elapsedMinutes = getElapsedMinutes(
-    assignment.startedAt,
-    endedAt,
-    assignment.timerPausedAt,
-    assignment.extraTimeApprovedMinutes
-  );
-  const billableMinutes = roundBillableMinutes(elapsedMinutes);
+  const pausedSeconds =
+    assignment.totalApprovedPausedSeconds ||
+    (assignment.timerPausedAt
+      ? Math.max(0, Math.floor((endedAt.getTime() - assignment.timerPausedAt.getTime()) / 1000))
+      : 0);
+  const actualWorkedSeconds = billableSecondsFromWorkWindow({
+    workStartedAt: assignment.startedAt,
+    workCompletedAt: endedAt,
+    totalApprovedPausedSeconds: pausedSeconds
+  });
+  const elapsedMinutes =
+    Math.max(0, Math.round(actualWorkedSeconds / 60)) + assignment.extraTimeApprovedMinutes;
+  const increment = gig.billingIncrementMinutes || 15;
+  const billableMinutes = roundBillableMinutes(elapsedMinutes, 60, increment);
+  const billableSeconds = billableMinutes * 60;
   const hourlyRateCents = gig.serviceCategory.hourlyRateCents;
-  const workerPayoutCents = Math.round((billableMinutes / 60) * hourlyRateCents);
   const estimate = calculatePriceEstimate(
     {
       serviceCategoryId: gig.serviceCategoryId,
@@ -448,12 +511,23 @@ export async function calculateFinalGigAmount(gigId: string) {
     }
   );
 
+  let totalCents = estimate.totalCents + gig.taxCents;
+  const maxAuthorized = gig.maximumAuthorizedAmountCents ?? gig.payment?.maximumAuthorizedAmountCents;
+  if (typeof maxAuthorized === "number" && maxAuthorized > 0) {
+    totalCents = Math.min(totalCents, maxAuthorized);
+  }
+
   return {
     workerPayoutCents: estimate.workerPayoutCents,
     platformFeeCents: estimate.platformFeeCents,
     taxCents: gig.taxCents,
-    totalCents: estimate.totalCents + gig.taxCents,
-    billableMinutes
+    totalCents,
+    billableMinutes,
+    actualWorkedSeconds,
+    billableSeconds,
+    hourlyRateCents,
+    workStartedAt: assignment.startedAt,
+    workCompletedAt: endedAt
   };
 }
 
@@ -505,12 +579,33 @@ export async function approveExtraTime(
 
 export async function approveGigCompletion(gigId: string, clientId: string, io?: Server) {
   const gig = await prisma.gig.findFirst({
-    where: { id: gigId, clientId, status: GigStatus.WAITING_CUSTOMER_CONFIRMATION },
-    include: { assignments: { orderBy: { acceptedAt: "desc" }, take: 1 }, payment: true }
+    where: {
+      id: gigId,
+      clientId,
+      status: { in: [GigStatus.WAITING_CUSTOMER_CONFIRMATION, GigStatus.WAITING_EXTRA_TIME_APPROVAL] }
+    },
+    include: { assignments: { where: { cancelledAt: null }, orderBy: { acceptedAt: "desc" }, take: 1 }, payment: true }
   });
 
   if (!gig?.assignments[0]) {
     throw new AppError("INVALID_STATE", 409, "INVALID_GIG_STATE", { gig: "This gig is not waiting for your approval." });
+  }
+
+  // Finishing from overtime pause: stop the timer with a server timestamp first.
+  if (gig.status === GigStatus.WAITING_EXTRA_TIME_APPROVAL) {
+    const now = new Date();
+    await prisma.gigAssignment.update({
+      where: { id: gig.assignments[0].id },
+      data: {
+        endedAt: gig.assignments[0].endedAt ?? now,
+        completedAt: gig.assignments[0].completedAt ?? now,
+        timerPausedAt: null
+      }
+    });
+    await prisma.gig.update({
+      where: { id: gigId },
+      data: { status: GigStatus.WAITING_CUSTOMER_CONFIRMATION }
+    });
   }
 
   const finalAmounts = await calculateFinalGigAmount(gigId);
@@ -542,7 +637,9 @@ export async function approveGigCompletion(gigId: string, clientId: string, io?:
     where: { id: gig.assignments[0].id },
     data: {
       completedAt: gig.assignments[0].completedAt ?? new Date(),
-      billableMinutes: finalAmounts.billableMinutes ?? undefined
+      billableMinutes: finalAmounts.billableMinutes ?? undefined,
+      actualWorkedSeconds: finalAmounts.actualWorkedSeconds ?? undefined,
+      billableSeconds: finalAmounts.billableSeconds ?? undefined
     }
   });
 
@@ -554,10 +651,24 @@ export async function approveGigCompletion(gigId: string, clientId: string, io?:
   await creditWorkerForCompletedGig(gigId);
 
   if (io) {
+    const billableLabel =
+      finalAmounts.billableMinutes != null
+        ? `${Math.floor(finalAmounts.billableMinutes / 60)} hour${finalAmounts.billableMinutes >= 120 ? "s" : ""} and ${finalAmounts.billableMinutes % 60} minutes`
+        : null;
     notifyUser(io, gig.assignments[0].workerId, {
       type: "GIG_COMPLETED",
       title: "Gig completed",
-      body: `Payment captured for "${gig.title}".`,
+      body: billableLabel
+        ? `Gig completed. Final charge is based on ${billableLabel} of billable work.`
+        : `Payment confirmed for "${gig.title}".`,
+      gigId
+    });
+    notifyUser(io, gig.clientId, {
+      type: "GIG_COMPLETED",
+      title: "Gig completed",
+      body: billableLabel
+        ? `Gig completed. Your final charge is $${(finalAmounts.totalCents / 100).toFixed(2)} based on ${billableLabel} of billable work.`
+        : `Your booking for "${gig.title}" is complete.`,
       gigId
     });
   }
@@ -607,11 +718,10 @@ export async function assertWorkerNearGig(
 export async function checkTimerThreshold(gigId: string, io?: Server): Promise<void> {
   const gig = await prisma.gig.findUnique({
     where: { id: gigId, status: GigStatus.IN_PROGRESS },
-    include: { assignments: { orderBy: { acceptedAt: "desc" }, take: 1 } }
+    include: { assignments: { where: { cancelledAt: null }, orderBy: { acceptedAt: "desc" }, take: 1 }, serviceCategory: true }
   });
 
   if (!gig?.assignments[0]?.startedAt || !usesTimer(gig.pricingType)) return;
-  if (gig.pricingType !== PricingType.ESTIMATE_TIMER) return;
 
   const assignment = gig.assignments[0];
   const elapsedMinutes = getElapsedMinutes(
@@ -621,8 +731,42 @@ export async function checkTimerThreshold(gigId: string, io?: Server): Promise<v
     assignment.extraTimeApprovedMinutes
   );
   const bookedMinutes = Math.round(Number(gig.estimatedHours) * 60);
+  const maxAuthorized = gig.maximumAuthorizedAmountCents ?? 0;
+  const projected = calculatePriceEstimate(
+    {
+      serviceCategoryId: gig.serviceCategoryId,
+      location: {
+        latitude: Number(gig.latitude),
+        longitude: Number(gig.longitude),
+        formattedAddress: gig.formattedAddress ?? gig.addressLine1,
+        addressLine1: gig.addressLine1,
+        city: gig.city,
+        region: gig.region,
+        postalCode: gig.postalCode,
+        country: gig.country ?? "US"
+      },
+      estimatedHours: Math.max(elapsedMinutes, bookedMinutes) / 60,
+      distanceMiles: Number(gig.distanceMiles),
+      urgency: gig.urgency,
+      startsAt: gig.startsAt.toISOString(),
+      demandMultiplier: Number(gig.demandMultiplier),
+      pricingType: gig.pricingType,
+      size: gig.size ?? "MEDIUM"
+    },
+    {
+      baseRateCents: gig.serviceCategory.baseRateCents,
+      hourlyRateCents: gig.serviceCategory.hourlyRateCents,
+      distanceRateCents: gig.serviceCategory.distanceRateCents,
+      multiplier: Number(gig.serviceCategory.multiplier)
+    }
+  );
 
-  if (elapsedMinutes < bookedMinutes) return;
+  const approachingAuthLimit =
+    maxAuthorized > 0 && projected.totalCents + gig.taxCents >= Math.floor(maxAuthorized * 0.9);
+  const pastBookedEstimate =
+    gig.pricingType === PricingType.ESTIMATE_TIMER && elapsedMinutes >= bookedMinutes;
+
+  if (!approachingAuthLimit && !pastBookedEstimate) return;
 
   await prisma.$transaction([
     prisma.gig.update({ where: { id: gigId }, data: { status: GigStatus.WAITING_EXTRA_TIME_APPROVAL } }),
@@ -635,11 +779,309 @@ export async function checkTimerThreshold(gigId: string, io?: Server): Promise<v
   if (io) {
     notifyUser(io, gig.clientId, {
       type: "ESTIMATED_TIME_REACHED",
-      title: "Booked time reached",
-      body: `Your worker has reached the booked time for "${gig.title}". Approve extra time or finish the job.`,
+      title: approachingAuthLimit ? "Approved booking time almost complete" : "Booked time reached",
+      body: approachingAuthLimit
+        ? "The approved booking time is almost complete. Approve additional time to continue, or finish the job."
+        : `Your worker has reached the booked time for "${gig.title}". Approve extra time or finish the job.`,
       gigId
     });
+    if (assignment.workerId) {
+      notifyUser(io, assignment.workerId, {
+        type: "TIMER_PAUSED",
+        title: "Timer paused",
+        body: "Waiting for the customer to approve more time or finish the job.",
+        gigId
+      });
+    }
   }
 }
 
 export { releaseAuthorizedPayment, assertGigPaymentAuthorized };
+
+/** Worker withdraws interest while still matching (before customer selection). */
+export async function withdrawWorkerInterest(gigId: string, workerId: string, io?: Server) {
+  const interest = await prisma.gigInterest.findFirst({
+    where: { gigId, workerId, status: GigInterestStatus.INTERESTED },
+    include: { gig: { include: { serviceCategory: true } } }
+  });
+
+  if (!interest) {
+    throw new AppError("NOT_FOUND", 404, "NOT_FOUND", { interest: "No active matching offer for this gig." });
+  }
+
+  if (!OPEN_FOR_INTEREST.includes(interest.gig.status)) {
+    throw new AppError("INVALID_STATE", 409, "INVALID_GIG_STATE", {
+      gig: "You can only withdraw before the customer selects a worker."
+    });
+  }
+
+  await prisma.gigInterest.update({
+    where: { id: interest.id },
+    data: { status: GigInterestStatus.WITHDRAWN }
+  });
+
+  if (io) {
+    io.to(`user:${interest.gig.clientId}`).emit("worker_withdrew", {
+      gigId,
+      workerId,
+      status: "WITHDRAWN"
+    });
+    notifyUser(io, interest.gig.clientId, {
+      type: "WORKER_WITHDREW",
+      title: "Worker withdrew",
+      body: `A worker withdrew from "${interest.gig.title}".`,
+      gigId
+    });
+  }
+
+  return { withdrawn: true, gigId };
+}
+
+/**
+ * Selected worker cancels before IN_PROGRESS → rematch customer on same gig (no new payment).
+ * During IN_PROGRESS → DISPUTED (no automatic rematch).
+ */
+export async function cancelAssignedWorkerAndRematch(
+  gigId: string,
+  workerId: string,
+  reason: string,
+  io?: Server
+) {
+  const trimmedReason = reason.trim();
+  if (trimmedReason.length < 3) {
+    throw new AppError("VALIDATION_ERROR", 400, "VALIDATION_ERROR", {
+      reason: "Please provide a short cancellation reason."
+    });
+  }
+
+  const gig = await prisma.gig.findUnique({
+    where: { id: gigId },
+    include: {
+      payment: true,
+      assignments: { where: { workerId, cancelledAt: null }, orderBy: { acceptedAt: "desc" }, take: 1 },
+      serviceCategory: true
+    }
+  });
+
+  if (!gig) {
+    throw new AppError("NOT_FOUND", 404, "NOT_FOUND", { gig: "Gig not found" });
+  }
+
+  if (gig.assignedWorkerId !== workerId) {
+    throw new AppError("FORBIDDEN", 403, "FORBIDDEN", { worker: "You are not the selected worker for this gig." });
+  }
+
+  const outcome = workerCancelOutcome(gig.status);
+  if (outcome === "BLOCKED") {
+    throw new AppError("INVALID_STATE", 409, "INVALID_GIG_STATE", {
+      gig: "This gig can no longer be cancelled by the worker."
+    });
+  }
+
+  if (outcome === "DISPUTE") {
+    await prisma.$transaction(async (tx) => {
+      if (gig.assignments[0]) {
+        await tx.gigAssignment.update({
+          where: { id: gig.assignments[0]!.id },
+          data: { cancelledAt: new Date(), completionNotes: trimmedReason }
+        });
+      }
+      await tx.gigInterest.updateMany({
+        where: { gigId, workerId },
+        data: { status: GigInterestStatus.WITHDRAWN }
+      });
+      await tx.gig.update({
+        where: { id: gigId },
+        data: { status: GigStatus.DISPUTED, assignedWorkerId: null }
+      });
+    });
+
+    if (io) {
+      notifyUser(io, gig.clientId, {
+        type: "GIG_INTERRUPTED",
+        title: "Gig interrupted",
+        body: `Your worker cancelled after work started on "${gig.title}". Support has been notified.`,
+        gigId
+      });
+      io.to(`user:${gig.clientId}`).emit("selected_worker_cancelled", {
+        gigId,
+        cancelledWorkerId: workerId,
+        customerId: gig.clientId,
+        previousStatus: gig.status,
+        newStatus: GigStatus.DISPUTED,
+        cancellationReason: trimmedReason,
+        cancelledAt: new Date().toISOString(),
+        rematching: false
+      });
+    }
+
+    return { rematching: false, status: GigStatus.DISPUTED };
+  }
+
+  const previousStatus = gig.status;
+
+  await prisma.$transaction(async (tx) => {
+    if (gig.assignments[0]) {
+      await tx.gigAssignment.update({
+        where: { id: gig.assignments[0]!.id },
+        data: { cancelledAt: new Date(), completionNotes: trimmedReason }
+      });
+    }
+
+    await tx.gigInterest.updateMany({
+      where: { gigId, workerId },
+      data: { status: GigInterestStatus.WITHDRAWN }
+    });
+
+    // Keep other valid INTERESTED offers; reopen matching on the same gig + payment.
+    await tx.gig.update({
+      where: { id: gigId },
+      data: {
+        status: GigStatus.SEARCHING_FOR_WORKER,
+        assignedWorkerId: null
+      }
+    });
+
+    // Cancelled worker must not receive payout; keep customer payment on the gig.
+    if (gig.payment?.stripeTransferId == null && gig.payment) {
+      await tx.payment.update({
+        where: { id: gig.payment.id },
+        data: {
+          status:
+            gig.paymentStatus === PaymentLifecycle.PAYMENT_CAPTURED ||
+            gig.paymentStatus === PaymentLifecycle.PAYOUT_PENDING ||
+            gig.paymentStatus === PaymentLifecycle.PAYOUT_PAID
+              ? PaymentStatus.CAPTURED
+              : gig.payment.status
+        }
+      });
+    }
+  });
+
+  if (io) {
+    const payload = {
+      gigId,
+      cancelledWorkerId: workerId,
+      customerId: gig.clientId,
+      previousStatus,
+      newStatus: GigStatus.SEARCHING_FOR_WORKER,
+      cancellationReason: trimmedReason,
+      cancelledAt: new Date().toISOString()
+    };
+    io.to(`user:${gig.clientId}`).emit("selected_worker_cancelled", { ...payload, rematching: true });
+    io.to(`user:${gig.clientId}`).emit("gig_rematching", {
+      gigId,
+      customerId: gig.clientId,
+      status: GigStatus.SEARCHING_FOR_WORKER,
+      rematchingStartedAt: new Date().toISOString()
+    });
+    io.to(`gig:${gigId}`).emit("gig:status", { gigId, status: GigStatus.SEARCHING_FOR_WORKER });
+    notifyUser(io, gig.clientId, {
+      type: "WORKER_CANCELLED_REMATCH",
+      title: "Finding another worker",
+      body: "Your previous worker cancelled. We’re searching for another available worker nearby.",
+      gigId
+    });
+
+    // Re-broadcast to nearby workers (exclude cancelled worker via client filters / interest status).
+    const { broadcastGigOffer } = await import("../realtime/realtime.service.js");
+    await broadcastGigOffer(io, {
+      gigId: gig.id,
+      title: gig.title,
+      serviceCategoryId: gig.serviceCategoryId,
+      serviceCategoryName: gig.serviceCategory.name,
+      latitude: Number(gig.latitude),
+      longitude: Number(gig.longitude),
+      city: gig.city,
+      region: gig.region,
+      size: gig.size,
+      totalCents: gig.totalCents,
+      workerPayoutCents: gig.workerPayoutCents,
+      startsAt: gig.startsAt.toISOString(),
+      urgency: gig.urgency,
+      estimatedHours: Number(gig.estimatedHours)
+    });
+  }
+
+  return { rematching: true, status: GigStatus.SEARCHING_FOR_WORKER };
+}
+
+export async function getWorkerMatchingInterest(gigId: string, workerId: string) {
+  const interest = await prisma.gigInterest.findFirst({
+    where: { gigId, workerId },
+    include: {
+      gig: {
+        include: {
+          serviceCategory: true,
+          client: { select: { id: true, fullName: true } }
+        }
+      }
+    }
+  });
+
+  if (!interest) {
+    throw new AppError("NOT_FOUND", 404, "NOT_FOUND", { interest: "Offer not found" });
+  }
+
+  const gig = interest.gig;
+  return {
+    interest: {
+      id: interest.id,
+      status: interest.status,
+      offeredWorkerPayoutCents: interest.offeredWorkerPayoutCents ?? gig.workerPayoutCents,
+      estimatedArrivalMinutes: interest.estimatedArrivalMinutes,
+      estimatedHours: Number(interest.estimatedHours ?? gig.estimatedHours),
+      createdAt: interest.createdAt
+    },
+    gig: {
+      id: gig.id,
+      title: gig.title,
+      status: gig.status,
+      paymentStatus: gig.paymentStatus,
+      city: gig.city,
+      region: gig.region,
+      startsAt: gig.startsAt,
+      estimatedHours: Number(gig.estimatedHours),
+      workerPayoutCents: interest.offeredWorkerPayoutCents ?? gig.workerPayoutCents,
+      totalCents: gig.totalCents,
+      urgency: gig.urgency,
+      size: gig.size,
+      serviceCategory: { id: gig.serviceCategory.id, name: gig.serviceCategory.name },
+      assignedWorkerId: gig.assignedWorkerId
+    }
+  };
+}
+
+export async function listWorkerMatchingInterests(workerId: string) {
+  const interests = await prisma.gigInterest.findMany({
+    where: {
+      workerId,
+      status: { in: [GigInterestStatus.INTERESTED, GigInterestStatus.SELECTED] }
+    },
+    include: {
+      gig: { include: { serviceCategory: true } }
+    },
+    orderBy: { updatedAt: "desc" }
+  });
+
+  return interests.map((interest) => ({
+    id: interest.id,
+    status: interest.status,
+    offeredWorkerPayoutCents: interest.offeredWorkerPayoutCents ?? interest.gig.workerPayoutCents,
+    gig: {
+      id: interest.gig.id,
+      title: interest.gig.title,
+      status: interest.gig.status,
+      city: interest.gig.city,
+      region: interest.gig.region,
+      startsAt: interest.gig.startsAt,
+      estimatedHours: Number(interest.gig.estimatedHours),
+      workerPayoutCents: interest.offeredWorkerPayoutCents ?? interest.gig.workerPayoutCents,
+      serviceCategory: {
+        id: interest.gig.serviceCategory.id,
+        name: interest.gig.serviceCategory.name
+      },
+      assignedWorkerId: interest.gig.assignedWorkerId
+    }
+  }));
+}

@@ -43,9 +43,13 @@ import {
   approveExtraTime,
   approveGigCompletion,
   authorizeWorkerSelectionWithoutStripe,
+  cancelAssignedWorkerAndRematch,
+  getWorkerMatchingInterest,
   getWorkerSelectionSummary,
   listGigInterests,
-  selectWorkerForGig
+  listWorkerMatchingInterests,
+  selectWorkerForGig,
+  withdrawWorkerInterest
 } from "./gig-workflow.service.js";
 
 
@@ -80,6 +84,10 @@ const selectWorkerSchema = z.object({ workerId: z.string().uuid() });
 
 const approveExtraTimeSchema = z.object({ extraMinutes: z.number().int().min(15).max(480) });
 
+const workerCancelSchema = z.object({
+  reason: z.string().min(3).max(500)
+});
+
 
 
 export function createGigRouter(io: Server): Router {
@@ -102,6 +110,15 @@ export function createGigRouter(io: Server): Router {
 
     }
 
+  });
+
+  router.get("/worker/matching", requireAuth, requireRole(UserRole.WORKER), requireApprovedWorker, async (req, res, next) => {
+    try {
+      const interests = await listWorkerMatchingInterests(req.auth!.userId);
+      res.json({ interests });
+    } catch (error) {
+      next(error);
+    }
   });
 
 
@@ -334,6 +351,45 @@ export function createGigRouter(io: Server): Router {
 
   });
 
+  router.get("/:gigId/my-interest", requireAuth, requireRole(UserRole.WORKER), requireApprovedWorker, async (req, res, next) => {
+    try {
+      const result = await getWorkerMatchingInterest(String(req.params.gigId), req.auth!.userId);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/:gigId/withdraw-interest", requireAuth, requireRole(UserRole.WORKER), requireApprovedWorker, async (req, res, next) => {
+    try {
+      const result = await withdrawWorkerInterest(String(req.params.gigId), req.auth!.userId, io);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post(
+    "/:gigId/cancel-by-worker",
+    requireAuth,
+    requireRole(UserRole.WORKER),
+    requireApprovedWorker,
+    validateBody(workerCancelSchema),
+    async (req, res, next) => {
+      try {
+        const result = await cancelAssignedWorkerAndRematch(
+          String(req.params.gigId),
+          req.auth!.userId,
+          req.body.reason,
+          io
+        );
+        res.json(result);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
 
 
   router.patch("/:gigId/status", requireAuth, validateBody(statusUpdateSchema), async (req, res, next) => {
@@ -415,6 +471,16 @@ export function createGigRouter(io: Server): Router {
   router.post("/:gigId/approve-completion", requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN), async (req, res, next) => {
     try {
       const result = await approveGigCompletion(String(req.params.gigId), req.auth!.userId, io);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/:gigId/release-worker-payment", requireAuth, requireRole(UserRole.ADMIN, UserRole.WORKER), async (req, res, next) => {
+    try {
+      const { releaseWorkerPayment } = await import("../payments/payment.service.js");
+      const result = await releaseWorkerPayment(String(req.params.gigId));
       res.json(result);
     } catch (error) {
       next(error);

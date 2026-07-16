@@ -19,7 +19,7 @@ import { useSocketEvents } from "../../hooks/useSocket";
 import type { RootStackParamList, WorkerTabParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 
-type TabValue = "available" | "accepted" | "completed";
+type TabValue = "available" | "matching" | "accepted" | "completed";
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<WorkerTabParamList, "NearbyGigs">,
@@ -38,6 +38,12 @@ export function WorkerNearbyGigsScreen() {
   const nearbyQuery = useQuery({
     queryKey: ["nearby-gigs"],
     queryFn: () => api.nearbyGigs(session.token),
+    refetchInterval: 10_000
+  });
+
+  const matchingQuery = useQuery({
+    queryKey: ["worker-matching-list"],
+    queryFn: () => api.listWorkerMatchingInterests(session.token),
     refetchInterval: 10_000
   });
 
@@ -63,12 +69,11 @@ export function WorkerNearbyGigsScreen() {
 
   const acceptMutation = useMutation({
     mutationFn: (gigId: string) => api.acceptGig(gigId, session.token),
-    onSuccess: ({ gig }) => {
+    onSuccess: (_result, gigId) => {
       void queryClient.invalidateQueries({ queryKey: ["my-gigs"] });
       void nearbyQuery.refetch();
-      setAcceptedGigId(gig.id);
+      setAcceptedGigId(gigId);
       setShowAcceptAnimation(true);
-      setTab("accepted");
     },
     onError: (error: Error) => showAlert("Could not accept", error.message),
     onSettled: () => setAcceptingId(null)
@@ -76,6 +81,11 @@ export function WorkerNearbyGigsScreen() {
 
   const availableGigs = nearbyQuery.data?.gigs ?? [];
   const myGigs = myGigsQuery.data?.gigs ?? [];
+  const matchingOffers = (matchingQuery.data?.interests ?? []).filter(
+    (row) =>
+      row.status === "INTERESTED" ||
+      (row.status === "SELECTED" && row.gig.status === "WORKER_SELECTED")
+  );
   const acceptedGigs = myGigs.filter((gig) =>
     ACTIVE_WORKER_STATUSES.includes(gig.status as (typeof ACTIVE_WORKER_STATUSES)[number])
   );
@@ -96,10 +106,15 @@ export function WorkerNearbyGigsScreen() {
       title: "No available gigs",
       description: "Go online from home to receive new gigs matching your services."
     },
+    matching: {
+      emoji: "⏳",
+      title: "No matching offers",
+      description: "Accept a nearby gig to wait for the customer to choose a worker."
+    },
     accepted: {
       emoji: "🧰",
-      title: "No accepted gig",
-      description: "Accept a gig from home to start earning."
+      title: "No active gig",
+      description: "Once a customer selects you and payment is secured, the gig appears here."
     },
     completed: {
       emoji: "✅",
@@ -115,7 +130,7 @@ export function WorkerNearbyGigsScreen() {
         onDone={() => {
           setShowAcceptAnimation(false);
           if (acceptedGigId) {
-            navigation.navigate("GigDetail", { gigId: acceptedGigId });
+            navigation.replace("WorkerMatching", { gigId: acceptedGigId });
             setAcceptedGigId(null);
           }
         }}
@@ -130,7 +145,8 @@ export function WorkerNearbyGigsScreen() {
         <SegmentedTabs
           tabs={[
             { value: "available" as const, label: "Available" },
-            { value: "accepted" as const, label: "Accepted" },
+            { value: "matching" as const, label: "Matching" },
+            { value: "accepted" as const, label: "Active" },
             { value: "completed" as const, label: "Completed" }
           ]}
           value={tab}
@@ -149,6 +165,42 @@ export function WorkerNearbyGigsScreen() {
                   onView={() => navigation.navigate("GigDetail", { gigId: gig.id })}
                   onAccept={() => confirmAccept(gig.id, gig.title)}
                   acceptDisabled={acceptMutation.isPending && acceptingId === gig.id}
+                />
+              ))}
+            </View>
+          )
+        ) : null}
+
+        {tab === "matching" ? (
+          matchingOffers.length === 0 ? (
+            <EmptyState {...emptyCopy} />
+          ) : (
+            <View className="gap-4">
+              {matchingOffers.map((offer) => (
+                <GigCard
+                  key={offer.id}
+                  gig={{
+                    id: offer.gig.id,
+                    title: offer.gig.title,
+                    description: "",
+                    status: offer.gig.status,
+                    urgency: "STANDARD",
+                    totalCents: offer.offeredWorkerPayoutCents,
+                    workerPayoutCents: offer.offeredWorkerPayoutCents,
+                    addressLine1: "",
+                    city: offer.gig.city,
+                    region: offer.gig.region,
+                    latitude: 0,
+                    longitude: 0,
+                    startsAt: offer.gig.startsAt,
+                    createdAt: offer.gig.startsAt,
+                    serviceCategory: offer.gig.serviceCategory
+                  }}
+                  showWorkerEarnings
+                  subtitle={`${offer.gig.city}, ${offer.gig.region} · Waiting for customer`}
+                  actionLabel="Open Matching"
+                  onAction={() => navigation.navigate("WorkerMatching", { gigId: offer.gig.id })}
+                  onPress={() => navigation.navigate("WorkerMatching", { gigId: offer.gig.id })}
                 />
               ))}
             </View>

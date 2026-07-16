@@ -79,6 +79,7 @@ enum PaymentStatus {
   PAYOUT_PENDING
   PAID_OUT
   REFUNDED
+  PARTIALLY_REFUNDED
   FAILED
 }
 
@@ -279,6 +280,9 @@ model Gig {
   autoApproveAt         DateTime?
   taxCents              Int               @default(0)
   finalTotalCents       Int?
+  authorizationBufferCents Int            @default(0)
+  maximumAuthorizedAmountCents Int?
+  billingIncrementMinutes Int             @default(15)
   urgency               GigUrgency
   size                  GigSize
   estimatedHours        Decimal         @db.Decimal(5, 2)
@@ -349,6 +353,9 @@ model GigAssignment {
   endLatitude              Decimal?  @db.Decimal(9, 6)
   endLongitude             Decimal?  @db.Decimal(9, 6)
   billableMinutes          Int?
+  actualWorkedSeconds      Int?
+  billableSeconds          Int?
+  totalApprovedPausedSeconds Int     @default(0)
   timerPausedAt            DateTime?
   extraTimeApprovedMinutes Int       @default(0)
   completionNotes          String?
@@ -359,20 +366,28 @@ model GigAssignment {
 }
 
 model Payment {
-  id                     String        @id @default(uuid())
-  gigId                  String        @unique
-  gig                    Gig           @relation(fields: [gigId], references: [id], onDelete: Cascade)
-  stripePaymentIntentId  String?       @unique
-  stripeCheckoutSessionId String?      @unique
-  stripeTransferId       String?       @unique
-  status                 PaymentStatus @default(REQUIRES_PAYMENT_METHOD)
-  amountCents            Int
-  platformFeeCents       Int
-  workerPayoutCents      Int
-  currency               String        @default("usd")
-  transactions           Transaction[]
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
+  id                      String        @id @default(uuid())
+  gigId                   String        @unique
+  gig                     Gig           @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  stripePaymentIntentId   String?       @unique
+  stripeCheckoutSessionId String?       @unique
+  stripeChargeId          String?
+  stripeTransferId        String?       @unique
+  stripeRefundId          String?
+  status                  PaymentStatus @default(REQUIRES_PAYMENT_METHOD)
+  authorizationStatus     String?
+  authorizedAt            DateTime?
+  captureBefore           DateTime?
+  capturedAt              DateTime?
+  maximumAuthorizedAmountCents Int?
+  amountCents             Int
+  platformFeeCents        Int
+  workerPayoutCents       Int
+  refundAmountCents       Int           @default(0)
+  currency                String        @default("usd")
+  transactions            Transaction[]
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
 }
 
 model Transaction {

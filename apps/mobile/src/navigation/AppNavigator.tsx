@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ClientTabs } from "./ClientTabs";
 import { WorkerTabs } from "./WorkerTabs";
 import { GigDetailScreen } from "../screens/shared/GigDetailScreen";
+import { WorkerMatchingScreen } from "../screens/worker/WorkerMatchingScreen";
 import { GigTrackingScreen } from "../screens/shared/GigTrackingScreen";
 import { GigPaymentScreen } from "../screens/shared/GigPaymentScreen";
 import { GigSelectWorkersScreen } from "../screens/shared/GigSelectWorkersScreen";
@@ -57,6 +58,7 @@ export function AppNavigator() {
       <Stack.Screen name="MainTabs" component={RoleTabs} options={{ headerShown: false }} />
       <Stack.Screen name="PostGig" component={ClientPostScreen} options={{ title: "Request Help" }} />
       <Stack.Screen name="GigDetail" component={GigDetailScreen} options={{ title: "Gig details" }} />
+      <Stack.Screen name="WorkerMatching" component={WorkerMatchingScreen} options={{ title: "Matching" }} />
       <Stack.Screen name="GigSelectWorkers" component={GigSelectWorkersScreen} options={{ title: "Choose your worker" }} />
       <Stack.Screen name="GigWorkerSummary" component={GigWorkerSummaryScreen} options={{ title: "Worker summary" }} />
       <Stack.Screen name="GigPayment" component={GigPaymentScreen} options={{ title: "Confirm booking" }} />

@@ -15,7 +15,9 @@ import {
   getPaymentStatusForGig,
   getWorkerConnectStatus,
   handleAccountUpdated,
+  handleChargeRefunded,
   handleCheckoutSessionCompleted,
+  handleCheckoutSessionExpired,
   handlePaymentIntentAuthorized,
   handlePaymentIntentFailed,
   listCustomerPaymentMethods,
@@ -73,14 +75,26 @@ paymentRouter.post("/webhook", async (req: Request, res: Response) => {
       case "checkout.session.completed":
         await handleCheckoutSessionCompleted(event.data.object);
         break;
-      case "payment_intent.amount_capturable_updated":
-        await handlePaymentIntentAuthorized(event.data.object);
+      case "checkout.session.expired":
+        await handleCheckoutSessionExpired(event.data.object);
         break;
       case "payment_intent.succeeded":
         await handlePaymentIntentAuthorized(event.data.object);
         break;
+      case "payment_intent.amount_capturable_updated":
+        await handlePaymentIntentAuthorized(event.data.object);
+        break;
+      case "payment_intent.canceled":
+        await handlePaymentIntentFailed(event.data.object);
+        break;
       case "payment_intent.payment_failed":
         await handlePaymentIntentFailed(event.data.object);
+        break;
+      case "charge.captured":
+        // capture confirmation is handled via payment_intent.succeeded
+        break;
+      case "charge.refunded":
+        await handleChargeRefunded(event.data.object);
         break;
       case "account.updated":
         await handleAccountUpdated(event.data.object);

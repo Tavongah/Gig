@@ -6,7 +6,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import { useRoute } from "@react-navigation/native";
 import { api } from "../../lib/api";
-import { showAlert, showConfirm } from "../../lib/confirm";
+import { showAlert, showConfirm, showPrompt } from "../../lib/confirm";
 import { formatAddress, formatCents } from "../../lib/format";
 import { canClientCancel, isSearching, nextWorkerAction } from "../../lib/gig-status";
 import { getCurrentCoordinates } from "../../lib/location";
@@ -110,7 +110,7 @@ export function GigDetailScreen() {
     mutationFn: () => api.acceptGig(route.params.gigId, session.token),
     onSuccess: () => {
       invalidate();
-      showAlert("Gig accepted", "You are now assigned to this gig.");
+      navigation.replace("WorkerMatching", { gigId: route.params.gigId });
     },
     onError: (error: Error) => showAlert("Could not accept", error.message)
   });
@@ -120,6 +120,21 @@ export function GigDetailScreen() {
     onSuccess: () => {
       invalidate();
       showAlert("Gig cancelled", "This gig has been cancelled.");
+    },
+    onError: (error: Error) => showAlert("Could not cancel", error.message)
+  });
+
+  const workerCancelMutation = useMutation({
+    mutationFn: (reason: string) => api.cancelGigByWorker(route.params.gigId, reason, session.token),
+    onSuccess: (result) => {
+      invalidate();
+      showAlert(
+        result.rematching ? "Gig cancelled" : "Gig interrupted",
+        result.rematching
+          ? "You cancelled this gig. The customer is being matched with another worker."
+          : "This gig was sent to support for review."
+      );
+      navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
     },
     onError: (error: Error) => showAlert("Could not cancel", error.message)
   });
@@ -136,6 +151,27 @@ export function GigDetailScreen() {
       confirmLabel: "Cancel gig",
       destructive: true
     });
+  }
+
+  function confirmWorkerCancel(): void {
+    const arrivedOrLater = gig?.status === "WORKER_ARRIVED" || gig?.status === "IN_PROGRESS";
+    showConfirm(
+      "Cancel this gig?",
+      arrivedOrLater
+        ? "Cancelling after arrival requires a clear reason. The customer will be notified."
+        : "The customer will be matched with another worker. You will return to Home.",
+      () => {
+        showPrompt(
+          "Cancellation reason",
+          arrivedOrLater
+            ? "Please explain why you need to cancel after arriving."
+            : "Tell the customer why you need to cancel.",
+          (reason) => workerCancelMutation.mutate(reason),
+          { confirmLabel: "Cancel gig", placeholder: "Reason" }
+        );
+      },
+      { confirmLabel: "Continue", destructive: true }
+    );
   }
 
   useEffect(() => {
@@ -287,6 +323,19 @@ export function GigDetailScreen() {
             variant="cancel"
             onPress={confirmCancel}
             loading={cancelMutation.isPending}
+          />
+        ) : null}
+
+        {activeRole === "WORKER" &&
+        gig.assignedWorkerId === userId &&
+        ["WORKER_SELECTED", "WORKER_ASSIGNED", "WORKER_EN_ROUTE", "WORKER_ARRIVED", "IN_PROGRESS"].includes(
+          gig.status
+        ) ? (
+          <LoadingButton
+            label="Cancel this gig"
+            variant="cancel"
+            onPress={confirmWorkerCancel}
+            loading={workerCancelMutation.isPending}
           />
         ) : null}
 

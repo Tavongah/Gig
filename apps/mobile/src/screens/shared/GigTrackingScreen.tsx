@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { customerJourneyHeadline, formatMoney, haversineMiles, liveTrackingWorkerStatus, resolveCustomerJourneyStage } from "@gigflow/shared";
+import { customerJourneyHeadline, formatMoney, haversineMiles, isCustomerRematching, liveTrackingWorkerStatus, resolveCustomerJourneyStage } from "@gigflow/shared";
 import { api } from "../../lib/api";
 import { formatAddress, formatCents } from "../../lib/format";
 import { canClientCancel, isSearching, needsClientReview, showTrackingMap } from "../../lib/gig-status";
@@ -59,6 +59,22 @@ export function GigTrackingScreen() {
         "gig:status": invalidate,
         "gig:assigned": invalidate,
         "gig:matched": invalidate,
+        gig_rematching: (payload: { gigId?: string }) => {
+          invalidate();
+          if (payload.gigId === route.params.gigId) {
+            navigation.replace("GigSelectWorkers", { gigId: route.params.gigId });
+          }
+        },
+        selected_worker_cancelled: (payload: { gigId?: string; rematching?: boolean }) => {
+          invalidate();
+          if (payload.gigId === route.params.gigId && payload.rematching !== false) {
+            Alert.alert(
+              "Finding another worker",
+              "Your previous worker cancelled. We’re searching for another available worker nearby."
+            );
+            navigation.replace("GigSelectWorkers", { gigId: route.params.gigId });
+          }
+        },
         "location:updated": (payload: { latitude: number; longitude: number }) => {
           setWorkerLocation({ latitude: payload.latitude, longitude: payload.longitude });
         },
@@ -66,7 +82,7 @@ export function GigTrackingScreen() {
           Alert.alert(payload.title, payload.body);
         }
       }),
-      [invalidate]
+      [invalidate, navigation, route.params.gigId]
     )
   );
 
@@ -109,12 +125,13 @@ export function GigTrackingScreen() {
   if (!gig) {
     return (
       <View className="flex-1 items-center justify-center" style={{ backgroundColor: DUTS.background }}>
-        <Text className="text-ink">{gigQuery.isLoading ? "Loading..." : "Gig not found"}</Text>
+        <Text className="text-ink">{gigQuery.isLoading ? "Opening tracking…" : "Gig not found"}</Text>
       </View>
     );
   }
 
   const searching = isSearching(gig.status);
+  const rematching = isCustomerRematching(gig.status, gig.paymentStatus, gig.payment?.status);
   const showMap = showTrackingMap(gig.status);
   const arrived = gig.status === "WORKER_ARRIVED";
   const inProgress = gig.status === "IN_PROGRESS";
@@ -151,7 +168,22 @@ export function GigTrackingScreen() {
         </View>
       ) : null}
 
-      {searching ? <SearchingIndicator /> : null}
+      {searching ? (
+        <View className="gap-3">
+          <SearchingIndicator
+            title={rematching ? "Finding another worker" : "Matching workers near you..."}
+            message={
+              rematching
+                ? "Your previous worker cancelled. We’re searching for another available worker nearby."
+                : "Your request was sent to nearby verified workers who can accept or submit offers."
+            }
+          />
+          <LoadingButton
+            label="View worker offers"
+            onPress={() => navigation.navigate("GigSelectWorkers", { gigId: gig.id })}
+          />
+        </View>
+      ) : null}
 
       {worker && !searching ? (
         <AssignedWorkerCard

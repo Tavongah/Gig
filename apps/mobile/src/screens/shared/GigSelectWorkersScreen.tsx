@@ -1,5 +1,6 @@
 import { Text, View } from "react-native";
-import { customerJourneyHeadline, resolveCustomerJourneyStage } from "@gigflow/shared";
+import { useMemo } from "react";
+import { customerJourneyHeadline, isCustomerRematching, resolveCustomerJourneyStage } from "@gigflow/shared";
 import { Screen } from "../../components/Screen";
 import { DutsCard } from "../../components/DutsCard";
 import { WorkerInterestCard } from "../../components/WorkerInterestCard";
@@ -10,6 +11,7 @@ import { useSessionStore } from "../../stores/session.store";
 import type { RootStackParamList } from "../../navigation/types";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
+import { useSocketEvents } from "../../hooks/useSocket";
 
 type Props = NativeStackScreenProps<RootStackParamList, "GigSelectWorkers">;
 
@@ -19,7 +21,8 @@ export function GigSelectWorkersScreen({ navigation, route }: Props) {
 
   const gigQuery = useQuery({
     queryKey: ["gig", gigId],
-    queryFn: () => api.getGig(gigId, session.token)
+    queryFn: () => api.getGig(gigId, session.token),
+    refetchInterval: 5000
   });
 
   const interestsQuery = useQuery({
@@ -28,8 +31,31 @@ export function GigSelectWorkersScreen({ navigation, route }: Props) {
     refetchInterval: 5000
   });
 
+  useSocketEvents(
+    useMemo(
+      () => ({
+        gig_rematching: (payload: { gigId?: string }) => {
+          if (payload.gigId !== gigId) return;
+          void gigQuery.refetch();
+          void interestsQuery.refetch();
+        },
+        selected_worker_cancelled: (payload: { gigId?: string }) => {
+          if (payload.gigId !== gigId) return;
+          void gigQuery.refetch();
+          void interestsQuery.refetch();
+        },
+        "gig:interest": (payload: { gigId?: string }) => {
+          if (payload.gigId !== gigId) return;
+          void interestsQuery.refetch();
+        }
+      }),
+      [gigId, gigQuery, interestsQuery]
+    )
+  );
+
   const interests = interestsQuery.data?.interests ?? [];
   const gig = gigQuery.data?.gig;
+  const rematching = isCustomerRematching(gig?.status ?? "", gig?.paymentStatus, gig?.payment?.status);
   const stage = resolveCustomerJourneyStage({
     status: gig?.status ?? "POSTED",
     paymentStatus: gig?.paymentStatus,
@@ -40,8 +66,14 @@ export function GigSelectWorkersScreen({ navigation, route }: Props) {
     <Screen>
       <View className="gap-4">
         <View className="gap-2">
-          <Text className="text-2xl font-black text-ink">Choose your worker</Text>
-          <Text className="text-sm text-muted">{customerJourneyHeadline(stage)}</Text>
+          <Text className="text-2xl font-black text-ink">
+            {rematching ? "Finding another worker" : "Choose your worker"}
+          </Text>
+          <Text className="text-sm text-muted">
+            {rematching
+              ? "Your previous worker cancelled. We’re searching for another available worker nearby."
+              : customerJourneyHeadline(stage)}
+          </Text>
         </View>
 
         {gig ? (
@@ -53,7 +85,12 @@ export function GigSelectWorkersScreen({ navigation, route }: Props) {
           />
         ) : null}
 
-        {interests.length === 0 ? (
+        {rematching && interests.length === 0 ? (
+          <SearchingIndicator
+            title="Finding another worker"
+            message="Your previous worker cancelled. We’re searching for another available worker nearby."
+          />
+        ) : interests.length === 0 ? (
           <View className="gap-3">
             <SearchingIndicator />
             <DutsCard className="gap-2 p-5">

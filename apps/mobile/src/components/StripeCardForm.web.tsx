@@ -150,7 +150,7 @@ export function StripeCardForm({ publishableKey, clientSecret, amountLabel, onSu
         loading={submitting}
         disabled={!ready || submitting}
       />
-      <Text className="text-center text-xs text-muted">Secured by Stripe. Your card is authorized, not charged until the gig completes.</Text>
+      <Text className="text-center text-xs text-muted">Secured by Stripe. Your payment is collected when the booking is confirmed.</Text>
     </View>
   );
 }

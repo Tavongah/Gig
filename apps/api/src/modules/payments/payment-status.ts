@@ -43,7 +43,9 @@ export function paymentStatusToLifecycle(status: PaymentStatus): PaymentLifecycl
     case PaymentStatus.PAID_OUT:
       return PaymentLifecycle.PAYOUT_PAID;
     case PaymentStatus.FAILED:
+      return PaymentLifecycle.PAYMENT_FAILED;
     case PaymentStatus.REFUNDED:
+    case PaymentStatus.PARTIALLY_REFUNDED:
       return PaymentLifecycle.PAYMENT_FAILED;
     default:
       return PaymentLifecycle.PAYMENT_PENDING;
@@ -69,17 +71,28 @@ export function lifecycleToPaymentStatus(status: PaymentLifecycle): PaymentStatu
   }
 }
 
+/** Booking is secured: fixed paid in full, or time-based card authorized. */
 export function isAuthorizedForWorkerAccept(status: PaymentLifecycle): boolean {
-  return status === PaymentLifecycle.PAYMENT_AUTHORIZED;
+  return (
+    status === PaymentLifecycle.PAYMENT_CAPTURED ||
+    status === PaymentLifecycle.PAYMENT_AUTHORIZED ||
+    status === PaymentLifecycle.PAYOUT_PENDING ||
+    status === PaymentLifecycle.PAYOUT_PAID
+  );
 }
 
-export function isPaidLifecycle(status: PaymentLifecycle): boolean {
+/** Funds have been captured from the customer (not merely authorized). */
+export function isCapturedLifecycle(status: PaymentLifecycle): boolean {
   return (
-    status === PaymentLifecycle.PAYMENT_AUTHORIZED ||
     status === PaymentLifecycle.PAYMENT_CAPTURED ||
     status === PaymentLifecycle.PAYOUT_PENDING ||
     status === PaymentLifecycle.PAYOUT_PAID
   );
+}
+
+/** @deprecated Prefer isAuthorizedForWorkerAccept / isCapturedLifecycle */
+export function isPaidLifecycle(status: PaymentLifecycle): boolean {
+  return isAuthorizedForWorkerAccept(status);
 }
 
 export function formatPaymentStatusResponse(input: {
@@ -92,7 +105,13 @@ export function formatPaymentStatusResponse(input: {
   checkoutSessionId?: string | null;
   stripeTransferId?: string | null;
   gigStatus?: string;
+  refundAmountCents?: number;
+  pricingType?: string;
+  maximumAuthorizedAmountCents?: number | null;
+  authorizationBufferCents?: number | null;
 }) {
+  const secured = isAuthorizedForWorkerAccept(input.paymentStatus);
+  const captured = isCapturedLifecycle(input.paymentStatus);
   return {
     id: input.id,
     paymentStatus: lifecycleToSnakeCase(input.paymentStatus),
@@ -106,8 +125,14 @@ export function formatPaymentStatusResponse(input: {
     paymentIntentId: input.paymentIntentId ?? null,
     checkoutSessionId: input.checkoutSessionId ?? null,
     stripeTransferId: input.stripeTransferId ?? null,
+    refundAmountCents: input.refundAmountCents ?? 0,
     gigStatus: input.gigStatus,
-    isPaid: isPaidLifecycle(input.paymentStatus),
-    isAuthorized: input.paymentStatus === PaymentLifecycle.PAYMENT_AUTHORIZED
+    pricingType: input.pricingType,
+    maximumAuthorizedAmountCents: input.maximumAuthorizedAmountCents ?? null,
+    authorizationBufferCents: input.authorizationBufferCents ?? null,
+    isPaid: captured,
+    // Booking secured (captured for FIXED, authorized for time-based).
+    isAuthorized: secured,
+    confirmationPending: input.paymentStatus === PaymentLifecycle.PAYMENT_PENDING
   };
 }
