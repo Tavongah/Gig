@@ -7,6 +7,10 @@
     "apps/*",
     "packages/*"
   ],
+  "overrides": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
     "dev:api": "npm run build --workspace @gigflow/shared && npm run dev --workspace @gigflow/api",
@@ -25,15 +29,12 @@
     "setup:firebase": "node scripts/import-firebase-env.mjs",
     "firebase:config": "node scripts/generate-firebase-native-config.mjs",
     "docker:up": "docker compose up --build",
-    "eas-build-pre-install": "node apps/mobile/scripts/eas-pre-install.js"
+    "eas-build-pre-install": "node apps/mobile/scripts/eas-pre-install.js",
+    "eas-build-post-install": "npm run build --workspace @gigflow/shared"
   },
   "engines": {
     "node": ">=22.13.0",
     "npm": ">=10.0.0"
-  },
-  "overrides": {
-    "react": "19.2.7",
-    "react-dom": "19.2.7"
   },
   "devDependencies": {
     "prettier": "^3.8.3",
