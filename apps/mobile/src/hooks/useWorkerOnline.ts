@@ -1,10 +1,15 @@
 import { useCallback, useMemo, useState } from "react";
-import { Alert } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import {
+  MAX_WORKER_TRAVEL_MILES,
+  workerAvailabilitySchema,
+  zodErrorsToFieldMap
+} from "@gigflow/shared";
 import { api } from "../lib/api";
 import { getCurrentCoordinates } from "../lib/location";
 import { canWorkerGoOnline } from "../lib/auth";
+import { showAlert, showConfirm } from "../lib/confirm";
 import { hasWorkerPreferencesConfigured, workerPreferencesFromProfile } from "../components/WorkerPreferencesForm";
 import { useSocket } from "./useSocket";
 import type { RootStackParamList } from "../navigation/types";
@@ -37,7 +42,7 @@ export function useWorkerOnline() {
 
   async function goOnline(): Promise<void> {
     if (!profile || !canWorkerGoOnline(profile)) {
-      Alert.alert(
+      showAlert(
         "Verification required",
         "Verify your email, complete your profile, and get admin approval before going online."
       );
@@ -45,21 +50,38 @@ export function useWorkerOnline() {
     }
 
     if (!preferencesReady) {
-      Alert.alert(
+      showConfirm(
         "Set up work preferences",
         "Choose your services and travel distance before going online.",
-        [
-          { text: "Open preferences", onPress: () => navigation.navigate("WorkerWorkPreferences") },
-          { text: "Cancel", style: "cancel" }
-        ]
+        () => navigation.navigate("WorkerWorkPreferences"),
+        { confirmLabel: "Open preferences", cancelLabel: "Cancel" }
       );
       return;
     }
+
+    const travelDistanceMiles = Math.min(
+      MAX_WORKER_TRAVEL_MILES,
+      Math.max(1, Math.round(Number(preferences.travelDistanceMiles) || 10))
+    );
 
     setIsGoingOnline(true);
     try {
       const coords = await getCurrentCoordinates();
       const resolved = await api.reverseGeocode(coords.latitude, coords.longitude, session.token);
+
+      const availability = workerAvailabilitySchema.safeParse({
+        serviceCategoryIds: preferences.serviceCategoryIds,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        travelDistanceMiles,
+        hourlyRateCents: Math.round((Number(preferences.hourlyRate) || 35) * 100),
+        minJobAmountCents: Math.round((Number(preferences.minJobAmount) || 50) * 100)
+      });
+
+      if (!availability.success) {
+        const errors = zodErrorsToFieldMap(availability.error);
+        throw new Error(Object.values(errors)[0] ?? "Fix your work preferences, then try again.");
+      }
 
       await api.updateWorkerLocation(
         {
@@ -70,20 +92,10 @@ export function useWorkerOnline() {
         session.token
       );
 
-      await api.updateWorkerAvailability(
-        {
-          serviceCategoryIds: preferences.serviceCategoryIds,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          travelDistanceMiles: Number(preferences.travelDistanceMiles) || 10,
-          hourlyRateCents: Math.round((Number(preferences.hourlyRate) || 35) * 100),
-          minJobAmountCents: Math.round((Number(preferences.minJobAmount) || 50) * 100)
-        },
-        session.token
-      );
+      await api.updateWorkerAvailability(availability.data, session.token);
 
       socket?.emit("worker:available", {
-        serviceCategoryIds: preferences.serviceCategoryIds,
+        serviceCategoryIds: availability.data.serviceCategoryIds,
         latitude: coords.latitude,
         longitude: coords.longitude
       });
@@ -91,17 +103,31 @@ export function useWorkerOnline() {
       await refreshProfile();
       setIsOnline(true);
     } catch (error) {
-      Alert.alert("Could not go online", error instanceof Error ? error.message : "Try again.");
+      const message = error instanceof Error ? error.message : "Try again.";
+      const needsLocation =
+        /location|geolocation|permission|position/i.test(message) ||
+        message.toLowerCase().includes("not available");
+
+      showAlert(
+        "Could not go online",
+        needsLocation
+          ? `${message}\n\nAllow location access for this site, then try again.`
+          : message
+      );
     } finally {
       setIsGoingOnline(false);
     }
   }
 
   async function goOffline(): Promise<void> {
-    await api.setWorkerOffline(session.token);
-    socket?.emit("worker:offline");
-    await refreshProfile();
-    setIsOnline(false);
+    try {
+      await api.setWorkerOffline(session.token);
+      socket?.emit("worker:offline");
+      await refreshProfile();
+      setIsOnline(false);
+    } catch (error) {
+      showAlert("Could not go offline", error instanceof Error ? error.message : "Try again.");
+    }
   }
 
   return {
