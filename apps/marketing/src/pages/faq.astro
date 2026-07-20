@@ -1,0 +1,51 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import CtaButton from "../components/CtaButton.astro";
+import { appLinks, faqs } from "../data/site";
+
+const faqLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a }
+  }))
+};
+---
+
+<BaseLayout
+  title="FAQ"
+  description="Answers about requesting help, payments, matching speed, cancellations, worker verification, and more."
+  canonicalPath="/faq"
+  jsonLd={faqLd}
+>
+  <section class="section">
+    <div class="container narrow">
+      <p class="section__eyebrow">FAQ</p>
+      <h1>Frequently asked questions</h1>
+      <div class="list">
+        {
+          faqs.map((item) => (
+            <details class="card">
+              <summary>{item.q}</summary>
+              <p>{item.a}</p>
+            </details>
+          ))
+        }
+      </div>
+      <div class="ctas">
+        <CtaButton href={appLinks.requestHelp} label="Request Help" />
+        <CtaButton href="/contact" label="Contact Support" variant="ghost" />
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .narrow { max-width: 760px; }
+  .list { display: grid; gap: 0.75rem; margin: 1.5rem 0 2rem; }
+  summary { cursor: pointer; font-weight: 700; font-family: var(--font-display); }
+  details p { margin-top: 0.75rem; }
+  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+</style>

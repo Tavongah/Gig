@@ -1,0 +1,37 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import CtaButton from "../components/CtaButton.astro";
+import { appLinks } from "../data/site";
+---
+
+<BaseLayout
+  title="About DUTS"
+  description="DUTS connects customers with trusted local workers for everyday services—simple, affordable, and fast."
+  canonicalPath="/about"
+>
+  <section class="section">
+    <div class="container narrow">
+      <p class="section__eyebrow">About</p>
+      <h1>Local help, powered by modern matching</h1>
+      <p>
+        DUTS is a technology platform that connects customers with trusted local workers for everyday services. Our mission
+        is to make finding reliable help simple, affordable and fast while creating flexible earning opportunities for
+        local communities.
+      </p>
+      <p>
+        From cleaning and lawn care to moving help and assembly, DUTS is built for real neighborhoods—with secure payments,
+        in-app chat, and a flow designed to feel as smooth as the best modern marketplaces.
+      </p>
+      <div class="ctas">
+        <CtaButton href={appLinks.requestHelp} label="Request Help" />
+        <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .narrow { max-width: 720px; }
+  .narrow h1 { font-size: clamp(2rem, 5vw, 3rem); }
+  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
+</style>

@@ -1,0 +1,59 @@
+---
+import { formatFromCents, type ServiceDef, appLinks } from "../data/site";
+
+interface Props {
+  service: ServiceDef;
+}
+const { service } = Astro.props;
+const icons: Record<string, string> = {
+  truck: "🚚",
+  sparkles: "✨",
+  home: "🏠",
+  leaf: "🌿",
+  hammer: "🔨",
+  car: "🚗",
+  wrench: "🔧",
+  trash: "🗑️",
+  calendar: "📅"
+};
+---
+
+<article class="card service-card reveal">
+  <div class="icon-badge" aria-hidden="true">{icons[service.icon] ?? "✦"}</div>
+  <h3>{service.name}</h3>
+  <p>{service.short}</p>
+  <p class="price">Starting from {formatFromCents(service.startingFromCents)}</p>
+  <div class="actions">
+    <a class="btn btn--ghost" href={`/services/${service.slug}`}>Learn More</a>
+    <a class="btn btn--primary" href={appLinks.requestHelp}>Request Service</a>
+  </div>
+</article>
+
+<style>
+  .service-card {
+    display: grid;
+    gap: 0.65rem;
+    height: 100%;
+  }
+  .service-card h3 {
+    font-size: 1.2rem;
+  }
+  .service-card p {
+    margin: 0;
+  }
+  .price {
+    color: #7b3fe4 !important;
+    font-weight: 700;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 0.5rem;
+  }
+  .actions .btn {
+    min-height: 42px;
+    padding: 0.65rem 1rem;
+    font-size: 0.88rem;
+  }
+</style>

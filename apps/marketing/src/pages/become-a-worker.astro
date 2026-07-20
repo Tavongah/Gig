@@ -1,0 +1,58 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import CtaButton from "../components/CtaButton.astro";
+import { appLinks } from "../data/site";
+
+const benefits = [
+  { title: "Choose your own schedule", body: "Go online when you’re free and accept nearby jobs that fit your day." },
+  { title: "Earn extra income", body: "Turn spare time into flexible earnings with local gigs in your area." },
+  { title: "Accept jobs nearby", body: "See opportunities close to you so travel stays practical." },
+  { title: "Simple registration", body: "Create your profile, get approved, and start exploring available work." },
+  { title: "Flexible work", body: "No rigid shifts—work around school, another job, or family time." }
+];
+---
+
+<BaseLayout
+  title="Become a Worker"
+  description="Join DUTS as a worker. Choose your schedule, earn nearby, and accept flexible local jobs."
+  canonicalPath="/become-a-worker"
+>
+  <section class="hero">
+    <div class="container">
+      <p class="section__eyebrow">Workers</p>
+      <h1>Earn on your schedule with local gigs</h1>
+      <p class="lead">DUTS helps trusted local workers find nearby jobs—without complicated setups.</p>
+      <CtaButton href={appLinks.becomeWorker} label="Become a Worker" />
+    </div>
+  </section>
+  <section class="section">
+    <div class="container grid-3">
+      {
+        benefits.map((b) => (
+          <article class="card reveal">
+            <div class="icon-badge">✓</div>
+            <h2>{b.title}</h2>
+            <p>{b.body}</p>
+          </article>
+        ))
+      }
+    </div>
+    <div class="container" style="margin-top: 2rem">
+      <div class="ctas">
+        <CtaButton href={appLinks.becomeWorker} label="Become a Worker" />
+        <CtaButton href={appLinks.login} label="Login" variant="ghost" />
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    padding: 4rem 0 2rem;
+    background: var(--gradient-soft);
+  }
+  .hero h1 { font-size: clamp(2rem, 5vw, 3.3rem); max-width: 14ch; }
+  .lead { max-width: 40rem; }
+  .card h2 { font-size: 1.15rem; margin-top: 0.85rem; }
+  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+</style>

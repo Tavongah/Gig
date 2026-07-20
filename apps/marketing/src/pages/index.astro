@@ -1,0 +1,312 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import CtaButton from "../components/CtaButton.astro";
+import ServiceCard from "../components/ServiceCard.astro";
+import { appLinks, faqs, howSteps, services, trustItems, SITE_URL } from "../data/site";
+
+const orgLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "DUTS",
+  url: SITE_URL,
+  logo: `${SITE_URL}/logo.png`,
+  description: "Book trusted local help in minutes for everyday services.",
+  sameAs: []
+};
+
+const webLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "DUTS",
+  url: SITE_URL,
+  potentialAction: {
+    "@type": "SearchAction",
+    target: `${SITE_URL}/services`,
+    "query-input": "required name=search_term_string"
+  }
+};
+---
+
+<BaseLayout
+  title="DUTS — Book trusted local help in minutes"
+  description="Find trusted local workers for moving, cleaning, lawn care, furniture assembly, junk removal, event help, car detailing, and more."
+  canonicalPath="/"
+  jsonLd={[orgLd, webLd]}
+>
+  <section class="hero">
+    <div class="container hero__grid">
+      <div class="hero__copy reveal">
+        <p class="section__eyebrow">Local help, on demand</p>
+        <h1>Book trusted local help in minutes.</h1>
+        <p class="hero__sub">
+          Find trusted local workers for moving, cleaning, lawn care, furniture assembly, junk removal, event help,
+          car detailing, and more—all in one place.
+        </p>
+        <div class="hero__ctas">
+          <CtaButton href={appLinks.requestHelp} label="Request Help" />
+          <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
+        </div>
+      </div>
+      <div class="hero__art reveal" aria-hidden="true">
+        <div class="orb orb-a"></div>
+        <div class="orb orb-b"></div>
+        <div class="panel panel-a">
+          <strong>Customer</strong>
+          <span>Requested house cleaning</span>
+        </div>
+        <div class="panel panel-b">
+          <strong>Worker accepted</strong>
+          <span>On the way · 12 min</span>
+        </div>
+        <div class="panel panel-c">
+          <strong>Live tracking</strong>
+          <span>Secure chat + GPS</span>
+        </div>
+        <div class="float f1">🧹</div>
+        <div class="float f2">🚚</div>
+        <div class="float f3">🌿</div>
+        <div class="float f4">🔧</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--surface" id="trust">
+    <div class="container">
+      <p class="section__eyebrow">Why people choose DUTS</p>
+      <h2 class="section__title">Built for trust, speed, and clarity</h2>
+      <div class="grid-3" style="margin-top: 2rem">
+        {
+          trustItems.map((item) => (
+            <article class="card reveal">
+              <div class="icon-badge">{item.icon === "bolt" ? "⚡" : item.icon === "lock" ? "🔒" : item.icon === "pin" ? "📍" : item.icon === "tag" ? "💵" : item.icon === "users" ? "🤝" : "🛡️"}</div>
+              <h3 style="margin-top:0.9rem;font-size:1.15rem">{item.title}</h3>
+              <p>{item.body}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="how">
+    <div class="container">
+      <p class="section__eyebrow">How DUTS works</p>
+      <h2 class="section__title">Four simple steps</h2>
+      <ol class="timeline">
+        {
+          howSteps.map((step) => (
+            <li class="timeline__item reveal">
+              <div class="timeline__num">{step.step}</div>
+              <div>
+                <h3>{step.title}</h3>
+                <p>{step.body}</p>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+      <div style="margin-top: 2rem">
+        <CtaButton href="/how-it-works" label="See the full flow" variant="ghost" />
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--surface" id="services">
+    <div class="container">
+      <p class="section__eyebrow">Services</p>
+      <h2 class="section__title">Everyday help, ready nearby</h2>
+      <p class="section__lead">Transparent starting prices. Local matching. Secure payments.</p>
+      <div class="grid-3" style="margin-top: 2rem">
+        {services.map((service) => <ServiceCard service={service} />)}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container cta-band reveal">
+      <div>
+        <p class="section__eyebrow">Ready when you are</p>
+        <h2 class="section__title">Need help today?</h2>
+        <p class="section__lead">Request a service or join as a worker—both start in the DUTS app.</p>
+      </div>
+      <div class="hero__ctas">
+        <CtaButton href={appLinks.requestHelp} label="Request Help" />
+        <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
+        <CtaButton href={appLinks.login} label="Login" variant="ghost" />
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--surface" id="faq-preview">
+    <div class="container">
+      <p class="section__eyebrow">FAQ</p>
+      <h2 class="section__title">Quick answers</h2>
+      <div class="faq-list">
+        {
+          faqs.slice(0, 4).map((item) => (
+            <details class="card reveal">
+              <summary>{item.q}</summary>
+              <p>{item.a}</p>
+            </details>
+          ))
+        }
+      </div>
+      <div style="margin-top: 1.5rem">
+        <a href="/faq">View all FAQs →</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    position: relative;
+    overflow: hidden;
+    padding: 4.5rem 0 3.5rem;
+    background: var(--gradient-soft);
+  }
+  .hero__grid {
+    display: grid;
+    gap: 2.5rem;
+    align-items: center;
+  }
+  @media (min-width: 960px) {
+    .hero__grid {
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 3rem;
+    }
+  }
+  .hero h1 {
+    font-size: clamp(2.4rem, 6vw, 4rem);
+    max-width: 12ch;
+  }
+  .hero__sub {
+    font-size: 1.1rem;
+    max-width: 38rem;
+  }
+  .hero__ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+  .hero__art {
+    position: relative;
+    min-height: 360px;
+  }
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(2px);
+    opacity: 0.55;
+  }
+  .orb-a {
+    width: 220px;
+    height: 220px;
+    background: radial-gradient(circle, #ff7a18 0%, transparent 70%);
+    top: 10%;
+    left: 5%;
+  }
+  .orb-b {
+    width: 260px;
+    height: 260px;
+    background: radial-gradient(circle, #7b3fe4 0%, transparent 70%);
+    right: 0;
+    bottom: 0;
+  }
+  .panel {
+    position: absolute;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 1rem 1.1rem;
+    display: grid;
+    gap: 0.2rem;
+    min-width: 190px;
+  }
+  .panel strong {
+    font-family: var(--font-display);
+  }
+  .panel span {
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+  .panel-a { top: 12%; left: 8%; animation: floaty 6s ease-in-out infinite; }
+  .panel-b { top: 42%; right: 4%; animation: floaty 7s ease-in-out infinite 0.4s; }
+  .panel-c { bottom: 8%; left: 18%; animation: floaty 5.5s ease-in-out infinite 0.8s; }
+  .float {
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    background: #fff;
+    box-shadow: var(--shadow-sm);
+    font-size: 1.25rem;
+  }
+  .f1 { top: 0; right: 22%; }
+  .f2 { top: 28%; left: 0; }
+  .f3 { bottom: 22%; right: 18%; }
+  .f4 { bottom: 4%; right: 42%; }
+  @keyframes floaty {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .timeline {
+    list-style: none;
+    margin: 2rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 1rem;
+  }
+  .timeline__item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1rem;
+    align-items: start;
+    padding: 1.2rem;
+    border-radius: 18px;
+    background: #fff;
+    border: 1px solid var(--border);
+  }
+  .timeline__num {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-weight: 800;
+    background-image: var(--gradient);
+  }
+  .cta-band {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 2rem;
+    border-radius: 24px;
+    background: var(--gradient-soft);
+    border: 1px solid var(--border);
+  }
+  @media (min-width: 800px) {
+    .cta-band {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+  .faq-list {
+    display: grid;
+    gap: 0.85rem;
+    margin-top: 1.5rem;
+  }
+  details summary {
+    cursor: pointer;
+    font-weight: 700;
+    font-family: var(--font-display);
+  }
+  details p {
+    margin-top: 0.75rem;
+  }
+</style>

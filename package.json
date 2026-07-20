@@ -15,6 +15,7 @@
     "dev": "npm run dev --workspaces --if-present",
     "dev:api": "npm run build --workspace @gigflow/shared && npm run dev --workspace @gigflow/api",
     "dev:admin": "npm run dev --workspace @gigflow/admin",
+    "dev:marketing": "npm run dev --workspace @gigflow/marketing",
     "dev:mobile": "npm run build --workspace @gigflow/shared && npm run dev --workspace @gigflow/mobile",
     "build": "npm run build --workspace @gigflow/shared && npm run build --workspaces --if-present",
     "build:api": "npm run build --workspace @gigflow/shared && npm run prisma:generate --workspace @gigflow/api && npm run build --workspace @gigflow/api",

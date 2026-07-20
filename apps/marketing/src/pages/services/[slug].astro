@@ -1,0 +1,137 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import CtaButton from "../../components/CtaButton.astro";
+import { appLinks, formatFromCents, getService, services } from "../../data/site";
+
+export function getStaticPaths() {
+  return services.map((service) => ({ params: { slug: service.slug } }));
+}
+
+const { slug } = Astro.params;
+const service = getService(slug!);
+if (!service) {
+  return Astro.redirect("/services");
+}
+
+const related = services.filter((s) => s.slug !== service.slug).slice(0, 3);
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Service",
+  name: service.name,
+  description: service.description,
+  provider: { "@type": "Organization", name: "DUTS" },
+  areaServed: "Connecticut",
+  offers: {
+    "@type": "Offer",
+    priceCurrency: "USD",
+    price: (service.startingFromCents / 100).toFixed(2),
+    description: "Starting estimate"
+  }
+};
+---
+
+<BaseLayout
+  title={`${service.name} near you`}
+  description={service.description}
+  canonicalPath={`/services/${service.slug}`}
+  jsonLd={jsonLd}
+>
+  <section class="hero-service">
+    <div class="container">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a> / <a href="/services">Services</a> / <span>{service.name}</span>
+      </nav>
+      <p class="section__eyebrow">Service</p>
+      <h1>{service.name}</h1>
+      <p class="lead">{service.description}</p>
+      <p class="price">Starting from {formatFromCents(service.startingFromCents)}</p>
+      <div class="ctas">
+        <CtaButton href={appLinks.requestHelp} label="Request this Service" />
+        <CtaButton href={appLinks.login} label="Login" variant="ghost" />
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container narrow">
+      <h2>Why choose DUTS</h2>
+      <p>Verified local workers, fast matching, secure payments, and clear starting prices—so you can book with confidence.</p>
+      <h2>What’s included</h2>
+      <ul>
+        {service.includes.map((item) => <li>{item}</li>)}
+      </ul>
+      <h2>Starting price</h2>
+      <p>
+        From <strong>{formatFromCents(service.startingFromCents)}</strong>. Final pricing can vary by location, job size,
+        duration, complexity, and special requirements.
+      </p>
+      <h2>Frequently asked questions</h2>
+      {
+        service.faqs.map((faq) => (
+          <details class="card">
+            <summary>{faq.q}</summary>
+            <p>{faq.a}</p>
+          </details>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="section section--surface">
+    <div class="container">
+      <h2>Related services</h2>
+      <div class="related">
+        {
+          related.map((item) => (
+            <a class="card" href={`/services/${item.slug}`}>
+              <strong>{item.name}</strong>
+              <span>From {formatFromCents(item.startingFromCents)}</span>
+            </a>
+          ))
+        }
+      </div>
+      <div class="ctas" style="margin-top: 1.5rem">
+        <CtaButton href={appLinks.requestHelp} label="Request Help" />
+        <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero-service {
+    padding: 3.5rem 0 2.5rem;
+    background: var(--gradient-soft);
+  }
+  .hero-service h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+  }
+  .lead { max-width: 42rem; font-size: 1.05rem; }
+  .price {
+    color: #7b3fe4;
+    font-weight: 800;
+    font-size: 1.15rem;
+  }
+  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.25rem; }
+  .crumbs { font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem; }
+  .crumbs a { color: var(--purple); }
+  .narrow { max-width: 720px; }
+  .narrow h2 { margin-top: 1.75rem; }
+  .narrow ul { color: var(--muted); }
+  details { margin: 0.75rem 0; }
+  details summary { cursor: pointer; font-weight: 700; }
+  .related {
+    display: grid;
+    gap: 0.85rem;
+    grid-template-columns: 1fr;
+    margin-top: 1rem;
+  }
+  @media (min-width: 720px) {
+    .related { grid-template-columns: repeat(3, 1fr); }
+  }
+  .related a {
+    display: grid;
+    gap: 0.35rem;
+  }
+  .related span { color: var(--muted); font-size: 0.9rem; }
+</style>

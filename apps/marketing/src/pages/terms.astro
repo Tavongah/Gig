@@ -1,0 +1,29 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { SUPPORT_EMAIL } from "../data/site";
+---
+
+<BaseLayout
+  title="Terms of Service"
+  description="DUTS terms of service overview for customers and workers using the platform."
+  canonicalPath="/terms"
+>
+  <section class="section">
+    <div class="container narrow">
+      <h1>Terms of Service</h1>
+      <p>
+        By using DUTS, you agree to use the platform lawfully, provide accurate information, and respect other users.
+        Workers and customers are responsible for completing jobs professionally and following local laws.
+      </p>
+      <p>
+        Questions? Email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Complete terms are also available in the
+        DUTS app.
+      </p>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .narrow { max-width: 720px; }
+  a { color: var(--purple); font-weight: 600; }
+</style>

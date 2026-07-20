@@ -1,0 +1,29 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { SUPPORT_EMAIL } from "../data/site";
+---
+
+<BaseLayout
+  title="Privacy Policy"
+  description="DUTS privacy policy overview. Read how we handle account and service information."
+  canonicalPath="/privacy"
+>
+  <section class="section">
+    <div class="container narrow">
+      <h1>Privacy Policy</h1>
+      <p>
+        DUTS respects your privacy. We collect account, location, and job details needed to match customers with workers
+        and process payments. We do not sell your personal information.
+      </p>
+      <p>
+        For questions, contact <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Full policy text is also available
+        in the DUTS app.
+      </p>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .narrow { max-width: 720px; }
+  a { color: var(--purple); font-weight: 600; }
+</style>

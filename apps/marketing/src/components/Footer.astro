@@ -1,0 +1,106 @@
+---
+import { appLinks, services, SUPPORT_EMAIL, SUPPORT_PHONE } from "../data/site";
+---
+
+<footer class="footer">
+  <div class="container footer__grid">
+    <div>
+      <img src="/logo.png" alt="DUTS" width="120" height="40" />
+      <p>Book trusted local help in minutes. Modern matching for everyday services.</p>
+      <div class="footer__social">
+        <a href="https://instagram.com" rel="noopener noreferrer" target="_blank">Instagram</a>
+        <a href="https://facebook.com" rel="noopener noreferrer" target="_blank">Facebook</a>
+        <a href="https://linkedin.com" rel="noopener noreferrer" target="_blank">LinkedIn</a>
+      </div>
+    </div>
+    <div>
+      <h3>Services</h3>
+      <ul>
+        {services.slice(0, 6).map((s) => (
+          <li><a href={`/services/${s.slug}`}>{s.name}</a></li>
+        ))}
+        <li><a href="/services">All services</a></li>
+      </ul>
+    </div>
+    <div>
+      <h3>Company</h3>
+      <ul>
+        <li><a href="/about">About</a></li>
+        <li><a href="/become-a-worker">Become a Worker</a></li>
+        <li><a href="/pricing">Pricing</a></li>
+        <li><a href="/safety">Safety</a></li>
+        <li><a href="/faq">FAQ</a></li>
+        <li><a href="/contact">Contact</a></li>
+      </ul>
+    </div>
+    <div>
+      <h3>Support</h3>
+      <ul>
+        <li><a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></li>
+        <li><a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, "")}`}>{SUPPORT_PHONE}</a></li>
+        <li><a href={appLinks.login}>Login</a></li>
+        <li><a href={appLinks.requestHelp}>Request Help</a></li>
+        <li><a href="/privacy">Privacy Policy</a></li>
+        <li><a href="/terms">Terms of Service</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="container footer__bottom">
+    <p>© {new Date().getFullYear()} DUTS. All rights reserved.</p>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    background: #f8fafc;
+    border-top: 1px solid var(--border);
+    padding: 4rem 0 2rem;
+  }
+  .footer__grid {
+    display: grid;
+    gap: 2rem;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 800px) {
+    .footer__grid {
+      grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    }
+  }
+  .footer img {
+    height: 34px;
+    width: auto;
+    margin-bottom: 1rem;
+  }
+  .footer h3 {
+    font-size: 0.95rem;
+    margin-bottom: 0.85rem;
+  }
+  .footer ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.55rem;
+  }
+  .footer a {
+    color: #6b7280;
+    font-size: 0.92rem;
+  }
+  .footer a:hover {
+    color: #7b3fe4;
+  }
+  .footer__social {
+    display: flex;
+    gap: 0.9rem;
+    margin-top: 1rem;
+  }
+  .footer__bottom {
+    margin-top: 2.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+  .footer__bottom p {
+    margin: 0;
+    font-size: 0.85rem;
+  }
+</style>

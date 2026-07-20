@@ -1,0 +1,143 @@
+---
+import { appLinks } from "../data/site";
+
+const links = [
+  { href: "/", label: "Home" },
+  { href: "/services", label: "Services" },
+  { href: "/how-it-works", label: "How It Works" },
+  { href: "/become-a-worker", label: "Become a Worker" },
+  { href: "/about", label: "About" },
+  { href: "/faq", label: "FAQ" },
+  { href: "/contact", label: "Contact" }
+];
+---
+
+<header class="nav" id="top">
+  <div class="container nav__inner">
+    <a class="nav__brand" href="/" aria-label="DUTS home">
+      <img src="/logo.png" alt="DUTS" width="120" height="40" />
+    </a>
+
+    <button class="nav__toggle" type="button" aria-expanded="false" aria-controls="nav-menu" id="nav-toggle">
+      <span class="sr-only">Menu</span>
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="nav__menu" id="nav-menu" aria-label="Primary">
+      <ul>
+        {links.map((link) => (
+          <li>
+            <a href={link.href}>{link.label}</a>
+          </li>
+        ))}
+      </ul>
+      <div class="nav__actions">
+        <a class="btn btn--ghost" href={appLinks.login}>Login</a>
+        <a class="btn btn--primary" href={appLinks.requestHelp}>Request Help</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(14px);
+    background: rgba(255, 255, 255, 0.86);
+    border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+  }
+  .nav__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 72px;
+    gap: 1rem;
+  }
+  .nav__brand img {
+    height: 36px;
+    width: auto;
+  }
+  .nav__toggle {
+    display: none;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    background: transparent;
+    padding: 10px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+  }
+  .nav__toggle span {
+    display: block;
+    height: 2px;
+    width: 100%;
+    background: #111827;
+    border-radius: 2px;
+  }
+  .nav__menu {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+  .nav__menu ul {
+    display: flex;
+    list-style: none;
+    gap: 1.1rem;
+    margin: 0;
+    padding: 0;
+  }
+  .nav__menu a {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #6b7280;
+  }
+  .nav__menu a:hover {
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .nav__actions {
+    display: flex;
+    gap: 0.6rem;
+  }
+  @media (max-width: 960px) {
+    .nav__toggle {
+      display: flex;
+    }
+    .nav__menu {
+      display: none;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 72px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1rem 1.25rem;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .nav__menu.is-open {
+      display: flex;
+    }
+    .nav__menu ul {
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .nav__actions {
+      flex-direction: column;
+    }
+  }
+</style>
+
+<script>
+  const toggle = document.getElementById("nav-toggle");
+  const menu = document.getElementById("nav-menu");
+  toggle?.addEventListener("click", () => {
+    const open = menu?.classList.toggle("is-open");
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+</script>

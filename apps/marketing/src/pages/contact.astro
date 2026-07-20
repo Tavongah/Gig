@@ -1,0 +1,54 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import CtaButton from "../components/CtaButton.astro";
+import { appLinks, SUPPORT_EMAIL, SUPPORT_HOURS, SUPPORT_PHONE } from "../data/site";
+---
+
+<BaseLayout
+  title="Contact"
+  description="Contact DUTS support by phone or email. Business hours and help resources for customers and workers."
+  canonicalPath="/contact"
+>
+  <section class="section">
+    <div class="container contact">
+      <div>
+        <p class="section__eyebrow">Contact</p>
+        <h1>We’re here to help</h1>
+        <p>Reach DUTS support for account questions, bookings, or worker onboarding.</p>
+        <ul>
+          <li><strong>Phone:</strong> <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, "")}`}>{SUPPORT_PHONE}</a></li>
+          <li><strong>Email:</strong> <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></li>
+          <li><strong>Hours:</strong> {SUPPORT_HOURS}</li>
+        </ul>
+        <div class="ctas">
+          <CtaButton href={appLinks.requestHelp} label="Request Help" />
+          <CtaButton href={appLinks.login} label="Login" variant="ghost" />
+        </div>
+      </div>
+      <div class="map card" aria-label="Map placeholder">
+        <p>Google Maps placeholder</p>
+        <span>Connecticut · Local marketplace</span>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .contact {
+    display: grid;
+    gap: 2rem;
+  }
+  @media (min-width: 900px) {
+    .contact { grid-template-columns: 1.1fr 0.9fr; align-items: stretch; }
+  }
+  ul { list-style: none; padding: 0; display: grid; gap: 0.75rem; color: var(--muted); }
+  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.25rem; }
+  .map {
+    min-height: 280px;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    background: var(--gradient-soft);
+  }
+  .map p { margin: 0; font-weight: 700; color: var(--ink); }
+</style>

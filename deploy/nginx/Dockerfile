@@ -1,4 +1,4 @@
-# Nginx + built admin dashboard + Expo mobile web
+# Nginx + admin + Expo mobile web + marketing site
 FROM node:22-bookworm-slim AS admin-build
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -43,10 +43,27 @@ RUN npm run build --workspace @gigflow/shared \
   && cd apps/mobile \
   && npx expo export --platform web --output-dir dist-web
 
+FROM node:22-bookworm-slim AS marketing-build
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY apps/marketing/package.json ./apps/marketing/
+RUN npm ci --workspace @gigflow/marketing --include-workspace-root
+COPY apps/marketing ./apps/marketing
+ARG PUBLIC_SITE_URL=https://www.gigflow.ink
+ARG PUBLIC_APP_URL=https://app.gigflow.ink
+ARG PUBLIC_SUPPORT_EMAIL=support@gigflow.ink
+ARG PUBLIC_SUPPORT_PHONE=+12036769717
+ENV PUBLIC_SITE_URL=$PUBLIC_SITE_URL \
+    PUBLIC_APP_URL=$PUBLIC_APP_URL \
+    PUBLIC_SUPPORT_EMAIL=$PUBLIC_SUPPORT_EMAIL \
+    PUBLIC_SUPPORT_PHONE=$PUBLIC_SUPPORT_PHONE
+RUN npm run build --workspace @gigflow/marketing
+
 FROM nginx:1.27-alpine
 RUN apk add --no-cache curl
 COPY deploy/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY --from=admin-build /app/apps/admin/dist /usr/share/nginx/html/admin
 COPY --from=mobile-web-build /app/apps/mobile/dist-web /usr/share/nginx/html/app
+COPY --from=marketing-build /app/apps/marketing/dist /usr/share/nginx/html/marketing
 EXPOSE 80 443 8080
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -fsS http://127.0.0.1:8080/health || exit 1

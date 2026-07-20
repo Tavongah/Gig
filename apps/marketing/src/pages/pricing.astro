@@ -1,0 +1,58 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import CtaButton from "../components/CtaButton.astro";
+import { appLinks, formatFromCents, services } from "../data/site";
+---
+
+<BaseLayout
+  title="Pricing"
+  description="DUTS starting prices are estimates. Final pricing depends on location, job size, duration, complexity, and special requirements."
+  canonicalPath="/pricing"
+>
+  <section class="section">
+    <div class="container narrow">
+      <p class="section__eyebrow">Pricing</p>
+      <h1>Transparent starting estimates</h1>
+      <p>
+        Displayed prices are starting estimates. Final pricing depends on location, job size, duration, complexity, and
+        special requirements. You’ll see clear details as you request help in the app.
+      </p>
+      <div class="table">
+        {
+          services.map((s) => (
+            <div class="row">
+              <a href={`/services/${s.slug}`}>{s.name}</a>
+              <span>From {formatFromCents(s.startingFromCents)}</span>
+            </div>
+          ))
+        }
+      </div>
+      <div class="ctas">
+        <CtaButton href={appLinks.requestHelp} label="Request Help" />
+        <CtaButton href="/services" label="Browse Services" variant="ghost" />
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .narrow { max-width: 720px; }
+  .table {
+    margin: 1.5rem 0 2rem;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.95rem 1.1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .row:last-child { border-bottom: 0; }
+  .row a { font-weight: 700; }
+  .row span { color: var(--muted); }
+  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+</style>

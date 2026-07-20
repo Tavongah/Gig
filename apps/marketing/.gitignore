@@ -1,0 +1,7 @@
+# @gigflow/marketing
+.DS_Store
+dist/
+.astro/
+node_modules/
+.env
+.env.*

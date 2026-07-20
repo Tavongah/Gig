@@ -94,8 +94,9 @@ See [COST_OPTIMIZATION.md](./COST_OPTIMIZATION.md) for tuning.
 | A | `api` | Droplet IP |
 | A | `admin` | Droplet IP |
 | A | `app` | Droplet IP |
+| A | `www` | Droplet IP |
 
-Optional: Cloudflare proxy (orange cloud) for DDoS; use **Full (strict)** SSL.
+Marketing site: `https://www.gigflow.ink` (Astro static). App stays at `https://app.gigflow.ink`. CTAs on the marketing site open the existing app—app logic is not modified.
 
 ---
 
