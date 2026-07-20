@@ -11,6 +11,7 @@ source "$ENV_FILE"
 
 : "${API_DOMAIN:?}"
 : "${ADMIN_DOMAIN:?}"
+: "${APP_DOMAIN:?}"
 : "${LETSENCRYPT_EMAIL:?}"
 
 mkdir -p "$ROOT/deploy/nginx/conf.d"
@@ -20,7 +21,7 @@ cat > "$ROOT/deploy/nginx/conf.d/gigflow.conf" <<EOF
 server {
     listen 80;
     listen [::]:80;
-    server_name $API_DOMAIN $ADMIN_DOMAIN;
+    server_name $API_DOMAIN $ADMIN_DOMAIN $APP_DOMAIN;
     location /.well-known/acme-challenge/ { root /var/www/certbot; }
     location / { return 200 'GigFlow SSL setup\n'; add_header Content-Type text/plain; }
 }
@@ -31,7 +32,8 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d nginx
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" --profile tools run --rm certbot-once \
   certonly --webroot -w /var/www/certbot \
   --email "$LETSENCRYPT_EMAIL" --agree-tos --no-eff-email \
-  -d "$API_DOMAIN" -d "$ADMIN_DOMAIN"
+  --cert-name "$API_DOMAIN" \
+  -d "$API_DOMAIN" -d "$ADMIN_DOMAIN" -d "$APP_DOMAIN"
 
 bash "$ROOT/deploy/digitalocean/scripts/render-nginx-conf.sh"
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d nginx

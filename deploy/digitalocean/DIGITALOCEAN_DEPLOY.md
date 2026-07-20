@@ -93,6 +93,7 @@ See [COST_OPTIMIZATION.md](./COST_OPTIMIZATION.md) for tuning.
 |------|------|-------|
 | A | `api` | Droplet IP |
 | A | `admin` | Droplet IP |
+| A | `app` | Droplet IP |
 
 Optional: Cloudflare proxy (orange cloud) for DDoS; use **Full (strict)** SSL.
 
@@ -129,10 +130,11 @@ nano /opt/gigflow/.env.production
 
 **Required before first deploy:**
 
-- `API_DOMAIN`, `ADMIN_DOMAIN`, `LETSENCRYPT_EMAIL`
+- `API_DOMAIN`, `ADMIN_DOMAIN`, `APP_DOMAIN`, `LETSENCRYPT_EMAIL`
 - `VITE_API_URL=https://api.YOURDOMAIN.com/v1`
+- `EXPO_PUBLIC_API_URL` + Firebase `EXPO_PUBLIC_FIREBASE_*` (baked into web app at image build)
 - `POSTGRES_PASSWORD`, `JWT_SECRET`, `ADMIN_SEED_PASSWORD`
-- `API_PUBLIC_URL`, `CORS_ORIGINS`, `MOBILE_PUBLIC_URL`
+- `API_PUBLIC_URL`, `CORS_ORIGINS` (must include `https://APP_DOMAIN`), `MOBILE_PUBLIC_URL=https://APP_DOMAIN`
 - Stripe test/live keys
 - Firebase service account vars (for social login)
 
@@ -172,7 +174,20 @@ curl https://api.YOURDOMAIN.com/health
 curl https://api.YOURDOMAIN.com/ready
 ```
 
-Admin: `https://admin.YOURDOMAIN.com` → `admin@gigflow.local`
+Admin: `https://admin.YOURDOMAIN.com` → `admin@gigflow.local`  
+Customer/worker web app: `https://app.YOURDOMAIN.com`
+
+### Adding the web app to an existing Droplet
+
+1. DNS: create `A` record `app` → Droplet IP  
+2. In `/opt/gigflow/.env.production` set:
+   - `APP_DOMAIN=app.gigflow.ink`
+   - `MOBILE_PUBLIC_URL=https://app.gigflow.ink`
+   - `CORS_ORIGINS=...include https://app.gigflow.ink...`
+   - `EXPO_PUBLIC_API_URL` + Firebase public keys (same as EAS)
+3. Expand TLS: `bash deploy/digitalocean/scripts/expand-ssl-app-domain.sh`  
+4. Redeploy: `./deploy/digitalocean/scripts/deploy.sh` (rebuilds Nginx with Expo web export)  
+5. Firebase Console → Authentication → Settings → Authorized domains → add `app.gigflow.ink`
 
 ---
 

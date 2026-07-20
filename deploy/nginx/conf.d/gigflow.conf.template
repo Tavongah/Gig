@@ -1,11 +1,11 @@
 # Copy to gigflow.conf and replace domains, or run: envsubst < gigflow.conf.template > gigflow.conf
-# Required env: API_DOMAIN, ADMIN_DOMAIN
+# Required env: API_DOMAIN, ADMIN_DOMAIN, APP_DOMAIN
 
 # HTTP — ACME + redirect
 server {
     listen 80;
     listen [::]:80;
-    server_name ${API_DOMAIN} ${ADMIN_DOMAIN};
+    server_name ${API_DOMAIN} ${ADMIN_DOMAIN} ${APP_DOMAIN};
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -52,6 +52,31 @@ server {
     location / {
         proxy_pass http://api:4000;
         include /etc/nginx/snippets/proxy-api.conf;
+    }
+}
+
+# Customer / worker web app (Expo export)
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${APP_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${API_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${API_DOMAIN}/privkey.pem;
+    include /etc/nginx/snippets/ssl-params.conf;
+    include /etc/nginx/snippets/security-headers.conf;
+
+    root /usr/share/nginx/html/app;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /health {
+        access_log off;
+        return 200 "ok\n";
+        add_header Content-Type text/plain;
     }
 }
 

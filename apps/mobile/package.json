@@ -8,6 +8,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "web:export": "expo export --platform web --output-dir dist-web",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "eas:login": "npx eas-cli login",
     "eas:build:android": "npx eas-cli build --platform android --profile production",
