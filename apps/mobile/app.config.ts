@@ -15,6 +15,7 @@ export default {
   expo: {
     name: "Duts",
     slug: "gigflow",
+    owner: "tdutumas-team",
     scheme: "gigflow",
     version: "1.0.0",
     orientation: "portrait",
