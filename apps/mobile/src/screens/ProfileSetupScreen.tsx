@@ -1,4 +1,4 @@
-import { onboardingSchema } from "@gigflow/shared";
+import { MAX_WORKER_TRAVEL_MILES, onboardingSchema } from "@gigflow/shared";
 import { useEffect, useState } from "react";
 import { Text, TextInput, View } from "react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -11,7 +11,7 @@ import { AppButton } from "../components/AppButton";
 import { ServiceCategoryPicker } from "../components/ServiceCategoryPicker";
 import { useSessionStore } from "../stores/session.store";
 
-const MAX_TRAVEL_MILES = 50;
+const MAX_TRAVEL_MILES = MAX_WORKER_TRAVEL_MILES;
 
 export function ProfileSetupScreen() {
   const session = useSessionStore((state) => state.session);

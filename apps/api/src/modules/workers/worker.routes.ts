@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { workerAvailabilitySchema } from "@gigflow/shared";
+import { workerAvailabilitySchema, workerPreferencesSchema, MAX_WORKER_TRAVEL_MILES } from "@gigflow/shared";
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
 import { requireApprovedWorker, requireAuth, requireRole } from "../../middleware/auth.js";
@@ -13,13 +13,14 @@ import {
   getWorkerEarnings,
   setWorkerOffline,
   updateWorkerAvailability,
-  updateWorkerLocation
+  updateWorkerLocation,
+  updateWorkerPreferences
 } from "./worker.service.js";
 
 const nearbyQuerySchema = z.object({
   latitude: z.coerce.number().min(-90).max(90),
   longitude: z.coerce.number().min(-180).max(180),
-  radiusMiles: z.coerce.number().min(1).max(50).default(20)
+  radiusMiles: z.coerce.number().min(1).max(MAX_WORKER_TRAVEL_MILES).default(20)
 });
 
 const withdrawBodySchema = z.object({
@@ -45,6 +46,21 @@ workerRouter.get("/available-nearby", requireAuth, requireRole(UserRole.CLIENT, 
     next(error);
   }
 });
+
+workerRouter.patch(
+  "/preferences",
+  requireAuth,
+  requireRole(UserRole.WORKER),
+  validateBody(workerPreferencesSchema),
+  async (req, res, next) => {
+    try {
+      const profile = await updateWorkerPreferences(req.auth!.userId, req.body);
+      res.json({ profile });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 workerRouter.patch(
   "/availability",

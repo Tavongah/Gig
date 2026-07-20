@@ -1,5 +1,11 @@
-import { workerAvailabilitySchema, haversineMiles, estimateResponseMinutes, compareWorkersForMatching } from "@gigflow/shared";
-import type { WorkerAvailabilityInput } from "@gigflow/shared";
+import {
+  workerAvailabilitySchema,
+  workerPreferencesSchema,
+  haversineMiles,
+  estimateResponseMinutes,
+  compareWorkersForMatching
+} from "@gigflow/shared";
+import type { WorkerAvailabilityInput, WorkerPreferencesInput } from "@gigflow/shared";
 import { AccountStatus, AvailabilityStatus, GigStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { getWorkerConnectStatus } from "../payments/payment.service.js";
@@ -19,6 +25,26 @@ function formatTransactionType(type: string): string {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+export async function updateWorkerPreferences(userId: string, input: WorkerPreferencesInput) {
+  const parsed = workerPreferencesSchema.parse(input);
+
+  return prisma.workerProfile.update({
+    where: { userId },
+    data: {
+      travelDistanceMiles: parsed.travelDistanceMiles,
+      hourlyRateCents: parsed.hourlyRateCents,
+      minJobAmountCents: parsed.minJobAmountCents,
+      serviceCategories: {
+        set: parsed.serviceCategoryIds.map((id) => ({ id }))
+      }
+    },
+    include: {
+      user: { select: { id: true, fullName: true } },
+      serviceCategories: true
+    }
+  });
 }
 
 export async function updateWorkerAvailability(userId: string, input: WorkerAvailabilityInput) {

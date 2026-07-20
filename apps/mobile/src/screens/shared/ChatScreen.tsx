@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -12,9 +11,11 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { RouteProp } from "@react-navigation/native";
 import { useRoute } from "@react-navigation/native";
+import { MAX_CHAT_MESSAGE_LENGTH } from "@gigflow/shared";
 import { api, type ChatMessage } from "../../lib/api";
 import { AppButton } from "../../components/AppButton";
 import { DUTS } from "../../lib/theme";
+import { showAlert } from "../../lib/confirm";
 import { useSocket } from "../../hooks/useSocket";
 import { useSessionStore } from "../../stores/session.store";
 
@@ -87,6 +88,10 @@ export function ChatScreen() {
     if (!body || sending) {
       return;
     }
+    if (body.length > MAX_CHAT_MESSAGE_LENGTH) {
+      showAlert("Message too long", `Keep messages under ${MAX_CHAT_MESSAGE_LENGTH} characters.`);
+      return;
+    }
 
     setSending(true);
     setDraft("");
@@ -101,7 +106,7 @@ export function ChatScreen() {
       void queryClient.invalidateQueries({ queryKey: ["chat", route.params.gigId] });
     } catch (error) {
       setDraft(body);
-      Alert.alert("Message not sent", error instanceof Error ? error.message : "Please try again.");
+      showAlert("Message not sent", error instanceof Error ? error.message : "Please try again.");
     } finally {
       setSending(false);
     }
@@ -149,6 +154,7 @@ export function ChatScreen() {
           placeholder="Type a message..."
           placeholderTextColor={DUTS.placeholder}
           multiline
+          maxLength={MAX_CHAT_MESSAGE_LENGTH}
           editable={!sending}
         />
         {sending ? (

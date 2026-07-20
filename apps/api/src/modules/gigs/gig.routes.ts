@@ -501,7 +501,7 @@ export function createGigRouter(io: Server): Router {
     }
   });
 
-  router.post("/:gigId/release-worker-payment", requireAuth, requireRole(UserRole.ADMIN, UserRole.WORKER), async (req, res, next) => {
+  router.post("/:gigId/release-worker-payment", requireAuth, requireRole(UserRole.ADMIN), async (req, res, next) => {
     try {
       const { releaseWorkerPayment } = await import("../payments/payment.service.js");
       const result = await releaseWorkerPayment(String(req.params.gigId));

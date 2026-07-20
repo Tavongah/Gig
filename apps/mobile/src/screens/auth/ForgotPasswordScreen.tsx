@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Text, TextInput, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { forgotPasswordSchema, zodErrorsToFieldMap } from "@gigflow/shared";
 import { api } from "../../lib/api";
 import { Screen } from "../../components/Screen";
 import { AppButton } from "../../components/AppButton";
@@ -16,13 +17,25 @@ export function ForgotPasswordScreen(_props: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: () => api.forgotPassword(email),
+    mutationFn: (value: string) => api.forgotPassword(value),
     onSuccess: (result) => {
       setMessage(result.message);
       setError(null);
     },
     onError: (err: Error) => setError(err.message)
   });
+
+  function handleSubmit(): void {
+    const parsed = forgotPasswordSchema.safeParse({ email });
+    if (!parsed.success) {
+      const fieldErrors = zodErrorsToFieldMap(parsed.error);
+      setError(fieldErrors.email ?? Object.values(fieldErrors)[0] ?? "Enter a valid email.");
+      setMessage(null);
+      return;
+    }
+    setError(null);
+    mutation.mutate(parsed.data.email);
+  }
 
   return (
     <Screen>
@@ -42,7 +55,12 @@ export function ForgotPasswordScreen(_props: Props) {
           />
           {message ? <Text className="text-sm text-success">{message}</Text> : null}
           {error ? <Text className="text-sm text-danger">{error}</Text> : null}
-          <AppButton label={mutation.isPending ? "Sending..." : "Send reset link"} onPress={() => mutation.mutate()} />
+          <AppButton
+            label={mutation.isPending ? "Sending..." : "Send reset link"}
+            onPress={handleSubmit}
+            disabled={mutation.isPending}
+            loading={mutation.isPending}
+          />
         </DutsCard>
       </View>
     </Screen>

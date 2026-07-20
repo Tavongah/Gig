@@ -29,6 +29,9 @@ export type UserRole = (typeof userRoles)[number];
 export type LaunchPhase = (typeof launchPhases)[number];
 export type GigStatus = (typeof gigStatuses)[number];
 
+export { MAX_WORKER_TRAVEL_MILES, MAX_CHAT_MESSAGE_LENGTH, MAX_AVATAR_URL_LENGTH } from "./limits.js";
+import { MAX_WORKER_TRAVEL_MILES } from "./limits.js";
+
 export const geoPointSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
@@ -40,34 +43,53 @@ export const geoPointSchema = z.object({
   country: z.string().length(2).default("US")
 });
 
-export const onboardingSchema = z.object({
-  role: z.enum(userRoles),
-  fullName: z.string().min(2).max(100),
-  phoneNumber: z.string().min(7).max(24),
-  workerProfile: z
-    .object({
-      serviceCategoryIds: z.array(z.string().uuid()).min(1),
-      bio: z.string().min(20).max(500),
-      hasVehicle: z.boolean(),
-      backgroundCheckConsent: z.boolean(),
-      travelDistanceMiles: z.number().min(1).max(50).default(10),
-      hourlyRateCents: z.number().int().min(1000).max(50000).optional(),
-      minJobAmountCents: z.number().int().min(1000).max(100000).default(5000)
-    })
-    .optional()
-});
+export const onboardingSchema = z
+  .object({
+    role: z.enum(["CLIENT", "WORKER"]),
+    fullName: z.string().min(2).max(100),
+    phoneNumber: z.string().min(7).max(24),
+    workerProfile: z
+      .object({
+        serviceCategoryIds: z.array(z.string().uuid()).min(1),
+        bio: z.string().min(20).max(500),
+        hasVehicle: z.boolean(),
+        backgroundCheckConsent: z.literal(true),
+        travelDistanceMiles: z.number().min(1).max(MAX_WORKER_TRAVEL_MILES).default(10),
+        hourlyRateCents: z.number().int().min(1000).max(50000).optional(),
+        minJobAmountCents: z.number().int().min(1000).max(100000).default(5000)
+      })
+      .optional()
+  })
+  .superRefine((data, ctx) => {
+    if (data.role === "WORKER" && !data.workerProfile) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["workerProfile"],
+        message: "Worker profile details are required."
+      });
+    }
+  });
 
 export const workerAvailabilitySchema = z.object({
   serviceCategoryIds: z.array(z.string().uuid()).min(1),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
-  travelDistanceMiles: z.number().min(1).max(50),
+  travelDistanceMiles: z.number().min(1).max(MAX_WORKER_TRAVEL_MILES),
+  hourlyRateCents: z.number().int().min(1000).max(50000).optional(),
+  minJobAmountCents: z.number().int().min(1000).max(100000).default(5000)
+});
+
+/** Update gig filters without going online or sending GPS. */
+export const workerPreferencesSchema = z.object({
+  serviceCategoryIds: z.array(z.string().uuid()).min(1),
+  travelDistanceMiles: z.number().min(1).max(MAX_WORKER_TRAVEL_MILES),
   hourlyRateCents: z.number().int().min(1000).max(50000).optional(),
   minJobAmountCents: z.number().int().min(1000).max(100000).default(5000)
 });
 
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
 export type WorkerAvailabilityInput = z.infer<typeof workerAvailabilitySchema>;
+export type WorkerPreferencesInput = z.infer<typeof workerPreferencesSchema>;
 
 import type { GigEstimateInput } from "./gig-validation.js";
 import {
@@ -233,12 +255,13 @@ export function calculatePriceEstimate(
 ): PriceBreakdown {
   const urgencyMultiplier = urgencyMultipliers[input.urgency];
   const pricingType = input.pricingType ?? "FIXED";
+  const demandMultiplier = input.demandMultiplier ?? 1;
   const laborCents =
     pricingType === "FIXED" ? 0 : Math.round(category.hourlyRateCents * input.estimatedHours);
   const distanceFeeCents = Math.round(category.distanceRateCents * input.distanceMiles);
   const subtotal = category.baseRateCents + laborCents + distanceFeeCents;
-  const standardTotalCents = Math.round(subtotal * category.multiplier * input.demandMultiplier);
-  const totalCents = Math.round(subtotal * category.multiplier * urgencyMultiplier * input.demandMultiplier);
+  const standardTotalCents = Math.round(subtotal * category.multiplier * demandMultiplier);
+  const totalCents = Math.round(subtotal * category.multiplier * urgencyMultiplier * demandMultiplier);
   const urgencyFeeCents = Math.max(0, totalCents - standardTotalCents);
   const commissionRate = calculateTieredCommissionRate(totalCents);
   const platformFeeCents = Math.round(totalCents * commissionRate);
@@ -252,7 +275,7 @@ export function calculatePriceEstimate(
     estimatedHours: input.estimatedHours,
     serviceMultiplier: category.multiplier,
     urgencyMultiplier,
-    demandMultiplier: input.demandMultiplier,
+    demandMultiplier,
     totalCents,
     platformFeeCents,
     workerPayoutCents: totalCents - platformFeeCents,

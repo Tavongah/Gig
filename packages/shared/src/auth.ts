@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_WORKER_TRAVEL_MILES } from "./limits.js";
 
 export const accountStatuses = [
   "ACTIVE",
@@ -72,7 +73,7 @@ export const workerRegisterSchema = z
     serviceCategoryIds: z.array(z.string().uuid()).min(1, "Select at least one service"),
     city: z.string().min(2, "City is required").max(80),
     serviceArea: z.string().min(2, "Service area is required").max(120),
-    travelDistanceMiles: z.number().min(1).max(50),
+    travelDistanceMiles: z.number().min(1).max(MAX_WORKER_TRAVEL_MILES),
     workExperience: z.string().min(10, "Work experience is required").max(500),
     availabilityNotes: z.string().max(200).optional(),
     hourlyRateCents: z.number().int().min(1000).max(50000).optional(),
@@ -152,11 +153,11 @@ export const phoneOtpVerifySchema = z.object({
 });
 
 export const completeProfileSchema = z.object({
-  fullName: z.string().min(2).max(100),
-  email: z.string().email("Enter a valid email").optional(),
+  fullName: z.string().trim().min(2).max(100),
+  email: emailSchema.optional(),
   phoneNumber: optionalPhoneSchema,
   defaultRole: z.enum(["CLIENT", "WORKER"]),
-  avatarUrl: z.string().url().optional(),
+  avatarUrl: z.string().url().max(2048).optional(),
   location: z
     .object({
       formattedAddress: z.string().min(5).max(200),

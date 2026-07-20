@@ -125,6 +125,10 @@ export async function estimateGig(input: GigEstimateInput) {
 
   parsed.location = toGeoPointInput(validatedLocation);
 
+  // Price inputs are server-owned — never trust client multipliers/distance fees.
+  parsed.demandMultiplier = 1;
+  parsed.distanceMiles = 0;
+
   return calculatePriceEstimate(parsed, {
 
     baseRateCents: category.baseRateCents,
@@ -170,6 +174,10 @@ export async function createGig(clientId: string, input: CreateGigInput, _io: Se
   });
 
   parsed.location = toGeoPointInput(validatedLocation);
+
+  // Price inputs are server-owned — never trust client multipliers/distance fees.
+  parsed.demandMultiplier = 1;
+  parsed.distanceMiles = 0;
 
   const price = await estimateGig(parsed);
 

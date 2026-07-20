@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { Text, TextInput, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
+import type { GeoPointInput } from "@gigflow/shared";
+import { completeProfileSchema, zodErrorsToFieldMap } from "@gigflow/shared";
 import { api } from "../../lib/api";
 import { defaultActiveRole, isApplePlaceholderEmail } from "../../lib/auth";
+import { AddressAutocomplete } from "../../components/AddressAutocomplete";
 import { AuthProgressHeader } from "../../components/AuthProgressHeader";
 import { AppButton } from "../../components/AppButton";
 import { DutsCard } from "../../components/DutsCard";
@@ -20,41 +23,58 @@ export function CompleteProfileScreen() {
   );
   const [phoneNumber, setPhoneNumber] = useState(session.user.phoneNumber ?? "");
   const [userType, setUserType] = useState<"CLIENT" | "WORKER">(defaultActiveRole(session.user));
-  const [address, setAddress] = useState(session.user.formattedAddress ?? "");
+  const [addressQuery, setAddressQuery] = useState(session.user.formattedAddress ?? "");
+  const [selectedLocation, setSelectedLocation] = useState<GeoPointInput | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   const completeMutation = useMutation({
-    mutationFn: () =>
-      api.completeProfile(
-        {
-          fullName,
-          ...(email.trim() ? { email: email.trim() } : {}),
-          ...(phoneNumber.trim() ? { phoneNumber: phoneNumber.trim() } : {}),
-          defaultRole: userType,
-          ...(address.trim()
-            ? {
-                location: {
-                  formattedAddress: address,
-                  addressLine1: address,
-                  city: session.user.city ?? "Pending",
-                  region: session.user.region ?? "Pending",
-                  postalCode: "00000",
-                  country: "US",
-                  latitude: 33.749,
-                  longitude: -84.388
-                }
-              }
-            : {})
-        },
-        session.token
-      ),
+    mutationFn: (payload: Parameters<typeof api.completeProfile>[0]) =>
+      api.completeProfile(payload, session.token),
     onSuccess: ({ user }) => {
       setProfile(user);
       setActiveRole(defaultActiveRole(user));
       setError(null);
+      setFieldErrors({});
     },
     onError: (err: Error) => setError(err.message)
   });
+
+  function handleSubmit(): void {
+    const needsEmail = isApplePlaceholderEmail(session.user.email);
+    const payload = {
+      fullName,
+      ...(needsEmail || email.trim() ? { email: email.trim() } : {}),
+      ...(phoneNumber.trim() ? { phoneNumber: phoneNumber.trim() } : {}),
+      defaultRole: userType,
+      ...(selectedLocation
+        ? {
+            location: {
+              formattedAddress: selectedLocation.formattedAddress,
+              addressLine1: selectedLocation.addressLine1,
+              city: selectedLocation.city,
+              region: selectedLocation.region,
+              postalCode: selectedLocation.postalCode,
+              country: selectedLocation.country ?? "US",
+              latitude: selectedLocation.latitude,
+              longitude: selectedLocation.longitude
+            }
+          }
+        : {})
+    };
+
+    const parsed = completeProfileSchema.safeParse(payload);
+    if (!parsed.success) {
+      const errors = zodErrorsToFieldMap(parsed.error);
+      setFieldErrors(errors);
+      setError(Object.values(errors)[0] ?? "Check your details.");
+      return;
+    }
+
+    setError(null);
+    setFieldErrors({});
+    completeMutation.mutate(parsed.data);
+  }
 
   return (
     <Screen>
@@ -69,15 +89,19 @@ export function CompleteProfileScreen() {
             onChangeText={setFullName}
             placeholder="Full name"
           />
+          {fieldErrors.fullName ? <Text className="text-xs text-danger">{fieldErrors.fullName}</Text> : null}
           {isApplePlaceholderEmail(session.user.email) ? (
-            <TextInput
-              className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Email address"
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
+            <>
+              <TextInput
+                className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email address"
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              {fieldErrors.email ? <Text className="text-xs text-danger">{fieldErrors.email}</Text> : null}
+            </>
           ) : null}
           <TextInput
             className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
@@ -86,6 +110,7 @@ export function CompleteProfileScreen() {
             placeholder="Phone number (optional)"
             keyboardType="phone-pad"
           />
+          {fieldErrors.phoneNumber ? <Text className="text-xs text-danger">{fieldErrors.phoneNumber}</Text> : null}
           <Text className="text-xs text-muted">Phone verification will be available in a future update.</Text>
           <View className="flex-row gap-3">
             <AppButton
@@ -101,17 +126,27 @@ export function CompleteProfileScreen() {
               onPress={() => setUserType("WORKER")}
             />
           </View>
-          <TextInput
-            className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
-            value={address}
-            onChangeText={setAddress}
-            placeholder="Address or service area"
+          <AddressAutocomplete
+            token={session.token}
+            label="Home or service area"
+            value={addressQuery}
+            onChangeText={(value) => {
+              setAddressQuery(value);
+              if (selectedLocation) {
+                setSelectedLocation(null);
+              }
+            }}
+            selectedLocation={selectedLocation}
+            onLocationResolved={setSelectedLocation}
+            onLocationCleared={() => setSelectedLocation(null)}
+            error={fieldErrors.location}
           />
           {error ? <Text className="text-sm text-danger">{error}</Text> : null}
           <AppButton
             label={completeMutation.isPending ? "Saving..." : `Continue to ${APP_NAME}`}
-            onPress={() => completeMutation.mutate()}
+            onPress={handleSubmit}
             disabled={completeMutation.isPending}
+            loading={completeMutation.isPending}
           />
         </DutsCard>
       </View>

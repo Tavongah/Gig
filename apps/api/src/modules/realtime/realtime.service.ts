@@ -1,12 +1,72 @@
 import type { Server, Socket } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import jwt from "jsonwebtoken";
-import { getGigMatchingRadiusMiles, haversineMiles, isWithinMatchingRadius } from "@gigflow/shared";
+import { z } from "zod";
+import {
+  getGigMatchingRadiusMiles,
+  haversineMiles,
+  isWithinMatchingRadius,
+  MAX_CHAT_MESSAGE_LENGTH
+} from "@gigflow/shared";
 import type { GigSize, GigUrgency, UserRole } from "@prisma/client";
 import { redis } from "../../config/redis.js";
 import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
+
+const coordsSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180)
+});
+
+const workerAvailableSchema = z.object({
+  serviceCategoryIds: z.array(z.string().uuid()).max(50).optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional()
+}).refine(
+  (value) =>
+    (value.latitude === undefined && value.longitude === undefined) ||
+    (value.latitude !== undefined && value.longitude !== undefined),
+  { message: "latitude and longitude must be provided together" }
+);
+
+const gigJoinSchema = z.object({
+  gigId: z.string().uuid()
+});
+
+const locationUpdateSchema = z.object({
+  gigId: z.string().uuid(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180)
+});
+
+const chatMessageSchema = z.object({
+  gigId: z.string().uuid(),
+  body: z.string().trim().min(1).max(MAX_CHAT_MESSAGE_LENGTH)
+});
+
+async function assertGigParticipant(userId: string, gigId: string): Promise<boolean> {
+  const gig = await prisma.gig.findUnique({
+    where: { id: gigId },
+    select: {
+      clientId: true,
+      assignedWorkerId: true,
+      assignments: {
+        where: { cancelledAt: null },
+        orderBy: { acceptedAt: "desc" },
+        take: 1,
+        select: { workerId: true }
+      }
+    }
+  });
+
+  if (!gig) {
+    return false;
+  }
+
+  const activeWorkerId = gig.assignments[0]?.workerId ?? gig.assignedWorkerId;
+  return userId === gig.clientId || (Boolean(activeWorkerId) && userId === activeWorkerId);
+}
 
 interface SocketAuthPayload {
   sub: string;
@@ -74,6 +134,11 @@ export async function persistAndBroadcastChatMessage(
   if (!body) {
     throw new AppError("MESSAGE_REQUIRED", 400, "MESSAGE_REQUIRED", {
       body: "Message cannot be empty."
+    });
+  }
+  if (body.length > MAX_CHAT_MESSAGE_LENGTH) {
+    throw new AppError("MESSAGE_TOO_LONG", 400, "MESSAGE_TOO_LONG", {
+      body: `Message cannot exceed ${MAX_CHAT_MESSAGE_LENGTH} characters.`
     });
   }
 
@@ -177,21 +242,34 @@ export function configureRealtime(io: Server): void {
   io.on("connection", (socket: Socket) => {
     socket.join(`user:${socket.data.userId}`);
 
-    socket.on("worker:available", async (payload: { serviceCategoryIds?: string[]; latitude?: number; longitude?: number }) => {
-      const categoryIds = await resolveWorkerCategoryIds(socket.data.userId, payload.serviceCategoryIds ?? []);
+    socket.on("worker:available", async (payload: unknown) => {
+      const parsed = workerAvailableSchema.safeParse(payload ?? {});
+      if (!parsed.success) {
+        return;
+      }
+
+      const categoryIds = await resolveWorkerCategoryIds(socket.data.userId, parsed.data.serviceCategoryIds ?? []);
 
       for (const categoryId of categoryIds) {
         socket.join(`category:${categoryId}`);
       }
 
+      const coords =
+        parsed.data.latitude !== undefined && parsed.data.longitude !== undefined
+          ? coordsSchema.safeParse({
+              latitude: parsed.data.latitude,
+              longitude: parsed.data.longitude
+            })
+          : null;
+
       await prisma.workerProfile.updateMany({
         where: { userId: socket.data.userId },
         data: {
           availabilityStatus: "AVAILABLE",
-          ...(payload.latitude !== undefined && payload.longitude !== undefined
+          ...(coords?.success
             ? {
-                currentLatitude: payload.latitude,
-                currentLongitude: payload.longitude,
+                currentLatitude: coords.data.latitude,
+                currentLongitude: coords.data.longitude,
                 locationUpdatedAt: new Date()
               }
             : {})
@@ -209,45 +287,70 @@ export function configureRealtime(io: Server): void {
       await redis.del(`worker:available:${socket.data.userId}`);
     });
 
-    socket.on("gig:join", (payload: { gigId: string }) => {
-      socket.join(`gig:${payload.gigId}`);
+    socket.on("gig:join", async (payload: unknown) => {
+      const parsed = gigJoinSchema.safeParse(payload);
+      if (!parsed.success) {
+        return;
+      }
+      const allowed = await assertGigParticipant(socket.data.userId, parsed.data.gigId);
+      if (!allowed) {
+        return;
+      }
+      socket.join(`gig:${parsed.data.gigId}`);
     });
 
-    socket.on("location:update", async (payload: { gigId: string; latitude: number; longitude: number }) => {
+    socket.on("location:update", async (payload: unknown) => {
+      const parsed = locationUpdateSchema.safeParse(payload);
+      if (!parsed.success) {
+        return;
+      }
+
+      const allowed = await assertGigParticipant(socket.data.userId, parsed.data.gigId);
+      if (!allowed) {
+        return;
+      }
+
       await prisma.workerProfile.updateMany({
         where: { userId: socket.data.userId },
         data: {
-          currentLatitude: payload.latitude,
-          currentLongitude: payload.longitude,
+          currentLatitude: parsed.data.latitude,
+          currentLongitude: parsed.data.longitude,
           locationUpdatedAt: new Date()
         }
       });
 
-      io.to(`gig:${payload.gigId}`).emit("location:updated", {
+      io.to(`gig:${parsed.data.gigId}`).emit("location:updated", {
         workerId: socket.data.userId,
-        latitude: payload.latitude,
-        longitude: payload.longitude,
+        latitude: parsed.data.latitude,
+        longitude: parsed.data.longitude,
         updatedAt: new Date().toISOString()
       });
     });
 
-    socket.on("chat:message", async (payload: { gigId?: string; body?: string }, ack?: (result: unknown) => void) => {
+    socket.on("chat:message", async (payload: unknown, ack?: (result: unknown) => void) => {
       try {
-        if (!payload?.gigId || typeof payload.body !== "string") {
+        const parsed = chatMessageSchema.safeParse(payload);
+        if (!parsed.success) {
           ack?.({ ok: false, error: "INVALID_PAYLOAD" });
           return;
         }
 
         const message = await persistAndBroadcastChatMessage(io, {
-          gigId: payload.gigId,
+          gigId: parsed.data.gigId,
           senderId: socket.data.userId,
-          body: payload.body
+          body: parsed.data.body
         });
         ack?.({ ok: true, message });
       } catch (error) {
         const code = error instanceof AppError ? error.code ?? error.message : "SEND_FAILED";
         ack?.({ ok: false, error: code });
-        socket.emit("chat:error", { error: code, gigId: payload?.gigId });
+        const gigId =
+          payload && typeof payload === "object" && "gigId" in payload
+            ? String((payload as { gigId?: string }).gigId ?? "")
+            : "";
+        if (gigId) {
+          socket.emit("chat:error", { error: code, gigId });
+        }
       }
     });
   });

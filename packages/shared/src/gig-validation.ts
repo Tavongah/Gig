@@ -268,7 +268,8 @@ export const gigEstimateSchema = z.object({
   distanceMiles: z.number().nonnegative().max(250).default(0),
   urgency: z.enum(["STANDARD", "SOON", "URGENT"], { message: GIG_VALIDATION_MESSAGES.urgency }),
   startsAt: startsAtSchema,
-  demandMultiplier: z.number().min(1).max(3).default(1),
+  /** Ignored by the API — demand is server-controlled. Kept for payload compatibility. */
+  demandMultiplier: z.number().min(1).max(3).default(1).optional(),
   pricingType: z.enum(["FIXED", "HOURLY", "ESTIMATE_TIMER"]).default("FIXED"),
   description: z.string().max(1000).optional(),
   size: z.enum(["SMALL", "MEDIUM", "LARGE", "ENTERPRISE"]).default("MEDIUM")

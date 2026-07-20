@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { customerRegisterSchema, zodErrorsToFieldMap } from "@gigflow/shared";
 import { api, ApiValidationError } from "../../lib/api";
 import { defaultActiveRole } from "../../lib/auth";
 import { Screen } from "../../components/Screen";
@@ -24,14 +25,13 @@ export function CustomerRegisterScreen({ navigation }: Props) {
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
 
   const registerMutation = useMutation({
-    mutationFn: () =>
-      api.registerCustomer({
-        fullName,
-        email,
-        password,
-        confirmPassword,
-        acceptTerms: true as const
-      }),
+    mutationFn: (payload: {
+      fullName: string;
+      email: string;
+      password: string;
+      confirmPassword: string;
+      acceptTerms: true;
+    }) => api.registerCustomer(payload),
     onSuccess: (session) => {
       setSession(session);
       setActiveRole(defaultActiveRole(session.user));
@@ -47,17 +47,19 @@ export function CustomerRegisterScreen({ navigation }: Props) {
   });
 
   function handleSubmit(): void {
-    const errors: Record<string, string> = {};
-    if (fullName.trim().length < 2) errors.fullName = "Full name is required";
-    if (!email.trim()) errors.email = "Email is required";
-    if (password.length < 8) errors.password = "Password must be at least 8 characters";
-    if (password !== confirmPassword) errors.confirmPassword = "Passwords must match";
-    if (!acceptTerms) errors.acceptTerms = "Please accept the Terms of Service and Privacy Policy";
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
+    const parsed = customerRegisterSchema.safeParse({
+      fullName,
+      email,
+      password,
+      confirmPassword,
+      acceptTerms: acceptTerms ? true : false
+    });
+    if (!parsed.success) {
+      setFieldErrors(zodErrorsToFieldMap(parsed.error));
       return;
     }
-    registerMutation.mutate();
+    setFieldErrors({});
+    registerMutation.mutate(parsed.data);
   }
 
   return (

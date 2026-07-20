@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { createReviewSchema, zodErrorsToFieldMap } from "@gigflow/shared";
 import { api } from "../../lib/api";
+import { showAlert } from "../../lib/confirm";
 import { LoadingButton } from "../../components/LoadingButton";
 import { ErrorMessage } from "../../components/ErrorMessage";
 import { DutsCard } from "../../components/DutsCard";
@@ -22,23 +24,25 @@ export function ReviewScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const reviewMutation = useMutation({
-    mutationFn: () => api.createReview(route.params.gigId, { rating, comment: comment.trim() }, session.token),
+    mutationFn: (payload: { rating: number; comment: string }) =>
+      api.createReview(route.params.gigId, payload, session.token),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["gig", route.params.gigId] });
-      Alert.alert("Thank you!", "Your review helps other customers find great workers.", [
-        { text: "Done", onPress: () => navigation.goBack() }
-      ]);
+      showAlert("Thank you!", "Your review helps other customers find great workers.");
+      navigation.goBack();
     },
     onError: (err: Error) => setError(err.message)
   });
 
   function handleSubmit(): void {
-    if (comment.trim().length < 10) {
-      setError("Please write at least 10 characters.");
+    const parsed = createReviewSchema.safeParse({ rating, comment: comment.trim() });
+    if (!parsed.success) {
+      const errors = zodErrorsToFieldMap(parsed.error);
+      setError(errors.comment ?? errors.rating ?? Object.values(errors)[0] ?? "Check your review.");
       return;
     }
     setError(null);
-    reviewMutation.mutate();
+    reviewMutation.mutate(parsed.data);
   }
 
   return (

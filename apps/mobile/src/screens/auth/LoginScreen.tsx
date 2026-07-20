@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { loginSchema, zodErrorsToFieldMap } from "@gigflow/shared";
 import { api } from "../../lib/api";
 import { defaultActiveRole } from "../../lib/auth";
 import { Screen } from "../../components/Screen";
@@ -27,7 +28,7 @@ export function LoginScreen({ navigation }: Props) {
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
 
   const loginMutation = useMutation({
-    mutationFn: () => api.login({ email, password }),
+    mutationFn: (payload: { email: string; password: string }) => api.login(payload),
     onSuccess: (session) => {
       setSession(session);
       setActiveRole(defaultActiveRole(session.user));
@@ -35,6 +36,17 @@ export function LoginScreen({ navigation }: Props) {
     },
     onError: (err: Error) => setError(err.message)
   });
+
+  function handleSubmit(): void {
+    const parsed = loginSchema.safeParse({ email, password });
+    if (!parsed.success) {
+      const fieldErrors = zodErrorsToFieldMap(parsed.error);
+      setError(fieldErrors.email ?? fieldErrors.password ?? Object.values(fieldErrors)[0] ?? "Check your details.");
+      return;
+    }
+    setError(null);
+    loginMutation.mutate(parsed.data);
+  }
 
   const isBusy = loginMutation.isPending;
 
@@ -72,7 +84,7 @@ export function LoginScreen({ navigation }: Props) {
           {error ? <Text className="text-sm text-danger">{error}</Text> : null}
           <AppButton
             label={isBusy ? "Signing in..." : "Log in"}
-            onPress={() => loginMutation.mutate()}
+            onPress={handleSubmit}
             disabled={isBusy}
             loading={isBusy}
           />

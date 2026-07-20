@@ -142,9 +142,17 @@ authRouter.get("/me", async (req, res, next) => {
 });
 
 const updateProfileSchema = z.object({
-  fullName: z.string().min(2).max(100).optional(),
-  phoneNumber: z.string().min(7).max(24).nullable().optional(),
-  avatarUrl: z.string().max(2_000_000).nullable().optional()
+  fullName: z.string().trim().min(2).max(100).optional(),
+  phoneNumber: z.string().trim().min(7).max(24).nullable().optional(),
+  avatarUrl: z
+    .string()
+    .url("Avatar must be a valid URL")
+    .max(2048, "Avatar URL is too long")
+    .refine((value) => !value.toLowerCase().startsWith("data:"), {
+      message: "Inline image uploads are not supported for avatars"
+    })
+    .nullable()
+    .optional()
 });
 
 authRouter.patch("/me", validateBody(updateProfileSchema), async (req, res, next) => {

@@ -2,6 +2,11 @@ import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import {
+  MAX_WORKER_TRAVEL_MILES,
+  workerRegisterSchema,
+  zodErrorsToFieldMap
+} from "@gigflow/shared";
 import { api, ApiValidationError } from "../../lib/api";
 import { defaultActiveRole } from "../../lib/auth";
 import { Screen } from "../../components/Screen";
@@ -13,6 +18,49 @@ import type { AuthStackParamList } from "../../navigation/auth-types";
 type Props = NativeStackScreenProps<AuthStackParamList, "WorkerRegister">;
 
 const STEPS = ["Basic Info", "Worker Profile", "Verification", "Review & Submit"] as const;
+
+function buildWorkerPayload(input: {
+  fullName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  acceptTerms: boolean;
+  bio: string;
+  city: string;
+  serviceArea: string;
+  travelDistanceMiles: string;
+  workExperience: string;
+  availabilityNotes: string;
+  hourlyRate: string;
+  minJobAmount: string;
+  serviceCategoryIds: string[];
+  governmentIdAcknowledged: boolean;
+  proofOfAddressAcknowledged: boolean;
+  platformRulesAgreed: boolean;
+  backgroundCheckConsent: boolean;
+}) {
+  return {
+    fullName: input.fullName,
+    email: input.email,
+    password: input.password,
+    confirmPassword: input.confirmPassword,
+    acceptTerms: input.acceptTerms ? true : false,
+    bio: input.bio,
+    city: input.city,
+    serviceArea: input.serviceArea,
+    travelDistanceMiles: Number(input.travelDistanceMiles),
+    workExperience: input.workExperience,
+    availabilityNotes: input.availabilityNotes || undefined,
+    hourlyRateCents: Math.round(Number(input.hourlyRate) * 100),
+    minJobAmountCents: Math.round(Number(input.minJobAmount) * 100),
+    hasVehicle: false,
+    serviceCategoryIds: input.serviceCategoryIds,
+    governmentIdAcknowledged: input.governmentIdAcknowledged ? true : false,
+    proofOfAddressAcknowledged: input.proofOfAddressAcknowledged ? true : false,
+    platformRulesAgreed: input.platformRulesAgreed ? true : false,
+    backgroundCheckConsent: input.backgroundCheckConsent ? true : false
+  };
+}
 
 export function WorkerRegisterScreen({ navigation }: Props) {
   const [step, setStep] = useState(0);
@@ -45,28 +93,7 @@ export function WorkerRegisterScreen({ navigation }: Props) {
   });
 
   const registerMutation = useMutation({
-    mutationFn: () =>
-      api.registerWorker({
-        fullName,
-        email,
-        password,
-        confirmPassword,
-        acceptTerms: true,
-        bio,
-        city,
-        serviceArea,
-        travelDistanceMiles: Number(travelDistanceMiles),
-        workExperience,
-        availabilityNotes: availabilityNotes || undefined,
-        hourlyRateCents: Math.round(Number(hourlyRate) * 100),
-        minJobAmountCents: Math.round(Number(minJobAmount) * 100),
-        hasVehicle: false,
-        serviceCategoryIds,
-        governmentIdAcknowledged: governmentIdAcknowledged as true,
-        proofOfAddressAcknowledged: proofOfAddressAcknowledged as true,
-        platformRulesAgreed: platformRulesAgreed as true,
-        backgroundCheckConsent: backgroundCheckConsent as true
-      }),
+    mutationFn: (payload: Parameters<typeof api.registerWorker>[0]) => api.registerWorker(payload),
     onSuccess: (session) => {
       setSession(session);
       setActiveRole(defaultActiveRole(session.user));
@@ -87,13 +114,72 @@ export function WorkerRegisterScreen({ navigation }: Props) {
     );
   }
 
+  function currentPayload() {
+    return buildWorkerPayload({
+      fullName,
+      email,
+      password,
+      confirmPassword,
+      acceptTerms,
+      bio,
+      city,
+      serviceArea,
+      travelDistanceMiles,
+      workExperience,
+      availabilityNotes,
+      hourlyRate,
+      minJobAmount,
+      serviceCategoryIds,
+      governmentIdAcknowledged,
+      proofOfAddressAcknowledged,
+      platformRulesAgreed,
+      backgroundCheckConsent
+    });
+  }
+
   function nextStep(): void {
-    if (step === 0 && !acceptTerms) {
-      setFieldErrors({ acceptTerms: "Please accept the Terms of Service and Privacy Policy" });
+    const payload = currentPayload();
+    const stepFields: string[][] = [
+      ["fullName", "email", "password", "confirmPassword", "acceptTerms"],
+      [
+        "bio",
+        "city",
+        "serviceArea",
+        "travelDistanceMiles",
+        "workExperience",
+        "serviceCategoryIds",
+        "hourlyRateCents",
+        "minJobAmountCents"
+      ],
+      [
+        "governmentIdAcknowledged",
+        "proofOfAddressAcknowledged",
+        "platformRulesAgreed",
+        "backgroundCheckConsent"
+      ]
+    ];
+
+    const parsed = workerRegisterSchema.safeParse(payload);
+    const errors = parsed.success ? {} : zodErrorsToFieldMap(parsed.error);
+    const allowed = new Set(stepFields[step] ?? []);
+    const stepErrors = Object.fromEntries(Object.entries(errors).filter(([key]) => allowed.has(key)));
+    if (Object.keys(stepErrors).length > 0) {
+      setFieldErrors(stepErrors);
+      return;
+    }
+
+    setFieldErrors({});
+    setStep((current) => Math.min(current + 1, STEPS.length - 1));
+  }
+
+  function handleSubmit(): void {
+    const parsed = workerRegisterSchema.safeParse(currentPayload());
+    if (!parsed.success) {
+      setFieldErrors(zodErrorsToFieldMap(parsed.error));
       return;
     }
     setFieldErrors({});
-    setStep((current) => Math.min(current + 1, STEPS.length - 1));
+    registerMutation.mutate(parsed.data);
   }
 
   function prevStep(): void {
@@ -194,7 +280,7 @@ export function WorkerRegisterScreen({ navigation }: Props) {
               className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"
               value={travelDistanceMiles}
               onChangeText={setTravelDistanceMiles}
-              placeholder="Max travel distance (miles)"
+              placeholder={`Max travel distance (1–${MAX_WORKER_TRAVEL_MILES} miles)`}
               keyboardType="numeric"
             />
             <TextInput
@@ -287,7 +373,9 @@ export function WorkerRegisterScreen({ navigation }: Props) {
             <View className="flex-1">
               <AppButton
                 label={registerMutation.isPending ? "Submitting..." : "Submit application"}
-                onPress={() => registerMutation.mutate()}
+                onPress={handleSubmit}
+                disabled={registerMutation.isPending}
+                loading={registerMutation.isPending}
               />
             </View>
           )}

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Alert, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { workerPreferencesSchema, zodErrorsToFieldMap } from "@gigflow/shared";
 import { api } from "../../lib/api";
-import { getCurrentCoordinates } from "../../lib/location";
+import { showAlert } from "../../lib/confirm";
 import { Screen } from "../../components/Screen";
 import { DutsCard } from "../../components/DutsCard";
 import { AppButton } from "../../components/AppButton";
@@ -29,37 +30,28 @@ export function WorkerWorkPreferencesScreen() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (preferences.serviceCategoryIds.length === 0) {
-        throw new Error("Select at least one service type.");
+      const parsed = workerPreferencesSchema.safeParse({
+        serviceCategoryIds: preferences.serviceCategoryIds,
+        travelDistanceMiles: Math.round(Number(preferences.travelDistanceMiles)),
+        hourlyRateCents: Math.round(Number(preferences.hourlyRate) * 100),
+        minJobAmountCents: Math.round(Number(preferences.minJobAmount) * 100)
+      });
+
+      if (!parsed.success) {
+        const errors = zodErrorsToFieldMap(parsed.error);
+        throw new Error(Object.values(errors)[0] ?? "Check your preferences and try again.");
       }
 
-      const storedLat = Number(profile?.workerProfile?.currentLatitude);
-      const storedLng = Number(profile?.workerProfile?.currentLongitude);
-      const coords =
-        Number.isFinite(storedLat) && Number.isFinite(storedLng)
-          ? { latitude: storedLat, longitude: storedLng }
-          : await getCurrentCoordinates();
-
-      await api.updateWorkerAvailability(
-        {
-          serviceCategoryIds: preferences.serviceCategoryIds,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          travelDistanceMiles: Number(preferences.travelDistanceMiles) || 10,
-          hourlyRateCents: Math.round((Number(preferences.hourlyRate) || 35) * 100),
-          minJobAmountCents: Math.round((Number(preferences.minJobAmount) || 50) * 100)
-        },
-        session.token
-      );
+      await api.updateWorkerPreferences(parsed.data, session.token);
 
       const { user } = await api.getMe(session.token);
       setProfile(user);
     },
     onSuccess: () => {
-      Alert.alert("Saved", "Your work preferences were updated.");
+      showAlert("Saved", "Your work preferences were updated.");
       navigation.goBack();
     },
-    onError: (error: Error) => Alert.alert("Could not save", error.message)
+    onError: (error: Error) => showAlert("Could not save", error.message)
   });
 
   return (

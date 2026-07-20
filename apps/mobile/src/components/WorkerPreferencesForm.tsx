@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Text, TextInput, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
+import { MAX_WORKER_TRAVEL_MILES } from "@gigflow/shared";
 import { api } from "../lib/api";
 import { DUTS } from "../lib/theme";
 import { ServiceCategoryPicker } from "./ServiceCategoryPicker";
@@ -30,6 +31,18 @@ export function WorkerPreferencesForm({ values, onChange, disabled = false }: Wo
     onChange({ ...values, serviceCategoryIds: next });
   }
 
+  function clampTravelDistance(raw: string): void {
+    const parsed = Math.round(Number(raw));
+    if (!Number.isFinite(parsed)) {
+      onChange({ ...values, travelDistanceMiles: "10" });
+      return;
+    }
+    onChange({
+      ...values,
+      travelDistanceMiles: String(Math.min(MAX_WORKER_TRAVEL_MILES, Math.max(1, parsed)))
+    });
+  }
+
   return (
     <View className="gap-4">
       <View className="gap-1">
@@ -45,11 +58,14 @@ export function WorkerPreferencesForm({ values, onChange, disabled = false }: Wo
 
       <View className="gap-1">
         <Text className="text-sm font-bold uppercase tracking-wider text-label">Travel distance (mi)</Text>
-        <Text className="text-xs text-muted">How far you're willing to travel for gigs.</Text>
+        <Text className="text-xs text-muted">
+          How far you're willing to travel for gigs. Max {MAX_WORKER_TRAVEL_MILES} miles.
+        </Text>
         <TextInput
           className="rounded-2xl border border-border bg-surface px-4 py-3.5 text-ink"
           value={values.travelDistanceMiles}
           onChangeText={(travelDistanceMiles) => onChange({ ...values, travelDistanceMiles })}
+          onBlur={() => clampTravelDistance(values.travelDistanceMiles)}
           keyboardType="decimal-pad"
           editable={!disabled}
           placeholderTextColor={DUTS.placeholder}
@@ -58,6 +74,7 @@ export function WorkerPreferencesForm({ values, onChange, disabled = false }: Wo
 
       <View className="gap-1">
         <Text className="text-sm font-bold uppercase tracking-wider text-label">Preferred hourly rate ($)</Text>
+        <Text className="text-xs text-muted">Between $10 and $500.</Text>
         <TextInput
           className="rounded-2xl border border-border bg-surface px-4 py-3.5 text-ink"
           value={values.hourlyRate}
@@ -70,6 +87,7 @@ export function WorkerPreferencesForm({ values, onChange, disabled = false }: Wo
 
       <View className="gap-1">
         <Text className="text-sm font-bold uppercase tracking-wider text-label">Minimum job amount ($)</Text>
+        <Text className="text-xs text-muted">Between $10 and $1,000.</Text>
         <TextInput
           className="rounded-2xl border border-border bg-surface px-4 py-3.5 text-ink"
           value={values.minJobAmount}

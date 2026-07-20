@@ -4,7 +4,8 @@ import type {
   CreateReviewInput,
   GigEstimateInput,
   OnboardingInput,
-  WorkerAvailabilityInput
+  WorkerAvailabilityInput,
+  WorkerPreferencesInput
 } from "@gigflow/shared";
 
 const extra = Constants.expoConfig?.extra as { apiUrl?: string } | undefined;
@@ -458,6 +459,12 @@ export const api = {
   updateWorkerAvailability: (payload: WorkerAvailabilityInput, token: string) =>
     request<{ profile: ApiUser["workerProfile"] }>(
       "/workers/availability",
+      { method: "PATCH", body: JSON.stringify(payload) },
+      token
+    ),
+  updateWorkerPreferences: (payload: WorkerPreferencesInput, token: string) =>
+    request<{ profile: ApiUser["workerProfile"] }>(
+      "/workers/preferences",
       { method: "PATCH", body: JSON.stringify(payload) },
       token
     ),
