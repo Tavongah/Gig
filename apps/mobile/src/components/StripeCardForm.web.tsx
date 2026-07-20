@@ -82,7 +82,7 @@ export function StripeCardForm({ publishableKey, clientSecret, amountLabel, onSu
           appearance: {
             theme: "stripe",
             variables: {
-              colorPrimary: "#6A1B9A",
+              colorPrimary: "#7B3FE4",
               borderRadius: "16px"
             }
           }

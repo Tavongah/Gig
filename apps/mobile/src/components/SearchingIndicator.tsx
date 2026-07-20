@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Text, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import { DutsCard } from "./DutsCard";
+import { DutsGradient } from "./DutsGradient";
 
 export function SearchingIndicator({
   title = "Matching workers near you...",
@@ -22,22 +23,22 @@ export function SearchingIndicator({
 
   const ringStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 0.85 + pulse.value * 0.25 }],
-    opacity: 0.2 + pulse.value * 0.25
+    opacity: 0.15 + pulse.value * 0.2
   }));
 
   return (
     <DutsCard className="items-center gap-5 p-8">
       <View className="h-24 w-24 items-center justify-center">
-        <Animated.View style={ringStyle} className="absolute h-24 w-24 rounded-full bg-hero" />
-        <View className="h-14 w-14 items-center justify-center rounded-full bg-brand">
+        <Animated.View style={ringStyle} className="absolute h-24 w-24 rounded-full bg-surface" />
+        <DutsGradient style={{ height: 56, width: 56, borderRadius: 28, alignItems: "center", justifyContent: "center" }}>
           <Text className="text-2xl">📡</Text>
-        </View>
+        </DutsGradient>
       </View>
       <Text className="text-center text-lg font-black text-ink">{title}</Text>
       <Text className="text-center text-sm leading-5 text-muted">{message}</Text>
       <View className="flex-row gap-2">
         {[0, 1, 2].map((dot) => (
-          <View key={dot} className="h-2 w-2 rounded-full bg-brand/40" />
+          <View key={dot} className="h-2 w-2 rounded-full bg-brand/35" />
         ))}
       </View>
     </DutsCard>

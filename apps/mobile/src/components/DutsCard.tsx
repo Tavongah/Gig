@@ -9,8 +9,8 @@ interface DutsCardProps extends ViewProps {
 export function DutsCard({ children, style, elevated = true, className, ...props }: DutsCardProps) {
   return (
     <View
-      className={`rounded-4xl bg-card ${className ?? ""}`}
-      style={[elevated ? cardShadow : undefined, style]}
+      className={`bg-card ${className ?? ""}`}
+      style={[{ borderRadius: 18 }, elevated ? cardShadow : undefined, style]}
       {...props}
     >
       {children}

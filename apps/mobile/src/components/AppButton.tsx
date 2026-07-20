@@ -1,4 +1,6 @@
 import { ActivityIndicator, Pressable, Text } from "react-native";
+import { DutsGradient } from "./DutsGradient";
+import { DUTS } from "../lib/theme";
 
 export type AppButtonVariant = "primary" | "secondary";
 
@@ -14,19 +16,6 @@ interface AppButtonProps {
   variant?: AppButtonVariantInput;
   size?: "md" | "lg";
 }
-
-const VARIANTS: Record<AppButtonVariant, { container: string; text: string; disabledContainer: string }> = {
-  primary: {
-    container: "bg-brand",
-    text: "text-white",
-    disabledContainer: "bg-disabled"
-  },
-  secondary: {
-    container: "bg-card border border-brand",
-    text: "text-brand",
-    disabledContainer: "bg-disabled border border-border"
-  }
-};
 
 function resolveVariant(variant: AppButtonVariantInput): AppButtonVariant {
   if (variant === "secondary" || variant === "cancel") {
@@ -45,9 +34,42 @@ export function AppButton({
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
   const resolved = resolveVariant(variant);
-  const styles = VARIANTS[resolved];
   const padding = size === "lg" ? "px-6 py-4" : "px-5 py-3";
   const textSize = size === "lg" ? "text-base" : "text-sm";
+  const radius = 18;
+
+  if (resolved === "primary" && !isDisabled) {
+    return (
+      <Pressable
+        disabled={isDisabled}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled: isDisabled, busy: loading }}
+        style={({ pressed }) => [{ opacity: pressed ? 0.88 : 1, borderRadius: radius, overflow: "hidden" }]}
+      >
+        <DutsGradient style={{ borderRadius: radius, minHeight: 48, justifyContent: "center" }} className={padding}>
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text className={`text-center font-black text-white ${textSize}`}>{label}</Text>
+          )}
+        </DutsGradient>
+      </Pressable>
+    );
+  }
+
+  const container =
+    resolved === "secondary"
+      ? isDisabled
+        ? "bg-disabled border border-border"
+        : "bg-card border border-brand"
+      : "bg-disabled";
+  const textClass = isDisabled
+    ? "text-disabled-text"
+    : resolved === "secondary"
+      ? "text-brand"
+      : "text-white";
 
   return (
     <Pressable
@@ -56,16 +78,13 @@ export function AppButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
-      className={`min-h-[48px] justify-center rounded-full ${padding} ${isDisabled ? styles.disabledContainer : styles.container} active:opacity-90`}
+      className={`min-h-[48px] justify-center ${padding} ${container} active:opacity-90`}
+      style={{ borderRadius: radius }}
     >
       {loading ? (
-        <ActivityIndicator color={resolved === "secondary" ? "#6A1B9A" : "#FFFFFF"} />
+        <ActivityIndicator color={DUTS.brand} />
       ) : (
-        <Text
-          className={`text-center font-black ${textSize} ${isDisabled ? "text-disabled-text" : styles.text}`}
-        >
-          {label}
-        </Text>
+        <Text className={`text-center font-black ${textSize} ${textClass}`}>{label}</Text>
       )}
     </Pressable>
   );
