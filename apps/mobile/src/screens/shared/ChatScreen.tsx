@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Platform, Text, TextInput, View } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Text,
+  TextInput,
+  View
+} from "react-native";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { RouteProp } from "@react-navigation/native";
 import { useRoute } from "@react-navigation/native";
 import { api, type ChatMessage } from "../../lib/api";
@@ -13,9 +22,11 @@ export function ChatScreen() {
   const session = useSessionStore((state) => state.session)!;
   const route = useRoute<RouteProp<{ Chat: { gigId: string; title: string } }, "Chat">>();
   const socket = useSocket();
+  const queryClient = useQueryClient();
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const [draft, setDraft] = useState("");
   const [liveMessages, setLiveMessages] = useState<ChatMessage[]>([]);
+  const [sending, setSending] = useState(false);
 
   const historyQuery = useQuery({
     queryKey: ["chat", route.params.gigId],
@@ -39,14 +50,28 @@ export function ChatScreen() {
       return;
     }
 
-    socket.emit("gig:join", { gigId: route.params.gigId });
+    const joinRoom = () => {
+      socket.emit("gig:join", { gigId: route.params.gigId });
+    };
+
+    joinRoom();
+    socket.on("connect", joinRoom);
 
     const onMessage = (message: ChatMessage) => {
-      setLiveMessages((current) => [...current, message]);
+      if (message.gigId && message.gigId !== route.params.gigId) {
+        return;
+      }
+      setLiveMessages((current) => {
+        if (current.some((item) => item.id === message.id)) {
+          return current;
+        }
+        return [...current, message];
+      });
     };
 
     socket.on("chat:message", onMessage);
     return () => {
+      socket.off("connect", joinRoom);
       socket.off("chat:message", onMessage);
     };
   }, [socket, route.params.gigId]);
@@ -57,14 +82,29 @@ export function ChatScreen() {
     }
   }, [messages.length]);
 
-  function sendMessage(): void {
+  async function sendMessage(): Promise<void> {
     const body = draft.trim();
-    if (!body || !socket) {
+    if (!body || sending) {
       return;
     }
 
-    socket.emit("chat:message", { gigId: route.params.gigId, body });
+    setSending(true);
     setDraft("");
+    try {
+      const { message } = await api.sendChatMessage(route.params.gigId, body, session.token);
+      setLiveMessages((current) => {
+        if (current.some((item) => item.id === message.id)) {
+          return current;
+        }
+        return [...current, message];
+      });
+      void queryClient.invalidateQueries({ queryKey: ["chat", route.params.gigId] });
+    } catch (error) {
+      setDraft(body);
+      Alert.alert("Message not sent", error instanceof Error ? error.message : "Please try again.");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -109,8 +149,15 @@ export function ChatScreen() {
           placeholder="Type a message..."
           placeholderTextColor={DUTS.placeholder}
           multiline
+          editable={!sending}
         />
-        <AppButton label="Send" onPress={sendMessage} variant="primary" size="md" />
+        {sending ? (
+          <View className="h-11 w-20 items-center justify-center">
+            <ActivityIndicator color={DUTS.purple} />
+          </View>
+        ) : (
+          <AppButton label="Send" onPress={() => void sendMessage()} variant="primary" size="md" />
+        )}
       </View>
     </KeyboardAvoidingView>
   );

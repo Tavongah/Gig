@@ -35,6 +35,8 @@ import {
 
   publishGigWithoutPayment,
 
+  sendChatMessage,
+
   updateGigStatus
 
 } from "./gig.service.js";
@@ -260,6 +262,28 @@ export function createGigRouter(io: Server): Router {
     }
 
   });
+
+
+
+  router.post(
+    "/:gigId/chat",
+    requireAuth,
+    validateBody(z.object({ body: z.string().trim().min(1).max(2000) })),
+    async (req, res, next) => {
+      try {
+        const { gigId } = req.params;
+        if (!gigId || Array.isArray(gigId)) {
+          res.status(400).json({ error: "GIG_ID_REQUIRED" });
+          return;
+        }
+
+        const message = await sendChatMessage(gigId, req.auth!.userId, req.body.body, io);
+        res.status(201).json({ message });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
 
 
 

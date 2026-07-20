@@ -16,7 +16,14 @@ export function useSocket(): Socket | null {
     }
 
     if (!sharedSocket) {
-      sharedSocket = io(socketUrl, { auth: { token }, autoConnect: true });
+      sharedSocket = io(socketUrl, {
+        auth: { token },
+        autoConnect: true,
+        transports: ["websocket", "polling"],
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000
+      });
     } else {
       sharedSocket.auth = { token };
       if (!sharedSocket.connected) {

@@ -976,35 +976,27 @@ export async function getGigDetail(gigId: string, userId: string) {
 
 
 export async function listChatMessages(gigId: string, userId: string) {
-
   await getGigDetail(gigId, userId);
 
-
-
-  const thread = await prisma.chatThread.findUniqueOrThrow({
-
+  const thread = await prisma.chatThread.upsert({
     where: { gigId },
-
+    create: { gigId },
+    update: {},
     include: {
-
       messages: {
-
         include: { sender: { select: { id: true, fullName: true } } },
-
         orderBy: { createdAt: "asc" },
-
         take: 200
-
       }
-
     }
-
   });
 
-
-
   return thread.messages;
+}
 
+export async function sendChatMessage(gigId: string, userId: string, body: string, io: Server) {
+  const { persistAndBroadcastChatMessage } = await import("../realtime/realtime.service.js");
+  return persistAndBroadcastChatMessage(io, { gigId, senderId: userId, body });
 }
 
 

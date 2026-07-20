@@ -6,6 +6,7 @@ import type { GigSize, GigUrgency, UserRole } from "@prisma/client";
 import { redis } from "../../config/redis.js";
 import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
+import { AppError } from "../../lib/errors.js";
 
 interface SocketAuthPayload {
   sub: string;
@@ -53,6 +54,98 @@ async function resolveWorkerCategoryIds(userId: string, provided: string[]): Pro
 
 export function notifyUser(io: Server, userId: string, payload: NotificationPayload): void {
   io.to(`user:${userId}`).emit("notification", payload);
+}
+
+export interface ChatMessagePayload {
+  id: string;
+  gigId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+  sender?: { id: string; fullName: string };
+}
+
+/** Persist a gig chat message and deliver it to both participants (room + user sockets). */
+export async function persistAndBroadcastChatMessage(
+  io: Server,
+  params: { gigId: string; senderId: string; body: string }
+): Promise<ChatMessagePayload> {
+  const body = params.body.trim();
+  if (!body) {
+    throw new AppError("MESSAGE_REQUIRED", 400, "MESSAGE_REQUIRED", {
+      body: "Message cannot be empty."
+    });
+  }
+
+  const gig = await prisma.gig.findUnique({
+    where: { id: params.gigId },
+    include: {
+      assignments: {
+        where: { cancelledAt: null },
+        orderBy: { acceptedAt: "desc" },
+        take: 1,
+        select: { workerId: true }
+      }
+    }
+  });
+
+  if (!gig) {
+    throw new AppError("GIG_NOT_FOUND", 404, "GIG_NOT_FOUND");
+  }
+
+  const activeWorkerId = gig.assignments[0]?.workerId ?? gig.assignedWorkerId ?? null;
+  const isClient = params.senderId === gig.clientId;
+  const isWorker = Boolean(activeWorkerId && params.senderId === activeWorkerId);
+  if (!isClient && !isWorker) {
+    throw new AppError("FORBIDDEN", 403, "FORBIDDEN");
+  }
+
+  const thread = await prisma.chatThread.upsert({
+    where: { gigId: params.gigId },
+    create: { gigId: params.gigId },
+    update: {}
+  });
+
+  const sender = await prisma.user.findUnique({
+    where: { id: params.senderId },
+    select: { id: true, fullName: true }
+  });
+
+  const message = await prisma.chatMessage.create({
+    data: {
+      threadId: thread.id,
+      senderId: params.senderId,
+      body
+    }
+  });
+
+  const chatPayload: ChatMessagePayload = {
+    id: message.id,
+    gigId: params.gigId,
+    senderId: message.senderId,
+    body: message.body,
+    createdAt: message.createdAt.toISOString(),
+    sender: sender ?? undefined
+  };
+
+  // Gig room (anyone currently viewing) + both participants' personal rooms.
+  io.to(`gig:${params.gigId}`).emit("chat:message", chatPayload);
+  io.to(`user:${gig.clientId}`).emit("chat:message", chatPayload);
+  if (activeWorkerId) {
+    io.to(`user:${activeWorkerId}`).emit("chat:message", chatPayload);
+  }
+
+  const recipientId = isClient ? activeWorkerId : gig.clientId;
+  if (recipientId && recipientId !== params.senderId) {
+    notifyUser(io, recipientId, {
+      type: "NEW_MESSAGE",
+      title: "New message",
+      body: body.length > 80 ? `${body.slice(0, 77)}...` : body,
+      gigId: params.gigId
+    });
+  }
+
+  return chatPayload;
 }
 
 export function broadcastGigStatus(io: Server, gig: { id: string; clientId: string; status: string }, gigPayload: unknown): void {
@@ -138,51 +231,24 @@ export function configureRealtime(io: Server): void {
       });
     });
 
-    socket.on("chat:message", async (payload: { gigId: string; body: string }) => {
-      const thread = await prisma.chatThread.findUnique({ where: { gigId: payload.gigId } });
-      if (!thread) {
-        return;
-      }
+    socket.on("chat:message", async (payload: { gigId?: string; body?: string }, ack?: (result: unknown) => void) => {
+      try {
+        if (!payload?.gigId || typeof payload.body !== "string") {
+          ack?.({ ok: false, error: "INVALID_PAYLOAD" });
+          return;
+        }
 
-      const gig = await prisma.gig.findUnique({
-        where: { id: payload.gigId },
-        include: { assignments: { select: { workerId: true } } }
-      });
-
-      const message = await prisma.chatMessage.create({
-        data: {
-          threadId: thread.id,
+        const message = await persistAndBroadcastChatMessage(io, {
+          gigId: payload.gigId,
           senderId: socket.data.userId,
           body: payload.body
-        }
-      });
-
-      if (gig) {
-        const recipientId =
-          socket.data.userId === gig.clientId ? gig.assignments[0]?.workerId : gig.clientId;
-        if (recipientId) {
-          notifyUser(io, recipientId, {
-            type: "NEW_MESSAGE",
-            title: "New message",
-            body: payload.body.length > 80 ? `${payload.body.slice(0, 77)}...` : payload.body,
-            gigId: payload.gigId
-          });
-        }
+        });
+        ack?.({ ok: true, message });
+      } catch (error) {
+        const code = error instanceof AppError ? error.code ?? error.message : "SEND_FAILED";
+        ack?.({ ok: false, error: code });
+        socket.emit("chat:error", { error: code, gigId: payload?.gigId });
       }
-
-      io.to(`gig:${payload.gigId}`).emit("chat:message", {
-        id: message.id,
-        senderId: message.senderId,
-        body: message.body,
-        createdAt: message.createdAt.toISOString()
-      });
-
-      socket.emit("chat:message", {
-        id: message.id,
-        senderId: message.senderId,
-        body: message.body,
-        createdAt: message.createdAt.toISOString()
-      });
     });
   });
 }

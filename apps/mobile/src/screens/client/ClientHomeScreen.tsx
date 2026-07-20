@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { CompositeNavigationProp } from "@react-navigation/native";
@@ -55,6 +55,26 @@ export function ClientHomeScreen() {
           if (payload.gigId && payload.rematching !== false) {
             navigation.navigate("GigSelectWorkers", { gigId: payload.gigId });
           }
+        },
+        notification: (payload: { type?: string; title: string; body: string; gigId?: string }) => {
+          if (payload.type !== "NEW_MESSAGE") {
+            return;
+          }
+          Alert.alert(payload.title, payload.body, [
+            { text: "Dismiss", style: "cancel" },
+            ...(payload.gigId
+              ? [
+                  {
+                    text: "Open chat",
+                    onPress: () =>
+                      navigation.navigate("Chat", {
+                        gigId: payload.gigId!,
+                        title: "Messages"
+                      })
+                  }
+                ]
+              : [])
+          ]);
         }
       }),
       [myGigsQuery, navigation]

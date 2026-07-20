@@ -177,6 +177,7 @@ export interface GigDetail {
 
 export interface ChatMessage {
   id: string;
+  gigId?: string;
   senderId: string;
   body: string;
   createdAt: string;
@@ -466,6 +467,12 @@ export const api = {
   getGig: (gigId: string, token: string) => request<{ gig: GigDetail }>(`/gigs/${gigId}`, {}, token),
   getChatMessages: (gigId: string, token: string) =>
     request<{ messages: ChatMessage[] }>(`/gigs/${gigId}/chat`, {}, token),
+  sendChatMessage: (gigId: string, body: string, token: string) =>
+    request<{ message: ChatMessage }>(
+      `/gigs/${gigId}/chat`,
+      { method: "POST", body: JSON.stringify({ body }) },
+      token
+    ),
   acceptGig: (gigId: string, token: string) =>
     request<{ gig: GigDetail & { gigId?: string }; interest?: { gigId: string } }>(
       `/gigs/${gigId}/accept`,
