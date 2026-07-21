@@ -63,9 +63,25 @@ async function syncGigPaymentState(
 
 async function getOrCreateStripeCustomer(userId: string): Promise<string> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-  if (user.stripeCustomerId) return user.stripeCustomerId;
-
   const stripe = getStripe();
+
+  if (user.stripeCustomerId) {
+    try {
+      const existing = await stripe.customers.retrieve(user.stripeCustomerId);
+      if (!("deleted" in existing && existing.deleted)) {
+        return existing.id;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Common after switching test ↔ live keys: stored cus_ id is from the other mode.
+      if (!/no such customer|resource_missing/i.test(message)) {
+        throw error;
+      }
+      console.warn("[stripe] clearing stale customer id", { userId, customerId: user.stripeCustomerId });
+      await prisma.user.update({ where: { id: userId }, data: { stripeCustomerId: null } });
+    }
+  }
+
   const customer = await stripe.customers.create({
     email: user.email,
     name: user.fullName,
@@ -74,6 +90,21 @@ async function getOrCreateStripeCustomer(userId: string): Promise<string> {
 
   await prisma.user.update({ where: { id: userId }, data: { stripeCustomerId: customer.id } });
   return customer.id;
+}
+
+function resolveCheckoutReturnBase(): string {
+  const configured = env.API_PUBLIC_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, "");
+  }
+  if (env.NODE_ENV === "production") {
+    throw new AppError(
+      "Payment return URL is not configured. Set API_PUBLIC_URL on the server.",
+      503,
+      "API_PUBLIC_URL_MISSING"
+    );
+  }
+  return `http://localhost:${env.PORT}`;
 }
 
 async function recordTransaction(
@@ -301,8 +332,15 @@ export async function createCheckoutSession(gigId: string, clientId: string) {
     }
 
     const customerId = await getOrCreateStripeCustomer(clientId);
-    const apiBase = env.API_PUBLIC_URL ?? `http://localhost:${env.PORT}`;
+    const apiBase = resolveCheckoutReturnBase();
     const amount = checkoutChargeAmountCents(gig);
+    if (!Number.isFinite(amount) || amount < 50) {
+      throw new AppError(
+        "This booking amount is too low to authorize with Stripe. Please update the gig and try again.",
+        400,
+        "INVALID_PAYMENT_AMOUNT"
+      );
+    }
     const timed = isTimeBasedPricing(gig.pricingType);
     const productDescription = timed
       ? `Authorization hold up to ${formatCentsLabel(amount)} for ${gig.serviceCategory.name}. Final charge is based on approved work time.`
@@ -317,8 +355,8 @@ export async function createCheckoutSession(gigId: string, clientId: string) {
               currency: "usd",
               unit_amount: amount,
               product_data: {
-                name: timed ? `${gig.title} (authorization)` : gig.title,
-                description: productDescription
+                name: timed ? `${gig.title} (authorization)`.slice(0, 120) : gig.title.slice(0, 120),
+                description: productDescription.slice(0, 500)
               }
             },
             quantity: 1
@@ -326,6 +364,7 @@ export async function createCheckoutSession(gigId: string, clientId: string) {
         ],
         payment_intent_data: {
           ...(timed ? { capture_method: "manual" as const } : {}),
+          // Save card for later top-ups / overtime capture when needed.
           setup_future_usage: "off_session",
           metadata: {
             gigId: gig.id,

@@ -68,7 +68,14 @@ export function GigPaymentScreen({ navigation, route }: Props) {
         return;
       }
       if (result.checkoutUrl) {
-        await Linking.openURL(result.checkoutUrl);
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          window.location.assign(result.checkoutUrl);
+          return;
+        }
+        const opened = await Linking.openURL(result.checkoutUrl);
+        if (!opened) {
+          setCheckoutError("Unable to open Stripe Checkout. Allow pop-ups, then try again.");
+        }
         return;
       }
       setCheckoutError(FRIENDLY_PAYMENT_ERROR);

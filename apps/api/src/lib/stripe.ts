@@ -72,7 +72,39 @@ export function toFriendlyPaymentStartError(error: unknown): AppError {
   const message = error instanceof Error ? error.message : String(error);
   // Never echo secrets or raw Stripe key fragments to clients.
   const safe = message.replace(/sk_(test|live)_[A-Za-z0-9]+/g, "[redacted]").replace(/rk_live_[A-Za-z0-9]+/g, "[redacted]");
-  console.error("[stripe] payment_start_failed", { message: safe.slice(0, 200) });
+  console.error("[stripe] payment_start_failed", { message: safe.slice(0, 400) });
+
+  if (/no such customer|resource_missing/i.test(safe)) {
+    return new AppError(
+      "Your saved payment profile is out of date. Please try authorizing again.",
+      502,
+      "STRIPE_CUSTOMER_MISSING"
+    );
+  }
+
+  if (/invalid api key|api key.*invalid|expired.*key/i.test(safe)) {
+    return new AppError(
+      "Secure payments are temporarily unavailable. Please contact Duts Support.",
+      503,
+      "STRIPE_KEY_INVALID"
+    );
+  }
+
+  if (/success_url|cancel_url|url must be|not a valid url|https/i.test(safe)) {
+    return new AppError(
+      "Payment return URLs are misconfigured. Please contact Duts Support.",
+      503,
+      "STRIPE_RETURN_URL_INVALID"
+    );
+  }
+
+  if (/amount.*at least|amount must be|must be at least 50/i.test(safe)) {
+    return new AppError(
+      "This booking amount is too low to authorize. Please update the gig and try again.",
+      400,
+      "INVALID_PAYMENT_AMOUNT"
+    );
+  }
 
   return new AppError(
     "We couldn’t start the secure payment process. Please try again or contact Duts Support.",
