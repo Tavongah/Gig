@@ -34,7 +34,7 @@ export const services: ServiceDef[] = [
       "Get help loading, unloading, and moving items locally. DUTS connects you with nearby workers ready to lift, haul, and finish the job faster.",
     startingFromCents: 6000,
     icon: "truck",
-    image: "https://images.unsplash.com/photo-1600518464441-9154a4dea21b?w=800&q=80&auto=format&fit=crop",
+    image: "/images/services/moving.jpg",
     includes: ["Loading and unloading help", "Local short-distance moves", "Furniture and box handling", "On-demand or scheduled help"],
     faqs: [
       { q: "Do workers bring a truck?", a: "Some workers may have a vehicle; confirm details in chat after matching." },
@@ -48,7 +48,7 @@ export const services: ServiceDef[] = [
     description: "Book trusted local cleaners for apartments and houses. Clear expectations, transparent starting prices, and fast matching.",
     startingFromCents: 4500,
     icon: "sparkles",
-    image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800&q=80&auto=format&fit=crop",
+    image: "/images/services/house-cleaning.jpg",
     includes: ["Whole-home cleaning", "Kitchen and bathroom focus", "Flexible scheduling", "Verified local workers"],
     faqs: [
       { q: "Do I need to provide supplies?", a: "Share preferences in your request. Many workers bring basics; specialty products can be noted in the job details." },
@@ -62,7 +62,7 @@ export const services: ServiceDef[] = [
     description: "Need one space refreshed? Room cleaning is ideal for bedrooms, offices, and focused tidy-ups without booking a full-home clean.",
     startingFromCents: 2500,
     icon: "home",
-    image: "https://images.unsplash.com/photo-1563453392217-320e827875a9?w=800&q=80&auto=format&fit=crop",
+    image: "/images/services/room-cleaning.jpg",
     includes: ["Single-room focus", "Light organization", "Quick turnaround options", "Affordable starting rates"],
     faqs: [
       { q: "Can I book multiple rooms?", a: "Yes—describe each room in your request or create separate jobs if you prefer clearer pricing." }
@@ -75,7 +75,7 @@ export const services: ServiceDef[] = [
     description: "Keep your yard sharp with local lawn help for mowing, edging, and basic cleanup—matched nearby so you don't wait on a distant crew.",
     startingFromCents: 3500,
     icon: "leaf",
-    image: "https://images.unsplash.com/photo-1558904541-efa843a96f01?w=800&q=80&auto=format&fit=crop",
+    image: "/images/services/lawn-cutting.jpg",
     includes: ["Mowing", "Edging", "Basic yard cleanup", "Neighborhood-based matching"],
     faqs: [
       { q: "Do I need to own a mower?", a: "Many workers bring equipment. Mention if tools are on-site or if the worker should arrive equipped." }
@@ -88,7 +88,7 @@ export const services: ServiceDef[] = [
     description: "Extra hands for projects, setups, and one-off tasks. Describe the work, match a worker nearby, and get it done.",
     startingFromCents: 5000,
     icon: "hammer",
-    image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&q=80&auto=format&fit=crop",
+    image: "/images/services/short-term-labor.jpg",
     includes: ["Flexible task support", "Project and event labor", "Short or multi-hour jobs", "Local matching"],
     faqs: [
       { q: "What kind of labor can I request?", a: "General local help—lifting, setup, cleanup, and similar tasks. Be specific in your description for the best match." }
@@ -101,7 +101,7 @@ export const services: ServiceDef[] = [
     description: "Interior and exterior vehicle detailing from local pros. Request help, match nearby, and get your car looking sharp.",
     startingFromCents: 5000,
     icon: "car",
-    image: "https://images.unsplash.com/photo-1507136562916-4354600f7c52?w=800&q=80&auto=format&fit=crop",
+    image: "/images/services/car-detailing.jpg",
     includes: ["Interior detailing", "Exterior wash and detail options", "Flexible scheduling", "Secure in-app payments"],
     faqs: [
       { q: "Is water and power required on-site?", a: "Share access details in your request so the worker can prepare correctly." }
@@ -114,7 +114,7 @@ export const services: ServiceDef[] = [
     description: "From flat-pack furniture to fixtures, get matched with nearby workers who can assemble it right the first time.",
     startingFromCents: 4000,
     icon: "wrench",
-    image: "https://images.unsplash.com/photo-1555041469-a586c12ea9bc?w=800&q=80&auto=format&fit=crop",
+    image: "/images/services/furniture-assembly.jpg",
     includes: ["Flat-pack assembly", "Fixtures and basic setup", "On-site completion", "Photo and chat coordination"],
     faqs: [
       { q: "Should I open the boxes first?", a: "Optional—workers can start from sealed packaging if you note it in the job description." }
@@ -127,7 +127,7 @@ export const services: ServiceDef[] = [
     description: "Clear out unwanted items and light debris with local junk-removal help. Fast matching, clear starting prices, and secure payment.",
     startingFromCents: 5500,
     icon: "trash",
-    image: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=800&q=80&auto=format&fit=crop",
+    image: "/images/services/junk-removal.jpg",
     includes: ["Household item removal", "Light debris haul-away", "Loading help", "Transparent estimates"],
     faqs: [
       { q: "Are disposal fees included?", a: "Starting prices cover labor estimates. Disposal or dump fees may vary—confirm in chat before work begins." }
@@ -140,7 +140,7 @@ export const services: ServiceDef[] = [
     description: "Setup, teardown, and on-site support for gatherings and events. Match local workers who can show up ready to help.",
     startingFromCents: 4500,
     icon: "calendar",
-    image: "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&q=80&auto=format&fit=crop",
+    image: "/images/services/event-help.jpg",
     includes: ["Event setup", "Teardown support", "On-site assistance", "Flexible timing"],
     faqs: [
       { q: "Can I book multiple workers?", a: "You can request help and coordinate through DUTS. For larger events, describe headcount needs clearly in the job details." }
