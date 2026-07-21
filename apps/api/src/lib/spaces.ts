@@ -90,4 +90,49 @@ export async function createDownloadSignedUrl(objectKey: string, expiresInSecond
   return getSignedUrl(getSpacesClient(), command, { expiresIn: expiresInSeconds });
 }
 
+/** Upload a public avatar/object and return a stable HTTPS URL. */
+export async function uploadPublicObject(input: {
+  purpose: UploadPurpose;
+  userId: string;
+  fileName: string;
+  contentType: string;
+  body: Buffer;
+}): Promise<{ objectKey: string; publicUrl: string }> {
+  const objectKey = buildObjectKey(input.purpose, input.userId, input.fileName);
+  const bucket = getBucket();
+
+  await getSpacesClient().send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: objectKey,
+      Body: input.body,
+      ContentType: input.contentType,
+      ACL: "public-read",
+      CacheControl: "public, max-age=31536000, immutable"
+    })
+  );
+
+  if (env.SPACES_CDN_URL) {
+    return {
+      objectKey,
+      publicUrl: `${env.SPACES_CDN_URL.replace(/\/$/, "")}/${objectKey}`
+    };
+  }
+
+  const endpoint = (env.SPACES_ENDPOINT ?? env.S3_ENDPOINT ?? "").replace(/\/$/, "");
+  // DigitalOcean Spaces virtual-host style: https://bucket.region.digitaloceanspaces.com/key
+  if (endpoint.includes("digitaloceanspaces.com")) {
+    const host = endpoint.replace(/^https?:\/\//, "");
+    return {
+      objectKey,
+      publicUrl: `https://${bucket}.${host}/${objectKey}`
+    };
+  }
+
+  return {
+    objectKey,
+    publicUrl: `${endpoint}/${bucket}/${objectKey}`
+  };
+}
+
 export { isSpacesConfigured } from "../config/env.js";

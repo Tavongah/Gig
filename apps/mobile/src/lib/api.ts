@@ -379,6 +379,12 @@ export const api = {
     token: string
   ) =>
     request<{ user: ApiUser }>("/auth/me", { method: "PATCH", body: JSON.stringify(payload) }, token),
+  uploadAvatar: (imageDataUrl: string | null, token: string) =>
+    request<{ user: ApiUser }>(
+      "/auth/me/avatar",
+      { method: "POST", body: JSON.stringify({ imageDataUrl }) },
+      token
+    ),
   changePassword: (
     payload: { currentPassword: string; password: string; confirmPassword: string },
     token: string

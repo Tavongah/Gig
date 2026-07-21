@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -14,6 +13,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../lib/api";
+import { showAlert } from "../../lib/confirm";
 import { initials } from "../../lib/format";
 import { Screen } from "../../components/Screen";
 import { DutsCard } from "../../components/DutsCard";
@@ -25,7 +25,7 @@ import { DUTS } from "../../lib/theme";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "EditProfile">;
 
-const MAX_AVATAR_BYTES = 900_000;
+const MAX_AVATAR_DATA_URL_CHARS = 350_000;
 
 function splitName(fullName: string): { firstName: string; lastName: string } {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -45,6 +45,7 @@ export function EditProfileScreen() {
   const [lastName, setLastName] = useState(initial.lastName);
   const [phoneNumber, setPhoneNumber] = useState(profile?.phoneNumber ?? "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatarUrl ?? null);
+  const [pendingAvatarDataUrl, setPendingAvatarDataUrl] = useState<string | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +60,7 @@ export function EditProfileScreen() {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert("Permission needed", "Allow photo access to update your profile picture.");
+        showAlert("Permission needed", "Allow photo access to update your profile picture.");
         return;
       }
 
@@ -67,7 +68,7 @@ export function EditProfileScreen() {
         mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8
+        quality: 0.7
       });
 
       if (result.canceled || !result.assets[0]) return;
@@ -75,8 +76,8 @@ export function EditProfileScreen() {
       const asset = result.assets[0];
       const manipulated = await ImageManipulator.manipulateAsync(
         asset.uri,
-        [{ resize: { width: 512 } }],
-        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        [{ resize: { width: 384 } }],
+        { compress: 0.55, format: ImageManipulator.SaveFormat.JPEG, base64: true }
       );
 
       if (!manipulated.base64) {
@@ -84,11 +85,12 @@ export function EditProfileScreen() {
       }
 
       const dataUrl = `data:image/jpeg;base64,${manipulated.base64}`;
-      if (dataUrl.length > MAX_AVATAR_BYTES) {
+      if (dataUrl.length > MAX_AVATAR_DATA_URL_CHARS) {
         throw new Error("Image is too large. Try a smaller photo.");
       }
 
       setAvatarUrl(dataUrl);
+      setPendingAvatarDataUrl(dataUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update photo.");
     } finally {
@@ -112,16 +114,25 @@ export function EditProfileScreen() {
     setSaving(true);
     setError(null);
     try {
+      let latestUser = profile ?? session.user;
+
+      if (pendingAvatarDataUrl !== undefined) {
+        const avatarResult = await api.uploadAvatar(pendingAvatarDataUrl, session.token);
+        latestUser = avatarResult.user;
+        setAvatarUrl(avatarResult.user.avatarUrl ?? null);
+        setPendingAvatarDataUrl(undefined);
+      }
+
       const { user } = await api.updateProfile(
         {
           fullName,
-          phoneNumber: phoneNumber.trim() ? phoneNumber.trim() : null,
-          avatarUrl
+          phoneNumber: phoneNumber.trim() ? phoneNumber.trim() : null
         },
         session.token
       );
-      setProfile(user);
-      Alert.alert("Saved", "Your profile was updated.", [{ text: "OK", onPress: () => navigation.goBack() }]);
+      setProfile({ ...latestUser, ...user });
+      showAlert("Saved", "Your profile was updated.");
+      navigation.goBack();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save profile.");
     } finally {
@@ -156,7 +167,12 @@ export function EditProfileScreen() {
             </View>
           </Pressable>
           {avatarUrl ? (
-            <Pressable onPress={() => setAvatarUrl(null)}>
+            <Pressable
+              onPress={() => {
+                setAvatarUrl(null);
+                setPendingAvatarDataUrl(null);
+              }}
+            >
               <Text className="text-sm font-semibold text-muted">Remove photo</Text>
             </Pressable>
           ) : null}

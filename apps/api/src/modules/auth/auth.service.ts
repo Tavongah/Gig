@@ -16,6 +16,7 @@ import { env } from "../../config/env.js";
 import { AppError } from "../../lib/errors.js";
 import { createResetToken, hashPassword, hashResetToken, verifyPassword } from "../../lib/password.js";
 import { buildSimpleEmail, sendTransactionalEmail } from "../../lib/email.js";
+import { isSpacesConfigured, uploadPublicObject } from "../../lib/spaces.js";
 import { normalizePhoneNumber } from "./access.service.js";
 import { passwordResetAppUrl, sendEmailVerification } from "./verification.service.js";
 
@@ -321,6 +322,72 @@ export async function getAuthenticatedUser(userId: string) {
 
 export async function getCurrentUser(userId: string) {
   return getAuthenticatedUser(userId);
+}
+
+const MAX_AVATAR_DATA_URL_CHARS = 400_000;
+const MAX_AVATAR_BYTES = 350_000;
+
+function parseAvatarDataUrl(dataUrl: string): { contentType: string; buffer: Buffer } {
+  const match = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl.trim());
+  if (!match) {
+    throw new AppError("VALIDATION_ERROR", 400, "INVALID_AVATAR", {
+      avatarUrl: "Upload a JPEG, PNG, or WebP photo."
+    });
+  }
+
+  const contentType = match[1]!.toLowerCase() === "image/jpg" ? "image/jpeg" : match[1]!.toLowerCase();
+  const buffer = Buffer.from(match[2]!, "base64");
+  if (buffer.byteLength === 0 || buffer.byteLength > MAX_AVATAR_BYTES) {
+    throw new AppError("VALIDATION_ERROR", 400, "INVALID_AVATAR", {
+      avatarUrl: "Image is too large. Try a smaller photo."
+    });
+  }
+
+  return { contentType, buffer };
+}
+
+export async function updateUserAvatarFromDataUrl(userId: string, dataUrl: string | null) {
+  if (dataUrl === null) {
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: null },
+      include: userInclude
+    });
+    return sanitizeUser(user);
+  }
+
+  if (dataUrl.length > MAX_AVATAR_DATA_URL_CHARS) {
+    throw new AppError("VALIDATION_ERROR", 400, "INVALID_AVATAR", {
+      avatarUrl: "Image is too large. Try a smaller photo."
+    });
+  }
+
+  const { contentType, buffer } = parseAvatarDataUrl(dataUrl);
+  const extension = contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : "jpg";
+
+  let avatarUrl: string;
+  if (isSpacesConfigured()) {
+    const uploaded = await uploadPublicObject({
+      purpose: "worker-profile",
+      userId,
+      fileName: `avatar.${extension}`,
+      contentType,
+      body: buffer
+    });
+    avatarUrl = uploaded.publicUrl;
+  } else {
+    // Fallback when Spaces keys are not configured yet — keeps beta/profile photos working.
+    avatarUrl = `data:${contentType};base64,${buffer.toString("base64")}`;
+    console.warn("[avatar] Spaces not configured — storing compressed data URL on user record.");
+  }
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { avatarUrl },
+    include: userInclude
+  });
+
+  return sanitizeUser(user);
 }
 
 export async function updateAuthenticatedProfile(

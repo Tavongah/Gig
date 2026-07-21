@@ -15,6 +15,7 @@ import {
   requestPasswordReset,
   resetPassword,
   updateAuthenticatedProfile,
+  updateUserAvatarFromDataUrl,
   deleteAuthenticatedAccount
 } from "./auth.service.js";
 import { completeUserProfile, loginWithSocialProvider } from "./social-auth.service.js";
@@ -162,15 +163,35 @@ const updateProfileSchema = z.object({
     .url("Avatar must be a valid URL")
     .max(2048, "Avatar URL is too long")
     .refine((value) => !value.toLowerCase().startsWith("data:"), {
-      message: "Inline image uploads are not supported for avatars"
+      message: "Use the photo upload endpoint for profile pictures"
     })
     .nullable()
     .optional()
 });
 
+const avatarUploadSchema = z.object({
+  imageDataUrl: z
+    .string()
+    .min(32)
+    .max(400_000, "Image is too large. Try a smaller photo.")
+    .refine((value) => /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(value), {
+      message: "Upload a JPEG, PNG, or WebP photo."
+    })
+    .nullable()
+});
+
 authRouter.patch("/me", validateBody(updateProfileSchema), async (req, res, next) => {
   try {
     const user = await updateAuthenticatedProfile(req.auth!.userId, req.body);
+    res.json({ user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/me/avatar", validateBody(avatarUploadSchema), async (req, res, next) => {
+  try {
+    const user = await updateUserAvatarFromDataUrl(req.auth!.userId, req.body.imageDataUrl);
     res.json({ user });
   } catch (error) {
     next(error);
