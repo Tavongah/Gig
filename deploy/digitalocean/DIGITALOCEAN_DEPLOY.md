@@ -98,6 +98,49 @@ See [COST_OPTIMIZATION.md](./COST_OPTIMIZATION.md) for tuning.
 
 Marketing site: `https://www.gigflow.ink` (Astro static). App stays at `https://app.gigflow.ink`. CTAs on the marketing site open the existing app—app logic is not modified.
 
+### Launch marketing site (`www`)
+
+1. **DNS** — add the `www` A record (see table above). Wait until it resolves:
+
+   ```bash
+   nslookup www.gigflow.ink
+   ```
+
+2. **Server env** — in `/opt/gigflow/.env.production`:
+
+   ```env
+   MARKETING_DOMAIN=www.gigflow.ink
+   PUBLIC_SITE_URL=https://www.gigflow.ink
+   PUBLIC_APP_URL=https://app.gigflow.ink
+   ```
+
+3. **SSL** — if the browser shows **Not secure** on `www`, the cert was issued before `www` existed. Fix once:
+
+   ```bash
+   bash /opt/gigflow/deploy/digitalocean/scripts/fix-marketing-ssl.sh
+   ```
+
+   Or expand manually:
+
+   ```bash
+   bash /opt/gigflow/deploy/digitalocean/scripts/expand-ssl-app-domain.sh
+   ```
+
+4. **Deploy** — rebuilds nginx with the Astro marketing build:
+
+   ```bash
+   bash /opt/gigflow/deploy/digitalocean/scripts/deploy-marketing.sh
+   ```
+
+5. **Verify** — should return HTML (not API JSON):
+
+   ```bash
+   curl -fsS https://www.gigflow.ink/health
+   curl -fsS https://www.gigflow.ink/ | head
+   ```
+
+Local preview: `npm run dev:marketing` → http://localhost:4321
+
 ---
 
 ## 2. Server bootstrap

@@ -27,3 +27,4 @@ bash "$ROOT/deploy/digitalocean/scripts/render-nginx-conf.sh"
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d nginx
 
 echo "Done. Visit https://$MARKETING_DOMAIN (marketing) and https://$APP_DOMAIN (app)"
+echo "If the browser still shows Not secure, wait 1–2 minutes and hard-refresh (Ctrl+Shift+R)."

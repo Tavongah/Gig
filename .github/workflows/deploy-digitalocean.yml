@@ -54,6 +54,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run build:api
       - run: npm run build --workspace @gigflow/admin
+      - run: npm run build --workspace @gigflow/marketing
       - run: npm run typecheck --workspace @gigflow/mobile
 
   deploy:
@@ -77,3 +78,7 @@ jobs:
         run: |
           curl -fsS "https://${{ secrets.API_DOMAIN }}/health" | grep -q '"ok":true'
           curl -fsS "https://${{ secrets.API_DOMAIN }}/ready" | grep -q '"ready":true'
+      - name: Smoke test marketing site
+        run: |
+          curl -fsS "https://${{ secrets.MARKETING_DOMAIN }}/health" | grep -q '^ok'
+          curl -fsS "https://${{ secrets.MARKETING_DOMAIN }}/" | grep -qi 'DUTS'
