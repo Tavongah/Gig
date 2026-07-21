@@ -43,6 +43,9 @@ const envSchema = z.object({
   SPACES_ACCESS_KEY_ID: optionalString,
   SPACES_SECRET_ACCESS_KEY: optionalString,
   SPACES_CDN_URL: optionalUrl,
+  /** Preferred free email provider: https://resend.com (100 emails/day free). */
+  RESEND_API_KEY: optionalString,
+  /** Optional legacy provider. Used only if RESEND_API_KEY is unset. */
   SENDGRID_API_KEY: optionalString,
   EMAIL_FROM: optionalString,
   TWILIO_ACCOUNT_SID: optionalString,
@@ -50,7 +53,7 @@ const envSchema = z.object({
   TWILIO_FROM_NUMBER: optionalString,
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   SENTRY_DSN: optionalUrl,
-  /** Beta only: log email verification links and phone OTP codes to API stdout (no SendGrid/Twilio yet). */
+  /** Log verification / reset links to API stdout when no email provider is configured (beta). */
   LOG_VERIFICATION_TO_CONSOLE: z
     .string()
     .optional()

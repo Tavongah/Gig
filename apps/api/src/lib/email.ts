@@ -2,7 +2,9 @@ import { env } from "../config/env.js";
 import { AppError } from "./errors.js";
 
 export function isEmailConfigured(): boolean {
-  return Boolean(env.SENDGRID_API_KEY?.trim() && env.EMAIL_FROM?.trim());
+  const from = Boolean(env.EMAIL_FROM?.trim());
+  const hasProvider = Boolean(env.RESEND_API_KEY?.trim() || env.SENDGRID_API_KEY?.trim());
+  return from && hasProvider;
 }
 
 export interface TransactionalEmailInput {
@@ -13,23 +15,26 @@ export interface TransactionalEmailInput {
 }
 
 /**
- * Send a transactional email via SendGrid.
- * In development (or when LOG_VERIFICATION_TO_CONSOLE is set) without SendGrid,
- * logs the message and succeeds so local flows still work.
+ * Send transactional email.
+ * Provider order: Resend (recommended free tier) → SendGrid → console stub when allowed.
  */
 export async function sendTransactionalEmail(input: TransactionalEmailInput): Promise<{ ok: true }> {
   const to = input.to.trim().toLowerCase();
   const from = env.EMAIL_FROM?.trim();
-  const apiKey = env.SENDGRID_API_KEY?.trim();
+  const resendKey = env.RESEND_API_KEY?.trim();
+  const sendgridKey = env.SENDGRID_API_KEY?.trim();
+  const allowConsoleStub = env.NODE_ENV === "development" || env.LOG_VERIFICATION_TO_CONSOLE;
 
-  if (env.NODE_ENV === "development" || env.LOG_VERIFICATION_TO_CONSOLE) {
+  if (allowConsoleStub) {
     console.info(`[email] to=${to} subject=${input.subject}`);
     console.info(`[email] text=\n${input.text}`);
   }
 
-  if (!apiKey || !from) {
-    if (env.NODE_ENV === "development" || env.LOG_VERIFICATION_TO_CONSOLE) {
-      console.warn("[email] SENDGRID_API_KEY / EMAIL_FROM not set — email stubbed (console only).");
+  if (!from || (!resendKey && !sendgridKey)) {
+    if (allowConsoleStub) {
+      console.warn(
+        "[email] No email provider configured — stubbed to console. Set RESEND_API_KEY (recommended) or SENDGRID_API_KEY + EMAIL_FROM."
+      );
       return { ok: true };
     }
 
@@ -41,10 +46,40 @@ export async function sendTransactionalEmail(input: TransactionalEmailInput): Pr
     );
   }
 
+  if (resendKey) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: `Duts <${from}>`,
+        to: [to],
+        subject: input.subject,
+        text: input.text,
+        html: input.html
+      })
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      console.error("[email] resend_failed", { status: response.status, body: body.slice(0, 300) });
+      throw new AppError(
+        "We couldn’t send that email right now. Please try again in a few minutes.",
+        502,
+        "EMAIL_SEND_FAILED",
+        { email: "Email provider rejected the message." }
+      );
+    }
+
+    return { ok: true };
+  }
+
   const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${sendgridKey}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -60,10 +95,7 @@ export async function sendTransactionalEmail(input: TransactionalEmailInput): Pr
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    console.error("[email] sendgrid_failed", {
-      status: response.status,
-      body: body.slice(0, 300)
-    });
+    console.error("[email] sendgrid_failed", { status: response.status, body: body.slice(0, 300) });
     throw new AppError(
       "We couldn’t send that email right now. Please try again in a few minutes.",
       502,
