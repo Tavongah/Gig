@@ -1,37 +1,88 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import PageHeader from "../components/PageHeader.astro";
+import CtaSection from "../components/CtaSection.astro";
 import CtaButton from "../components/CtaButton.astro";
 import { appLinks } from "../data/site";
 ---
 
 <BaseLayout
   title="About DUTS"
-  description="DUTS connects customers with trusted local workers for everyday services—simple, affordable, and fast."
+  description="DUTS is a technology platform connecting trusted local workers with customers who need help with everyday tasks."
   canonicalPath="/about"
 >
   <section class="section">
-    <div class="container narrow">
-      <p class="section__eyebrow">About</p>
-      <h1>Local help, powered by modern matching</h1>
-      <p>
-        DUTS is a technology platform that connects customers with trusted local workers for everyday services. Our mission
-        is to make finding reliable help simple, affordable and fast while creating flexible earning opportunities for
-        local communities.
-      </p>
-      <p>
-        From cleaning and lawn care to moving help and assembly, DUTS is built for real neighborhoods—with secure payments,
-        in-app chat, and a flow designed to feel as smooth as the best modern marketplaces.
-      </p>
-      <div class="ctas">
-        <CtaButton href={appLinks.requestHelp} label="Request Help" />
-        <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
+    <div class="container container--narrow">
+      <PageHeader
+        label="About"
+        title="Local help, powered by modern technology"
+      />
+      <div class="about__content reveal">
+        <p>
+          DUTS is a technology platform connecting trusted local workers with customers who need help with everyday tasks.
+          Our mission is to make finding reliable help simple, affordable, and fast—while creating flexible earning
+          opportunities for local communities.
+        </p>
+        <p>
+          From cleaning and lawn care to moving help and assembly, DUTS is built for real neighborhoods—with secure
+          payments, in-app chat, and a flow designed to feel as smooth as the best modern marketplaces.
+        </p>
+        <div class="about__values">
+          <div class="about__value">
+            <strong>Community</strong>
+            <span>Strengthening neighborhoods through local work.</span>
+          </div>
+          <div class="about__value">
+            <strong>Trust</strong>
+            <span>Verified workers and secure payments.</span>
+          </div>
+          <div class="about__value">
+            <strong>Convenience</strong>
+            <span>Book help in minutes, not days.</span>
+          </div>
+        </div>
+        <div class="btn-group">
+          <CtaButton href={appLinks.requestHelp} label="Request Help" />
+          <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
+        </div>
       </div>
     </div>
   </section>
+  <CtaSection showLogin={false} />
 </BaseLayout>
 
 <style>
-  .narrow { max-width: 720px; }
-  .narrow h1 { font-size: clamp(2rem, 5vw, 3rem); }
-  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
+  .about__content p {
+    font-size: 1.0625rem;
+    line-height: 1.75;
+    margin-bottom: 1.5rem;
+  }
+  .about__values {
+    display: grid;
+    gap: 1rem;
+    margin: 2.5rem 0;
+  }
+  @media (min-width: 640px) {
+    .about__values {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  .about__value {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+  }
+  .about__value strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 0.375rem;
+  }
+  .about__value span {
+    font-size: 0.9375rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
 </style>

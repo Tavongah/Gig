@@ -1,6 +1,8 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
 import ServiceCard from "../../components/ServiceCard.astro";
+import CtaSection from "../../components/CtaSection.astro";
 import CtaButton from "../../components/CtaButton.astro";
 import { appLinks, services } from "../../data/site";
 ---
@@ -15,26 +17,19 @@ import { appLinks, services } from "../../data/site";
       <nav class="crumbs" aria-label="Breadcrumb">
         <a href="/">Home</a> / <span>Services</span>
       </nav>
-      <p class="section__eyebrow">Services</p>
-      <h1 class="section__title">Local help for everyday jobs</h1>
-      <p class="section__lead">Every card links to an SEO page with details, FAQs, and a direct path into the DUTS app.</p>
-      <div class="grid-3" style="margin-top: 2rem">
+      <PageHeader
+        label="Services"
+        title="Local help for everyday jobs"
+        lead="Every service links to detailed information and a direct path into the DUTS app."
+      />
+      <div class="grid-3">
         {services.map((service) => <ServiceCard service={service} />)}
       </div>
-      <div style="margin-top: 2rem" class="hero__ctas">
+      <div class="btn-group" style="margin-top: 3rem">
         <CtaButton href={appLinks.requestHelp} label="Request Help" />
         <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
       </div>
     </div>
   </section>
+  <CtaSection showLogin={false} />
 </BaseLayout>
-
-<style>
-  .crumbs {
-    font-size: 0.85rem;
-    color: var(--muted);
-    margin-bottom: 1rem;
-  }
-  .crumbs a { color: var(--purple); }
-  .hero__ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-</style>

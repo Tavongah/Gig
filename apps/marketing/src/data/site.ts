@@ -20,6 +20,7 @@ export interface ServiceDef {
   description: string;
   startingFromCents: number;
   icon: string;
+  image: string;
   includes: string[];
   faqs: Array<{ q: string; a: string }>;
 }
@@ -28,11 +29,12 @@ export const services: ServiceDef[] = [
   {
     slug: "moving-assistance",
     name: "Moving Assistance",
-    short: "Loading, unloading and moving help.",
+    short: "Loading, unloading, and local moving help from trusted workers.",
     description:
       "Get help loading, unloading, and moving items locally. DUTS connects you with nearby workers ready to lift, haul, and finish the job faster.",
     startingFromCents: 6000,
     icon: "truck",
+    image: "https://images.unsplash.com/photo-1600518464441-9154a4dea21b?w=800&q=80&auto=format&fit=crop",
     includes: ["Loading and unloading help", "Local short-distance moves", "Furniture and box handling", "On-demand or scheduled help"],
     faqs: [
       { q: "Do workers bring a truck?", a: "Some workers may have a vehicle; confirm details in chat after matching." },
@@ -42,10 +44,11 @@ export const services: ServiceDef[] = [
   {
     slug: "house-cleaning",
     name: "House Cleaning",
-    short: "Whole-home cleaning.",
+    short: "Whole-home cleaning from verified local professionals.",
     description: "Book trusted local cleaners for apartments and houses. Clear expectations, transparent starting prices, and fast matching.",
     startingFromCents: 4500,
     icon: "sparkles",
+    image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800&q=80&auto=format&fit=crop",
     includes: ["Whole-home cleaning", "Kitchen and bathroom focus", "Flexible scheduling", "Verified local workers"],
     faqs: [
       { q: "Do I need to provide supplies?", a: "Share preferences in your request. Many workers bring basics; specialty products can be noted in the job details." },
@@ -55,10 +58,11 @@ export const services: ServiceDef[] = [
   {
     slug: "room-cleaning",
     name: "Room Cleaning",
-    short: "Single-room cleaning and organization.",
+    short: "Single-room cleaning and light organization.",
     description: "Need one space refreshed? Room cleaning is ideal for bedrooms, offices, and focused tidy-ups without booking a full-home clean.",
     startingFromCents: 2500,
     icon: "home",
+    image: "https://images.unsplash.com/photo-1563453392217-320e827875a9?w=800&q=80&auto=format&fit=crop",
     includes: ["Single-room focus", "Light organization", "Quick turnaround options", "Affordable starting rates"],
     faqs: [
       { q: "Can I book multiple rooms?", a: "Yes—describe each room in your request or create separate jobs if you prefer clearer pricing." }
@@ -67,10 +71,11 @@ export const services: ServiceDef[] = [
   {
     slug: "lawn-cutting",
     name: "Lawn Cutting",
-    short: "Mowing, edging and yard cleanup.",
-    description: "Keep your yard sharp with local lawn help for mowing, edging, and basic cleanup—matched nearby so you don’t wait on a distant crew.",
+    short: "Mowing, edging, and yard cleanup from local pros.",
+    description: "Keep your yard sharp with local lawn help for mowing, edging, and basic cleanup—matched nearby so you don't wait on a distant crew.",
     startingFromCents: 3500,
     icon: "leaf",
+    image: "https://images.unsplash.com/photo-1558904541-efa843a96f01?w=800&q=80&auto=format&fit=crop",
     includes: ["Mowing", "Edging", "Basic yard cleanup", "Neighborhood-based matching"],
     faqs: [
       { q: "Do I need to own a mower?", a: "Many workers bring equipment. Mention if tools are on-site or if the worker should arrive equipped." }
@@ -79,10 +84,11 @@ export const services: ServiceDef[] = [
   {
     slug: "short-term-labor",
     name: "Short-Term Labor",
-    short: "Flexible labor for projects and events.",
+    short: "Flexible hands for projects, setups, and one-off tasks.",
     description: "Extra hands for projects, setups, and one-off tasks. Describe the work, match a worker nearby, and get it done.",
     startingFromCents: 5000,
     icon: "hammer",
+    image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&q=80&auto=format&fit=crop",
     includes: ["Flexible task support", "Project and event labor", "Short or multi-hour jobs", "Local matching"],
     faqs: [
       { q: "What kind of labor can I request?", a: "General local help—lifting, setup, cleanup, and similar tasks. Be specific in your description for the best match." }
@@ -91,10 +97,11 @@ export const services: ServiceDef[] = [
   {
     slug: "car-detailing",
     name: "Car Detailing",
-    short: "Interior and exterior detailing.",
+    short: "Interior and exterior detailing at your location.",
     description: "Interior and exterior vehicle detailing from local pros. Request help, match nearby, and get your car looking sharp.",
     startingFromCents: 5000,
     icon: "car",
+    image: "https://images.unsplash.com/photo-1507136562916-4354600f7c52?w=800&q=80&auto=format&fit=crop",
     includes: ["Interior detailing", "Exterior wash and detail options", "Flexible scheduling", "Secure in-app payments"],
     faqs: [
       { q: "Is water and power required on-site?", a: "Share access details in your request so the worker can prepare correctly." }
@@ -103,10 +110,11 @@ export const services: ServiceDef[] = [
   {
     slug: "furniture-assembly",
     name: "Furniture Assembly",
-    short: "Assembly of furniture and fixtures.",
+    short: "Flat-pack furniture and fixture assembly done right.",
     description: "From flat-pack furniture to fixtures, get matched with nearby workers who can assemble it right the first time.",
     startingFromCents: 4000,
     icon: "wrench",
+    image: "https://images.unsplash.com/photo-1555041469-a586c12ea9bc?w=800&q=80&auto=format&fit=crop",
     includes: ["Flat-pack assembly", "Fixtures and basic setup", "On-site completion", "Photo and chat coordination"],
     faqs: [
       { q: "Should I open the boxes first?", a: "Optional—workers can start from sealed packaging if you note it in the job description." }
@@ -115,10 +123,11 @@ export const services: ServiceDef[] = [
   {
     slug: "junk-removal",
     name: "Junk Removal",
-    short: "Removal of unwanted household items.",
+    short: "Haul away unwanted items and light debris.",
     description: "Clear out unwanted items and light debris with local junk-removal help. Fast matching, clear starting prices, and secure payment.",
     startingFromCents: 5500,
     icon: "trash",
+    image: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=800&q=80&auto=format&fit=crop",
     includes: ["Household item removal", "Light debris haul-away", "Loading help", "Transparent estimates"],
     faqs: [
       { q: "Are disposal fees included?", a: "Starting prices cover labor estimates. Disposal or dump fees may vary—confirm in chat before work begins." }
@@ -127,10 +136,11 @@ export const services: ServiceDef[] = [
   {
     slug: "event-help",
     name: "Event Help",
-    short: "Setup, teardown and event assistance.",
+    short: "Setup, teardown, and on-site event assistance.",
     description: "Setup, teardown, and on-site support for gatherings and events. Match local workers who can show up ready to help.",
     startingFromCents: 4500,
     icon: "calendar",
+    image: "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&q=80&auto=format&fit=crop",
     includes: ["Event setup", "Teardown support", "On-site assistance", "Flexible timing"],
     faqs: [
       { q: "Can I book multiple workers?", a: "You can request help and coordinate through DUTS. For larger events, describe headcount needs clearly in the job details." }
@@ -181,19 +191,33 @@ export const cities: CityDef[] = [
 ];
 
 export const trustItems = [
-  { title: "Verified Workers", body: "Workers go through account checks so you can book with more confidence.", icon: "shield" },
-  { title: "Fast Matching", body: "Your request goes to nearby available workers—so help can start sooner.", icon: "bolt" },
-  { title: "Secure Payments", body: "Pay through Stripe-powered checkout. No awkward cash handoffs.", icon: "lock" },
-  { title: "Reliable Local Pros", body: "Work with people in your community who know the area.", icon: "pin" },
-  { title: "Affordable Pricing", body: "See starting prices up front. Final cost reflects job size and details.", icon: "tag" },
-  { title: "Community Powered", body: "Customers get help. Workers earn flexibly. Neighborhoods stay productive.", icon: "users" }
+  { title: "Verified Workers", body: "Every worker completes registration and approval before taking jobs.", icon: "shield" },
+  { title: "Fast Matching", body: "Your request reaches nearby available workers in minutes.", icon: "bolt" },
+  { title: "Secure Payments", body: "Pay through Stripe-powered checkout. No cash handoffs.", icon: "lock" },
+  { title: "Transparent Pricing", body: "See starting prices up front. No surprises.", icon: "tag" },
+  { title: "Reliable Service", body: "Track progress, chat in-app, and approve when done.", icon: "check" },
+  { title: "Local Professionals", body: "Work with people in your community who know the area.", icon: "pin" }
+];
+
+export const whyDuts = [
+  { title: "Built for trust", body: "Account checks, secure payments, and clear job details.", icon: "shield" },
+  { title: "Designed for speed", body: "Match with nearby workers without long wait times.", icon: "bolt" },
+  { title: "Made for your neighborhood", body: "Local workers. Local jobs. Real community impact.", icon: "pin" },
+  { title: "Simple from start to finish", body: "Request, match, pay, and done—all in one app.", icon: "check" }
+];
+
+export const socialProof = [
+  { value: "4.9", label: "Average Rating", sub: "Placeholder" },
+  { value: "2,500+", label: "Jobs Completed", sub: "Placeholder" },
+  { value: "500+", label: "Workers Available", sub: "Placeholder" },
+  { value: "4+", label: "Cities Served", sub: "Connecticut" }
 ];
 
 export const howSteps = [
-  { step: 1, title: "Choose a Service", body: "Pick from cleaning, moving help, lawn care, assembly, and more." },
-  { step: 2, title: "Describe your Job", body: "Add location, timing, and details so workers know exactly what’s needed." },
-  { step: 3, title: "Get Matched with a Worker", body: "Nearby workers can express interest. Choose who feels right—then secure payment." },
-  { step: 4, title: "Job Completed", body: "Track progress, stay in chat, approve completion, and you’re done." }
+  { step: 1, title: "Choose a Service", body: "Pick from cleaning, moving, lawn care, assembly, and more." },
+  { step: 2, title: "Describe Your Job", body: "Add location, timing, and details so workers know what's needed." },
+  { step: 3, title: "Get Matched", body: "Nearby workers respond. Choose who feels right and secure payment." },
+  { step: 4, title: "Job Completed", body: "Track progress, stay in chat, approve completion—you're done." }
 ];
 
 export const faqs = [
@@ -203,7 +227,7 @@ export const faqs = [
   },
   {
     q: "How do I pay?",
-    a: "Payments are handled securely in the app through Stripe. You’ll confirm payment before work proceeds according to the job flow."
+    a: "Payments are handled securely in the app through Stripe. You'll confirm payment before work proceeds according to the job flow."
   },
   {
     q: "How quickly can I get matched?",
@@ -225,4 +249,11 @@ export const faqs = [
     q: "What services are available?",
     a: "Launch services include moving assistance, house and room cleaning, lawn cutting, short-term labor, car detailing, furniture assembly, junk removal, and event help."
   }
+];
+
+export const workerBenefits = [
+  { title: "Your schedule", body: "Go online when you're free and accept nearby jobs that fit your day." },
+  { title: "Flexible income", body: "Turn spare time into earnings with local gigs in your area." },
+  { title: "Jobs nearby", body: "See opportunities close to you so travel stays practical." },
+  { title: "Simple onboarding", body: "Create your profile, get approved, and start exploring work." }
 ];

@@ -9,7 +9,7 @@ import { SUPPORT_EMAIL } from "../data/site";
   canonicalPath="/terms"
 >
   <section class="section">
-    <div class="container narrow">
+    <div class="container container--narrow legal">
       <h1>Terms of Service</h1>
       <p>
         By using DUTS, you agree to use the platform lawfully, provide accurate information, and respect other users.
@@ -24,6 +24,7 @@ import { SUPPORT_EMAIL } from "../data/site";
 </BaseLayout>
 
 <style>
-  .narrow { max-width: 720px; }
-  a { color: var(--purple); font-weight: 600; }
+  .legal h1 { font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 800; margin-bottom: 1.5rem; }
+  .legal p { font-size: 1.0625rem; line-height: 1.75; }
+  .legal a { color: var(--purple); font-weight: 600; }
 </style>

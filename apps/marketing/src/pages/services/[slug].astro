@@ -1,6 +1,8 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import CtaButton from "../../components/CtaButton.astro";
+import FaqAccordion from "../../components/FaqAccordion.astro";
+import CtaSection from "../../components/CtaSection.astro";
 import { appLinks, formatFromCents, getService, services } from "../../data/site";
 
 export function getStaticPaths() {
@@ -19,6 +21,7 @@ const jsonLd = {
   "@type": "Service",
   name: service.name,
   description: service.description,
+  image: service.image,
   provider: { "@type": "Organization", name: "DUTS" },
   areaServed: "Connecticut",
   offers: {
@@ -36,102 +39,157 @@ const jsonLd = {
   canonicalPath={`/services/${service.slug}`}
   jsonLd={jsonLd}
 >
-  <section class="hero-service">
-    <div class="container">
-      <nav class="crumbs" aria-label="Breadcrumb">
-        <a href="/">Home</a> / <a href="/services">Services</a> / <span>{service.name}</span>
-      </nav>
-      <p class="section__eyebrow">Service</p>
-      <h1>{service.name}</h1>
-      <p class="lead">{service.description}</p>
-      <p class="price">Starting from {formatFromCents(service.startingFromCents)}</p>
-      <div class="ctas">
-        <CtaButton href={appLinks.requestHelp} label="Request this Service" />
-        <CtaButton href={appLinks.login} label="Login" variant="ghost" />
+  <section class="service-hero">
+    <div class="container service-hero__grid">
+      <div class="service-hero__copy reveal">
+        <nav class="crumbs" aria-label="Breadcrumb">
+          <a href="/">Home</a> / <a href="/services">Services</a> / <span>{service.name}</span>
+        </nav>
+        <p class="section__label">Service</p>
+        <h1>{service.name}</h1>
+        <p class="service-hero__lead">{service.description}</p>
+        <p class="service-hero__price">Starting from {formatFromCents(service.startingFromCents)}</p>
+        <div class="btn-group">
+          <CtaButton href={appLinks.requestHelp} label="Request this Service" />
+          <CtaButton href={appLinks.login} label="Login" variant="ghost" />
+        </div>
+      </div>
+      <div class="service-hero__image reveal">
+        <img src={service.image} alt={service.name} width="640" height="480" loading="eager" />
       </div>
     </div>
   </section>
 
   <section class="section">
-    <div class="container narrow">
-      <h2>Why choose DUTS</h2>
-      <p>Verified local workers, fast matching, secure payments, and clear starting prices—so you can book with confidence.</p>
-      <h2>What’s included</h2>
-      <ul>
+    <div class="container container--narrow">
+      <h2>What's included</h2>
+      <ul class="includes">
         {service.includes.map((item) => <li>{item}</li>)}
       </ul>
-      <h2>Starting price</h2>
+
+      <h2>Pricing</h2>
       <p>
-        From <strong>{formatFromCents(service.startingFromCents)}</strong>. Final pricing can vary by location, job size,
-        duration, complexity, and special requirements.
+        Starting from <strong>{formatFromCents(service.startingFromCents)}</strong>. Final pricing depends on location,
+        job size, duration, and complexity. You'll see clear details as you request help in the app.
       </p>
-      <h2>Frequently asked questions</h2>
-      {
-        service.faqs.map((faq) => (
-          <details class="card">
-            <summary>{faq.q}</summary>
-            <p>{faq.a}</p>
-          </details>
-        ))
-      }
+
+      <h2>Questions</h2>
+      <FaqAccordion items={service.faqs} />
     </div>
   </section>
 
   <section class="section section--surface">
     <div class="container">
-      <h2>Related services</h2>
+      <h2 class="section__title">Related services</h2>
       <div class="related">
         {
           related.map((item) => (
-            <a class="card" href={`/services/${item.slug}`}>
-              <strong>{item.name}</strong>
-              <span>From {formatFromCents(item.startingFromCents)}</span>
+            <a class="related__card reveal" href={`/services/${item.slug}`}>
+              <img src={item.image} alt={item.name} width="320" height="192" loading="lazy" />
+              <div>
+                <strong>{item.name}</strong>
+                <span>From {formatFromCents(item.startingFromCents)}</span>
+              </div>
             </a>
           ))
         }
       </div>
-      <div class="ctas" style="margin-top: 1.5rem">
-        <CtaButton href={appLinks.requestHelp} label="Request Help" />
-        <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
-      </div>
     </div>
   </section>
+
+  <CtaSection showLogin={false} />
 </BaseLayout>
 
 <style>
-  .hero-service {
-    padding: 3.5rem 0 2.5rem;
-    background: var(--gradient-soft);
+  .service-hero {
+    padding: clamp(2.5rem, 6vw, 4rem) 0;
+    background: var(--bg);
   }
-  .hero-service h1 {
-    font-size: clamp(2rem, 5vw, 3.2rem);
+  .service-hero__grid {
+    display: grid;
+    gap: 3rem;
+    align-items: center;
   }
-  .lead { max-width: 42rem; font-size: 1.05rem; }
-  .price {
-    color: #7b3fe4;
+  @media (min-width: 900px) {
+    .service-hero__grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .service-hero h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
     font-weight: 800;
-    font-size: 1.15rem;
+    margin-bottom: 1rem;
   }
-  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.25rem; }
-  .crumbs { font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem; }
-  .crumbs a { color: var(--purple); }
-  .narrow { max-width: 720px; }
-  .narrow h2 { margin-top: 1.75rem; }
-  .narrow ul { color: var(--muted); }
-  details { margin: 0.75rem 0; }
-  details summary { cursor: pointer; font-weight: 700; }
+  .service-hero__lead {
+    font-size: 1.0625rem;
+    line-height: 1.7;
+    margin-bottom: 1rem;
+  }
+  .service-hero__price {
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--ink) !important;
+    margin-bottom: 1.5rem !important;
+  }
+  .service-hero__image {
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .service-hero__image img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+  }
+  .includes {
+    color: var(--muted);
+    line-height: 1.8;
+    margin-bottom: 2rem;
+    padding-left: 1.25rem;
+  }
+  h2 {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+  }
   .related {
     display: grid;
-    gap: 0.85rem;
-    grid-template-columns: 1fr;
-    margin-top: 1rem;
+    gap: 1.25rem;
+    margin-top: 1.5rem;
   }
-  @media (min-width: 720px) {
-    .related { grid-template-columns: repeat(3, 1fr); }
+  @media (min-width: 768px) {
+    .related {
+      grid-template-columns: repeat(3, 1fr);
+    }
   }
-  .related a {
+  .related__card {
+    background: var(--bg);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  .related__card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow);
+  }
+  .related__card img {
+    width: 100%;
+    aspect-ratio: 5 / 3;
+    object-fit: cover;
+  }
+  .related__card div {
+    padding: 1rem 1.25rem;
     display: grid;
-    gap: 0.35rem;
+    gap: 0.25rem;
   }
-  .related span { color: var(--muted); font-size: 0.9rem; }
+  .related__card strong {
+    font-family: var(--font-display);
+    color: var(--ink);
+  }
+  .related__card span {
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
 </style>

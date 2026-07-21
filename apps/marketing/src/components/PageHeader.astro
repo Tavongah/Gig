@@ -1,0 +1,43 @@
+---
+interface Props {
+  label?: string;
+  title: string;
+  lead?: string;
+  centered?: boolean;
+}
+const { label, title, lead, centered = false } = Astro.props;
+---
+
+<header class:list={["page-header", { "page-header--center": centered }]}>
+  {label && <p class="section__label">{label}</p>}
+  <h1 class="page-header__title">{title}</h1>
+  {lead && <p class="page-header__lead">{lead}</p>}
+</header>
+
+<style>
+  .page-header {
+    margin-bottom: 3rem;
+  }
+  .page-header--center {
+    text-align: center;
+  }
+  .page-header--center .page-header__lead {
+    margin-inline: auto;
+  }
+  .page-header__title {
+    font-size: clamp(2rem, 5vw, 3.25rem);
+    font-weight: 800;
+    max-width: 18ch;
+    letter-spacing: -0.03em;
+  }
+  .page-header--center .page-header__title {
+    max-width: none;
+    margin-inline: auto;
+  }
+  .page-header__lead {
+    font-size: 1.125rem;
+    max-width: 42rem;
+    line-height: 1.7;
+    margin-top: 1rem;
+  }
+</style>

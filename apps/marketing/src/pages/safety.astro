@@ -1,16 +1,9 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import CtaButton from "../components/CtaButton.astro";
-import { appLinks } from "../data/site";
-
-const points = [
-  { title: "Trusted workers", body: "Workers complete registration and approval before taking jobs." },
-  { title: "Secure platform", body: "Payments run through Stripe-powered checkout inside the app." },
-  { title: "Privacy protection", body: "We design flows to share what’s needed for the job—nothing more than necessary." },
-  { title: "Reliable customer support", body: "Reach support by email or phone during published business hours." },
-  { title: "Transparent pricing", body: "Starting prices are shown up front; final cost reflects job details." },
-  { title: "Community-first approach", body: "DUTS is built to strengthen local neighborhoods—customers and workers together." }
-];
+import PageHeader from "../components/PageHeader.astro";
+import TrustCard from "../components/TrustCard.astro";
+import CtaSection from "../components/CtaSection.astro";
+import { trustItems } from "../data/site";
 ---
 
 <BaseLayout
@@ -20,28 +13,18 @@ const points = [
 >
   <section class="section">
     <div class="container">
-      <p class="section__eyebrow">Safety & Trust</p>
-      <h1 class="section__title">Designed for confidence</h1>
-      <div class="grid-3" style="margin-top: 2rem">
-        {
-          points.map((p) => (
-            <article class="card reveal">
-              <div class="icon-badge">✓</div>
-              <h2>{p.title}</h2>
-              <p>{p.body}</p>
-            </article>
-          ))
-        }
-      </div>
-      <div class="ctas">
-        <CtaButton href={appLinks.requestHelp} label="Request Help" />
-        <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
+      <PageHeader
+        label="Safety & Trust"
+        title="Designed for confidence"
+        lead="Every part of DUTS is built to help you book with peace of mind."
+        centered
+      />
+      <div class="grid-3">
+        {trustItems.map((item) => (
+          <TrustCard title={item.title} body={item.body} icon={item.icon} />
+        ))}
       </div>
     </div>
   </section>
+  <CtaSection showLogin={false} />
 </BaseLayout>
-
-<style>
-  .card h2 { font-size: 1.15rem; margin-top: 0.85rem; }
-  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
-</style>

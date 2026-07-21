@@ -1,7 +1,10 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import PageHeader from "../components/PageHeader.astro";
+import Timeline from "../components/Timeline.astro";
+import CtaSection from "../components/CtaSection.astro";
 import CtaButton from "../components/CtaButton.astro";
-import { appLinks, howSteps } from "../data/site";
+import { appLinks } from "../data/site";
 ---
 
 <BaseLayout
@@ -11,38 +14,17 @@ import { appLinks, howSteps } from "../data/site";
 >
   <section class="section">
     <div class="container">
-      <p class="section__eyebrow">How It Works</p>
-      <h1 class="section__title">From request to done—clear and fast</h1>
-      <ol class="steps">
-        {
-          howSteps.map((step) => (
-            <li class="card reveal">
-              <div class="icon-badge">{step.step}</div>
-              <h2>{step.title}</h2>
-              <p>{step.body}</p>
-            </li>
-          ))
-        }
-      </ol>
-      <div class="ctas">
+      <PageHeader
+        label="How It Works"
+        title="From request to done—clear and fast"
+        lead="Four simple steps to get trusted local help when you need it."
+      />
+      <Timeline />
+      <div class="btn-group" style="margin-top: 3rem">
         <CtaButton href={appLinks.requestHelp} label="Request Help" />
         <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
       </div>
     </div>
   </section>
+  <CtaSection showLogin={false} />
 </BaseLayout>
-
-<style>
-  .steps {
-    list-style: none;
-    margin: 2rem 0 0;
-    padding: 0;
-    display: grid;
-    gap: 1rem;
-  }
-  @media (min-width: 900px) {
-    .steps { grid-template-columns: repeat(4, 1fr); }
-  }
-  .steps h2 { font-size: 1.2rem; margin-top: 0.85rem; }
-  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
-</style>

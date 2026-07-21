@@ -1,0 +1,178 @@
+<div class="phone reveal" aria-hidden="true">
+  <div class="phone__frame">
+    <div class="phone__notch"></div>
+    <div class="phone__screen">
+      <div class="phone__header">
+        <span class="phone__logo">DUTS</span>
+        <span class="phone__status"></span>
+      </div>
+      <div class="phone__card phone__card--active">
+        <span class="phone__badge">Matched</span>
+        <strong>House Cleaning</strong>
+        <span>Today · 2:00 PM</span>
+      </div>
+      <div class="phone__card">
+        <strong>Worker on the way</strong>
+        <span>12 min · Secure chat</span>
+        <div class="phone__progress"><div></div></div>
+      </div>
+      <div class="phone__card phone__card--small">
+        <span>Payment secured</span>
+        <strong>$45</strong>
+      </div>
+    </div>
+  </div>
+  <div class="phone__float phone__float--1">
+    <img src="https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=120&q=80&auto=format&fit=crop" alt="" width="56" height="56" loading="lazy" />
+  </div>
+  <div class="phone__float phone__float--2">
+    <img src="https://images.unsplash.com/photo-1600518464441-9154a4dea21b?w=120&q=80&auto=format&fit=crop" alt="" width="56" height="56" loading="lazy" />
+  </div>
+</div>
+
+<style>
+  .phone {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    padding: 2rem 0;
+  }
+  .phone__frame {
+    width: min(100%, 280px);
+    background: #111827;
+    border-radius: 40px;
+    padding: 12px;
+    box-shadow: var(--shadow-lg);
+  }
+  .phone__notch {
+    width: 100px;
+    height: 24px;
+    background: #111827;
+    border-radius: 0 0 16px 16px;
+    margin: 0 auto -12px;
+    position: relative;
+    z-index: 2;
+  }
+  .phone__screen {
+    background: #fff;
+    border-radius: 32px;
+    padding: 2rem 1.25rem 1.5rem;
+    min-height: 420px;
+    display: grid;
+    gap: 0.875rem;
+    align-content: start;
+  }
+  .phone__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .phone__logo {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.125rem;
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .phone__status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+  }
+  .phone__card {
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 1rem;
+    display: grid;
+    gap: 0.25rem;
+  }
+  .phone__card strong {
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    color: var(--ink);
+  }
+  .phone__card span {
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+  .phone__card--active {
+    background: var(--bg);
+    box-shadow: var(--shadow-sm);
+  }
+  .phone__badge {
+    display: inline-block;
+    width: fit-content;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #fff;
+    background: var(--gradient);
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    margin-bottom: 0.25rem;
+  }
+  .phone__progress {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 0.5rem;
+    overflow: hidden;
+  }
+  .phone__progress div {
+    width: 65%;
+    height: 100%;
+    background: var(--gradient);
+    border-radius: 2px;
+    animation: progress 3s ease-in-out infinite;
+  }
+  .phone__card--small {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+  .phone__card--small strong {
+    font-size: 1.125rem;
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .phone__float {
+    position: absolute;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    animation: float 6s ease-in-out infinite;
+  }
+  .phone__float img {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+  }
+  .phone__float--1 {
+    top: 15%;
+    right: 5%;
+    animation-delay: 0.5s;
+  }
+  .phone__float--2 {
+    bottom: 20%;
+    left: 0;
+    animation-delay: 1s;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  @keyframes progress {
+    0%, 100% { width: 45%; }
+    50% { width: 75%; }
+  }
+  @media (min-width: 960px) {
+    .phone__float--1 { right: 0; }
+    .phone__float--2 { left: -5%; }
+  }
+</style>

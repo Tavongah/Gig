@@ -9,15 +9,17 @@
   --ink: #111827;
   --muted: #6b7280;
   --border: #e5e7eb;
-  --shadow: 0 10px 40px rgba(17, 24, 39, 0.06);
-  --shadow-sm: 0 4px 20px rgba(17, 24, 39, 0.04);
-  --radius: 18px;
-  --radius-lg: 24px;
-  --gradient: linear-gradient(90deg, var(--orange), var(--pink), var(--purple), var(--blue), var(--teal));
-  --gradient-soft: linear-gradient(135deg, #fff7ed, #fdf2f8, #f5f3ff, #eff6ff, #f0fdfa);
-  --font-display: "Outfit", system-ui, sans-serif;
-  --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
-  --max: 1120px;
+  --shadow-sm: 0 1px 3px rgba(17, 24, 39, 0.04), 0 4px 16px rgba(17, 24, 39, 0.04);
+  --shadow: 0 4px 24px rgba(17, 24, 39, 0.08);
+  --shadow-lg: 0 12px 48px rgba(17, 24, 39, 0.1);
+  --radius: 20px;
+  --radius-lg: 28px;
+  --radius-xl: 36px;
+  --gradient: linear-gradient(135deg, var(--orange), var(--pink), var(--purple), var(--blue), var(--teal));
+  --font-display: "Manrope", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --max: 1200px;
+  --section-y: clamp(4rem, 8vw, 7rem);
 }
 
 *,
@@ -33,9 +35,10 @@ html {
 body {
   margin: 0;
   font-family: var(--font-body);
+  font-size: 1rem;
   color: var(--ink);
   background: var(--bg);
-  line-height: 1.6;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -56,9 +59,11 @@ h2,
 h3,
 h4 {
   font-family: var(--font-display);
-  line-height: 1.15;
+  line-height: 1.12;
   letter-spacing: -0.03em;
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.75rem;
+  color: var(--ink);
+  font-weight: 700;
 }
 
 p {
@@ -67,54 +72,91 @@ p {
 }
 
 .container {
-  width: min(100% - 2rem, var(--max));
+  width: min(100% - 2.5rem, var(--max));
+  margin-inline: auto;
+}
+
+.container--narrow {
+  width: min(100% - 2.5rem, 720px);
   margin-inline: auto;
 }
 
 .section {
-  padding: 5rem 0;
+  padding: var(--section-y) 0;
 }
 
 .section--surface {
   background: var(--surface);
 }
 
-.section__eyebrow {
+.section__label {
   display: inline-block;
   font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  background: var(--gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  margin-bottom: 0.75rem;
+  color: var(--purple);
+  margin-bottom: 1rem;
 }
 
 .section__title {
-  font-size: clamp(1.85rem, 4vw, 2.75rem);
-  max-width: 18ch;
+  font-size: clamp(1.875rem, 4vw, 2.75rem);
+  font-weight: 800;
+  max-width: 20ch;
+  margin-bottom: 1rem;
+}
+
+.section__title--center {
+  max-width: none;
+  text-align: center;
+  margin-inline: auto;
 }
 
 .section__lead {
-  font-size: 1.05rem;
+  font-size: 1.125rem;
   max-width: 42rem;
+  line-height: 1.7;
+}
+
+.section__lead--center {
+  text-align: center;
+  margin-inline: auto;
+}
+
+.section__header {
+  margin-bottom: 3.5rem;
+}
+
+.section__header--center {
+  text-align: center;
+}
+
+.section__header--center .section__lead {
+  margin-inline: auto;
+}
+
+.grid-2 {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: 1fr;
 }
 
 .grid-3 {
   display: grid;
-  gap: 1.25rem;
+  gap: 1.5rem;
   grid-template-columns: 1fr;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 640px) {
+  .grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
   .grid-3 {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (min-width: 980px) {
+@media (min-width: 960px) {
   .grid-3 {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -122,15 +164,14 @@ p {
 
 .card {
   background: var(--bg);
-  border: 1px solid rgba(229, 231, 235, 0.9);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
-  padding: 1.35rem;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  padding: 1.75rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   box-shadow: var(--shadow);
 }
 
@@ -139,57 +180,96 @@ p {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  min-height: 48px;
-  padding: 0.85rem 1.35rem;
+  min-height: 52px;
+  padding: 0.875rem 1.75rem;
   border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.95rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.9375rem;
   border: none;
   cursor: pointer;
-  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.25s ease;
+  transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.2s ease;
+  white-space: nowrap;
 }
 
 .btn:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .btn--primary {
   color: #fff;
   background-image: var(--gradient);
   background-size: 200% 100%;
-  box-shadow: 0 10px 30px rgba(123, 63, 228, 0.22);
+  box-shadow: 0 8px 24px rgba(123, 63, 228, 0.25);
 }
 
 .btn--primary:hover {
   background-position: 100% 0;
+  box-shadow: 0 12px 32px rgba(123, 63, 228, 0.32);
 }
 
 .btn--ghost {
   background: #fff;
   color: var(--ink);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
 }
 
 .btn--ghost:hover {
-  border-color: var(--purple);
-  color: var(--purple);
+  border-color: transparent;
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    var(--gradient) border-box;
+  border: 1.5px solid transparent;
 }
 
-.icon-badge {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  background-image: var(--gradient);
-  font-size: 1.1rem;
+.btn--sm {
+  min-height: 44px;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+}
+
+.btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.875rem;
+}
+
+.text-gradient {
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.link {
+  font-weight: 600;
+  color: var(--purple);
+  transition: opacity 0.2s ease;
+}
+
+.link:hover {
+  opacity: 0.8;
+}
+
+.crumbs {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-bottom: 1.5rem;
+}
+
+.crumbs a {
+  color: var(--purple);
+  font-weight: 500;
+}
+
+.crumbs a:hover {
+  text-decoration: underline;
 }
 
 .reveal {
   opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 0.7s ease, transform 0.7s ease;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
 }
 
 .reveal.is-visible {
@@ -206,4 +286,9 @@ p {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   border: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 3px;
 }

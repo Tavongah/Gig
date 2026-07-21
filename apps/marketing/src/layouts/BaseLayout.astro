@@ -34,6 +34,7 @@ const jsonLdBlocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     <meta name="theme-color" content="#FFFFFF" />
+    <meta name="robots" content="index, follow" />
 
     <meta property="og:type" content={ogType} />
     <meta property="og:title" content={fullTitle} />
@@ -51,14 +52,9 @@ const jsonLdBlocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
-
-    <!-- Analytics placeholders: replace with real IDs when ready -->
-    <!-- Google Analytics 4 -->
-    <!-- Microsoft Clarity -->
-    <!-- Meta Pixel -->
 
     {
       jsonLdBlocks.map((block) => (
@@ -68,7 +64,7 @@ const jsonLdBlocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
   </head>
   <body>
     <Nav />
-    <main>
+    <main id="main">
       <slot />
     </main>
     <Footer />
@@ -83,7 +79,7 @@ const jsonLdBlocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
             }
           }
         },
-        { threshold: 0.12 }
+        { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
       );
       els.forEach((el) => io.observe(el));
     </script>

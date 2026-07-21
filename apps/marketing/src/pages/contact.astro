@@ -1,5 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import PageHeader from "../components/PageHeader.astro";
+import CtaSection from "../components/CtaSection.astro";
 import CtaButton from "../components/CtaButton.astro";
 import { appLinks, SUPPORT_EMAIL, SUPPORT_HOURS, SUPPORT_PHONE } from "../data/site";
 ---
@@ -11,44 +13,100 @@ import { appLinks, SUPPORT_EMAIL, SUPPORT_HOURS, SUPPORT_PHONE } from "../data/s
 >
   <section class="section">
     <div class="container contact">
-      <div>
-        <p class="section__eyebrow">Contact</p>
-        <h1>We’re here to help</h1>
-        <p>Reach DUTS support for account questions, bookings, or worker onboarding.</p>
-        <ul>
-          <li><strong>Phone:</strong> <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, "")}`}>{SUPPORT_PHONE}</a></li>
-          <li><strong>Email:</strong> <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></li>
-          <li><strong>Hours:</strong> {SUPPORT_HOURS}</li>
-        </ul>
-        <div class="ctas">
+      <div class="reveal">
+        <PageHeader
+          label="Contact"
+          title="We're here to help"
+          lead="Reach DUTS support for account questions, bookings, or worker onboarding."
+        />
+        <div class="contact__details">
+          <div class="contact__item">
+            <span class="contact__label">Phone</span>
+            <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, "")}`}>{SUPPORT_PHONE}</a>
+          </div>
+          <div class="contact__item">
+            <span class="contact__label">Email</span>
+            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+          </div>
+          <div class="contact__item">
+            <span class="contact__label">Hours</span>
+            <span>{SUPPORT_HOURS}</span>
+          </div>
+        </div>
+        <div class="btn-group">
           <CtaButton href={appLinks.requestHelp} label="Request Help" />
           <CtaButton href={appLinks.login} label="Login" variant="ghost" />
         </div>
       </div>
-      <div class="map card" aria-label="Map placeholder">
-        <p>Google Maps placeholder</p>
-        <span>Connecticut · Local marketplace</span>
+      <div class="contact__map reveal" aria-label="Service area">
+        <div class="contact__map-inner">
+          <strong>Connecticut</strong>
+          <span>Local marketplace · Hartford, New Haven, Bridgeport, Stamford</span>
+        </div>
       </div>
     </div>
   </section>
+  <CtaSection showLogin={false} />
 </BaseLayout>
 
 <style>
   .contact {
     display: grid;
-    gap: 2rem;
+    gap: 3rem;
   }
   @media (min-width: 900px) {
-    .contact { grid-template-columns: 1.1fr 0.9fr; align-items: stretch; }
+    .contact {
+      grid-template-columns: 1.1fr 0.9fr;
+      align-items: start;
+    }
   }
-  ul { list-style: none; padding: 0; display: grid; gap: 0.75rem; color: var(--muted); }
-  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.25rem; }
-  .map {
-    min-height: 280px;
+  .contact__details {
     display: grid;
-    place-content: center;
-    text-align: center;
-    background: var(--gradient-soft);
+    gap: 1.25rem;
+    margin: 2rem 0;
   }
-  .map p { margin: 0; font-weight: 700; color: var(--ink); }
+  .contact__item {
+    display: grid;
+    gap: 0.25rem;
+  }
+  .contact__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .contact__item a,
+  .contact__item span {
+    font-size: 1.0625rem;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .contact__item a:hover {
+    color: var(--purple);
+  }
+  .contact__map {
+    background: var(--surface);
+    border-radius: var(--radius-xl);
+    min-height: 320px;
+    display: grid;
+    place-items: center;
+    padding: 2rem;
+  }
+  .contact__map-inner {
+    text-align: center;
+    display: grid;
+    gap: 0.5rem;
+  }
+  .contact__map-inner strong {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--ink);
+  }
+  .contact__map-inner span {
+    font-size: 0.9375rem;
+    color: var(--muted);
+    max-width: 28ch;
+  }
 </style>

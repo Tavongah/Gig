@@ -1,7 +1,9 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import CtaButton from "../components/CtaButton.astro";
+import PageHeader from "../components/PageHeader.astro";
 import ServiceCard from "../components/ServiceCard.astro";
+import CtaSection from "../components/CtaSection.astro";
+import CtaButton from "../components/CtaButton.astro";
 import { appLinks, cities, services } from "../data/site";
 
 export function getStaticPaths() {
@@ -18,35 +20,22 @@ if (!city) return Astro.redirect("/");
   description={`${city.blurb} Request help or become a worker with DUTS.`}
   canonicalPath={`/${city.slug}`}
 >
-  <section class="hero">
+  <section class="section">
     <div class="container">
-      <p class="section__eyebrow">{city.name}, {city.state}</p>
-      <h1>Trusted local help in {city.name}</h1>
-      <p class="lead">{city.blurb}</p>
-      <div class="ctas">
+      <PageHeader
+        label={`${city.name}, ${city.state}`}
+        title={`Trusted local help in ${city.name}`}
+        lead={city.blurb}
+      />
+      <div class="btn-group" style="margin-bottom: 3rem">
         <CtaButton href={appLinks.requestHelp} label="Request Help" />
         <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
       </div>
-    </div>
-  </section>
-  <section class="section">
-    <div class="container">
-      <h2>Why choose DUTS in {city.name}</h2>
-      <p>Fast matching with nearby workers, secure payments, and clear starting prices for everyday services.</p>
-      <h2 style="margin-top: 2rem">Available services</h2>
-      <div class="grid-3" style="margin-top: 1rem">
+      <h2 class="section__title">Available services</h2>
+      <div class="grid-3" style="margin-top: 1.5rem">
         {services.map((service) => <ServiceCard service={service} />)}
       </div>
     </div>
   </section>
+  <CtaSection showLogin={false} />
 </BaseLayout>
-
-<style>
-  .hero {
-    padding: 3.5rem 0 2rem;
-    background: var(--gradient-soft);
-  }
-  .hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
-  .lead { max-width: 40rem; }
-  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.25rem; }
-</style>

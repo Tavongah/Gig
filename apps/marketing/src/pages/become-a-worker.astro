@@ -1,15 +1,9 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import PageHeader from "../components/PageHeader.astro";
+import CtaSection from "../components/CtaSection.astro";
 import CtaButton from "../components/CtaButton.astro";
-import { appLinks } from "../data/site";
-
-const benefits = [
-  { title: "Choose your own schedule", body: "Go online when you’re free and accept nearby jobs that fit your day." },
-  { title: "Earn extra income", body: "Turn spare time into flexible earnings with local gigs in your area." },
-  { title: "Accept jobs nearby", body: "See opportunities close to you so travel stays practical." },
-  { title: "Simple registration", body: "Create your profile, get approved, and start exploring available work." },
-  { title: "Flexible work", body: "No rigid shifts—work around school, another job, or family time." }
-];
+import { appLinks, workerBenefits } from "../data/site";
 ---
 
 <BaseLayout
@@ -17,42 +11,97 @@ const benefits = [
   description="Join DUTS as a worker. Choose your schedule, earn nearby, and accept flexible local jobs."
   canonicalPath="/become-a-worker"
 >
-  <section class="hero">
-    <div class="container">
-      <p class="section__eyebrow">Workers</p>
-      <h1>Earn on your schedule with local gigs</h1>
-      <p class="lead">DUTS helps trusted local workers find nearby jobs—without complicated setups.</p>
-      <CtaButton href={appLinks.becomeWorker} label="Become a Worker" />
+  <section class="section worker-hero">
+    <div class="container worker-hero__grid">
+      <div class="reveal">
+        <PageHeader
+          label="Workers"
+          title="Earn on your schedule with local gigs"
+          lead="DUTS helps trusted local workers find nearby jobs—without complicated setups."
+        />
+        <CtaButton href={appLinks.becomeWorker} label="Become a Worker" />
+      </div>
+      <div class="worker-hero__image reveal">
+        <img
+          src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=800&q=80&auto=format&fit=crop"
+          alt="Worker providing local service"
+          width="640"
+          height="480"
+          loading="eager"
+        />
+      </div>
     </div>
   </section>
-  <section class="section">
-    <div class="container grid-3">
-      {
-        benefits.map((b) => (
-          <article class="card reveal">
-            <div class="icon-badge">✓</div>
-            <h2>{b.title}</h2>
-            <p>{b.body}</p>
-          </article>
-        ))
-      }
-    </div>
-    <div class="container" style="margin-top: 2rem">
-      <div class="ctas">
+
+  <section class="section section--surface">
+    <div class="container">
+      <header class="section__header section__header--center">
+        <h2 class="section__title section__title--center">Why work with DUTS</h2>
+      </header>
+      <div class="grid-2">
+        {
+          workerBenefits.map((b) => (
+            <article class="benefit-card reveal">
+              <h3>{b.title}</h3>
+              <p>{b.body}</p>
+            </article>
+          ))
+        }
+      </div>
+      <div class="btn-group" style="margin-top: 3rem; justify-content: center">
         <CtaButton href={appLinks.becomeWorker} label="Become a Worker" />
         <CtaButton href={appLinks.login} label="Login" variant="ghost" />
       </div>
     </div>
   </section>
+
+  <CtaSection
+    title="Start earning today"
+    lead="Create your profile, get approved, and go online to see nearby gigs."
+    showLogin={false}
+  />
 </BaseLayout>
 
 <style>
-  .hero {
-    padding: 4rem 0 2rem;
-    background: var(--gradient-soft);
+  .worker-hero__grid {
+    display: grid;
+    gap: 3rem;
+    align-items: center;
   }
-  .hero h1 { font-size: clamp(2rem, 5vw, 3.3rem); max-width: 14ch; }
-  .lead { max-width: 40rem; }
-  .card h2 { font-size: 1.15rem; margin-top: 0.85rem; }
-  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+  @media (min-width: 900px) {
+    .worker-hero__grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .worker-hero__image {
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .worker-hero__image img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+  }
+  .benefit-card {
+    background: var(--bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 2rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  .benefit-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow);
+  }
+  .benefit-card h3 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+  .benefit-card p {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
 </style>
