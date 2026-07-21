@@ -41,10 +41,10 @@ export function EmailVerificationScreen() {
         <DutsCard className="gap-4 p-5">
           <Text className="text-2xl font-black text-ink">Check your inbox</Text>
           <Text className="text-sm leading-6 text-muted">
-            We’ve sent a verification email to {session.user.email}. Please verify your email before signing in.
+            We’ve sent a verification email to {session.user.email}. Open the link, then tap “I verified my email.”
           </Text>
           <Text className="text-sm leading-6 text-muted">
-            The link expires in 24 hours. After you verify, come back here and tap “I verified my email.”
+            The link expires in 24 hours. Check spam if you don’t see it.
           </Text>
           {__DEV__ ? (
             <Text className="text-xs text-muted">

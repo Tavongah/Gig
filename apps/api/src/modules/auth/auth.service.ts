@@ -15,8 +15,9 @@ import { prisma } from "../../config/prisma.js";
 import { env } from "../../config/env.js";
 import { AppError } from "../../lib/errors.js";
 import { createResetToken, hashPassword, hashResetToken, verifyPassword } from "../../lib/password.js";
+import { buildSimpleEmail, sendTransactionalEmail } from "../../lib/email.js";
 import { normalizePhoneNumber } from "./access.service.js";
-import { sendEmailVerification } from "./verification.service.js";
+import { passwordResetAppUrl, sendEmailVerification } from "./verification.service.js";
 
 export const userInclude = {
   workerProfile: { include: { serviceCategories: true } }
@@ -85,7 +86,15 @@ export async function registerCustomer(input: CustomerRegisterInput) {
     include: userInclude
   });
 
-  await sendEmailVerification(user.id, user.email);
+  try {
+    await sendEmailVerification(user.id, user.email);
+  } catch (error) {
+    console.error("[auth] verification_email_failed", {
+      userId: user.id,
+      email: user.email,
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
   const token = issueToken(user);
   return { token, user: sanitizeUser(user) };
 }
@@ -139,7 +148,15 @@ export async function registerWorker(input: WorkerRegisterInput) {
     include: userInclude
   });
 
-  await sendEmailVerification(user.id, user.email);
+  try {
+    await sendEmailVerification(user.id, user.email);
+  } catch (error) {
+    console.error("[auth] verification_email_failed", {
+      userId: user.id,
+      email: user.email,
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
   const token = issueToken(user);
   return { token, user: sanitizeUser(user) };
 }
@@ -178,12 +195,7 @@ export async function login(input: LoginInput) {
     });
   }
 
-  if (!user.emailVerified) {
-    throw new AppError("EMAIL_NOT_VERIFIED", 403, "EMAIL_NOT_VERIFIED", {
-      email: "Please verify your email before signing in. Check your inbox for the verification link."
-    });
-  }
-
+  // Unverified users still get a session so they can resend verification from the app.
   const token = issueToken(user);
   return { token, user: sanitizeUser(user) };
 }
@@ -193,15 +205,38 @@ export async function requestPasswordReset(emailInput: string) {
   const normalized = email.toLowerCase();
   const user = await prisma.user.findUnique({ where: { email: normalized } });
 
-  if (user) {
+  if (user && user.accountStatus !== AccountStatus.SUSPENDED && user.passwordHash) {
+    await prisma.passwordResetToken.deleteMany({ where: { userId: user.id, usedAt: null } });
+
     const rawToken = createResetToken();
     const tokenHash = hashResetToken(rawToken);
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
     await prisma.passwordResetToken.create({
       data: { userId: user.id, tokenHash, expiresAt }
     });
-    if (env.NODE_ENV === "development") {
-      console.info(`[dev] Password reset token for ${normalized}: ${rawToken}`);
+
+    const resetUrl = passwordResetAppUrl(rawToken);
+    const content = buildSimpleEmail({
+      title: "Reset your Duts password",
+      intro: "We received a request to reset your password. Use the button below to choose a new one.",
+      actionLabel: "Reset password",
+      actionUrl: resetUrl,
+      footer: "This link expires in 1 hour. If you didn’t request a reset, you can ignore this email."
+    });
+
+    try {
+      await sendTransactionalEmail({
+        to: normalized,
+        subject: "Reset your Duts password",
+        text: content.text,
+        html: content.html
+      });
+    } catch (error) {
+      console.error("[auth] password_reset_email_failed", {
+        email: normalized,
+        message: error instanceof Error ? error.message : String(error)
+      });
+      // Still return generic success to avoid email enumeration.
     }
   }
 
@@ -371,26 +406,40 @@ export async function changePassword(
 
 export async function deleteAuthenticatedAccount(userId: string) {
   const tombstoneEmail = `deleted+${userId}@deleted.local`;
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      accountStatus: AccountStatus.SUSPENDED,
-      email: tombstoneEmail,
-      fullName: "Deleted User",
-      phoneNumber: null,
-      avatarUrl: null,
-      passwordHash: null,
-      profileCompleted: false,
-      emailVerified: false,
-      phoneVerified: false,
-      isVerified: false
-    }
-  });
 
-  await prisma.workerProfile.updateMany({
-    where: { userId },
-    data: { availabilityStatus: "OFFLINE" }
-  });
+  await prisma.$transaction([
+    prisma.emailVerificationToken.deleteMany({ where: { userId } }),
+    prisma.passwordResetToken.deleteMany({ where: { userId } }),
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        accountStatus: AccountStatus.SUSPENDED,
+        email: tombstoneEmail,
+        fullName: "Deleted User",
+        phoneNumber: null,
+        avatarUrl: null,
+        passwordHash: null,
+        firebaseUid: null,
+        stripeCustomerId: null,
+        authProvider: AuthProvider.EMAIL,
+        profileCompleted: false,
+        emailVerified: false,
+        phoneVerified: false,
+        isVerified: false,
+        formattedAddress: null,
+        addressLine1: null,
+        city: null,
+        region: null,
+        postalCode: null,
+        latitude: null,
+        longitude: null
+      }
+    }),
+    prisma.workerProfile.updateMany({
+      where: { userId },
+      data: { availabilityStatus: "OFFLINE" }
+    })
+  ]);
 
   return { ok: true as const };
 }

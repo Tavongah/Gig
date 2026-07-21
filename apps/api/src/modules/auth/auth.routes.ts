@@ -20,6 +20,7 @@ import {
 import { completeUserProfile, loginWithSocialProvider } from "./social-auth.service.js";
 import {
   requestPhoneOtp,
+  requestEmailVerificationByEmail,
   resendEmailVerification,
   sendEmailVerification,
   verifyEmailToken,
@@ -56,6 +57,18 @@ authRouter.get("/verify-email", async (req, res, next) => {
     await verifyEmailToken(token);
     const target = `${env.MOBILE_PUBLIC_URL}/?emailVerified=1`;
     res.redirect(target);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/verify-email/request", validateBody(forgotPasswordSchema), async (req, res, next) => {
+  try {
+    const result = await requestEmailVerificationByEmail(req.body.email);
+    res.json({
+      ...result,
+      message: "If that email needs verification, a new link has been sent."
+    });
   } catch (error) {
     next(error);
   }

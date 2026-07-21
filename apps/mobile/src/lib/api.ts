@@ -305,8 +305,12 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       WORKER_NOT_APPROVED: "Your worker account must be approved before you can accept gigs.",
       PAYMENT_REQUIRED: "This gig is not paid yet. The customer must complete payment first.",
       EMAIL_NOT_VERIFIED: "Please verify your email before continuing. Check your inbox for the link.",
-      PHONE_NOT_VERIFIED: "Phone verification is not required right now. Continue with email verification.",
+      EMAIL_NOT_CONFIGURED: "Email delivery is not configured on the server yet. Contact Duts Support.",
+      EMAIL_SEND_FAILED: "We couldn’t send that email right now. Please try again in a few minutes.",
       EMAIL_RESEND_RATE_LIMITED: "Too many verification emails sent. Please try again later.",
+      INVALID_RESET_TOKEN: "That password reset link is invalid or expired. Request a new one.",
+      INVALID_VERIFICATION_TOKEN: "That verification link is invalid or expired. Request a new one.",
+      PHONE_NOT_VERIFIED: "Phone verification is not required right now. Continue with email verification.",
       PROFILE_INCOMPLETE: "Complete your profile before continuing.",
       EMAIL_IN_USE: "That email is already registered.",
       PHONE_IN_USE: "That phone number is already linked to another account.",
@@ -353,6 +357,16 @@ export const api = {
     request<ApiSession>("/auth/register/worker", { method: "POST", body: JSON.stringify(payload) }),
   forgotPassword: (email: string) =>
     request<{ ok: boolean; message: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email })
+    }),
+  resetPassword: (payload: { token: string; password: string; confirmPassword: string }) =>
+    request<ApiSession>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  requestEmailVerification: (email: string) =>
+    request<{ ok: boolean; message: string }>("/auth/verify-email/request", {
       method: "POST",
       body: JSON.stringify({ email })
     }),

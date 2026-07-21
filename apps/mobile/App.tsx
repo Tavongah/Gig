@@ -57,6 +57,14 @@ const linking = {
   prefixes: appLinkingPrefixes,
   config: {
     screens: {
+      Login: "",
+      ForgotPassword: "forgot-password",
+      ResetPassword: {
+        path: "reset-password",
+        parse: {
+          token: (value: string) => value
+        }
+      },
       PaymentSuccess: {
         path: "payment-success",
         parse: {

@@ -1,8 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
+import { AccountStatus } from "@prisma/client";
 import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
 import { redis } from "../../config/redis.js";
 import { AppError } from "../../lib/errors.js";
+import { buildSimpleEmail, sendTransactionalEmail } from "../../lib/email.js";
 import { createResetToken, hashResetToken } from "../../lib/password.js";
 import { generateOtpCode, hashOtpCode, normalizePhoneNumber } from "./access.service.js";
 
@@ -18,6 +20,14 @@ function hashEmailToken(token: string): string {
   return hashResetToken(token);
 }
 
+function appBaseUrl(): string {
+  return (env.MOBILE_PUBLIC_URL ?? "http://localhost:8081").replace(/\/$/, "");
+}
+
+function apiBaseUrl(): string {
+  return (env.API_PUBLIC_URL ?? `http://localhost:${env.PORT}`).replace(/\/$/, "");
+}
+
 export async function sendEmailVerification(userId: string, email: string): Promise<{ ok: true }> {
   await prisma.emailVerificationToken.deleteMany({ where: { userId, usedAt: null } });
 
@@ -29,12 +39,21 @@ export async function sendEmailVerification(userId: string, email: string): Prom
     data: { userId, tokenHash, expiresAt }
   });
 
-  const apiBase = env.API_PUBLIC_URL ?? `http://localhost:${env.PORT}`;
-  const verifyUrl = `${apiBase}/v1/auth/verify-email?token=${encodeURIComponent(rawToken)}`;
+  const verifyUrl = `${apiBaseUrl()}/v1/auth/verify-email?token=${encodeURIComponent(rawToken)}`;
+  const content = buildSimpleEmail({
+    title: "Verify your Duts email",
+    intro: "Thanks for joining Duts. Confirm your email address to finish setting up your account.",
+    actionLabel: "Verify email",
+    actionUrl: verifyUrl,
+    footer: "This link expires in 24 hours. If you didn’t create a Duts account, you can ignore this email."
+  });
 
-  if (env.NODE_ENV === "development" || env.LOG_VERIFICATION_TO_CONSOLE) {
-    console.info(`[verification] Email link for ${email}: ${verifyUrl}`);
-  }
+  await sendTransactionalEmail({
+    to: email,
+    subject: "Verify your Duts email",
+    text: content.text,
+    html: content.html
+  });
 
   return { ok: true };
 }
@@ -88,6 +107,39 @@ export async function resendEmailVerification(userId: string): Promise<{ ok: tru
   }
 
   return sendEmailVerification(userId, user.email);
+}
+
+/** Public resend by email (for users who signed out before verifying). Always returns ok. */
+export async function requestEmailVerificationByEmail(emailInput: string): Promise<{ ok: true }> {
+  const email = emailInput.trim().toLowerCase();
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || user.emailVerified || user.accountStatus === AccountStatus.SUSPENDED) {
+    return { ok: true };
+  }
+
+  const rateKey = `email:verify:public:${email}`;
+  const requestCount = await redis.incr(rateKey);
+  if (requestCount === 1) {
+    await redis.expire(rateKey, EMAIL_RESEND_RATE_LIMIT_SECONDS);
+  }
+  if (requestCount > EMAIL_RESEND_MAX_PER_HOUR) {
+    return { ok: true };
+  }
+
+  try {
+    await sendEmailVerification(user.id, user.email);
+  } catch (error) {
+    console.error("[verification] public_resend_failed", {
+      email,
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+
+  return { ok: true };
+}
+
+export function passwordResetAppUrl(rawToken: string): string {
+  return `${appBaseUrl()}/reset-password?token=${encodeURIComponent(rawToken)}`;
 }
 
 async function assertPhoneAvailable(phoneNumber: string, userId: string): Promise<void> {
