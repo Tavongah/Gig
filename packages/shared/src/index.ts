@@ -96,6 +96,7 @@ import {
   estimateResponseMinutes as locationEstimateResponseMinutes,
   haversineMiles as locationHaversineMiles
 } from "./location.js";
+import { resolveHourlyRateCents } from "./pricing-constants.js";
 
 export {
   DEFAULT_MATCHING_RADIUS_MILES,
@@ -168,6 +169,14 @@ export {
   type GigFlowStatus,
   type PricingType
 } from "./gig-flow.js";
+
+export {
+  DEFAULT_BILLING_INCREMENT_MINUTES,
+  DEFAULT_HOURLY_RATE,
+  DEFAULT_HOURLY_RATE_CENTS,
+  formatHourlyRateLabel,
+  resolveHourlyRateCents
+} from "./pricing-constants.js";
 
 export {
   isRequestGigPricingType,
@@ -244,6 +253,12 @@ export function calculateTieredCommissionRate(totalCents: number): number {
   return 0.1;
 }
 
+/**
+ * MVP pricing:
+ * - FIXED: predefined category base rate (no hourly labor).
+ * - Timed (HOURLY / ESTIMATE_TIMER): Hours × DEFAULT_HOURLY_RATE ($25/hr).
+ *   Base rate is not added for timed jobs so customer total tracks Hours × $25.
+ */
 export function calculatePriceEstimate(
   input: GigEstimateInput,
   category: {
@@ -256,24 +271,28 @@ export function calculatePriceEstimate(
   const urgencyMultiplier = urgencyMultipliers[input.urgency];
   const pricingType = input.pricingType ?? "FIXED";
   const demandMultiplier = input.demandMultiplier ?? 1;
-  const laborCents =
-    pricingType === "FIXED" ? 0 : Math.round(category.hourlyRateCents * input.estimatedHours);
+  const isFixed = pricingType === "FIXED";
+  const hourlyRateCents = resolveHourlyRateCents(pricingType);
+  const laborCents = isFixed ? 0 : Math.round(hourlyRateCents * input.estimatedHours);
+  const baseRateCents = isFixed ? category.baseRateCents : 0;
   const distanceFeeCents = Math.round(category.distanceRateCents * input.distanceMiles);
-  const subtotal = category.baseRateCents + laborCents + distanceFeeCents;
-  const standardTotalCents = Math.round(subtotal * category.multiplier * demandMultiplier);
-  const totalCents = Math.round(subtotal * category.multiplier * urgencyMultiplier * demandMultiplier);
+  // Timed MVP: Hours × $25 (no category multiplier). Fixed keeps category multiplier.
+  const serviceMultiplier = isFixed ? category.multiplier : 1;
+  const subtotal = baseRateCents + laborCents + distanceFeeCents;
+  const standardTotalCents = Math.round(subtotal * serviceMultiplier * demandMultiplier);
+  const totalCents = Math.round(subtotal * serviceMultiplier * urgencyMultiplier * demandMultiplier);
   const urgencyFeeCents = Math.max(0, totalCents - standardTotalCents);
   const commissionRate = calculateTieredCommissionRate(totalCents);
   const platformFeeCents = Math.round(totalCents * commissionRate);
 
   return {
-    baseRateCents: category.baseRateCents,
-    hourlyRateCents: category.hourlyRateCents,
+    baseRateCents,
+    hourlyRateCents,
     laborCents,
     distanceFeeCents,
     urgencyFeeCents,
     estimatedHours: input.estimatedHours,
-    serviceMultiplier: category.multiplier,
+    serviceMultiplier,
     urgencyMultiplier,
     demandMultiplier,
     totalCents,

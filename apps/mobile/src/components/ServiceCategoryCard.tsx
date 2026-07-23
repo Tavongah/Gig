@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from "react-native";
+import { formatHourlyRateLabel, recommendedPricingForService, DEFAULT_HOURLY_RATE_CENTS } from "@gigflow/shared";
 import type { ServiceCategory } from "../lib/api";
 import { formatCents } from "../lib/format";
 import { cardShadow } from "../lib/theme";
@@ -28,7 +29,13 @@ interface ServiceCategoryCardProps {
 
 export function ServiceCategoryCard({ category, onPress, compact = false }: ServiceCategoryCardProps) {
   const icon = ICONS[category.iconName ?? ""] ?? "📦";
-  const startingPrice = category.baseRateCents ? formatCents(category.baseRateCents) : null;
+  const pricingType = recommendedPricingForService(category.slug);
+  const priceLabel =
+    pricingType === "ESTIMATE_TIMER" || pricingType === "HOURLY"
+      ? formatHourlyRateLabel(DEFAULT_HOURLY_RATE_CENTS)
+      : category.baseRateCents
+        ? `From ${formatCents(category.baseRateCents)}`
+        : null;
 
   return (
     <Pressable
@@ -44,7 +51,7 @@ export function ServiceCategoryCard({ category, onPress, compact = false }: Serv
       <Text className="text-base font-black text-ink" numberOfLines={2}>
         {category.name}
       </Text>
-      {startingPrice ? <Text className="text-sm font-bold text-brand">From {startingPrice}</Text> : null}
+      {priceLabel ? <Text className="text-sm font-bold text-brand">{priceLabel}</Text> : null}
     </Pressable>
   );
 }

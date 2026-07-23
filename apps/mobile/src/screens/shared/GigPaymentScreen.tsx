@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Linking, Platform, ScrollView, Text, View } from "react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { formatMoney, isTimeBasedPricing } from "@gigflow/shared";
+import { formatMoney, formatHourlyRateLabel, isTimeBasedPricing } from "@gigflow/shared";
 import { api, apiUrl } from "../../lib/api";
 import { showAlert } from "../../lib/confirm";
 import { Screen } from "../../components/Screen";
@@ -152,7 +152,7 @@ export function GigPaymentScreen({ navigation, route }: Props) {
           {pricing ? (
             <>
               {timed && hourlyRate != null ? (
-                <LineItem label="Hourly rate" value={`${formatMoney(hourlyRate)}/hr`} />
+                <LineItem label="Hourly Rate" value={formatHourlyRateLabel(hourlyRate)} />
               ) : null}
               {summary?.gig.estimatedHours ? (
                 <LineItem

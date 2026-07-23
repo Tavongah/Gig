@@ -19,10 +19,25 @@ export interface ServiceDef {
   short: string;
   description: string;
   startingFromCents: number;
+  /** FIXED = startingFromCents total; HOURLY = $25/hour MVP rate */
+  pricingModel: "FIXED" | "HOURLY";
   icon: string;
   image: string;
   includes: string[];
   faqs: Array<{ q: string; a: string }>;
+}
+
+export const DEFAULT_HOURLY_RATE_CENTS = 2500;
+
+export function formatFromCents(cents: number): string {
+  return `$${Math.round(cents / 100)}`;
+}
+
+export function formatServicePrice(service: ServiceDef): string {
+  if (service.pricingModel === "HOURLY") {
+    return `$${Math.round(DEFAULT_HOURLY_RATE_CENTS / 100)}/hour`;
+  }
+  return `From ${formatFromCents(service.startingFromCents)}`;
 }
 
 export const services: ServiceDef[] = [
@@ -33,6 +48,7 @@ export const services: ServiceDef[] = [
     description:
       "Get help loading, unloading, and moving items locally. DUTS connects you with nearby workers ready to lift, haul, and finish the job faster.",
     startingFromCents: 6000,
+    pricingModel: "HOURLY",
     icon: "truck",
     image: "/images/services/moving.jpg",
     includes: ["Loading and unloading help", "Local short-distance moves", "Furniture and box handling", "On-demand or scheduled help"],
@@ -47,6 +63,7 @@ export const services: ServiceDef[] = [
     short: "Whole-home cleaning from verified local professionals.",
     description: "Book trusted local cleaners for apartments and houses. Clear expectations, transparent starting prices, and fast matching.",
     startingFromCents: 4500,
+    pricingModel: "HOURLY",
     icon: "sparkles",
     image: "/images/services/house-cleaning.jpg",
     includes: ["Whole-home cleaning", "Kitchen and bathroom focus", "Flexible scheduling", "Verified local workers"],
@@ -61,6 +78,7 @@ export const services: ServiceDef[] = [
     short: "Single-room cleaning and light organization.",
     description: "Need one space refreshed? Room cleaning is ideal for bedrooms, offices, and focused tidy-ups without booking a full-home clean.",
     startingFromCents: 2500,
+    pricingModel: "HOURLY",
     icon: "home",
     image: "/images/services/room-cleaning.jpg",
     includes: ["Single-room focus", "Light organization", "Quick turnaround options", "Affordable starting rates"],
@@ -74,6 +92,7 @@ export const services: ServiceDef[] = [
     short: "Mowing, edging, and yard cleanup from local pros.",
     description: "Keep your yard sharp with local lawn help for mowing, edging, and basic cleanup—matched nearby so you don't wait on a distant crew.",
     startingFromCents: 3500,
+    pricingModel: "FIXED",
     icon: "leaf",
     image: "/images/services/lawn-cutting.jpg",
     includes: ["Mowing", "Edging", "Basic yard cleanup", "Neighborhood-based matching"],
@@ -87,6 +106,7 @@ export const services: ServiceDef[] = [
     short: "Flexible hands for projects, setups, and one-off tasks.",
     description: "Extra hands for projects, setups, and one-off tasks. Describe the work, match a worker nearby, and get it done.",
     startingFromCents: 5000,
+    pricingModel: "FIXED",
     icon: "hammer",
     image: "/images/services/short-term-labor.jpg",
     includes: ["Flexible task support", "Project and event labor", "Short or multi-hour jobs", "Local matching"],
@@ -100,6 +120,7 @@ export const services: ServiceDef[] = [
     short: "Interior and exterior detailing at your location.",
     description: "Interior and exterior vehicle detailing from local pros. Request help, match nearby, and get your car looking sharp.",
     startingFromCents: 5000,
+    pricingModel: "FIXED",
     icon: "car",
     image: "/images/services/car-detailing.jpg",
     includes: ["Interior detailing", "Exterior wash and detail options", "Flexible scheduling", "Secure in-app payments"],
@@ -113,6 +134,7 @@ export const services: ServiceDef[] = [
     short: "Flat-pack furniture and fixture assembly done right.",
     description: "From flat-pack furniture to fixtures, get matched with nearby workers who can assemble it right the first time.",
     startingFromCents: 4000,
+    pricingModel: "FIXED",
     icon: "wrench",
     image: "/images/services/furniture-assembly.jpg",
     includes: ["Flat-pack assembly", "Fixtures and basic setup", "On-site completion", "Photo and chat coordination"],
@@ -126,6 +148,7 @@ export const services: ServiceDef[] = [
     short: "Haul away unwanted items and light debris.",
     description: "Clear out unwanted items and light debris with local junk-removal help. Fast matching, clear starting prices, and secure payment.",
     startingFromCents: 5500,
+    pricingModel: "FIXED",
     icon: "trash",
     image: "/images/services/junk-removal.jpg",
     includes: ["Household item removal", "Light debris haul-away", "Loading help", "Transparent estimates"],
@@ -139,6 +162,7 @@ export const services: ServiceDef[] = [
     short: "Setup, teardown, and on-site event assistance.",
     description: "Setup, teardown, and on-site support for gatherings and events. Match local workers who can show up ready to help.",
     startingFromCents: 4500,
+    pricingModel: "HOURLY",
     icon: "calendar",
     image: "/images/services/event-help.jpg",
     includes: ["Event setup", "Teardown support", "On-site assistance", "Flexible timing"],
@@ -147,10 +171,6 @@ export const services: ServiceDef[] = [
     ]
   }
 ];
-
-export function formatFromCents(cents: number): string {
-  return `$${Math.round(cents / 100)}`;
-}
 
 export function getService(slug: string): ServiceDef | undefined {
   return services.find((s) => s.slug === slug);

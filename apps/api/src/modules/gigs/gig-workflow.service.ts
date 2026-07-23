@@ -8,7 +8,7 @@ import {
   PricingType,
   UserRole
 } from "@prisma/client";
-import { calculatePriceEstimate, estimateResponseMinutes, haversineMiles, isWithinMatchingRadius, getGigMatchingRadiusMiles, workerCancelOutcome, billableSecondsFromWorkWindow, calculateTimeBasedAuthorization, isTimeBasedPricing, roundBillableMinutes } from "@gigflow/shared";
+import { calculatePriceEstimate, estimateResponseMinutes, haversineMiles, isWithinMatchingRadius, getGigMatchingRadiusMiles, workerCancelOutcome, billableSecondsFromWorkWindow, calculateTimeBasedAuthorization, isTimeBasedPricing, resolveHourlyRateCents, DEFAULT_HOURLY_RATE_CENTS, roundBillableMinutes } from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { assertDevOnlyPaymentBypass } from "../../lib/production-guards.js";
@@ -280,7 +280,7 @@ export async function getWorkerSelectionSummary(gigId: string, clientId: string,
         ? calculateTimeBasedAuthorization({
             estimatedTotalCents,
             estimatedLaborCents: workerChargeCents,
-            hourlyRateCents: gig.serviceCategory.hourlyRateCents
+            hourlyRateCents: resolveHourlyRateCents(gig.pricingType)
           })
         : { authorizationBufferCents: 0, maximumAuthorizedAmountCents: estimatedTotalCents };
 
@@ -309,7 +309,7 @@ export async function getWorkerSelectionSummary(gigId: string, clientId: string,
       platformFeeCents,
       taxCents,
       estimatedTotalCents,
-      hourlyRateCents: gig.serviceCategory.hourlyRateCents,
+      hourlyRateCents: resolveHourlyRateCents(gig.pricingType),
       authorizationBufferCents: auth.authorizationBufferCents,
       maximumAuthorizedAmountCents: auth.maximumAuthorizedAmountCents,
       billingIncrementMinutes: gig.billingIncrementMinutes,
@@ -444,7 +444,7 @@ export async function calculateFinalGigAmount(gigId: string) {
       billableMinutes: null as number | null,
       actualWorkedSeconds: null as number | null,
       billableSeconds: null as number | null,
-      hourlyRateCents: gig.serviceCategory.hourlyRateCents,
+      hourlyRateCents: resolveHourlyRateCents(gig.pricingType),
       workStartedAt: null as Date | null,
       workCompletedAt: null as Date | null
     };
@@ -459,7 +459,7 @@ export async function calculateFinalGigAmount(gigId: string) {
       billableMinutes: null as number | null,
       actualWorkedSeconds: null as number | null,
       billableSeconds: null as number | null,
-      hourlyRateCents: gig.serviceCategory.hourlyRateCents,
+      hourlyRateCents: resolveHourlyRateCents(gig.pricingType),
       workStartedAt: assignment.startedAt,
       workCompletedAt: assignment.endedAt ?? assignment.completedAt ?? null
     };
@@ -481,7 +481,7 @@ export async function calculateFinalGigAmount(gigId: string) {
   const increment = gig.billingIncrementMinutes || 15;
   const billableMinutes = roundBillableMinutes(elapsedMinutes, 60, increment);
   const billableSeconds = billableMinutes * 60;
-  const hourlyRateCents = gig.serviceCategory.hourlyRateCents;
+  const hourlyRateCents = resolveHourlyRateCents(gig.pricingType);
   const estimate = calculatePriceEstimate(
     {
       serviceCategoryId: gig.serviceCategoryId,
@@ -505,7 +505,7 @@ export async function calculateFinalGigAmount(gigId: string) {
     },
     {
       baseRateCents: gig.serviceCategory.baseRateCents,
-      hourlyRateCents: gig.serviceCategory.hourlyRateCents,
+      hourlyRateCents: DEFAULT_HOURLY_RATE_CENTS,
       distanceRateCents: gig.serviceCategory.distanceRateCents,
       multiplier: Number(gig.serviceCategory.multiplier)
     }
@@ -755,7 +755,7 @@ export async function checkTimerThreshold(gigId: string, io?: Server): Promise<v
     },
     {
       baseRateCents: gig.serviceCategory.baseRateCents,
-      hourlyRateCents: gig.serviceCategory.hourlyRateCents,
+      hourlyRateCents: DEFAULT_HOURLY_RATE_CENTS,
       distanceRateCents: gig.serviceCategory.distanceRateCents,
       multiplier: Number(gig.serviceCategory.multiplier)
     }

@@ -53,7 +53,11 @@ export function LoginScreen({ navigation }: Props) {
   return (
     <Screen>
       <View className="gap-6">
-        <HeroBanner showLogo title="Welcome back" subtitle="Sign in to post gigs or accept work nearby." />
+        <HeroBanner
+          showLogo
+          title="Welcome back!"
+          subtitle="Sign in to book help or start earning"
+        />
 
         <DutsCard className="gap-4 p-5">
           <Text className="text-xl font-black text-ink">Log in</Text>

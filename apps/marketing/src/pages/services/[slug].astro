@@ -3,7 +3,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import CtaButton from "../../components/CtaButton.astro";
 import FaqAccordion from "../../components/FaqAccordion.astro";
 import CtaSection from "../../components/CtaSection.astro";
-import { appLinks, formatFromCents, getService, services } from "../../data/site";
+import { appLinks, formatFromCents, formatServicePrice, getService, services } from "../../data/site";
 
 export function getStaticPaths() {
   return services.map((service) => ({ params: { slug: service.slug } }));
@@ -48,7 +48,7 @@ const jsonLd = {
         <p class="section__label">Service</p>
         <h1>{service.name}</h1>
         <p class="service-hero__lead">{service.description}</p>
-        <p class="service-hero__price">Starting from {formatFromCents(service.startingFromCents)}</p>
+        <p class="service-hero__price">{service.pricingModel === "HOURLY" ? formatServicePrice(service) : `Starting from ${formatFromCents(service.startingFromCents)}`}</p>
         <div class="btn-group">
           <CtaButton href={appLinks.requestHelp} label="Request this Service" />
           <CtaButton href={appLinks.login} label="Login" variant="ghost" />
@@ -69,8 +69,17 @@ const jsonLd = {
 
       <h2>Pricing</h2>
       <p>
-        Starting from <strong>{formatFromCents(service.startingFromCents)}</strong>. Final pricing depends on location,
-        job size, duration, and complexity. You'll see clear details as you request help in the app.
+        {service.pricingModel === "HOURLY" ? (
+          <>
+            <strong>{formatServicePrice(service)}</strong>. Final pricing depends on location, job size, duration, and
+            complexity. You'll see clear details as you request help in the app.
+          </>
+        ) : (
+          <>
+            Starting from <strong>{formatFromCents(service.startingFromCents)}</strong>. Final pricing depends on
+            location, job size, duration, and complexity. You'll see clear details as you request help in the app.
+          </>
+        )}
       </p>
 
       <h2>Questions</h2>
@@ -88,7 +97,7 @@ const jsonLd = {
               <img src={item.image} alt={item.name} width="320" height="192" loading="lazy" />
               <div>
                 <strong>{item.name}</strong>
-                <span>From {formatFromCents(item.startingFromCents)}</span>
+                <span>{formatServicePrice(item)}</span>
               </div>
             </a>
           ))

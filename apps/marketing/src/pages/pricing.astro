@@ -3,7 +3,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
 import CtaSection from "../components/CtaSection.astro";
 import CtaButton from "../components/CtaButton.astro";
-import { appLinks, formatFromCents, services } from "../data/site";
+import { appLinks, formatServicePrice, services } from "../data/site";
 ---
 
 <BaseLayout
@@ -23,7 +23,7 @@ import { appLinks, formatFromCents, services } from "../data/site";
           services.map((s) => (
             <a class="pricing-row" href={`/services/${s.slug}`}>
               <span class="pricing-row__name">{s.name}</span>
-              <span class="pricing-row__price">From {formatFromCents(s.startingFromCents)}</span>
+              <span class="pricing-row__price">{formatServicePrice(s)}</span>
             </a>
           ))
         }

@@ -1,7 +1,7 @@
 import { Alert, Text, View } from "react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { formatMoney, isTimeBasedPricing } from "@gigflow/shared";
+import { formatMoney, formatHourlyRateLabel, isTimeBasedPricing, DEFAULT_HOURLY_RATE_CENTS } from "@gigflow/shared";
 import { api } from "../../lib/api";
 import { showAlert } from "../../lib/confirm";
 import { Screen } from "../../components/Screen";
@@ -101,11 +101,17 @@ export function GigCompletionReviewScreen({ navigation, route }: Props) {
             <LineItem label="Estimated duration" amount={`${gig.estimatedHours} hrs`} />
           ) : null}
           {timed && assignment?.billableMinutes != null ? (
-            <LineItem label="Billed duration" amount={`${assignment.billableMinutes} min`} />
+            <LineItem
+              label="Total hours worked"
+              amount={`${(assignment.billableMinutes / 60).toFixed(2)} hrs (${assignment.billableMinutes} min billed)`}
+            />
+          ) : null}
+          {timed ? (
+            <LineItem label="Hourly rate" amount={formatHourlyRateLabel(DEFAULT_HOURLY_RATE_CENTS)} />
           ) : null}
           <View className="border-t border-border pt-3">
             <Text className="text-xs font-bold uppercase tracking-wider text-muted">
-              {timed ? "Final total" : "Total"}
+              {timed ? "Total amount charged" : "Total"}
             </Text>
             <Text className="text-3xl font-black text-ink">{formatMoney(gig.finalTotalCents ?? gig.totalCents)}</Text>
           </View>

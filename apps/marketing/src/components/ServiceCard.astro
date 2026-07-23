@@ -1,6 +1,6 @@
 ---
 import Icon from "./Icon.astro";
-import { formatFromCents, type ServiceDef, appLinks } from "../data/site";
+import { formatServicePrice, type ServiceDef, appLinks } from "../data/site";
 
 interface Props {
   service: ServiceDef;
@@ -19,7 +19,7 @@ const { service, featured = false } = Astro.props;
     </div>
     <h3>{service.name}</h3>
     <p>{service.short}</p>
-    <p class="service-card__price">From {formatFromCents(service.startingFromCents)}</p>
+    <p class="service-card__price">{formatServicePrice(service)}</p>
     <div class="service-card__actions">
       <a class="btn btn--ghost btn--sm" href={`/services/${service.slug}`}>Learn More</a>
       <a class="btn btn--primary btn--sm" href={appLinks.requestHelp}>Request Help</a>
