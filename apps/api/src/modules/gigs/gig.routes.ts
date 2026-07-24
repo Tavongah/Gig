@@ -146,10 +146,17 @@ export function createGigRouter(io: Server): Router {
   router.post("/", requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN), validateBody(createGigSchema), async (req, res, next) => {
 
     try {
+      const headerKey = req.get("Idempotency-Key") ?? req.get("idempotency-key");
+      const gig = await createGig(req.auth!.userId, req.body, io, {
+        idempotencyKey: typeof headerKey === "string" ? headerKey : null
+      });
 
-      const gig = await createGig(req.auth!.userId, req.body, io);
-
-      res.status(201).json({ gig });
+      res.status(201).json({
+        success: true,
+        gigId: gig.id,
+        status: gig.status,
+        gig
+      });
 
     } catch (error) {
 

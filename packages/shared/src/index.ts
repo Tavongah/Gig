@@ -235,11 +235,38 @@ export interface PriceBreakdown {
   serviceMultiplier: number;
   urgencyMultiplier: number;
   demandMultiplier: number;
+  /** Service charge before tax (customer-facing subtotal). */
   totalCents: number;
   platformFeeCents: number;
   workerPayoutCents: number;
   commissionRate: number;
+  /** Applied when location is known (estimate/create). */
+  taxRateBps?: number;
+  taxAmountCents?: number;
+  /** totalCents + taxAmountCents (+ customer fee if any). */
+  customerTotalCents?: number;
 }
+
+export {
+  CT_SALES_TAX_RATE_BPS,
+  calculateApplicableTaxCents,
+  calculateCustomerTotalCents,
+  resolveTaxRateBps,
+  type TaxCalculation,
+  type TaxLocationInput
+} from "./tax.js";
+
+export {
+  buildCustomerPricingView,
+  buildWorkerEarningsView,
+  type AdminFinancialView,
+  type CustomerPricingView,
+  type WorkerEarningsView
+} from "./financial-views.js";
+
+export { DUTS_JOURNEY_LABELS, gigStatusLabel, type DutsJourneyStatus } from "./gig-status-map.js";
+
+export { DUTS_FLOW_EVENTS, type DutsFlowEvent, type DutsFlowLogPayload } from "./flow-events.js";
 
 export function calculateTieredCommissionRate(totalCents: number): number {
   if (totalCents < 10_000) {

@@ -35,7 +35,7 @@ export function DeleteAccountButton({ variant = "secondary" }: { variant?: "prim
                     } catch (error) {
                       Alert.alert(
                         "Could not delete account",
-                        error instanceof Error ? error.message : "Please try again or email support@gigflow.ink."
+                        error instanceof Error ? error.message : "Please try again or email support@duts.tech."
                       );
                     }
                   })();

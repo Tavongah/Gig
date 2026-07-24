@@ -13,17 +13,19 @@ export function showConfirm(
   title: string,
   message: string,
   onConfirm: () => void,
-  options?: { confirmLabel?: string; cancelLabel?: string; destructive?: boolean }
+  options?: { confirmLabel?: string; cancelLabel?: string; destructive?: boolean; onCancel?: () => void }
 ): void {
   if (Platform.OS === "web") {
     if (window.confirm(`${title}\n\n${message}`)) {
       onConfirm();
+    } else {
+      options?.onCancel?.();
     }
     return;
   }
 
   Alert.alert(title, message, [
-    { text: options?.cancelLabel ?? "Cancel", style: "cancel" },
+    { text: options?.cancelLabel ?? "Cancel", style: "cancel", onPress: () => options?.onCancel?.() },
     {
       text: options?.confirmLabel ?? "OK",
       style: options?.destructive ? "destructive" : "default",

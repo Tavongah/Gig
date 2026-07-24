@@ -197,10 +197,15 @@ function formatGigPaymentResponse(gig: GigWithPayment) {
 }
 
 function checkoutChargeAmountCents(gig: GigWithPayment): number {
+  const taxCents = gig.taxCents ?? 0;
   if (isTimeBasedPricing(gig.pricingType)) {
-    return gig.maximumAuthorizedAmountCents ?? gig.payment?.maximumAuthorizedAmountCents ?? gig.totalCents;
+    return (
+      gig.maximumAuthorizedAmountCents ??
+      gig.payment?.maximumAuthorizedAmountCents ??
+      gig.totalCents + taxCents
+    );
   }
-  return gig.totalCents;
+  return gig.totalCents + taxCents;
 }
 
 function paymentIntentCreateParams(gig: GigWithPayment, clientId: string, customerId: string): Stripe.PaymentIntentCreateParams {

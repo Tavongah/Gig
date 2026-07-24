@@ -16,7 +16,7 @@ export function RejectedScreen() {
         <HeroBanner eyebrow="Worker application" title="Application not approved" />
         <DutsCard className="gap-4 p-5">
           <Text className="text-base leading-6 text-ink">
-            Your worker application was not approved. Please contact support@gigflow.ink if you need help.
+            Your worker application was not approved. Please contact support@duts.tech if you need help.
           </Text>
           <AppButton label="Sign out" variant="secondary" onPress={() => { disconnectSocket(); void signOut(); }} />
           <DeleteAccountButton />

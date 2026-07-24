@@ -182,9 +182,18 @@ export function GigDetailScreen() {
       !hasReview &&
       !reviewsQuery.isLoading
     ) {
-      showConfirm("Leave a review?", `Tell us how ${worker.fullName} did on this gig.`, () => {
-        navigation.navigate("Review", { gigId: gig.id, workerName: worker.fullName });
-      }, { confirmLabel: "Review", cancelLabel: "Later" });
+      showConfirm(
+        "Leave a review?",
+        `Tell us how ${worker.fullName} did on this gig. Reviews are optional.`,
+        () => {
+          navigation.navigate("Review", { gigId: gig.id, workerName: worker.fullName });
+        },
+        {
+          confirmLabel: "Leave a Review",
+          cancelLabel: "Skip",
+          onCancel: () => navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] })
+        }
+      );
     }
   }, [activeRole, gig?.id, gig?.status, hasReview, navigation, reviewsQuery.isLoading, worker]);
 

@@ -8,9 +8,10 @@ import {
   PricingType,
   UserRole
 } from "@prisma/client";
-import { calculatePriceEstimate, estimateResponseMinutes, haversineMiles, isWithinMatchingRadius, getGigMatchingRadiusMiles, workerCancelOutcome, billableSecondsFromWorkWindow, calculateTimeBasedAuthorization, isTimeBasedPricing, resolveHourlyRateCents, DEFAULT_HOURLY_RATE_CENTS, roundBillableMinutes } from "@gigflow/shared";
+import { calculatePriceEstimate, estimateResponseMinutes, haversineMiles, isWithinMatchingRadius, getGigMatchingRadiusMiles, workerCancelOutcome, billableSecondsFromWorkWindow, calculateTimeBasedAuthorization, isTimeBasedPricing, resolveHourlyRateCents, DEFAULT_HOURLY_RATE_CENTS, roundBillableMinutes, calculateApplicableTaxCents } from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
+import { logDutsFlow } from "../../lib/flow-log.js";
 import { assertDevOnlyPaymentBypass } from "../../lib/production-guards.js";
 import { isStripeConfigured } from "../../lib/stripe.js";
 import { assertWorkerCanAcceptGigs } from "../auth/access.service.js";
@@ -267,8 +268,13 @@ export async function getWorkerSelectionSummary(gigId: string, clientId: string,
 
   const workerChargeCents = interest.offeredWorkerPayoutCents ?? gig.workerPayoutCents;
   const platformFeeCents = gig.platformFeeCents;
+  const serviceAmountCents = workerChargeCents + platformFeeCents;
   const taxCents = gig.taxCents;
-  const estimatedTotalCents = workerChargeCents + platformFeeCents + taxCents;
+  const taxRateBps =
+    typeof (gig.priceBreakdown as { taxRateBps?: number } | null)?.taxRateBps === "number"
+      ? (gig.priceBreakdown as { taxRateBps: number }).taxRateBps
+      : 0;
+  const estimatedTotalCents = serviceAmountCents + taxCents;
   const timed = isTimeBasedPricing(gig.pricingType);
   const auth =
     timed && gig.maximumAuthorizedAmountCents
@@ -305,9 +311,13 @@ export async function getWorkerSelectionSummary(gigId: string, clientId: string,
       phoneVerified: interest.worker.phoneVerified
     },
     pricing: {
-      workerChargeCents,
-      platformFeeCents,
+      // Customer-facing only — no worker payout / commission internals
+      serviceAmountCents,
+      taxAmountCents: taxCents,
       taxCents,
+      taxRateBps,
+      customerFeeCents: 0,
+      totalChargedCents: estimatedTotalCents,
       estimatedTotalCents,
       hourlyRateCents: resolveHourlyRateCents(gig.pricingType),
       authorizationBufferCents: auth.authorizationBufferCents,
@@ -511,17 +521,23 @@ export async function calculateFinalGigAmount(gigId: string) {
     }
   );
 
-  let totalCents = estimate.totalCents + gig.taxCents;
+  const tax = calculateApplicableTaxCents(estimate.totalCents, {
+    region: gig.region,
+    country: gig.country ?? "US"
+  });
+  let customerTotalCents = estimate.totalCents + tax.taxAmountCents;
   const maxAuthorized = gig.maximumAuthorizedAmountCents ?? gig.payment?.maximumAuthorizedAmountCents;
   if (typeof maxAuthorized === "number" && maxAuthorized > 0) {
-    totalCents = Math.min(totalCents, maxAuthorized);
+    customerTotalCents = Math.min(customerTotalCents, maxAuthorized);
   }
 
   return {
     workerPayoutCents: estimate.workerPayoutCents,
     platformFeeCents: estimate.platformFeeCents,
-    taxCents: gig.taxCents,
-    totalCents,
+    serviceAmountCents: estimate.totalCents,
+    taxCents: tax.taxAmountCents,
+    taxRateBps: tax.taxRateBps,
+    totalCents: customerTotalCents,
     billableMinutes,
     actualWorkedSeconds,
     billableSeconds,
@@ -617,7 +633,8 @@ export async function approveGigCompletion(gigId: string, clientId: string, io?:
       customerApprovedAt: new Date(),
       workerPayoutCents: finalAmounts.workerPayoutCents,
       platformFeeCents: finalAmounts.platformFeeCents,
-      totalCents: finalAmounts.totalCents,
+      taxCents: finalAmounts.taxCents,
+      totalCents: finalAmounts.serviceAmountCents ?? finalAmounts.totalCents - finalAmounts.taxCents,
       finalTotalCents: finalAmounts.totalCents
     }
   });
@@ -632,6 +649,14 @@ export async function approveGigCompletion(gigId: string, clientId: string, io?:
       }
     });
   }
+
+  logDutsFlow("GIG_COMPLETED", { gigId, userId: clientId, userRole: "CLIENT" });
+  logDutsFlow("PAYMENT_CAPTURED", { gigId, userId: clientId, userRole: "CLIENT", amountCents: finalAmounts.totalCents });
+  logDutsFlow("WORKER_EARNINGS_CREATED", {
+    gigId,
+    userRole: "WORKER",
+    netEarningsCents: finalAmounts.workerPayoutCents
+  });
 
   await prisma.gigAssignment.update({
     where: { id: gig.assignments[0].id },

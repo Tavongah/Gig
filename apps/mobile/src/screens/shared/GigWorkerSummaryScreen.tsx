@@ -104,8 +104,24 @@ export function GigWorkerSummaryScreen({ navigation, route }: Props) {
           <Text className="text-sm font-bold uppercase tracking-wider text-brand">Booking summary</Text>
           <LineItem label="Service" value={gig.serviceCategoryName} />
           <LineItem label="Estimated duration" value={`${gig.estimatedHours} hr${gig.estimatedHours === 1 ? "" : "s"}`} />
-          <View className="mt-1 border-t border-border pt-3">
-            <LineItem label="Estimated total" value={formatMoney(summary.pricing.estimatedTotalCents)} />
+          <View className="mt-1 border-t border-border pt-3 gap-2">
+            <LineItem
+              label="Service"
+              value={formatMoney(
+                summary.pricing.serviceAmountCents ??
+                  summary.pricing.estimatedTotalCents - (summary.pricing.taxAmountCents ?? summary.pricing.taxCents ?? 0)
+              )}
+            />
+            {(summary.pricing.taxAmountCents ?? summary.pricing.taxCents ?? 0) > 0 ? (
+              <LineItem
+                label="Tax"
+                value={formatMoney(summary.pricing.taxAmountCents ?? summary.pricing.taxCents ?? 0)}
+              />
+            ) : null}
+            <LineItem
+              label="Total"
+              value={formatMoney(summary.pricing.totalChargedCents ?? summary.pricing.estimatedTotalCents)}
+            />
           </View>
           <Text className="text-xs leading-5 text-muted">
             Your payment is collected when you confirm the booking. The worker is paid after the gig is completed.

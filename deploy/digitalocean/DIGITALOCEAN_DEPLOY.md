@@ -89,32 +89,42 @@ See [COST_OPTIMIZATION.md](./COST_OPTIMIZATION.md) for tuning.
 
 ### DNS
 
-| Type | Name | Value |
-|------|------|-------|
-| A | `api` | Droplet IP |
-| A | `admin` | Droplet IP |
-| A | `app` | Droplet IP |
-| A | `www` | Droplet IP |
+Droplet IP: `68.183.125.70` (replace if your Droplet IP changes).
 
-Marketing site: `https://www.gigflow.ink` (Astro static). App stays at `https://app.gigflow.ink`. CTAs on the marketing site open the existing app—app logic is not modified.
+| Type | Host / Name | Value | TTL | Notes |
+|------|-------------|-------|-----|-------|
+| A | `@` (apex / root) | `68.183.125.70` | 300 | Required for `https://duts.tech` |
+| A | `www` | `68.183.125.70` | 300 | Canonical marketing site |
+| A | `api` | `68.183.125.70` | 300 | API |
+| A | `admin` | `68.183.125.70` | 300 | Admin |
+| A | `app` | `68.183.125.70` | 300 | Web app |
 
-### Launch marketing site (`www`)
+If you use **Cloudflare** DNS: set Proxy status to **DNS only** (grey cloud) for these A records while issuing/renewing Let's Encrypt certificates. You can enable proxy later if desired.
 
-1. **DNS** — add the `www` A record (see table above). Wait until it resolves:
+**Canonical marketing URL:** `https://www.duts.tech`  
+**Apex behavior:** `https://duts.tech` → **301** → `https://www.duts.tech`
+
+Marketing site: Astro static. App stays at `https://app.duts.tech`. CTAs on the marketing site open the existing app—app logic is not modified.
+
+### Launch marketing site (`www` + apex redirect)
+
+1. **DNS** — add both the apex `@` and `www` A records (see table above). Wait until both resolve:
 
    ```bash
-   nslookup www.gigflow.ink
+   nslookup duts.tech
+   nslookup www.duts.tech
    ```
 
 2. **Server env** — in `/opt/gigflow/.env.production`:
 
    ```env
-   MARKETING_DOMAIN=www.gigflow.ink
-   PUBLIC_SITE_URL=https://www.gigflow.ink
-   PUBLIC_APP_URL=https://app.gigflow.ink
+   ROOT_DOMAIN=duts.tech
+   MARKETING_DOMAIN=www.duts.tech
+   PUBLIC_SITE_URL=https://www.duts.tech
+   PUBLIC_APP_URL=https://app.duts.tech
    ```
 
-3. **SSL** — if the browser shows **Not secure** on `www`, the cert was issued before `www` existed. Fix once:
+3. **SSL** — expand the cert so it includes both `www` and the apex:
 
    ```bash
    bash /opt/gigflow/deploy/digitalocean/scripts/fix-marketing-ssl.sh
@@ -126,20 +136,85 @@ Marketing site: `https://www.gigflow.ink` (Astro static). App stays at `https://
    bash /opt/gigflow/deploy/digitalocean/scripts/expand-ssl-app-domain.sh
    ```
 
-4. **Deploy** — rebuilds nginx with the Astro marketing build:
+4. **Deploy** — rebuilds nginx with the Astro marketing build + apex→www redirect:
 
    ```bash
    bash /opt/gigflow/deploy/digitalocean/scripts/deploy-marketing.sh
    ```
 
-5. **Verify** — should return HTML (not API JSON):
+5. **Verify**:
 
    ```bash
-   curl -fsS https://www.gigflow.ink/health
-   curl -fsS https://www.gigflow.ink/ | head
+   curl -fsS https://www.duts.tech/health
+   curl -I https://duts.tech          # expect: HTTP/1.1 301 … Location: https://www.duts.tech/
+   curl -fsSL https://duts.tech/ | head
    ```
 
 Local preview: `npm run dev:marketing` → http://localhost:4321
+
+---
+
+## Domain cutover to duts.tech
+
+Production hosts use **duts.tech** (not gigflow.ink):
+
+| Host | Role |
+|------|------|
+| `www.duts.tech` | Marketing (canonical) |
+| `duts.tech` | 301 redirect → `www.duts.tech` |
+| `app.duts.tech` | App |
+| `api.duts.tech` | API |
+| `admin.duts.tech` | Admin |
+
+Internal names (`@gigflow/*` packages, Docker project `gigflow`, Prisma DB names) are unchanged.
+
+### Cutover checklist (new root domain)
+
+This is a **new certificate** (`--cert-name api.duts.tech`), not an expand of the old `api.gigflow.ink` cert.
+
+1. **DNS** — point all five A records at `68.183.125.70` (DNS only / grey cloud if Cloudflare). Confirm:
+
+   ```bash
+   nslookup api.duts.tech
+   nslookup www.duts.tech
+   nslookup duts.tech
+   ```
+
+2. **Pull + env** — on the Droplet:
+
+   ```bash
+   cd /opt/gigflow
+   git pull origin main
+   nano .env.production   # copy domain block from deploy/digitalocean/.env.production.example
+   ```
+
+   Set at least: `API_DOMAIN`, `ADMIN_DOMAIN`, `APP_DOMAIN`, `MARKETING_DOMAIN`, `ROOT_DOMAIN`,
+   `PUBLIC_*`, `EXPO_PUBLIC_API_URL`, `API_PUBLIC_URL`, `MOBILE_PUBLIC_URL`, `CORS_ORIGINS`,
+   `EMAIL_FROM`, `LETSENCRYPT_EMAIL`.
+
+3. **SSL + nginx + deploy**:
+
+   ```bash
+   bash deploy/digitalocean/scripts/issue-ssl-certs.sh
+   bash deploy/digitalocean/scripts/deploy.sh
+   bash deploy/digitalocean/scripts/deploy-marketing.sh
+   docker compose --env-file .env.production -f deploy/digitalocean/docker-compose.prod.yml --profile certbot up -d certbot
+   ```
+
+4. **External services** (same day as cutover):
+   - Firebase → Authorized domains: add `app.duts.tech`, `www.duts.tech`
+   - Stripe → webhook URL `https://api.duts.tech/...` + return URLs under `app.duts.tech`
+   - Resend → verify sending domain `duts.tech`; set `EMAIL_FROM=noreply@duts.tech`
+
+5. **Verify**:
+
+   ```bash
+   curl -fsS https://api.duts.tech/health
+   curl -fsS https://www.duts.tech/health
+   curl -I https://duts.tech    # 301 → https://www.duts.tech/
+   ```
+
+Optional: keep `gigflow.ink` DNS for a while with redirects, or drop it once traffic moves.
 
 ---
 
@@ -225,13 +300,13 @@ Customer/worker web app: `https://app.YOURDOMAIN.com`
 
 1. DNS: create `A` record `app` → Droplet IP  
 2. In `/opt/gigflow/.env.production` set:
-   - `APP_DOMAIN=app.gigflow.ink`
-   - `MOBILE_PUBLIC_URL=https://app.gigflow.ink`
-   - `CORS_ORIGINS=...include https://app.gigflow.ink...`
+   - `APP_DOMAIN=app.duts.tech`
+   - `MOBILE_PUBLIC_URL=https://app.duts.tech`
+   - `CORS_ORIGINS=...include https://app.duts.tech...`
    - `EXPO_PUBLIC_API_URL` + Firebase public keys (same as EAS)
 3. Expand TLS: `bash deploy/digitalocean/scripts/expand-ssl-app-domain.sh`  
 4. Redeploy: `./deploy/digitalocean/scripts/deploy.sh` (rebuilds Nginx with Expo web export)  
-5. Firebase Console → Authentication → Settings → Authorized domains → add `app.gigflow.ink`
+5. Firebase Console → Authentication → Settings → Authorized domains → add `app.duts.tech`
 
 ---
 

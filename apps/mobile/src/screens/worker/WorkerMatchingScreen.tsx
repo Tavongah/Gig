@@ -187,7 +187,7 @@ export function WorkerMatchingScreen({ navigation, route }: Props) {
           <Line label="Area" value={`${gig.city}, ${gig.region}`} />
           <Line label="Scheduled" value={startsLabel} />
           <Line label="Estimated duration" value={`${gig.estimatedHours} hr`} />
-          <Line label="Your earnings" value={formatMoney(gig.workerPayoutCents)} />
+          <Line label="Your earnings" value={formatMoney(gig.earnings?.netEarningsCents ?? gig.workerPayoutCents ?? 0)} />
           <Line label="Status" value="Waiting for customer" />
         </DutsCard>
 

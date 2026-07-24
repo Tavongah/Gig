@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { createReviewSchema, zodErrorsToFieldMap } from "@gigflow/shared";
 import { api } from "../../lib/api";
+import { logDutsFlow } from "../../lib/flow-log";
 import { showAlert } from "../../lib/confirm";
 import { LoadingButton } from "../../components/LoadingButton";
+import { AppButton } from "../../components/AppButton";
 import { ErrorMessage } from "../../components/ErrorMessage";
 import { DutsCard } from "../../components/DutsCard";
 import { DUTS } from "../../lib/theme";
@@ -23,13 +25,29 @@ export function ReviewScreen() {
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  function goHome(): void {
+    logDutsFlow("HOME_REDIRECTED", {
+      gigId: route.params.gigId,
+      userId: session.user.id,
+      userRole: session.user.roles?.[0],
+      platform: Platform.OS === "web" ? "web" : "mobile"
+    });
+    navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
+  }
+
   const reviewMutation = useMutation({
     mutationFn: (payload: { rating: number; comment: string }) =>
       api.createReview(route.params.gigId, payload, session.token),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["gig", route.params.gigId] });
+      logDutsFlow("REVIEW_SUBMITTED", {
+        gigId: route.params.gigId,
+        userId: session.user.id,
+        userRole: session.user.roles?.[0],
+        platform: Platform.OS === "web" ? "web" : "mobile"
+      });
       showAlert("Thank you!", "Your review helps other customers find great workers.");
-      navigation.goBack();
+      goHome();
     },
     onError: (err: Error) => setError(err.message)
   });
@@ -45,6 +63,16 @@ export function ReviewScreen() {
     reviewMutation.mutate(parsed.data);
   }
 
+  function handleSkip(): void {
+    logDutsFlow("REVIEW_SKIPPED", {
+      gigId: route.params.gigId,
+      userId: session.user.id,
+      userRole: session.user.roles?.[0],
+      platform: Platform.OS === "web" ? "web" : "mobile"
+    });
+    goHome();
+  }
+
   return (
     <ScrollView
       className="flex-1"
@@ -53,6 +81,7 @@ export function ReviewScreen() {
     >
       <Text className="text-sm font-bold uppercase tracking-wider text-brand">Review</Text>
       <Text className="text-2xl font-black text-ink">How was {route.params.workerName}?</Text>
+      <Text className="text-sm text-muted">Reviews are optional. You can skip and return home anytime.</Text>
 
       <DutsCard className="gap-4 p-5">
         <Text className="text-sm font-bold uppercase tracking-wider text-muted">Star rating</Text>
@@ -82,12 +111,15 @@ export function ReviewScreen() {
         <ErrorMessage message={error} />
 
         <LoadingButton
-          label="Submit Review"
+          label="Leave a Review"
           loadingLabel="Submitting..."
           onPress={handleSubmit}
           loading={reviewMutation.isPending}
           disabled={comment.trim().length < 10}
         />
+        <AppButton label="Skip" variant="secondary" onPress={handleSkip} disabled={reviewMutation.isPending} />
+        <AppButton label="Not Now" variant="secondary" onPress={handleSkip} disabled={reviewMutation.isPending} />
+        <AppButton label="Back to Home" variant="secondary" onPress={goHome} disabled={reviewMutation.isPending} />
       </DutsCard>
     </ScrollView>
   );

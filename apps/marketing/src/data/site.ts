@@ -1,6 +1,6 @@
-export const APP_URL = (import.meta.env.PUBLIC_APP_URL || "https://app.gigflow.ink").replace(/\/$/, "");
-export const SITE_URL = (import.meta.env.PUBLIC_SITE_URL || "https://www.gigflow.ink").replace(/\/$/, "");
-export const SUPPORT_EMAIL = import.meta.env.PUBLIC_SUPPORT_EMAIL || "support@gigflow.ink";
+export const APP_URL = (import.meta.env.PUBLIC_APP_URL || "https://app.duts.tech").replace(/\/$/, "");
+export const SITE_URL = (import.meta.env.PUBLIC_SITE_URL || "https://www.duts.tech").replace(/\/$/, "");
+export const SUPPORT_EMAIL = import.meta.env.PUBLIC_SUPPORT_EMAIL || "support@duts.tech";
 export const SUPPORT_PHONE = import.meta.env.PUBLIC_SUPPORT_PHONE || "+12036769717";
 export const SUPPORT_HOURS = import.meta.env.PUBLIC_SUPPORT_HOURS || "Monday – Saturday · 8:00 AM – 8:00 PM (Eastern Time)";
 

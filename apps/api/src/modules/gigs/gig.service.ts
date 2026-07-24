@@ -2,6 +2,8 @@ import type { Server } from "socket.io";
 
 import {
   GIG_VALIDATION_MESSAGES,
+  calculateApplicableTaxCents,
+  calculateCustomerTotalCents,
   calculatePriceEstimate,
   calculateTimeBasedAuthorization,
   createGigSchema,
@@ -21,6 +23,7 @@ import { AccountStatus, AvailabilityStatus, GigStatus, LaunchPhase, PaymentLifec
 import { prisma } from "../../config/prisma.js";
 
 import { AppError } from "../../lib/errors.js";
+import { logDutsFlow } from "../../lib/flow-log.js";
 import { broadcastGigOffer, notifyUser } from "../realtime/realtime.service.js";
 import {
   processWorkerPayout,
@@ -129,23 +132,62 @@ export async function estimateGig(input: GigEstimateInput) {
   parsed.demandMultiplier = 1;
   parsed.distanceMiles = 0;
 
-  return calculatePriceEstimate(parsed, {
-
+  const price = calculatePriceEstimate(parsed, {
     baseRateCents: category.baseRateCents,
-
     hourlyRateCents: category.hourlyRateCents,
-
     distanceRateCents: category.distanceRateCents,
-
     multiplier: Number(category.multiplier)
-
   });
 
+  const tax = calculateApplicableTaxCents(price.totalCents, {
+    region: parsed.location.region,
+    country: parsed.location.country
+  });
+  const customerTotalCents = calculateCustomerTotalCents({
+    serviceAmountCents: price.totalCents,
+    taxAmountCents: tax.taxAmountCents
+  });
+
+  logDutsFlow("TAX_CALCULATED", {
+    taxRateBps: tax.taxRateBps,
+    taxAmountCents: tax.taxAmountCents,
+    serviceAmountCents: price.totalCents,
+    customerTotalCents
+  });
+
+  return {
+    ...price,
+    taxRateBps: tax.taxRateBps,
+    taxAmountCents: tax.taxAmountCents,
+    customerTotalCents
+  };
 }
 
 
 
-export async function createGig(clientId: string, input: CreateGigInput, _io: Server) {
+export async function createGig(
+  clientId: string,
+  input: CreateGigInput,
+  _io: Server,
+  options?: { idempotencyKey?: string | null }
+) {
+  const idempotencyKey = options?.idempotencyKey?.trim() || null;
+
+  if (idempotencyKey) {
+    const existing = await prisma.gig.findFirst({
+      where: { clientId, idempotencyKey },
+      include: { serviceCategory: true, payment: true }
+    });
+    if (existing) {
+      logDutsFlow("GIG_CREATED", {
+        gigId: existing.id,
+        userId: clientId,
+        userRole: "CLIENT",
+        idempotentReplay: true
+      });
+      return existing;
+    }
+  }
 
   const parsed = createGigSchema.parse(input);
 
@@ -181,111 +223,104 @@ export async function createGig(clientId: string, input: CreateGigInput, _io: Se
 
   const price = await estimateGig(parsed);
 
+  const taxAmountCents = price.taxAmountCents ?? 0;
+  const customerTotalCents = price.customerTotalCents ?? price.totalCents + taxAmountCents;
+
   const timed = isTimeBasedPricing(String(parsed.pricingType));
   const auth = timed
     ? calculateTimeBasedAuthorization({
-        estimatedTotalCents: price.totalCents,
+        estimatedTotalCents: customerTotalCents,
         estimatedLaborCents: price.laborCents ?? price.workerPayoutCents,
         hourlyRateCents: price.hourlyRateCents
       })
-    : { authorizationBufferCents: 0, maximumAuthorizedAmountCents: price.totalCents };
+    : { authorizationBufferCents: 0, maximumAuthorizedAmountCents: customerTotalCents };
 
-  const gig = await prisma.gig.create({
+  logDutsFlow("REQUEST_STARTED", { userId: clientId, userRole: "CLIENT" });
 
-    data: {
-
-      clientId,
-
-      serviceCategoryId: parsed.serviceCategoryId,
-
-      title: parsed.title,
-
-      description: parsed.description,
-
-      status: GigStatus.POSTED,
-
-      paymentStatus: PaymentLifecycle.PAYMENT_PENDING,
-
-      publishedAt: new Date(),
-
-      pricingType: parsed.pricingType as PricingType,
-
-      urgency: parsed.urgency,
-
-      size: parsed.size,
-
-      estimatedHours: parsed.estimatedHours,
-
-      distanceMiles: parsed.distanceMiles,
-
-      demandMultiplier: parsed.demandMultiplier,
-
-      startsAt: new Date(parsed.startsAt),
-
-      addressLine1: parsed.location.addressLine1,
-
-      addressLine2: parsed.location.addressLine2,
-
-      city: parsed.location.city,
-
-      region: parsed.location.region,
-
-      postalCode: parsed.location.postalCode,
-
-      country: parsed.location.country,
-
-      formattedAddress: parsed.location.formattedAddress,
-
-      latitude: parsed.location.latitude,
-
-      longitude: parsed.location.longitude,
-
-      photoUrls: parsed.photos,
-
-      priceBreakdown: {
-        ...price,
+  let gig;
+  try {
+    gig = await prisma.gig.create({
+      data: {
+        clientId,
+        serviceCategoryId: parsed.serviceCategoryId,
+        title: parsed.title,
+        description: parsed.description,
+        status: GigStatus.POSTED,
+        paymentStatus: PaymentLifecycle.PAYMENT_PENDING,
+        publishedAt: new Date(),
+        pricingType: parsed.pricingType as PricingType,
+        urgency: parsed.urgency,
+        size: parsed.size,
+        estimatedHours: parsed.estimatedHours,
+        distanceMiles: parsed.distanceMiles,
+        demandMultiplier: parsed.demandMultiplier,
+        startsAt: new Date(parsed.startsAt),
+        addressLine1: parsed.location.addressLine1,
+        addressLine2: parsed.location.addressLine2,
+        city: parsed.location.city,
+        region: parsed.location.region,
+        postalCode: parsed.location.postalCode,
+        country: parsed.location.country,
+        formattedAddress: parsed.location.formattedAddress,
+        latitude: parsed.location.latitude,
+        longitude: parsed.location.longitude,
+        photoUrls: parsed.photos,
+        idempotencyKey,
+        taxCents: taxAmountCents,
+        priceBreakdown: {
+          ...price,
+          taxRateBps: price.taxRateBps ?? 0,
+          taxAmountCents,
+          customerTotalCents,
+          authorizationBufferCents: auth.authorizationBufferCents,
+          maximumAuthorizedAmountCents: auth.maximumAuthorizedAmountCents,
+          billingIncrementMinutes: 15
+        } as unknown as Prisma.InputJsonValue,
+        totalCents: price.totalCents,
+        platformFeeCents: price.platformFeeCents,
+        workerPayoutCents: price.workerPayoutCents,
         authorizationBufferCents: auth.authorizationBufferCents,
         maximumAuthorizedAmountCents: auth.maximumAuthorizedAmountCents,
-        billingIncrementMinutes: 15
-      } as unknown as Prisma.InputJsonValue,
-
-      totalCents: price.totalCents,
-
-      platformFeeCents: price.platformFeeCents,
-
-      workerPayoutCents: price.workerPayoutCents,
-
-      authorizationBufferCents: auth.authorizationBufferCents,
-
-      maximumAuthorizedAmountCents: auth.maximumAuthorizedAmountCents,
-
-      billingIncrementMinutes: 15,
-
-      payment: {
-
-        create: {
-
-          amountCents: timed ? auth.maximumAuthorizedAmountCents : price.totalCents,
-
-          platformFeeCents: price.platformFeeCents,
-
-          workerPayoutCents: price.workerPayoutCents,
-
-          maximumAuthorizedAmountCents: auth.maximumAuthorizedAmountCents
-
-        }
-
+        billingIncrementMinutes: 15,
+        payment: {
+          create: {
+            amountCents: timed ? auth.maximumAuthorizedAmountCents : customerTotalCents,
+            platformFeeCents: price.platformFeeCents,
+            workerPayoutCents: price.workerPayoutCents,
+            maximumAuthorizedAmountCents: auth.maximumAuthorizedAmountCents
+          }
+        },
+        chatThread: { create: {} }
       },
-
-      chatThread: { create: {} }
-
-    },
-
-    include: { serviceCategory: true, payment: true }
-
-  });
+      include: { serviceCategory: true, payment: true }
+    });
+  } catch (error) {
+    // Concurrent duplicate Idempotency-Key: return the winner.
+    if (
+      idempotencyKey &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const existing = await prisma.gig.findFirst({
+        where: { clientId, idempotencyKey },
+        include: { serviceCategory: true, payment: true }
+      });
+      if (existing) {
+        logDutsFlow("GIG_CREATED", {
+          gigId: existing.id,
+          userId: clientId,
+          userRole: "CLIENT",
+          idempotentReplay: true
+        });
+        return existing;
+      }
+    }
+    throw error;
+  }
 
   await publishPostedGig(gig.id);
+  logDutsFlow("GIG_CREATED", { gigId: gig.id, userId: clientId, userRole: "CLIENT" });
+  logDutsFlow("MATCHING_STARTED", { gigId: gig.id, userId: clientId, userRole: "CLIENT" });
 
   return gig;
 }
@@ -406,7 +441,10 @@ export async function findNearbyGigs(workerId: string) {
     })
 
     .map((item) => ({
-      ...sanitizeGigForViewer(item.gig, workerId, { distanceMiles: item.distanceMiles }),
+      ...sanitizeGigForViewer(item.gig, workerId, {
+        distanceMiles: item.distanceMiles,
+        viewerRoles: [UserRole.WORKER]
+      }),
       distanceMiles: item.distanceMiles,
       estimatedResponseMinutes: item.estimatedResponseMinutes
     }));
@@ -791,31 +829,26 @@ export async function updateGigStatus(
 
 
 export async function listClientGigs(clientId: string) {
-
-  return prisma.gig.findMany({
-
+  const gigs = await prisma.gig.findMany({
     where: { clientId },
-
     include: {
       serviceCategory: true,
       payment: { select: { status: true, amountCents: true } },
       assignments: { where: { cancelledAt: null }, include: { worker: true } }
     },
-
     orderBy: { createdAt: "desc" },
-
     take: 50
-
   });
 
+  return gigs.map((gig) =>
+    sanitizeGigForViewer(gig, clientId, { viewerRoles: [UserRole.CLIENT] })
+  );
 }
 
 
 
 export async function listWorkerGigs(workerId: string) {
-
-  return prisma.gig.findMany({
-
+  const gigs = await prisma.gig.findMany({
     where: {
       OR: [
         { assignments: { some: { workerId, cancelledAt: null } } },
@@ -825,19 +858,18 @@ export async function listWorkerGigs(workerId: string) {
         }
       ]
     },
-
     include: {
       serviceCategory: true,
       client: true,
       assignments: { where: { workerId, cancelledAt: null }, include: { worker: true } }
     },
-
     orderBy: { createdAt: "desc" },
-
     take: 50
-
   });
 
+  return gigs.map((gig) =>
+    sanitizeGigForViewer(gig, workerId, { viewerRoles: [UserRole.WORKER] })
+  );
 }
 
 
@@ -971,13 +1003,20 @@ export async function getGigDetail(gigId: string, userId: string) {
       haversineMiles(workerLat, workerLng, Number(gig.latitude), Number(gig.longitude)) * 10
     ) / 10;
 
-    return sanitizeGigForViewer(gig, userId, { distanceMiles });
+    return sanitizeGigForViewer(gig, userId, {
+      distanceMiles,
+      viewerRoles: viewer?.roles,
+      isAdmin: viewer?.roles.includes(UserRole.ADMIN)
+    });
 
   }
 
 
 
-  return sanitizeGigForViewer(gig, userId);
+  return sanitizeGigForViewer(gig, userId, {
+    viewerRoles: viewer?.roles,
+    isAdmin: viewer?.roles.includes(UserRole.ADMIN)
+  });
 
 }
 

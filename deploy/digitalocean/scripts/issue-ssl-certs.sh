@@ -15,6 +15,10 @@ source "$ENV_FILE"
 : "${MARKETING_DOMAIN:?}"
 : "${LETSENCRYPT_EMAIL:?}"
 
+if [[ -z "${ROOT_DOMAIN:-}" ]]; then
+  ROOT_DOMAIN="${MARKETING_DOMAIN#www.}"
+fi
+
 mkdir -p "$ROOT/deploy/nginx/conf.d"
 
 # Temporary HTTP-only nginx for ACME
@@ -22,7 +26,7 @@ cat > "$ROOT/deploy/nginx/conf.d/gigflow.conf" <<EOF
 server {
     listen 80;
     listen [::]:80;
-    server_name $API_DOMAIN $ADMIN_DOMAIN $APP_DOMAIN $MARKETING_DOMAIN;
+    server_name $API_DOMAIN $ADMIN_DOMAIN $APP_DOMAIN $MARKETING_DOMAIN $ROOT_DOMAIN;
     location /.well-known/acme-challenge/ { root /var/www/certbot; }
     location / { return 200 'GigFlow SSL setup\n'; add_header Content-Type text/plain; }
 }
@@ -34,7 +38,7 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" --profile tools run --r
   certonly --webroot -w /var/www/certbot \
   --email "$LETSENCRYPT_EMAIL" --agree-tos --no-eff-email \
   --cert-name "$API_DOMAIN" \
-  -d "$API_DOMAIN" -d "$ADMIN_DOMAIN" -d "$APP_DOMAIN" -d "$MARKETING_DOMAIN"
+  -d "$API_DOMAIN" -d "$ADMIN_DOMAIN" -d "$APP_DOMAIN" -d "$MARKETING_DOMAIN" -d "$ROOT_DOMAIN"
 
 bash "$ROOT/deploy/digitalocean/scripts/render-nginx-conf.sh"
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d nginx

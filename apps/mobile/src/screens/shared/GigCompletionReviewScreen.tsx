@@ -39,7 +39,7 @@ export function GigCompletionReviewScreen({ navigation, route }: Props) {
         navigation.replace("Review", { gigId, workerName: worker.fullName });
         return;
       }
-      navigation.replace("GigDetail", { gigId });
+      navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
     },
     onError: (error: Error) => showAlert("Could not approve", error.message)
   });
@@ -109,11 +109,23 @@ export function GigCompletionReviewScreen({ navigation, route }: Props) {
           {timed ? (
             <LineItem label="Hourly rate" amount={formatHourlyRateLabel(DEFAULT_HOURLY_RATE_CENTS)} />
           ) : null}
-          <View className="border-t border-border pt-3">
+          <View className="border-t border-border pt-3 gap-2">
+            <LineItem
+              label="Service"
+              amount={formatMoney(
+                gig.pricing?.serviceAmountCents ??
+                  Math.max(0, (gig.finalTotalCents ?? gig.totalCents) - (gig.taxCents ?? 0))
+              )}
+            />
+            {(gig.pricing?.taxAmountCents ?? gig.taxCents ?? 0) > 0 ? (
+              <LineItem label="Tax" amount={formatMoney(gig.pricing?.taxAmountCents ?? gig.taxCents ?? 0)} />
+            ) : null}
             <Text className="text-xs font-bold uppercase tracking-wider text-muted">
               {timed ? "Total amount charged" : "Total"}
             </Text>
-            <Text className="text-3xl font-black text-ink">{formatMoney(gig.finalTotalCents ?? gig.totalCents)}</Text>
+            <Text className="text-3xl font-black text-ink">
+              {formatMoney(gig.pricing?.totalChargedCents ?? gig.finalTotalCents ?? gig.totalCents)}
+            </Text>
           </View>
         </DutsCard>
 

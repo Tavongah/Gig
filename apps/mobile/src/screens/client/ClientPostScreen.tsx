@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -24,6 +24,7 @@ import {
   validatePostGigForm
 } from "@gigflow/shared";
 import { api, ApiValidationError } from "../../lib/api";
+import { logDutsFlow } from "../../lib/flow-log";
 import { DutsCard } from "../../components/DutsCard";
 import { ServiceCategorySelect } from "../../components/ServiceCategorySelect";
 import { FormInput } from "../../components/FormInput";
@@ -49,6 +50,13 @@ function clearFieldError(errors: Record<string, string>, field: string): Record<
   return next;
 }
 
+function createIdempotencyKey(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `gig-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function ClientPostScreen() {
   const session = useSessionStore((state) => state.session)!;
   const route = useRoute<RouteProp<RootStackParamList, "PostGig">>();
@@ -67,6 +75,8 @@ export function ClientPostScreen() {
   const [preferredTime, setPreferredTime] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>(EMPTY_ERRORS);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: api.listCategories });
   const allowedCategoryIds = useMemo(
@@ -153,16 +163,39 @@ export function ClientPostScreen() {
   }, [runEstimate, validation.payload, validation.success]);
 
   const createMutation = useMutation({
-    mutationFn: (payload: CreateGigInput) => api.createGig(payload, session.token),
+    mutationFn: (payload: CreateGigInput) => {
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current = createIdempotencyKey();
+      }
+      return api.createGig(payload, session.token, { idempotencyKey: idempotencyKeyRef.current });
+    },
     onSuccess: (result) => {
+      const gigId = result.gigId ?? result.gig?.id;
       void queryClient.invalidateQueries({ queryKey: ["my-gigs"] });
-      Alert.alert(
-        "Request sent",
-        "Your request has been sent to nearby verified workers.",
-        [{ text: "View matches", onPress: () => navigation.navigate("GigSelectWorkers", { gigId: result.gig.id }) }]
-      );
+      if (!gigId) {
+        setIsSubmitting(false);
+        idempotencyKeyRef.current = null;
+        Alert.alert("Could not send request", "Gig ID was not returned. Please try again.");
+        return;
+      }
+      logDutsFlow("GIG_ID_RECEIVED", {
+        gigId,
+        userId: session.user.id,
+        userRole: "CLIENT",
+        platform: Platform.OS === "web" ? "web" : "mobile"
+      });
+      logDutsFlow("NAVIGATION_STARTED", {
+        gigId,
+        userId: session.user.id,
+        userRole: "CLIENT",
+        platform: Platform.OS === "web" ? "web" : "mobile"
+      });
+      // replace so back cannot resubmit the form
+      navigation.replace("GigSelectWorkers", { gigId });
     },
     onError: (error: Error) => {
+      setIsSubmitting(false);
+      // Keep the same idempotency key so a retry cannot create a second gig for this attempt.
       if (error instanceof ApiValidationError) {
         setFieldErrors(error.fieldErrors);
         setSubmitAttempted(true);
@@ -185,7 +218,7 @@ export function ClientPostScreen() {
   }
 
   function handleSubmit(): void {
-    if (createMutation.isPending) return;
+    if (isSubmitting || createMutation.isPending) return;
     setSubmitAttempted(true);
     setFieldErrors(EMPTY_ERRORS);
     const result = validatePostGigForm(formValues, allowedCategoryIds, confirmedLocation, new Date());
@@ -193,8 +226,16 @@ export function ClientPostScreen() {
       setFieldErrors(result.errors);
       return;
     }
+    setIsSubmitting(true);
+    logDutsFlow("REQUEST_STARTED", {
+      userId: session.user.id,
+      userRole: "CLIENT",
+      platform: Platform.OS === "web" ? "web" : "mobile"
+    });
     createMutation.mutate(result.payload);
   }
+
+  const submitting = isSubmitting || createMutation.isPending;
 
   return (
     <View style={{ flex: 1, backgroundColor: DUTS.background, paddingHorizontal: 20 }}>
@@ -302,10 +343,10 @@ export function ClientPostScreen() {
 
             <LoadingButton
               label="Request Help"
-              loadingLabel="Sending request..."
+              loadingLabel="Requesting Help…"
               onPress={handleSubmit}
-              disabled={!validation.success || createMutation.isPending}
-              loading={createMutation.isPending}
+              disabled={!validation.success || submitting}
+              loading={submitting}
             />
           </DutsCard>
         </ScrollView>

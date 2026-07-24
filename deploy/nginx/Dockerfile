@@ -50,9 +50,9 @@ COPY apps/marketing/package.json ./apps/marketing/
 RUN npm ci --workspace @gigflow/marketing --include-workspace-root
 COPY tsconfig.base.json ./
 COPY apps/marketing ./apps/marketing
-ARG PUBLIC_SITE_URL=https://www.gigflow.ink
-ARG PUBLIC_APP_URL=https://app.gigflow.ink
-ARG PUBLIC_SUPPORT_EMAIL=support@gigflow.ink
+ARG PUBLIC_SITE_URL=https://www.duts.tech
+ARG PUBLIC_APP_URL=https://app.duts.tech
+ARG PUBLIC_SUPPORT_EMAIL=support@duts.tech
 ARG PUBLIC_SUPPORT_PHONE=+12036769717
 ENV PUBLIC_SITE_URL=$PUBLIC_SITE_URL \
     PUBLIC_APP_URL=$PUBLIC_APP_URL \

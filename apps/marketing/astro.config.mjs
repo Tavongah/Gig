@@ -1,6 +1,6 @@
 import { defineConfig } from "astro/config";
 
-const site = process.env.PUBLIC_SITE_URL || "https://www.gigflow.ink";
+const site = process.env.PUBLIC_SITE_URL || "https://www.duts.tech";
 
 export default defineConfig({
   site,

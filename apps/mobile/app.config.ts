@@ -81,7 +81,7 @@ export default {
     extra: {
       apiUrl,
       webUrl: process.env.EXPO_PUBLIC_WEB_URL ?? "",
-      supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? "support@gigflow.ink",
+      supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? "support@duts.tech",
       supportPhone: process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? "+12036769717",
       supportHours:
         process.env.EXPO_PUBLIC_SUPPORT_HOURS ??

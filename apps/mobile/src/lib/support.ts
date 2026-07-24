@@ -14,7 +14,7 @@ const extra = Constants.expoConfig?.extra as SupportExtra | undefined;
 export const SUPPORT_EMAIL =
   process.env.EXPO_PUBLIC_SUPPORT_EMAIL?.trim() ||
   extra?.supportEmail?.trim() ||
-  "support@gigflow.ink";
+  "support@duts.tech";
 
 export const SUPPORT_PHONE =
   process.env.EXPO_PUBLIC_SUPPORT_PHONE?.trim() ||

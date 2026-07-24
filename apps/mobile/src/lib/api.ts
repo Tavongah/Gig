@@ -131,9 +131,14 @@ export interface GigSelectionSummary {
   };
   worker: GigWorkerInterest["worker"];
   pricing: {
-    workerChargeCents: number;
-    platformFeeCents: number;
-    taxCents: number;
+    serviceAmountCents?: number;
+    taxAmountCents?: number;
+    taxCents?: number;
+    taxRateBps?: number;
+    customerFeeCents?: number;
+    totalChargedCents?: number;
+    workerChargeCents?: number;
+    platformFeeCents?: number;
     estimatedTotalCents: number;
     hourlyRateCents?: number;
     authorizationBufferCents?: number;
@@ -150,7 +155,24 @@ export interface GigDetail {
   status: string;
   urgency: string;
   totalCents: number;
-  workerPayoutCents: number;
+  taxCents?: number;
+  workerPayoutCents?: number;
+  pricing?: {
+    serviceAmountCents: number;
+    taxAmountCents: number;
+    taxRateBps: number;
+    customerFeeCents: number;
+    totalChargedCents: number;
+    currency: string;
+  };
+  earnings?: {
+    grossEarningsCents: number;
+    platformDeductionCents: number;
+    netEarningsCents: number;
+    tipsCents: number;
+    payoutStatus: string;
+    currency: string;
+  };
   addressLine1: string;
   city: string;
   region: string;
@@ -196,6 +218,9 @@ export interface PriceEstimate {
   workerPayoutCents: number;
   commissionRate: number;
   urgencyMultiplier: number;
+  taxRateBps?: number;
+  taxAmountCents?: number;
+  customerTotalCents?: number;
 }
 
 export interface WorkerEarnings {
@@ -442,8 +467,16 @@ export const api = {
     request<{ categories: ServiceCategory[]; mvp: ServiceCategory[]; comingSoon: ServiceCategory[] }>("/gigs/categories"),
   estimateGig: (payload: GigEstimateInput, token: string) =>
     request<{ estimate: PriceEstimate }>("/gigs/estimate", { method: "POST", body: JSON.stringify(payload) }, token),
-  createGig: (payload: CreateGigInput, token: string) =>
-    request<{ gig: GigDetail }>("/gigs", { method: "POST", body: JSON.stringify(payload) }, token),
+  createGig: (payload: CreateGigInput, token: string, options?: { idempotencyKey?: string }) =>
+    request<{ success?: boolean; gigId?: string; status?: string; gig: GigDetail }>(
+      "/gigs",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: options?.idempotencyKey ? { "Idempotency-Key": options.idempotencyKey } : undefined
+      },
+      token
+    ),
   getStripeConfig: () => request<{ stripeConfigured: boolean; publishableKey: string | null }>("/payments/config"),
   createCheckoutSession: (gigId: string, token: string) =>
     request<{ checkoutUrl: string | null; alreadyPaid: boolean; payment: PaymentStatusResponse }>(

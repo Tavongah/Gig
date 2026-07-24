@@ -160,13 +160,23 @@ export function GigPaymentScreen({ navigation, route }: Props) {
                   value={`${summary.gig.estimatedHours} hr${summary.gig.estimatedHours === 1 ? "" : "s"}`}
                 />
               ) : null}
-              <LineItem label={timed ? "Estimated amount" : "Total"} value={formatMoney(pricing.estimatedTotalCents)} />
+              <LineItem
+                label="Service"
+                value={formatMoney(pricing.serviceAmountCents ?? pricing.estimatedTotalCents - (pricing.taxAmountCents ?? pricing.taxCents ?? 0))}
+              />
+              {(pricing.taxAmountCents ?? pricing.taxCents ?? 0) > 0 ? (
+                <LineItem label="Tax" value={formatMoney(pricing.taxAmountCents ?? pricing.taxCents ?? 0)} />
+              ) : null}
+              <LineItem
+                label={timed ? "Estimated total" : "Total"}
+                value={formatMoney(pricing.totalChargedCents ?? pricing.estimatedTotalCents)}
+              />
               {timed ? (
                 <>
                   <LineItem label="Authorization buffer" value={formatMoney(bufferCents)} />
                   <LineItem
                     label="Maximum authorization"
-                    value={formatMoney(maxAuthorized ?? pricing.estimatedTotalCents)}
+                    value={formatMoney(maxAuthorized ?? pricing.totalChargedCents ?? pricing.estimatedTotalCents)}
                   />
                   <LineItem label="Billing increment" value={`${billingIncrement} minutes`} />
                   <Text className="pt-1 text-xs leading-4 text-muted">
@@ -176,7 +186,16 @@ export function GigPaymentScreen({ navigation, route }: Props) {
               ) : null}
             </>
           ) : gig ? (
-            <LineItem label="Estimated total" value={formatMoney(gig.totalCents)} />
+            <>
+              <LineItem label="Service" value={formatMoney(gig.pricing?.serviceAmountCents ?? gig.totalCents)} />
+              {(gig.pricing?.taxAmountCents ?? gig.taxCents ?? 0) > 0 ? (
+                <LineItem label="Tax" value={formatMoney(gig.pricing?.taxAmountCents ?? gig.taxCents ?? 0)} />
+              ) : null}
+              <LineItem
+                label="Total"
+                value={formatMoney(gig.pricing?.totalChargedCents ?? gig.finalTotalCents ?? gig.totalCents)}
+              />
+            </>
           ) : null}
         </DutsCard>
 

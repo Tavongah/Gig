@@ -279,6 +279,8 @@ model Gig {
   customerApprovedAt    DateTime?
   autoApproveAt         DateTime?
   taxCents              Int               @default(0)
+  /** Client-generated key so duplicate Request Help submissions return the same gig. */
+  idempotencyKey        String?           @unique
   finalTotalCents       Int?
   authorizationBufferCents Int            @default(0)
   maximumAuthorizedAmountCents Int?

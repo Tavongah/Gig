@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.gigflow.ink/sitemap.xml
+Sitemap: https://www.duts.tech/sitemap.xml
