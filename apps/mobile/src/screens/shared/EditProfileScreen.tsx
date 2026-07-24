@@ -7,14 +7,13 @@ import {
   Text,
   View
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import * as ImageManipulator from "expo-image-manipulator";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../lib/api";
 import { showAlert } from "../../lib/confirm";
 import { initials } from "../../lib/format";
+import { pickProfilePhotoDataUrl } from "../../lib/pick-profile-photo";
 import { Screen } from "../../components/Screen";
 import { DutsCard } from "../../components/DutsCard";
 import { FormInput } from "../../components/FormInput";
@@ -24,8 +23,6 @@ import type { RootStackParamList } from "../../navigation/types";
 import { DUTS } from "../../lib/theme";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "EditProfile">;
-
-const MAX_AVATAR_DATA_URL_CHARS = 350_000;
 
 function splitName(fullName: string): { firstName: string; lastName: string } {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -45,56 +42,43 @@ export function EditProfileScreen() {
   const [lastName, setLastName] = useState(initial.lastName);
   const [phoneNumber, setPhoneNumber] = useState(profile?.phoneNumber ?? "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatarUrl ?? null);
-  const [pendingAvatarDataUrl, setPendingAvatarDataUrl] = useState<string | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
-  const [picking, setPicking] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const email = profile?.email ?? session.user.email;
   const emailVerified = Boolean(profile?.emailVerified ?? session.user.emailVerified);
   const displayName = `${firstName} ${lastName}`.trim();
+  const photoRequired = !avatarUrl;
 
-  async function pickAvatar(): Promise<void> {
-    setPicking(true);
+  async function pickAndUploadAvatar(): Promise<void> {
+    setUploadingPhoto(true);
     setError(null);
+    setUploadProgress("Opening camera / gallery…");
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        showAlert("Permission needed", "Allow photo access to update your profile picture.");
+      const dataUrl = await pickProfilePhotoDataUrl();
+      if (!dataUrl) {
+        setUploadProgress(null);
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7
-      });
-
-      if (result.canceled || !result.assets[0]) return;
-
-      const asset = result.assets[0];
-      const manipulated = await ImageManipulator.manipulateAsync(
-        asset.uri,
-        [{ resize: { width: 384 } }],
-        { compress: 0.55, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-      );
-
-      if (!manipulated.base64) {
-        throw new Error("Could not process image.");
-      }
-
-      const dataUrl = `data:image/jpeg;base64,${manipulated.base64}`;
-      if (dataUrl.length > MAX_AVATAR_DATA_URL_CHARS) {
-        throw new Error("Image is too large. Try a smaller photo.");
-      }
-
       setAvatarUrl(dataUrl);
-      setPendingAvatarDataUrl(dataUrl);
+      setUploadProgress("Uploading photo…");
+      const avatarResult = await api.uploadAvatar(dataUrl, session.token);
+      const nextUrl = avatarResult.user.avatarUrl ?? null;
+      if (!nextUrl) {
+        throw new Error("Upload succeeded but no photo URL was returned. Try again.");
+      }
+      setAvatarUrl(nextUrl);
+      setProfile({ ...(profile ?? session.user), ...avatarResult.user });
+      setUploadProgress(null);
+      showAlert("Photo saved", "Your profile picture was uploaded.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update photo.");
+      setUploadProgress(null);
+      setError(err instanceof Error ? err.message : "Could not upload photo.");
     } finally {
-      setPicking(false);
+      setUploadingPhoto(false);
     }
   }
 
@@ -110,19 +94,14 @@ export function EditProfileScreen() {
       setError("Enter your first and last name.");
       return;
     }
+    if (!avatarUrl) {
+      setError("Profile photo is required. Upload a photo before saving.");
+      return;
+    }
 
     setSaving(true);
     setError(null);
     try {
-      let latestUser = profile ?? session.user;
-
-      if (pendingAvatarDataUrl !== undefined) {
-        const avatarResult = await api.uploadAvatar(pendingAvatarDataUrl, session.token);
-        latestUser = avatarResult.user;
-        setAvatarUrl(avatarResult.user.avatarUrl ?? null);
-        setPendingAvatarDataUrl(undefined);
-      }
-
       const { user } = await api.updateProfile(
         {
           fullName,
@@ -130,7 +109,7 @@ export function EditProfileScreen() {
         },
         session.token
       );
-      setProfile({ ...latestUser, ...user });
+      setProfile({ ...(profile ?? session.user), ...user, avatarUrl });
       showAlert("Saved", "Your profile was updated.");
       navigation.goBack();
     } catch (err) {
@@ -148,14 +127,21 @@ export function EditProfileScreen() {
         contentContainerStyle={{ gap: 16, paddingBottom: 32 }}
       >
         <DutsCard className="items-center gap-3 p-5">
-          <Pressable onPress={() => void pickAvatar()} disabled={picking} className="items-center gap-2">
+          <Text className="text-center text-sm font-semibold text-ink">
+            Profile photo is required{photoRequired ? " — add one to continue" : ""}
+          </Text>
+          <Pressable
+            onPress={() => void pickAndUploadAvatar()}
+            disabled={uploadingPhoto || saving}
+            className="items-center gap-2"
+          >
             <View className="h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-hero">
               {avatarUrl ? (
                 <Image source={{ uri: avatarUrl }} className="h-24 w-24" />
               ) : (
                 <Text className="text-3xl font-black text-brand">{initials(displayName || "DU")}</Text>
               )}
-              {picking ? (
+              {uploadingPhoto ? (
                 <View className="absolute inset-0 items-center justify-center bg-black/40">
                   <ActivityIndicator color="#fff" />
                 </View>
@@ -163,19 +149,15 @@ export function EditProfileScreen() {
             </View>
             <View className="flex-row items-center gap-1">
               <Ionicons name="camera-outline" size={16} color={DUTS.purple} />
-              <Text className="font-bold text-brand">{avatarUrl ? "Change photo" : "Add photo"}</Text>
+              <Text className="font-bold text-brand">
+                {uploadingPhoto ? "Uploading…" : avatarUrl ? "Replace photo" : "Add photo"}
+              </Text>
             </View>
           </Pressable>
-          {avatarUrl ? (
-            <Pressable
-              onPress={() => {
-                setAvatarUrl(null);
-                setPendingAvatarDataUrl(null);
-              }}
-            >
-              <Text className="text-sm font-semibold text-muted">Remove photo</Text>
-            </Pressable>
-          ) : null}
+          {uploadProgress ? <Text className="text-xs text-muted">{uploadProgress}</Text> : null}
+          <Text className="text-center text-xs text-muted">
+            Use camera or gallery. Photos are cropped and compressed before upload.
+          </Text>
         </DutsCard>
 
         <DutsCard className="gap-3 p-5">
@@ -196,7 +178,13 @@ export function EditProfileScreen() {
             </Text>
           </View>
           {error ? <Text className="text-sm font-semibold text-danger">{error}</Text> : null}
-          <LoadingButton label="Save changes" loadingLabel="Saving..." onPress={() => void handleSave()} loading={saving} />
+          <LoadingButton
+            label="Save changes"
+            loadingLabel="Saving..."
+            onPress={() => void handleSave()}
+            loading={saving}
+            disabled={uploadingPhoto || !avatarUrl}
+          />
         </DutsCard>
       </ScrollView>
     </Screen>

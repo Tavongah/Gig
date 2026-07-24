@@ -14,6 +14,7 @@ import { api } from "../../lib/api";
 import { initials } from "../../lib/format";
 import { APP_NAME } from "../../lib/brand";
 import { DUTS } from "../../lib/theme";
+import { needsProfilePhoto } from "../../lib/auth";
 import type { ClientTabParamList, RootStackParamList, WorkerTabParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 
@@ -156,6 +157,16 @@ export function ProfileScreen() {
           </View>
           <AppButton label="Edit Profile" variant="secondary" onPress={() => navigation.navigate("EditProfile")} />
         </DutsCard>
+
+        {needsProfilePhoto(user) ? (
+          <DutsCard className="gap-3 border border-danger/30 bg-danger/5 p-5">
+            <Text className="text-base font-black text-ink">Profile photo required</Text>
+            <Text className="text-sm leading-5 text-muted">
+              Existing accounts must upload a profile photo to post gigs or go online as a worker.
+            </Text>
+            <AppButton label="Upload profile photo" onPress={() => navigation.navigate("EditProfile")} />
+          </DutsCard>
+        ) : null}
 
         {canSwitch ? (
           <DutsCard className="gap-3 p-5">

@@ -9,6 +9,7 @@ import { Screen } from "../../components/Screen";
 import { DutsCard } from "../../components/DutsCard";
 import { AppButton } from "../../components/AppButton";
 import { CustomerJourneyProgress } from "../../components/CustomerJourneyProgress";
+import { ClientCancelBookingButton } from "../../components/ClientCancelBookingButton";
 import { useSessionStore } from "../../stores/session.store";
 import type { RootStackParamList } from "../../navigation/types";
 
@@ -239,6 +240,8 @@ export function GigPaymentScreen({ navigation, route }: Props) {
             disabled={checkoutBusy}
           />
         ) : null}
+
+        {gig ? <ClientCancelBookingButton gig={gig} /> : null}
 
         {Platform.OS === "web" && stripeReady ? (
           <Text className="text-center text-xs text-muted">

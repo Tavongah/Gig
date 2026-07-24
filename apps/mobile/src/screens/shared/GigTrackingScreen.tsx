@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Linking, ScrollView, Text, View } from "react-native";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { customerJourneyHeadline, formatMoney, haversineMiles, isCustomerRematching, liveTrackingWorkerStatus, resolveCustomerJourneyStage } from "@gigflow/shared";
 import { api } from "../../lib/api";
 import { formatAddress, formatCents } from "../../lib/format";
-import { canClientCancel, clientCancelConfirmMessage, clientCancelMayIncurFee, isSearching, needsClientReview, showTrackingMap } from "../../lib/gig-status";
+import { clientCancelMayIncurFee, isSearching, needsClientReview, showTrackingMap } from "../../lib/gig-status";
 import { SearchingIndicator } from "../../components/SearchingIndicator";
 import { AssignedWorkerCard } from "../../components/AssignedWorkerCard";
 import { TrackingMap } from "../../components/TrackingMap";
@@ -16,6 +16,7 @@ import { LoadingButton } from "../../components/LoadingButton";
 import { DutsCard } from "../../components/DutsCard";
 import { SuccessAnimation } from "../../components/SuccessAnimation";
 import { CustomerJourneyProgress } from "../../components/CustomerJourneyProgress";
+import { ClientCancelBookingButton } from "../../components/ClientCancelBookingButton";
 import { useSocket, useSocketEvents } from "../../hooks/useSocket";
 import type { RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
@@ -108,22 +109,6 @@ export function GigTrackingScreen() {
     }, 1000);
     return () => clearInterval(timer);
   }, [gig?.assignments, gig?.status, showTimer]);
-
-  const cancelMutation = useMutation({
-    mutationFn: () => api.cancelGig(route.params.gigId, session.token),
-    onSuccess: (result) => {
-      invalidate();
-      const fee = result.gig.cancellationFeeCents ?? 0;
-      Alert.alert(
-        "Booking cancelled",
-        fee > 0
-          ? "You cancelled after the 5-minute grace period. A cancellation fee has been charged."
-          : "Your request has been cancelled."
-      );
-      navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
-    },
-    onError: (error: Error) => Alert.alert("Could not cancel", error.message)
-  });
 
   const customerLat = Number(gig?.latitude ?? 33.749);
   const customerLng = Number(gig?.longitude ?? -84.388);
@@ -286,23 +271,7 @@ export function GigTrackingScreen() {
         </View>
       ) : null}
 
-      {canClientCancel(gig.status) ? (
-        <LoadingButton
-          label="Cancel booking"
-          variant="cancel"
-          onPress={() =>
-            Alert.alert(
-              clientCancelMayIncurFee(gig) ? "Cancel with fee?" : "Cancel booking?",
-              clientCancelConfirmMessage(gig),
-              [
-                { text: "Keep booking", style: "cancel" },
-                { text: "Cancel booking", style: "destructive", onPress: () => cancelMutation.mutate() }
-              ]
-            )
-          }
-          loading={cancelMutation.isPending}
-        />
-      ) : null}
+      <ClientCancelBookingButton gig={gig} />
     </ScrollView>
   );
 }

@@ -8,7 +8,7 @@ import {
 } from "@gigflow/shared";
 import { api } from "../lib/api";
 import { getCurrentCoordinates } from "../lib/location";
-import { canWorkerGoOnline } from "../lib/auth";
+import { canWorkerGoOnline, needsProfilePhoto } from "../lib/auth";
 import { showAlert, showConfirm } from "../lib/confirm";
 import { hasWorkerPreferencesConfigured, workerPreferencesFromProfile } from "../components/WorkerPreferencesForm";
 import { useSocket } from "./useSocket";
@@ -41,7 +41,19 @@ export function useWorkerOnline() {
   }
 
   async function goOnline(): Promise<void> {
-    if (!profile || !canWorkerGoOnline(profile)) {
+    if (!profile) return;
+
+    if (needsProfilePhoto(profile)) {
+      showConfirm(
+        "Profile photo required",
+        "Upload a profile photo before going online.",
+        () => navigation.navigate("EditProfile"),
+        { confirmLabel: "Add photo", cancelLabel: "Cancel" }
+      );
+      return;
+    }
+
+    if (!canWorkerGoOnline(profile)) {
       showAlert(
         "Verification required",
         "Verify your email, complete your profile, and get admin approval before going online."

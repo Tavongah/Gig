@@ -8,7 +8,8 @@ import { useRoute } from "@react-navigation/native";
 import { api } from "../../lib/api";
 import { showAlert, showConfirm, showPrompt } from "../../lib/confirm";
 import { formatAddress, formatCents } from "../../lib/format";
-import { canClientCancel, clientCancelConfirmMessage, clientCancelMayIncurFee, isSearching, nextWorkerAction } from "../../lib/gig-status";
+import { isSearching, nextWorkerAction } from "../../lib/gig-status";
+import { ClientCancelBookingButton } from "../../components/ClientCancelBookingButton";
 import { getCurrentCoordinates } from "../../lib/location";
 import { gigNeedsPayment } from "../../lib/gig-payment";
 import { useStripeCheckout } from "../../hooks/useStripeCheckout";
@@ -115,22 +116,6 @@ export function GigDetailScreen() {
     onError: (error: Error) => showAlert("Could not accept", error.message)
   });
 
-  const cancelMutation = useMutation({
-    mutationFn: () => api.cancelGig(route.params.gigId, session.token),
-    onSuccess: (result) => {
-      invalidate();
-      const fee = result.gig.cancellationFeeCents ?? 0;
-      showAlert(
-        "Gig cancelled",
-        fee > 0
-          ? "You cancelled after the 5-minute grace period. A cancellation fee has been charged."
-          : "Your booking was cancelled."
-      );
-      navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
-    },
-    onError: (error: Error) => showAlert("Could not cancel", error.message)
-  });
-
   const workerCancelMutation = useMutation({
     mutationFn: (reason: string) => api.cancelGigByWorker(route.params.gigId, reason, session.token),
     onSuccess: (result) => {
@@ -150,15 +135,6 @@ export function GigDetailScreen() {
     if (!gig) return;
     showConfirm("Accept this gig?", "Are you sure you want to accept this gig?", () => acceptMutation.mutate(), {
       confirmLabel: "Accept"
-    });
-  }
-
-  function confirmCancel(): void {
-    if (!gig) return;
-    const title = clientCancelMayIncurFee(gig) ? "Cancel with fee?" : "Cancel gig?";
-    showConfirm(title, clientCancelConfirmMessage(gig), () => cancelMutation.mutate(), {
-      confirmLabel: "Cancel gig",
-      destructive: true
     });
   }
 
@@ -335,14 +311,7 @@ export function GigDetailScreen() {
           />
         ) : null}
 
-        {activeRole === "CLIENT" && canClientCancel(gig.status) ? (
-          <LoadingButton
-            label="Cancel Gig"
-            variant="cancel"
-            onPress={confirmCancel}
-            loading={cancelMutation.isPending}
-          />
-        ) : null}
+        {activeRole === "CLIENT" ? <ClientCancelBookingButton gig={gig} label="Cancel Gig" /> : null}
 
         {activeRole === "WORKER" &&
         gig.assignedWorkerId === userId &&

@@ -24,6 +24,8 @@ import {
   validatePostGigForm
 } from "@gigflow/shared";
 import { api, ApiValidationError } from "../../lib/api";
+import { canCustomerPostGigs, needsProfilePhoto } from "../../lib/auth";
+import { showConfirm } from "../../lib/confirm";
 import { logDutsFlow } from "../../lib/flow-log";
 import { DutsCard } from "../../components/DutsCard";
 import { ServiceCategorySelect } from "../../components/ServiceCategorySelect";
@@ -59,9 +61,11 @@ function createIdempotencyKey(): string {
 
 export function ClientPostScreen() {
   const session = useSessionStore((state) => state.session)!;
+  const profile = useSessionStore((state) => state.profile);
   const route = useRoute<RouteProp<RootStackParamList, "PostGig">>();
   const navigation = useNavigation<NavigationProp>();
   const queryClient = useQueryClient();
+  const user = profile ?? session.user;
 
   const [description, setDescription] = useState("");
   const [estimatedHours, setEstimatedHours] = useState(DEFAULT_FIXED_HOURS);
@@ -219,6 +223,17 @@ export function ClientPostScreen() {
 
   function handleSubmit(): void {
     if (isSubmitting || createMutation.isPending) return;
+
+    if (needsProfilePhoto(user) || !canCustomerPostGigs(user)) {
+      showConfirm(
+        "Profile photo required",
+        "Upload a profile photo before requesting help.",
+        () => navigation.navigate("EditProfile"),
+        { confirmLabel: "Add photo", cancelLabel: "Cancel" }
+      );
+      return;
+    }
+
     setSubmitAttempted(true);
     setFieldErrors(EMPTY_ERRORS);
     const result = validatePostGigForm(formValues, allowedCategoryIds, confirmedLocation, new Date());

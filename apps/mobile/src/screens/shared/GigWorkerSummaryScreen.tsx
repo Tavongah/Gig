@@ -9,6 +9,7 @@ import { DutsCard } from "../../components/DutsCard";
 import { AppButton } from "../../components/AppButton";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { CustomerJourneyProgress } from "../../components/CustomerJourneyProgress";
+import { ClientCancelBookingButton } from "../../components/ClientCancelBookingButton";
 import { useSessionStore } from "../../stores/session.store";
 import type { RootStackParamList } from "../../navigation/types";
 
@@ -139,6 +140,7 @@ export function GigWorkerSummaryScreen({ navigation, route }: Props) {
           onPress={() => navigation.navigate("Chat", { gigId, title: gig.title })}
         />
         <AppButton label="Back to workers" variant="secondary" onPress={() => navigation.goBack()} />
+        <ClientCancelBookingButton gig={{ id: gigId, status: gig.status, cancellationGraceEndsAt: null }} />
       </ScrollView>
     </Screen>
   );

@@ -6,6 +6,7 @@ import { DutsCard } from "../../components/DutsCard";
 import { WorkerInterestCard } from "../../components/WorkerInterestCard";
 import { CustomerJourneyProgress } from "../../components/CustomerJourneyProgress";
 import { SearchingIndicator } from "../../components/SearchingIndicator";
+import { ClientCancelBookingButton } from "../../components/ClientCancelBookingButton";
 import { api } from "../../lib/api";
 import { useSessionStore } from "../../stores/session.store";
 import type { RootStackParamList } from "../../navigation/types";
@@ -109,6 +110,8 @@ export function GigSelectWorkersScreen({ navigation, route }: Props) {
             />
           ))
         )}
+
+        {gig ? <ClientCancelBookingButton gig={gig} /> : null}
       </View>
     </Screen>
   );

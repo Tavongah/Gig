@@ -65,9 +65,15 @@ export function getAuthStep(user: ApiUser): AuthStep {
 }
 
 export function canCustomerPostGigs(user: ApiUser): boolean {
-  return Boolean(user.emailVerified);
+  return Boolean(user.emailVerified && user.avatarUrl);
 }
 
 export function canWorkerGoOnline(user: ApiUser): boolean {
-  return Boolean(user.emailVerified && user.profileCompleted && user.accountStatus === "APPROVED");
+  return Boolean(
+    user.emailVerified && user.profileCompleted && user.accountStatus === "APPROVED" && user.avatarUrl
+  );
+}
+
+export function needsProfilePhoto(user: ApiUser): boolean {
+  return !user.avatarUrl;
 }

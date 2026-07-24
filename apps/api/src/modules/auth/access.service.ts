@@ -10,17 +10,24 @@ export function normalizePhoneNumber(phone: string): string {
   return digits.startsWith("+") ? digits : `+${digits}`;
 }
 
-/** MVP access gate: email verification only. Phone OTP is deferred until push/SMS is live. */
-export function assertClientCanPostGigs(user: Pick<User, "emailVerified">): void {
+/** MVP access gate: email verification + profile photo. */
+export function assertClientCanPostGigs(
+  user: Pick<User, "emailVerified" | "avatarUrl">
+): void {
   if (!user.emailVerified) {
     throw new AppError("EMAIL_NOT_VERIFIED", 403, "EMAIL_NOT_VERIFIED", {
       email: "Verify your email before posting gigs."
     });
   }
+  if (!user.avatarUrl) {
+    throw new AppError("PROFILE_PHOTO_REQUIRED", 403, "PROFILE_PHOTO_REQUIRED", {
+      avatarUrl: "Upload a profile photo before posting gigs."
+    });
+  }
 }
 
 export function assertWorkerCanGoOnline(
-  user: Pick<User, "emailVerified" | "profileCompleted" | "accountStatus" | "roles">
+  user: Pick<User, "emailVerified" | "profileCompleted" | "accountStatus" | "roles" | "avatarUrl">
 ): void {
   if (!user.roles.includes(UserRole.WORKER)) {
     throw new AppError("FORBIDDEN", 403, "FORBIDDEN", { role: "Worker account required." });
@@ -28,6 +35,11 @@ export function assertWorkerCanGoOnline(
   if (!user.emailVerified) {
     throw new AppError("EMAIL_NOT_VERIFIED", 403, "EMAIL_NOT_VERIFIED", {
       email: "Verify your email before going online."
+    });
+  }
+  if (!user.avatarUrl) {
+    throw new AppError("PROFILE_PHOTO_REQUIRED", 403, "PROFILE_PHOTO_REQUIRED", {
+      avatarUrl: "Upload a profile photo before going online."
     });
   }
   if (!user.profileCompleted) {
@@ -53,7 +65,7 @@ export function assertWorkerCanGoOnline(
 }
 
 export function assertWorkerCanAcceptGigs(
-  user: Pick<User, "emailVerified" | "profileCompleted" | "accountStatus" | "roles">
+  user: Pick<User, "emailVerified" | "profileCompleted" | "accountStatus" | "roles" | "avatarUrl">
 ): void {
   assertWorkerCanGoOnline(user);
 }

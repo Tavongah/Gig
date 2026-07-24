@@ -172,12 +172,11 @@ const updateProfileSchema = z.object({
 const avatarUploadSchema = z.object({
   imageDataUrl: z
     .string()
-    .min(32)
-    .max(400_000, "Image is too large. Try a smaller photo.")
+    .min(32, "Profile photo is required")
+    .max(600_000, "Image is too large. Try a smaller photo.")
     .refine((value) => /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(value), {
       message: "Upload a JPEG, PNG, or WebP photo."
     })
-    .nullable()
 });
 
 authRouter.patch("/me", validateBody(updateProfileSchema), async (req, res, next) => {
