@@ -204,7 +204,7 @@ This is a **new certificate** (`--cert-name api.duts.tech`), not an expand of th
 4. **External services** (same day as cutover):
    - Firebase → Authorized domains: add `app.duts.tech`, `www.duts.tech`
    - Stripe → webhook URL `https://api.duts.tech/...` + return URLs under `app.duts.tech`
-   - Resend → verify sending domain `duts.tech`; set `EMAIL_FROM=noreply@duts.tech`
+   - Resend → verify sending domain `duts.tech`; set `EMAIL_FROM=info@duts.tech`
 
 5. **Verify**:
 

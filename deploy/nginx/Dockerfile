@@ -23,7 +23,7 @@ COPY packages/shared ./packages/shared
 COPY apps/mobile ./apps/mobile
 ARG EXPO_PUBLIC_API_URL=https://api.example.com/v1
 ARG EXPO_PUBLIC_WEB_URL=https://app.example.com
-ARG EXPO_PUBLIC_SUPPORT_EMAIL=support@example.com
+ARG EXPO_PUBLIC_SUPPORT_EMAIL=info@duts.tech
 ARG EXPO_PUBLIC_SUPPORT_PHONE=
 ARG EXPO_PUBLIC_FIREBASE_API_KEY=
 ARG EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=
@@ -52,7 +52,7 @@ COPY tsconfig.base.json ./
 COPY apps/marketing ./apps/marketing
 ARG PUBLIC_SITE_URL=https://www.duts.tech
 ARG PUBLIC_APP_URL=https://app.duts.tech
-ARG PUBLIC_SUPPORT_EMAIL=support@duts.tech
+ARG PUBLIC_SUPPORT_EMAIL=info@duts.tech
 ARG PUBLIC_SUPPORT_PHONE=+12036769717
 ENV PUBLIC_SITE_URL=$PUBLIC_SITE_URL \
     PUBLIC_APP_URL=$PUBLIC_APP_URL \

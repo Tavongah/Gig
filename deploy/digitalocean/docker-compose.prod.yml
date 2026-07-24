@@ -91,7 +91,7 @@ services:
         VITE_API_URL: ${VITE_API_URL:-https://api.example.com/v1}
         EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-https://api.example.com/v1}
         EXPO_PUBLIC_WEB_URL: ${MOBILE_PUBLIC_URL:-https://app.example.com}
-        EXPO_PUBLIC_SUPPORT_EMAIL: ${EXPO_PUBLIC_SUPPORT_EMAIL:-support@duts.tech}
+        EXPO_PUBLIC_SUPPORT_EMAIL: ${EXPO_PUBLIC_SUPPORT_EMAIL:-info@duts.tech}
         EXPO_PUBLIC_SUPPORT_PHONE: ${EXPO_PUBLIC_SUPPORT_PHONE:-}
         EXPO_PUBLIC_FIREBASE_API_KEY: ${EXPO_PUBLIC_FIREBASE_API_KEY:-}
         EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN:-}
@@ -99,7 +99,7 @@ services:
         EXPO_PUBLIC_FIREBASE_APP_ID: ${EXPO_PUBLIC_FIREBASE_APP_ID:-}
         PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-https://www.duts.tech}
         PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://app.duts.tech}
-        PUBLIC_SUPPORT_EMAIL: ${PUBLIC_SUPPORT_EMAIL:-support@duts.tech}
+        PUBLIC_SUPPORT_EMAIL: ${PUBLIC_SUPPORT_EMAIL:-info@duts.tech}
         PUBLIC_SUPPORT_PHONE: ${PUBLIC_SUPPORT_PHONE:-}
     restart: unless-stopped
     ports:
