@@ -40,6 +40,7 @@ import { ErrorBoundary } from "./src/components/ErrorBoundary";
 
 import { useSessionStore } from "./src/stores/session.store";
 import { api } from "./src/lib/api";
+import { usePushRegistration } from "./src/hooks/usePushRegistration";
 
 import { PendingApprovalScreen } from "./src/screens/auth/PendingApprovalScreen";
 
@@ -136,7 +137,7 @@ function Shell() {
 
   const bootstrap = useSessionStore((state) => state.bootstrap);
 
-
+  usePushRegistration();
 
   useEffect(() => {
     void bootstrap();

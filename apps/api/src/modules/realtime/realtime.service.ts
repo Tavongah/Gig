@@ -114,6 +114,9 @@ async function resolveWorkerCategoryIds(userId: string, provided: string[]): Pro
 
 export function notifyUser(io: Server, userId: string, payload: NotificationPayload): void {
   io.to(`user:${userId}`).emit("notification", payload);
+  void import("../notifications/push.service.js")
+    .then(({ sendPushToUser }) => sendPushToUser(userId, payload))
+    .catch((error) => console.warn("[push] notifyUser push failed", error));
 }
 
 export interface ChatMessagePayload {

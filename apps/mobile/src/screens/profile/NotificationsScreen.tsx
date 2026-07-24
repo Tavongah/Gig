@@ -1,17 +1,25 @@
 import { useCallback, useState } from "react";
-import { ScrollView, Switch, Text, View } from "react-native";
+import { Platform, ScrollView, Switch, Text, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { DutsCard } from "../../components/DutsCard";
 import { Screen } from "../../components/Screen";
 import {
   getNotificationPreferences,
-  setNotificationPreferences,
   type NotificationPreferences
 } from "../../lib/notification-prefs";
+import { setPushEnabled } from "../../lib/push";
+import { showAlert } from "../../lib/confirm";
 import { DUTS } from "../../lib/theme";
 import { useSessionStore } from "../../stores/session.store";
 
 const ROWS: Array<{ key: keyof NotificationPreferences; label: string; description: string }> = [
+  {
+    key: "pushNotifications",
+    label: "Push Notifications",
+    description: Platform.OS === "web"
+      ? "Available in the iOS and Android apps"
+      : "Alerts on your lock screen for gigs, messages, and updates"
+  },
   {
     key: "emailNotifications",
     label: "Email Notifications",
@@ -37,6 +45,7 @@ const ROWS: Array<{ key: keyof NotificationPreferences; label: string; descripti
 export function NotificationsScreen() {
   const session = useSessionStore((state) => state.session)!;
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
+  const [busyKey, setBusyKey] = useState<keyof NotificationPreferences | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -45,9 +54,32 @@ export function NotificationsScreen() {
   );
 
   async function toggle(key: keyof NotificationPreferences, value: boolean): Promise<void> {
-    if (!prefs) return;
-    const next = { ...prefs, [key]: value, pushNotifications: false };
+    if (!prefs || busyKey) return;
+
+    if (key === "pushNotifications") {
+      if (Platform.OS === "web") {
+        showAlert("Push on mobile", "Install the Duts iOS or Android app to enable lock-screen notifications.");
+        return;
+      }
+      setBusyKey(key);
+      try {
+        const enabled = await setPushEnabled(session.token, session.user.id, value);
+        setPrefs({ ...prefs, pushNotifications: enabled });
+        if (value && !enabled) {
+          showAlert(
+            "Permission needed",
+            "Enable notifications for Duts in iOS Settings → Notifications to receive gig alerts."
+          );
+        }
+      } finally {
+        setBusyKey(null);
+      }
+      return;
+    }
+
+    const next = { ...prefs, [key]: value };
     setPrefs(next);
+    const { setNotificationPreferences } = await import("../../lib/notification-prefs");
     await setNotificationPreferences(session.user.id, next);
   }
 
@@ -55,7 +87,7 @@ export function NotificationsScreen() {
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 32 }}>
         <Text className="text-sm text-muted">
-          Choose how you prefer to hear from Duts. These preferences are stored on this device and guide which messages we send.
+          Choose how you prefer to hear from Duts. Push alerts work when the app is in the background.
         </Text>
         <DutsCard className="overflow-hidden p-2">
           {ROWS.map((row, index) => (
@@ -72,6 +104,7 @@ export function NotificationsScreen() {
               <Switch
                 value={prefs?.[row.key] ?? false}
                 onValueChange={(value) => void toggle(row.key, value)}
+                disabled={busyKey === row.key || (row.key === "pushNotifications" && Platform.OS === "web")}
                 trackColor={{ true: DUTS.purple }}
                 accessibilityLabel={row.label}
               />

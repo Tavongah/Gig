@@ -65,6 +65,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const token = get().session?.token;
     if (token) {
       try {
+        const { unregisterPushNotifications } = await import("../lib/push");
+        await unregisterPushNotifications(token);
+      } catch {
+        // ignore push cleanup errors
+      }
+      try {
         await api.logout(token);
       } catch {
         // ignore network errors on logout

@@ -218,6 +218,20 @@ Optional: keep `gigflow.ink` DNS for a while with redirects, or drop it once tra
 
 ---
 
+## iOS / Android push notifications
+
+Duts uses **Expo Push Notifications** (APNs under the hood on iOS).
+
+1. Deploy API so `DevicePushToken` migration runs (API container startup).
+2. In [Expo credentials](https://expo.dev/accounts/tdutumas-team/projects/gigflow/credentials): ensure an **Apple Push Notifications Key** is attached to the iOS credentials for `com.gigflow.ios`.
+3. Rebuild and resubmit the native app (`eas build` / `eas submit`) — push requires a new binary after adding `expo-notifications`.
+4. On device: log in → allow notifications → Profile → Notifications → Push on.
+5. Test: create a gig while a worker app is backgrounded; worker should get a lock-screen alert.
+
+Push is sent whenever the API calls `notifyUser` (gig offers, status updates, chat, etc.), in addition to in-app socket events.
+
+---
+
 ## 2. Server bootstrap
 
 SSH as root:

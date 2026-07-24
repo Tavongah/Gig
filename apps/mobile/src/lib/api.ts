@@ -396,6 +396,18 @@ export const api = {
       body: JSON.stringify({ email })
     }),
   logout: (token: string) => request<{ ok: boolean }>("/auth/logout", { method: "POST" }, token),
+  registerPushToken: (payload: { token: string; platform: "ios" | "android" | "web" }, token: string) =>
+    request<{ ok: boolean; deviceId: string }>(
+      "/push/register",
+      { method: "POST", body: JSON.stringify(payload) },
+      token
+    ),
+  unregisterPushToken: (token: string, pushToken?: string) =>
+    request<{ ok: boolean }>(
+      "/push/unregister",
+      { method: "POST", body: JSON.stringify(pushToken ? { token: pushToken } : {}) },
+      token
+    ),
   createSession: (payload: { email: string; fullName: string; role: "CLIENT" | "WORKER" }) =>
     request<ApiSession>("/auth/session", { method: "POST", body: JSON.stringify(payload) }),
   getMe: (token: string) => request<{ user: ApiUser }>("/auth/me", {}, token),

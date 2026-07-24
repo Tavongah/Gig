@@ -39,7 +39,8 @@ export default {
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
           "Duts uses your location to show nearby gigs and match you with local workers.",
-        ITSAppUsesNonExemptEncryption: false
+        ITSAppUsesNonExemptEncryption: false,
+        UIBackgroundModes: ["remote-notification"]
       },
       ...(hasIosFirebase ? { googleServicesFile: googleServicesPlist } : {})
     },
@@ -62,6 +63,15 @@ export default {
       "expo-font",
       "expo-apple-authentication",
       "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/icon.png",
+          color: "#6C3CE1",
+          sounds: [],
+          mode: "production"
+        }
+      ],
       [
         "expo-image-picker",
         {

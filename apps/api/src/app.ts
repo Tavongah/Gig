@@ -16,6 +16,7 @@ import { adminRouter } from "./modules/admin/admin.routes.js";
 import { reviewRouter } from "./modules/reviews/review.routes.js";
 import { paymentRouter } from "./modules/payments/payment.routes.js";
 import { locationRouter } from "./modules/location/location.routes.js";
+import { pushRouter } from "./modules/notifications/push.routes.js";
 import { raw } from "express";
 
 export function createApp(io: Server) {
@@ -79,6 +80,7 @@ export function createApp(io: Server) {
   app.use("/v1/onboarding", onboardingRouter);
   app.use("/v1/payments", paymentRouter);
   app.use("/v1/location", locationRouter);
+  app.use("/v1/push", pushRouter);
   app.use("/v1/gigs", createGigRouter(io));
   app.use("/v1/workers", workerRouter);
   app.use("/v1", reviewRouter);
