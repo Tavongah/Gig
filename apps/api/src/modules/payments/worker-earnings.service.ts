@@ -161,6 +161,53 @@ function emitWorkerEarningsUpdated(workerId: string) {
   getSocketServer().to(`user:${workerId}`).emit("worker:earnings_updated", { workerId });
 }
 
+/** Credit 100% of a client travel-cancellation fee to the worker (no platform cut). */
+export async function creditWorkerCancellationFee(input: {
+  gigId: string;
+  workerId: string;
+  amountCents: number;
+  title: string;
+}): Promise<void> {
+  const { gigId, workerId, amountCents, title } = input;
+  if (amountCents <= 0) return;
+
+  const existing = await prisma.workerEarningsTransaction.findFirst({
+    where: {
+      workerId,
+      gigId,
+      type: WorkerEarningsTransactionType.CANCELLATION_FEE_CREDIT
+    }
+  });
+  if (existing) {
+    logEarnings("cancellation_fee_skipped_duplicate", { gigId, workerId });
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.workerEarningsTransaction.create({
+      data: {
+        workerId,
+        gigId,
+        type: WorkerEarningsTransactionType.CANCELLATION_FEE_CREDIT,
+        status: WorkerEarningsTransactionStatus.COMPLETED,
+        amountCents,
+        metadata: { title, platformFeeCents: 0, source: "cancellation_fee" }
+      }
+    });
+
+    await tx.workerProfile.update({
+      where: { userId: workerId },
+      data: {
+        availableBalanceCents: { increment: amountCents },
+        totalEarnedCents: { increment: amountCents }
+      }
+    });
+  });
+
+  logEarnings("cancellation_fee_credited", { gigId, workerId, amountCents });
+  emitWorkerEarningsUpdated(workerId);
+}
+
 export async function creditWorkerForCompletedGig(gigId: string): Promise<void> {
   const gig = await prisma.gig.findUnique({
     where: { id: gigId },

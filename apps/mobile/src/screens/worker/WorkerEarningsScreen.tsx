@@ -17,7 +17,7 @@ import type { RootStackParamList } from "../../navigation/types";
 
 function transactionTone(type: string, status: string): string {
   if (status === "FAILED") return "text-orange";
-  if (type === "GIG_COMPLETED_CREDIT") return "text-success";
+  if (type === "GIG_COMPLETED_CREDIT" || type === "CANCELLATION_FEE_CREDIT") return "text-success";
   if (type.startsWith("WITHDRAWAL")) return "text-brand";
   return "text-ink";
 }

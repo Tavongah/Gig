@@ -146,8 +146,32 @@ export function canClientCancel(status: string): boolean {
     status === "POSTED" ||
     status === "SEARCHING_FOR_WORKER" ||
     status === "WORKER_SELECTED" ||
-    status === "WORKER_ASSIGNED"
+    status === "WORKER_ASSIGNED" ||
+    status === "WORKER_EN_ROUTE"
   );
+}
+
+/** True when client cancel may incur a fee (travel grace already ended). */
+export function clientCancelMayIncurFee(gig: {
+  status: string;
+  cancellationGraceEndsAt?: string | null;
+}): boolean {
+  if (gig.status !== "WORKER_EN_ROUTE") return false;
+  if (!gig.cancellationGraceEndsAt) return false;
+  return Date.now() >= new Date(gig.cancellationGraceEndsAt).getTime();
+}
+
+export function clientCancelConfirmMessage(gig: {
+  status: string;
+  cancellationGraceEndsAt?: string | null;
+}): string {
+  if (gig.status !== "WORKER_EN_ROUTE") {
+    return "Cancel this booking? You will not be charged a cancellation fee.";
+  }
+  if (clientCancelMayIncurFee(gig)) {
+    return "The 5-minute grace period has ended. Cancelling now will charge a cancellation fee.";
+  }
+  return "You are still within the 5-minute free cancellation window. No cancellation fee will be charged.";
 }
 
 export function isSearching(status: string): boolean {

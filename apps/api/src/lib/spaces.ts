@@ -135,4 +135,29 @@ export async function uploadPublicObject(input: {
   };
 }
 
+/** Private object upload for identity documents — never public-read. */
+export async function uploadPrivateObject(input: {
+  purpose: UploadPurpose;
+  userId: string;
+  fileName: string;
+  contentType: string;
+  body: Buffer;
+}): Promise<{ objectKey: string }> {
+  const objectKey = buildObjectKey(input.purpose, input.userId, input.fileName);
+  const bucket = getBucket();
+
+  await getSpacesClient().send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: objectKey,
+      Body: input.body,
+      ContentType: input.contentType,
+      ACL: "private",
+      CacheControl: "private, max-age=0, no-store"
+    })
+  );
+
+  return { objectKey };
+}
+
 export { isSpacesConfigured } from "../config/env.js";

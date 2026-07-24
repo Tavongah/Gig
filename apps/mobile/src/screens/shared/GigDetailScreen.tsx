@@ -8,7 +8,7 @@ import { useRoute } from "@react-navigation/native";
 import { api } from "../../lib/api";
 import { showAlert, showConfirm, showPrompt } from "../../lib/confirm";
 import { formatAddress, formatCents } from "../../lib/format";
-import { canClientCancel, isSearching, nextWorkerAction } from "../../lib/gig-status";
+import { canClientCancel, clientCancelConfirmMessage, clientCancelMayIncurFee, isSearching, nextWorkerAction } from "../../lib/gig-status";
 import { getCurrentCoordinates } from "../../lib/location";
 import { gigNeedsPayment } from "../../lib/gig-payment";
 import { useStripeCheckout } from "../../hooks/useStripeCheckout";
@@ -117,9 +117,16 @@ export function GigDetailScreen() {
 
   const cancelMutation = useMutation({
     mutationFn: () => api.cancelGig(route.params.gigId, session.token),
-    onSuccess: () => {
+    onSuccess: (result) => {
       invalidate();
-      showAlert("Gig cancelled", "This gig has been cancelled.");
+      const fee = result.gig.cancellationFeeCents ?? 0;
+      showAlert(
+        "Gig cancelled",
+        fee > 0
+          ? "You cancelled after the 5-minute grace period. A cancellation fee has been charged."
+          : "Your booking was cancelled."
+      );
+      navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
     },
     onError: (error: Error) => showAlert("Could not cancel", error.message)
   });
@@ -147,7 +154,9 @@ export function GigDetailScreen() {
   }
 
   function confirmCancel(): void {
-    showConfirm("Cancel gig?", "Are you sure you want to cancel this gig?", () => cancelMutation.mutate(), {
+    if (!gig) return;
+    const title = clientCancelMayIncurFee(gig) ? "Cancel with fee?" : "Cancel gig?";
+    showConfirm(title, clientCancelConfirmMessage(gig), () => cancelMutation.mutate(), {
       confirmLabel: "Cancel gig",
       destructive: true
     });

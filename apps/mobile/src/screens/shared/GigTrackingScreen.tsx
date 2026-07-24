@@ -7,7 +7,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { customerJourneyHeadline, formatMoney, haversineMiles, isCustomerRematching, liveTrackingWorkerStatus, resolveCustomerJourneyStage } from "@gigflow/shared";
 import { api } from "../../lib/api";
 import { formatAddress, formatCents } from "../../lib/format";
-import { canClientCancel, isSearching, needsClientReview, showTrackingMap } from "../../lib/gig-status";
+import { canClientCancel, clientCancelConfirmMessage, clientCancelMayIncurFee, isSearching, needsClientReview, showTrackingMap } from "../../lib/gig-status";
 import { SearchingIndicator } from "../../components/SearchingIndicator";
 import { AssignedWorkerCard } from "../../components/AssignedWorkerCard";
 import { TrackingMap } from "../../components/TrackingMap";
@@ -87,6 +87,11 @@ export function GigTrackingScreen() {
   );
 
   useEffect(() => {
+    if (!gig || gig.status !== "CANCELLED") return;
+    navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
+  }, [gig?.status, navigation]);
+
+  useEffect(() => {
     if (!gig || !needsClientReview(gig.status)) return;
     navigation.replace("GigCompletionReview", { gigId: gig.id });
   }, [gig, navigation]);
@@ -106,9 +111,16 @@ export function GigTrackingScreen() {
 
   const cancelMutation = useMutation({
     mutationFn: () => api.cancelGig(route.params.gigId, session.token),
-    onSuccess: () => {
+    onSuccess: (result) => {
       invalidate();
-      Alert.alert("Booking cancelled", "Your request has been cancelled.");
+      const fee = result.gig.cancellationFeeCents ?? 0;
+      Alert.alert(
+        "Booking cancelled",
+        fee > 0
+          ? "You cancelled after the 5-minute grace period. A cancellation fee has been charged."
+          : "Your request has been cancelled."
+      );
+      navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
     },
     onError: (error: Error) => Alert.alert("Could not cancel", error.message)
   });
@@ -161,6 +173,19 @@ export function GigTrackingScreen() {
         </View>
         <CustomerJourneyProgress status={gig.status} paymentStatus={gig.paymentStatus} compact />
       </View>
+
+      {gig.status === "WORKER_EN_ROUTE" && gig.cancellationGraceEndsAt ? (
+        <DutsCard className="gap-1 p-4">
+          <Text className="text-sm font-black text-ink">
+            {clientCancelMayIncurFee(gig) ? "Free cancellation ended" : "Free cancellation window"}
+          </Text>
+          <Text className="text-sm text-muted">
+            {clientCancelMayIncurFee(gig)
+              ? "Cancelling now will charge a cancellation fee that goes to your worker."
+              : `Cancel free until ${new Date(gig.cancellationGraceEndsAt).toLocaleTimeString()}.`}
+          </Text>
+        </DutsCard>
+      ) : null}
 
       {arrived ? (
         <View className="rounded-4xl border border-success/30 bg-verified px-5 py-5">
@@ -266,10 +291,14 @@ export function GigTrackingScreen() {
           label="Cancel booking"
           variant="cancel"
           onPress={() =>
-            Alert.alert("Cancel booking?", "Cancellation may be subject to policy once a worker is assigned.", [
-              { text: "Keep booking", style: "cancel" },
-              { text: "Cancel booking", style: "destructive", onPress: () => cancelMutation.mutate() }
-            ])
+            Alert.alert(
+              clientCancelMayIncurFee(gig) ? "Cancel with fee?" : "Cancel booking?",
+              clientCancelConfirmMessage(gig),
+              [
+                { text: "Keep booking", style: "cancel" },
+                { text: "Cancel booking", style: "destructive", onPress: () => cancelMutation.mutate() }
+              ]
+            )
           }
           loading={cancelMutation.isPending}
         />

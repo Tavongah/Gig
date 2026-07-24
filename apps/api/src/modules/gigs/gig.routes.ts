@@ -76,7 +76,9 @@ const statusUpdateSchema = z.object({
 
   latitude: z.number().min(-90).max(90).optional(),
 
-  longitude: z.number().min(-180).max(180).optional()
+  longitude: z.number().min(-180).max(180).optional(),
+
+  cancellationReason: z.string().trim().max(500).optional()
 
 });
 
@@ -446,7 +448,8 @@ export function createGigRouter(io: Server): Router {
         io,
         req.body.latitude !== undefined && req.body.longitude !== undefined
           ? { latitude: req.body.latitude, longitude: req.body.longitude }
-          : undefined
+          : undefined,
+        { cancellationReason: req.body.cancellationReason }
       );
 
       res.json({ gig });

@@ -113,6 +113,7 @@ enum AvailabilityStatus {
 
 enum WorkerEarningsTransactionType {
   GIG_COMPLETED_CREDIT
+  CANCELLATION_FEE_CREDIT
   WITHDRAWAL_REQUESTED
   WITHDRAWAL_SUCCESS
   WITHDRAWAL_FAILED
@@ -229,6 +230,12 @@ model WorkerProfile {
   governmentIdAcknowledged Boolean           @default(false)
   proofOfAddressAcknowledged Boolean         @default(false)
   platformRulesAgreed      Boolean           @default(false)
+  /** Private Spaces object keys for identity documents (never public URLs). */
+  governmentIdType         String?
+  governmentIdFrontKey     String?
+  governmentIdBackKey      String?
+  identityVerificationStatus String          @default("PENDING")
+  identityDocumentsUploadedAt DateTime?
   reviewedAt               DateTime?
   reviewedById             String?
   rejectionReason          String?
@@ -295,6 +302,14 @@ model Gig {
   taxCents              Int               @default(0)
   /** Client-generated key so duplicate Request Help submissions return the same gig. */
   idempotencyKey        String?           @unique
+  travelStartedAt       DateTime?
+  cancellationGraceEndsAt DateTime?
+  cancelledAt           DateTime?
+  cancellationFeeCents  Int               @default(0)
+  cancellationFeePaid   Boolean           @default(false)
+  cancellationReason    String?
+  cancelledBy           String?
+  travelDurationSeconds Int?
   finalTotalCents       Int?
   authorizationBufferCents Int            @default(0)
   maximumAuthorizedAmountCents Int?
@@ -505,6 +520,15 @@ model CommissionSetting {
   effectiveFrom  DateTime @default(now())
   createdById    String?
   createdAt      DateTime @default(now())
+}
+
+/** Singleton-style platform policy knobs (cancellation fee %, grace minutes, etc.). */
+model PlatformSetting {
+  id                         String   @id @default("default")
+  cancellationFeePercent     Decimal  @default(0.25) @db.Decimal(4, 3)
+  cancellationGraceMinutes   Int      @default(5)
+  updatedAt                  DateTime @updatedAt
+  createdAt                  DateTime @default(now())
 }
 
 model AuditLog {

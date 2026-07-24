@@ -29,9 +29,13 @@ import {
   processWorkerPayout,
   publishGigDevWithoutPayment,
   publishPostedGig,
-  releaseAuthorizedPayment,
   assertGigPaymentAuthorized
 } from "../payments/payment.service.js";
+import {
+  applyClientCancellation,
+  markTravelStarted,
+  maybeNotifyGracePeriodExpired
+} from "./cancellation-policy.service.js";
 import {
   approveExtraTime,
   approveGigCompletion,
@@ -481,7 +485,10 @@ const CANCELLABLE_STATUSES: GigStatus[] = [
 
   GigStatus.WORKER_SELECTED,
 
-  GigStatus.WORKER_ASSIGNED
+  GigStatus.WORKER_ASSIGNED,
+
+  /** Client may cancel after Start Travel (grace / fee handled in applyClientCancellation). */
+  GigStatus.WORKER_EN_ROUTE
 
 ];
 
@@ -544,7 +551,8 @@ export async function updateGigStatus(
   userId: string,
   nextStatus: GigStatus,
   io?: Server,
-  location?: { latitude: number; longitude: number }
+  location?: { latitude: number; longitude: number },
+  options?: { cancellationReason?: string | null }
 ) {
 
   const gig = await prisma.gig.findUniqueOrThrow({
@@ -624,28 +632,6 @@ export async function updateGigStatus(
 
     });
 
-
-
-    if (io) {
-
-      for (const item of gig.assignments) {
-
-        notifyUser(io, item.workerId, {
-
-          type: "GIG_CANCELLED",
-
-          title: "Gig cancelled",
-
-          body: `The client cancelled "${gig.title}".`,
-
-          gigId: gig.id
-
-        });
-
-      }
-
-    }
-
   }
 
 
@@ -655,6 +641,7 @@ export async function updateGigStatus(
       where: { id: assignment.id },
       data: { enRouteAt: new Date() }
     });
+    await markTravelStarted(gigId, io);
   }
 
   if (assignment && nextStatus === GigStatus.WORKER_ARRIVED) {
@@ -731,7 +718,13 @@ export async function updateGigStatus(
 
 
   if (isClient && nextStatus === GigStatus.CANCELLED) {
-    await releaseAuthorizedPayment(gigId);
+    await applyClientCancellation({
+      gigId,
+      clientId: userId,
+      previousStatus: gig.status,
+      reason: options?.cancellationReason,
+      io
+    });
   }
 
 
@@ -1011,7 +1004,9 @@ export async function getGigDetail(gigId: string, userId: string) {
 
   }
 
-
+  if (isClient) {
+    void maybeNotifyGracePeriodExpired(gigId, userId);
+  }
 
   return sanitizeGigForViewer(gig, userId, {
     viewerRoles: viewer?.roles,

@@ -16,7 +16,7 @@ import { env } from "../../config/env.js";
 import { AppError } from "../../lib/errors.js";
 import { createResetToken, hashPassword, hashResetToken, verifyPassword } from "../../lib/password.js";
 import { buildSimpleEmail, sendTransactionalEmail } from "../../lib/email.js";
-import { isSpacesConfigured, uploadPublicObject } from "../../lib/spaces.js";
+import { isSpacesConfigured, uploadPrivateObject, uploadPublicObject } from "../../lib/spaces.js";
 import { normalizePhoneNumber } from "./access.service.js";
 import { passwordResetAppUrl, sendEmailVerification } from "./verification.service.js";
 
@@ -109,6 +109,12 @@ export async function registerWorker(input: WorkerRegisterInput) {
     await assertPhoneAvailable(parsed.phoneNumber);
   }
 
+  const profilePhoto = parseAvatarDataUrl(parsed.profilePhotoDataUrl);
+  const idFront = parseAvatarDataUrl(parsed.governmentIdFrontDataUrl);
+  const idBack = parsed.governmentIdBackDataUrl
+    ? parseAvatarDataUrl(parsed.governmentIdBackDataUrl)
+    : null;
+
   const passwordHash = await hashPassword(parsed.password);
   const user = await prisma.user.create({
     data: {
@@ -140,6 +146,8 @@ export async function registerWorker(input: WorkerRegisterInput) {
           governmentIdAcknowledged: parsed.governmentIdAcknowledged,
           proofOfAddressAcknowledged: parsed.proofOfAddressAcknowledged,
           platformRulesAgreed: parsed.platformRulesAgreed,
+          governmentIdType: parsed.governmentIdType,
+          identityVerificationStatus: "PENDING",
           serviceCategories: {
             connect: parsed.serviceCategoryIds.map((id) => ({ id }))
           }
@@ -150,16 +158,92 @@ export async function registerWorker(input: WorkerRegisterInput) {
   });
 
   try {
-    await sendEmailVerification(user.id, user.email);
+    const avatarExt =
+      profilePhoto.contentType === "image/png"
+        ? "png"
+        : profilePhoto.contentType === "image/webp"
+          ? "webp"
+          : "jpg";
+    let avatarUrl: string;
+    if (isSpacesConfigured()) {
+      const uploaded = await uploadPublicObject({
+        purpose: "worker-profile",
+        userId: user.id,
+        fileName: `avatar.${avatarExt}`,
+        contentType: profilePhoto.contentType,
+        body: profilePhoto.buffer
+      });
+      avatarUrl = uploaded.publicUrl;
+    } else {
+      avatarUrl = `data:${profilePhoto.contentType};base64,${profilePhoto.buffer.toString("base64")}`;
+    }
+
+    let frontKey: string;
+    let backKey: string | null = null;
+    if (isSpacesConfigured()) {
+      const front = await uploadPrivateObject({
+        purpose: "verification-document",
+        userId: user.id,
+        fileName: `id-front.${avatarExt}`,
+        contentType: idFront.contentType,
+        body: idFront.buffer
+      });
+      frontKey = front.objectKey;
+      if (idBack) {
+        const back = await uploadPrivateObject({
+          purpose: "verification-document",
+          userId: user.id,
+          fileName: "id-back.jpg",
+          contentType: idBack.contentType,
+          body: idBack.buffer
+        });
+        backKey = back.objectKey;
+      }
+    } else {
+      // Dev fallback — store opaque keys pointing at data URLs is unsafe for production;
+      // keep private-looking keys and skip public exposure.
+      frontKey = `local-verification/${user.id}/id-front`;
+      backKey = idBack ? `local-verification/${user.id}/id-back` : null;
+      console.warn("[identity] Spaces not configured — identity keys stored as local placeholders.");
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { avatarUrl }
+    });
+    await prisma.workerProfile.update({
+      where: { userId: user.id },
+      data: {
+        governmentIdFrontKey: frontKey,
+        governmentIdBackKey: backKey,
+        identityDocumentsUploadedAt: new Date(),
+        identityVerificationStatus: "PENDING"
+      }
+    });
+  } catch (error) {
+    await prisma.user.delete({ where: { id: user.id } }).catch(() => undefined);
+    throw new AppError("UPLOAD_FAILED", 400, "UPLOAD_FAILED", {
+      profilePhotoDataUrl:
+        error instanceof Error ? error.message : "Identity document upload failed. Try again."
+    });
+  }
+
+  const refreshed = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    include: userInclude
+  });
+
+  try {
+    await sendEmailVerification(refreshed.id, refreshed.email);
   } catch (error) {
     console.error("[auth] verification_email_failed", {
-      userId: user.id,
-      email: user.email,
+      userId: refreshed.id,
+      email: refreshed.email,
       message: error instanceof Error ? error.message : String(error)
     });
   }
-  const token = issueToken(user);
-  return { token, user: sanitizeUser(user) };
+  const token = issueToken(refreshed);
+  return { token, user: sanitizeUser(refreshed) };
 }
 
 export async function login(input: LoginInput) {

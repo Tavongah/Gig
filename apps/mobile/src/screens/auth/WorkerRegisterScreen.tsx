@@ -12,12 +12,19 @@ import { defaultActiveRole } from "../../lib/auth";
 import { Screen } from "../../components/Screen";
 import { AppButton } from "../../components/AppButton";
 import { DutsCard } from "../../components/DutsCard";
+import { IdentityImageField } from "../../components/IdentityImageField";
 import { useSessionStore } from "../../stores/session.store";
 import type { AuthStackParamList } from "../../navigation/auth-types";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "WorkerRegister">;
 
 const STEPS = ["Basic Info", "Worker Profile", "Verification", "Review & Submit"] as const;
+
+const ID_TYPES = [
+  { id: "DRIVERS_LICENSE" as const, label: "Driver's License" },
+  { id: "STATE_ID" as const, label: "State ID" },
+  { id: "NATIONAL_ID" as const, label: "National ID" }
+];
 
 function buildWorkerPayload(input: {
   fullName: string;
@@ -34,6 +41,10 @@ function buildWorkerPayload(input: {
   hourlyRate: string;
   minJobAmount: string;
   serviceCategoryIds: string[];
+  profilePhotoDataUrl: string | null;
+  governmentIdType: "DRIVERS_LICENSE" | "STATE_ID" | "NATIONAL_ID" | "";
+  governmentIdFrontDataUrl: string | null;
+  governmentIdBackDataUrl: string | null;
   governmentIdAcknowledged: boolean;
   proofOfAddressAcknowledged: boolean;
   platformRulesAgreed: boolean;
@@ -55,6 +66,10 @@ function buildWorkerPayload(input: {
     minJobAmountCents: Math.round(Number(input.minJobAmount) * 100),
     hasVehicle: false,
     serviceCategoryIds: input.serviceCategoryIds,
+    profilePhotoDataUrl: input.profilePhotoDataUrl ?? "",
+    governmentIdType: input.governmentIdType || undefined,
+    governmentIdFrontDataUrl: input.governmentIdFrontDataUrl ?? "",
+    governmentIdBackDataUrl: input.governmentIdBackDataUrl || undefined,
     governmentIdAcknowledged: input.governmentIdAcknowledged ? true : false,
     proofOfAddressAcknowledged: input.proofOfAddressAcknowledged ? true : false,
     platformRulesAgreed: input.platformRulesAgreed ? true : false,
@@ -78,6 +93,12 @@ export function WorkerRegisterScreen({ navigation }: Props) {
   const [hourlyRate, setHourlyRate] = useState("25");
   const [minJobAmount, setMinJobAmount] = useState("50");
   const [serviceCategoryIds, setServiceCategoryIds] = useState<string[]>([]);
+  const [profilePhotoDataUrl, setProfilePhotoDataUrl] = useState<string | null>(null);
+  const [governmentIdType, setGovernmentIdType] = useState<
+    "DRIVERS_LICENSE" | "STATE_ID" | "NATIONAL_ID" | ""
+  >("");
+  const [governmentIdFrontDataUrl, setGovernmentIdFrontDataUrl] = useState<string | null>(null);
+  const [governmentIdBackDataUrl, setGovernmentIdBackDataUrl] = useState<string | null>(null);
   const [governmentIdAcknowledged, setGovernmentIdAcknowledged] = useState(false);
   const [proofOfAddressAcknowledged, setProofOfAddressAcknowledged] = useState(false);
   const [platformRulesAgreed, setPlatformRulesAgreed] = useState(false);
@@ -130,6 +151,10 @@ export function WorkerRegisterScreen({ navigation }: Props) {
       hourlyRate,
       minJobAmount,
       serviceCategoryIds,
+      profilePhotoDataUrl,
+      governmentIdType,
+      governmentIdFrontDataUrl,
+      governmentIdBackDataUrl,
       governmentIdAcknowledged,
       proofOfAddressAcknowledged,
       platformRulesAgreed,
@@ -152,6 +177,10 @@ export function WorkerRegisterScreen({ navigation }: Props) {
         "minJobAmountCents"
       ],
       [
+        "profilePhotoDataUrl",
+        "governmentIdType",
+        "governmentIdFrontDataUrl",
+        "governmentIdBackDataUrl",
         "governmentIdAcknowledged",
         "proofOfAddressAcknowledged",
         "platformRulesAgreed",
@@ -187,6 +216,7 @@ export function WorkerRegisterScreen({ navigation }: Props) {
   }
 
   const mvpCategories = categoriesQuery.data?.mvp ?? [];
+  const needsIdBack = governmentIdType === "DRIVERS_LICENSE" || governmentIdType === "STATE_ID";
 
   return (
     <Screen>
@@ -322,15 +352,75 @@ export function WorkerRegisterScreen({ navigation }: Props) {
 
         {step === 2 ? (
           <DutsCard className="gap-4 p-5">
-            <Text className="text-xl font-black text-ink">Verification</Text>
+            <Text className="text-xl font-black text-ink">Identity verification</Text>
             <Text className="text-sm text-muted">
-              Confirm each item so we can review your worker application. DUTS may request documents during approval.
+              Profile photo and government ID are required. Images are compressed before upload and stored securely.
             </Text>
+
+            <IdentityImageField
+              label="Profile photo"
+              hint="Required. Use camera or gallery. Preview before submitting."
+              value={profilePhotoDataUrl}
+              onChange={setProfilePhotoDataUrl}
+              error={fieldErrors.profilePhotoDataUrl}
+              aspect={[1, 1]}
+            />
+
+            <Text className="text-sm font-semibold text-label">Government ID type</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {ID_TYPES.map((item) => {
+                const selected = governmentIdType === item.id;
+                return (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => setGovernmentIdType(item.id)}
+                    className={`rounded-full px-3 py-2 ${selected ? "bg-brand" : "border border-border bg-surface"}`}
+                  >
+                    <Text className={`text-xs font-bold ${selected ? "text-white" : "text-label"}`}>{item.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {fieldErrors.governmentIdType ? (
+              <Text className="text-xs text-danger">{fieldErrors.governmentIdType}</Text>
+            ) : null}
+
+            <IdentityImageField
+              label="ID front"
+              hint="Required."
+              value={governmentIdFrontDataUrl}
+              onChange={setGovernmentIdFrontDataUrl}
+              error={fieldErrors.governmentIdFrontDataUrl}
+              aspect={[16, 10]}
+            />
+
+            {needsIdBack || governmentIdType === "NATIONAL_ID" ? (
+              <IdentityImageField
+                label={needsIdBack ? "ID back (required)" : "ID back (optional)"}
+                value={governmentIdBackDataUrl}
+                onChange={setGovernmentIdBackDataUrl}
+                error={fieldErrors.governmentIdBackDataUrl}
+                aspect={[16, 10]}
+              />
+            ) : null}
+
             {[
-              { label: "I can provide government ID if requested", value: governmentIdAcknowledged, set: setGovernmentIdAcknowledged },
-              { label: "I can provide proof of address if requested", value: proofOfAddressAcknowledged, set: setProofOfAddressAcknowledged },
+              {
+                label: "I confirm these identity documents are mine",
+                value: governmentIdAcknowledged,
+                set: setGovernmentIdAcknowledged
+              },
+              {
+                label: "I can provide proof of address if requested",
+                value: proofOfAddressAcknowledged,
+                set: setProofOfAddressAcknowledged
+              },
               { label: "I agree to platform rules", value: platformRulesAgreed, set: setPlatformRulesAgreed },
-              { label: "I consent to a background check", value: backgroundCheckConsent, set: setBackgroundCheckConsent }
+              {
+                label: "I consent to a background check",
+                value: backgroundCheckConsent,
+                set: setBackgroundCheckConsent
+              }
             ].map((item) => (
               <Pressable key={item.label} onPress={() => item.set(!item.value)} className="flex-row items-center gap-3">
                 <View className={`h-5 w-5 rounded border ${item.value ? "border-brand bg-brand" : "border-border bg-surface"}`} />
@@ -343,9 +433,17 @@ export function WorkerRegisterScreen({ navigation }: Props) {
         {step === 3 ? (
           <DutsCard className="gap-3 p-5">
             <Text className="text-xl font-black text-ink">Review & submit</Text>
-            <Text className="text-sm text-muted">{fullName} · {email}</Text>
-            <Text className="text-sm text-muted">{city} · {serviceArea} · {travelDistanceMiles} mi radius</Text>
+            <Text className="text-sm text-muted">
+              {fullName} · {email}
+            </Text>
+            <Text className="text-sm text-muted">
+              {city} · {serviceArea} · {travelDistanceMiles} mi radius
+            </Text>
             <Text className="text-sm text-muted">{bio}</Text>
+            <Text className="text-sm text-muted">
+              Photo & ID: {profilePhotoDataUrl && governmentIdFrontDataUrl ? "Ready" : "Incomplete"} ·{" "}
+              {ID_TYPES.find((item) => item.id === governmentIdType)?.label ?? "ID type not selected"}
+            </Text>
             <Text className="text-sm text-muted">Status after submit: pending admin approval</Text>
           </DutsCard>
         ) : null}

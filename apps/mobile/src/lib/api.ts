@@ -196,6 +196,14 @@ export interface GigDetail {
   finalTotalCents?: number | null;
   payment?: { status: string; amountCents: number };
   chatThread?: { id: string };
+  travelStartedAt?: string | null;
+  cancellationGraceEndsAt?: string | null;
+  cancelledAt?: string | null;
+  cancellationFeeCents?: number;
+  cancellationFeePaid?: boolean;
+  cancellationReason?: string | null;
+  cancelledBy?: string | null;
+  travelDurationSeconds?: number | null;
 }
 
 export interface ChatMessage {

@@ -1,12 +1,14 @@
 import { AccountStatus, UserRole } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
+import { createDownloadSignedUrl, isSpacesConfigured } from "../../lib/spaces.js";
 
 const workerUserSelect = {
   id: true,
   email: true,
   fullName: true,
   phoneNumber: true,
+  avatarUrl: true,
   accountStatus: true,
   city: true,
   region: true,
@@ -16,8 +18,58 @@ const workerUserSelect = {
   }
 } as const;
 
+async function withIdentityDocumentUrls(user: {
+  id: string;
+  avatarUrl?: string | null;
+  workerProfile?: Record<string, unknown> | null;
+  [key: string]: unknown;
+}) {
+  const profile = (user.workerProfile ?? null) as {
+    governmentIdFrontKey?: string | null;
+    governmentIdBackKey?: string | null;
+    governmentIdType?: string | null;
+    identityVerificationStatus?: string | null;
+    identityDocumentsUploadedAt?: Date | null;
+  } | null;
+  let governmentIdFrontUrl: string | null = null;
+  let governmentIdBackUrl: string | null = null;
+
+  if (isSpacesConfigured() && profile?.governmentIdFrontKey && !profile.governmentIdFrontKey.startsWith("local-")) {
+    try {
+      governmentIdFrontUrl = await createDownloadSignedUrl(profile.governmentIdFrontKey, 600);
+    } catch {
+      governmentIdFrontUrl = null;
+    }
+  }
+  if (isSpacesConfigured() && profile?.governmentIdBackKey && !profile.governmentIdBackKey.startsWith("local-")) {
+    try {
+      governmentIdBackUrl = await createDownloadSignedUrl(profile.governmentIdBackKey, 600);
+    } catch {
+      governmentIdBackUrl = null;
+    }
+  }
+
+  return {
+    ...user,
+    identity: {
+      profilePhotoUrl: user.avatarUrl ?? null,
+      governmentIdType: profile?.governmentIdType ?? null,
+      governmentIdFrontUrl,
+      governmentIdBackUrl,
+      uploadStatus:
+        profile?.governmentIdFrontKey && user.avatarUrl
+          ? "UPLOADED"
+          : profile?.governmentIdFrontKey || user.avatarUrl
+            ? "PARTIAL"
+            : "MISSING",
+      verificationStatus: profile?.identityVerificationStatus ?? "PENDING",
+      documentsUploadedAt: profile?.identityDocumentsUploadedAt?.toISOString() ?? null
+    }
+  };
+}
+
 export async function listPendingWorkers() {
-  return prisma.user.findMany({
+  const workers = await prisma.user.findMany({
     where: {
       roles: { has: UserRole.WORKER },
       accountStatus: AccountStatus.PENDING_APPROVAL
@@ -25,6 +77,7 @@ export async function listPendingWorkers() {
     select: workerUserSelect,
     orderBy: { createdAt: "desc" }
   });
+  return Promise.all(workers.map((worker) => withIdentityDocumentUrls(worker)));
 }
 
 export async function getWorkerApplication(userId: string) {
@@ -35,7 +88,22 @@ export async function getWorkerApplication(userId: string) {
   if (!user) {
     throw new AppError("NOT_FOUND", 404, "NOT_FOUND", { worker: "Worker not found" });
   }
-  return user;
+  return withIdentityDocumentUrls(user);
+}
+
+export async function setIdentityVerificationStatus(
+  workerId: string,
+  status: "PENDING" | "APPROVED" | "REJECTED"
+) {
+  const user = await getWorkerOrThrow(workerId);
+  if (!user.workerProfile) {
+    throw new AppError("NOT_FOUND", 404, "NOT_FOUND", { worker: "Worker profile not found" });
+  }
+  await prisma.workerProfile.update({
+    where: { userId: workerId },
+    data: { identityVerificationStatus: status }
+  });
+  return getWorkerApplication(workerId);
 }
 
 async function getWorkerOrThrow(workerId: string) {

@@ -11,8 +11,10 @@ import {
   listPendingWorkers,
   reactivateWorker,
   rejectWorker,
+  setIdentityVerificationStatus,
   suspendWorker
 } from "./worker-approval.service.js";
+import { getCancellationPolicy } from "../gigs/cancellation-policy.service.js";
 
 export const adminRouter = Router();
 
@@ -20,31 +22,33 @@ adminRouter.use(requireAuth, requireRole(UserRole.ADMIN));
 
 adminRouter.get("/overview", async (_req, res, next) => {
   try {
-    const [users, workers, pendingWorkers, openGigs, completedGigs, revenue, commissionSetting] = await Promise.all([
-      prisma.user.count(),
-      prisma.workerProfile.count(),
-      prisma.user.count({ where: { accountStatus: "PENDING_APPROVAL", roles: { has: UserRole.WORKER } } }),
-      prisma.gig.count({
-        where: {
-          status: {
-            in: [
-              GigStatus.POSTED,
-              GigStatus.SEARCHING_FOR_WORKER,
-              GigStatus.WORKER_SELECTED,
-              GigStatus.WORKER_ASSIGNED,
-              GigStatus.WORKER_EN_ROUTE,
-              GigStatus.WORKER_ARRIVED,
-              GigStatus.IN_PROGRESS,
-              GigStatus.WAITING_EXTRA_TIME_APPROVAL,
-              GigStatus.WAITING_CUSTOMER_CONFIRMATION
-            ]
+    const [users, workers, pendingWorkers, openGigs, completedGigs, revenue, commissionSetting, cancelPolicy] =
+      await Promise.all([
+        prisma.user.count(),
+        prisma.workerProfile.count(),
+        prisma.user.count({ where: { accountStatus: "PENDING_APPROVAL", roles: { has: UserRole.WORKER } } }),
+        prisma.gig.count({
+          where: {
+            status: {
+              in: [
+                GigStatus.POSTED,
+                GigStatus.SEARCHING_FOR_WORKER,
+                GigStatus.WORKER_SELECTED,
+                GigStatus.WORKER_ASSIGNED,
+                GigStatus.WORKER_EN_ROUTE,
+                GigStatus.WORKER_ARRIVED,
+                GigStatus.IN_PROGRESS,
+                GigStatus.WAITING_EXTRA_TIME_APPROVAL,
+                GigStatus.WAITING_CUSTOMER_CONFIRMATION
+              ]
+            }
           }
-        }
-      }),
-      prisma.gig.count({ where: { status: "COMPLETED" } }),
-      prisma.payment.aggregate({ _sum: { platformFeeCents: true, amountCents: true } }),
-      prisma.commissionSetting.findFirst({ orderBy: { effectiveFrom: "desc" } })
-    ]);
+        }),
+        prisma.gig.count({ where: { status: "COMPLETED" } }),
+        prisma.payment.aggregate({ _sum: { platformFeeCents: true, amountCents: true } }),
+        prisma.commissionSetting.findFirst({ orderBy: { effectiveFrom: "desc" } }),
+        getCancellationPolicy()
+      ]);
 
     res.json({
       users,
@@ -54,7 +58,9 @@ adminRouter.get("/overview", async (_req, res, next) => {
       completedGigs,
       grossVolumeCents: revenue._sum.amountCents ?? 0,
       platformRevenueCents: revenue._sum.platformFeeCents ?? 0,
-      commissionRate: commissionSetting ? Number(commissionSetting.rate) : 0.2
+      commissionRate: commissionSetting ? Number(commissionSetting.rate) : 0.2,
+      cancellationFeePercent: cancelPolicy.cancellationFeePercent,
+      cancellationGraceMinutes: cancelPolicy.cancellationGraceMinutes
     });
   } catch (error) {
     next(error);
@@ -97,6 +103,50 @@ const commissionSchema = z.object({
   rate: z.number().min(0.05).max(0.35)
 });
 
+const platformSettingsSchema = z.object({
+  cancellationFeePercent: z.number().min(0).max(1).optional(),
+  cancellationGraceMinutes: z.number().int().min(1).max(60).optional()
+});
+
+adminRouter.get("/settings/cancellation", async (_req, res, next) => {
+  try {
+    const policy = await getCancellationPolicy();
+    res.json({ policy });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.patch("/settings/cancellation", validateBody(platformSettingsSchema), async (req, res, next) => {
+  try {
+    const current = await getCancellationPolicy();
+    const updated = await prisma.platformSetting.upsert({
+      where: { id: "default" },
+      create: {
+        id: "default",
+        cancellationFeePercent: req.body.cancellationFeePercent ?? current.cancellationFeePercent,
+        cancellationGraceMinutes: req.body.cancellationGraceMinutes ?? current.cancellationGraceMinutes
+      },
+      update: {
+        ...(req.body.cancellationFeePercent !== undefined
+          ? { cancellationFeePercent: req.body.cancellationFeePercent }
+          : {}),
+        ...(req.body.cancellationGraceMinutes !== undefined
+          ? { cancellationGraceMinutes: req.body.cancellationGraceMinutes }
+          : {})
+      }
+    });
+    res.json({
+      policy: {
+        cancellationFeePercent: Number(updated.cancellationFeePercent),
+        cancellationGraceMinutes: updated.cancellationGraceMinutes
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 adminRouter.get("/workers/pending", async (_req, res, next) => {
   try {
     const workers = await listPendingWorkers();
@@ -115,6 +165,24 @@ adminRouter.get("/workers/:workerId", async (req, res, next) => {
     next(error);
   }
 });
+
+const identityStatusSchema = z.object({
+  status: z.enum(["PENDING", "APPROVED", "REJECTED"])
+});
+
+adminRouter.post(
+  "/workers/:workerId/identity-status",
+  validateBody(identityStatusSchema),
+  async (req, res, next) => {
+    try {
+      const workerId = String(req.params.workerId);
+      const worker = await setIdentityVerificationStatus(workerId, req.body.status);
+      res.json({ worker });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 const rejectSchema = z.object({ reason: z.string().max(500).optional() });
 

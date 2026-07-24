@@ -20,6 +20,7 @@ const IN_PROGRESS_GIG_STATUSES: GigStatus[] = [
 ];
 
 function formatTransactionType(type: string): string {
+  if (type === "CANCELLATION_FEE_CREDIT") return "Cancellation Fee";
   return type
     .toLowerCase()
     .split("_")

@@ -79,6 +79,31 @@ export const workerRegisterSchema = z
     hourlyRateCents: z.number().int().min(1000).max(50000).optional(),
     minJobAmountCents: z.number().int().min(1000).max(100000).default(5000),
     hasVehicle: z.boolean().default(false),
+    profilePhotoDataUrl: z
+      .string()
+      .min(32, "Profile photo is required")
+      .max(400_000, "Profile photo is too large. Compress and try again.")
+      .refine((value) => /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(value), {
+        message: "Upload a JPEG, PNG, or WebP profile photo"
+      }),
+    governmentIdType: z.enum(["DRIVERS_LICENSE", "STATE_ID", "NATIONAL_ID"], {
+      error: "Select a government ID type"
+    }),
+    governmentIdFrontDataUrl: z
+      .string()
+      .min(32, "Government ID front image is required")
+      .max(400_000, "ID image is too large. Compress and try again.")
+      .refine((value) => /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(value), {
+        message: "Upload a JPEG, PNG, or WebP ID image"
+      }),
+    governmentIdBackDataUrl: z
+      .string()
+      .min(32)
+      .max(400_000, "ID image is too large. Compress and try again.")
+      .refine((value) => /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(value), {
+        message: "Upload a JPEG, PNG, or WebP ID image"
+      })
+      .optional(),
     governmentIdAcknowledged: z.literal(true, {
       error: "Government ID acknowledgment is required"
     }),
@@ -95,7 +120,15 @@ export const workerRegisterSchema = z
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords must match",
     path: ["confirmPassword"]
-  });
+  })
+  .refine(
+    (data) =>
+      data.governmentIdType === "NATIONAL_ID" || Boolean(data.governmentIdBackDataUrl),
+    {
+      message: "Government ID back image is required for this ID type",
+      path: ["governmentIdBackDataUrl"]
+    }
+  );
 
 export const forgotPasswordSchema = z.object({
   email: emailSchema

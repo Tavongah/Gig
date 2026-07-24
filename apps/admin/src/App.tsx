@@ -13,6 +13,8 @@ interface Overview {
   grossVolumeCents: number;
   platformRevenueCents: number;
   commissionRate: number;
+  cancellationFeePercent?: number;
+  cancellationGraceMinutes?: number;
 }
 
 interface PendingWorker {
@@ -20,6 +22,7 @@ interface PendingWorker {
   email: string;
   fullName: string;
   phoneNumber: string | null;
+  avatarUrl?: string | null;
   accountStatus: string;
   city?: string | null;
   region?: string | null;
@@ -28,7 +31,18 @@ interface PendingWorker {
     city: string | null;
     serviceArea: string | null;
     serviceCategories: Array<{ id: string; name: string }>;
+    governmentIdType?: string | null;
+    identityVerificationStatus?: string | null;
   } | null;
+  identity?: {
+    profilePhotoUrl: string | null;
+    governmentIdType: string | null;
+    governmentIdFrontUrl: string | null;
+    governmentIdBackUrl: string | null;
+    uploadStatus: string;
+    verificationStatus: string;
+    documentsUploadedAt: string | null;
+  };
 }
 
 interface AdminUser {
@@ -150,12 +164,14 @@ function PendingWorkersTable({
   isLoading,
   onApprove,
   onReject,
+  onIdentityStatus,
   actionsDisabled
 }: {
   workers: PendingWorker[];
   isLoading: boolean;
   onApprove: (workerId: string) => void;
   onReject: (workerId: string) => void;
+  onIdentityStatus: (workerId: string, status: "PENDING" | "APPROVED" | "REJECTED") => void;
   actionsDisabled: boolean;
 }) {
   if (isLoading) {
@@ -172,9 +188,9 @@ function PendingWorkersTable({
         <tr>
           <th>Name</th>
           <th>Email</th>
-          <th>Phone</th>
-          <th>Services</th>
-          <th>City</th>
+          <th>Photo / ID</th>
+          <th>Upload</th>
+          <th>ID verification</th>
           <th>Submitted</th>
           <th>Actions</th>
         </tr>
@@ -184,18 +200,49 @@ function PendingWorkersTable({
           <tr key={worker.id}>
             <td>{worker.fullName}</td>
             <td>{worker.email}</td>
-            <td>{worker.phoneNumber ?? "—"}</td>
             <td>
-              {worker.workerProfile?.serviceCategories?.length
-                ? worker.workerProfile.serviceCategories.map((c) => c.name).join(", ")
-                : "—"}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                {worker.identity?.profilePhotoUrl ? (
+                  <a href={worker.identity.profilePhotoUrl} target="_blank" rel="noreferrer">
+                    <img
+                      src={worker.identity.profilePhotoUrl}
+                      alt="Profile"
+                      style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 8 }}
+                    />
+                  </a>
+                ) : (
+                  <span>—</span>
+                )}
+                {worker.identity?.governmentIdFrontUrl ? (
+                  <a href={worker.identity.governmentIdFrontUrl} target="_blank" rel="noreferrer">
+                    ID front
+                  </a>
+                ) : (
+                  <span>No ID front</span>
+                )}
+                {worker.identity?.governmentIdBackUrl ? (
+                  <a href={worker.identity.governmentIdBackUrl} target="_blank" rel="noreferrer">
+                    ID back
+                  </a>
+                ) : null}
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.75 }}>
+                {worker.identity?.governmentIdType ?? worker.workerProfile?.governmentIdType ?? "—"}
+              </div>
             </td>
+            <td>{worker.identity?.uploadStatus ?? "—"}</td>
             <td>
-              {worker.workerProfile?.city ??
-                worker.workerProfile?.serviceArea ??
-                worker.city ??
-                worker.region ??
-                "—"}
+              <select
+                value={worker.identity?.verificationStatus ?? "PENDING"}
+                disabled={actionsDisabled}
+                onChange={(event) =>
+                  onIdentityStatus(worker.id, event.target.value as "PENDING" | "APPROVED" | "REJECTED")
+                }
+              >
+                <option value="PENDING">Pending</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
             </td>
             <td>{new Date(worker.createdAt).toLocaleDateString()}</td>
             <td className="actions">
@@ -218,6 +265,8 @@ export function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [commissionInput, setCommissionInput] = useState("20");
+  const [cancelFeeInput, setCancelFeeInput] = useState("25");
+  const [cancelGraceInput, setCancelGraceInput] = useState("5");
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
 
   useEffect(() => {
@@ -249,7 +298,16 @@ export function App() {
 
   const overviewQuery = useQuery({
     queryKey: ["admin-overview"],
-    queryFn: () => apiRequest<Overview>("/admin/overview"),
+    queryFn: async () => {
+      const data = await apiRequest<Overview>("/admin/overview");
+      if (data.cancellationFeePercent != null) {
+        setCancelFeeInput(String(Math.round(data.cancellationFeePercent * 100)));
+      }
+      if (data.cancellationGraceMinutes != null) {
+        setCancelGraceInput(String(data.cancellationGraceMinutes));
+      }
+      return data;
+    },
     enabled: authenticated,
     retry: false
   });
@@ -294,6 +352,27 @@ export function App() {
 
   const commissionMutation = useMutation({
     mutationFn: () => apiRequest("/admin/commission", { method: "POST", body: JSON.stringify({ rate: Number(commissionInput) / 100 }) }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-overview"] })
+  });
+
+  const identityStatusMutation = useMutation({
+    mutationFn: ({ workerId, status }: { workerId: string; status: "PENDING" | "APPROVED" | "REJECTED" }) =>
+      apiRequest(`/admin/workers/${workerId}/identity-status`, {
+        method: "POST",
+        body: JSON.stringify({ status })
+      }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-pending-workers"] })
+  });
+
+  const cancellationSettingsMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("/admin/settings/cancellation", {
+        method: "PATCH",
+        body: JSON.stringify({
+          cancellationFeePercent: Number(cancelFeeInput) / 100,
+          cancellationGraceMinutes: Number(cancelGraceInput)
+        })
+      }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-overview"] })
   });
 
@@ -401,7 +480,10 @@ export function App() {
                   isLoading={pendingQuery.isLoading}
                   onApprove={(workerId) => approveMutation.mutate(workerId)}
                   onReject={(workerId) => rejectMutation.mutate(workerId)}
-                  actionsDisabled={approveMutation.isPending || rejectMutation.isPending}
+                  onIdentityStatus={(workerId, status) => identityStatusMutation.mutate({ workerId, status })}
+                  actionsDisabled={
+                    approveMutation.isPending || rejectMutation.isPending || identityStatusMutation.isPending
+                  }
                 />
               </section>
             ) : null}
@@ -413,6 +495,35 @@ export function App() {
                 <span>% platform fee</span>
                 <button type="button" onClick={() => commissionMutation.mutate()} disabled={commissionMutation.isPending}>
                   {commissionMutation.isPending ? "Saving..." : "Update commission"}
+                </button>
+              </div>
+            </section>
+
+            <section className="panel">
+              <h2>Cancellation policy</h2>
+              <div className="commission-form">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={cancelFeeInput}
+                  onChange={(event) => setCancelFeeInput(event.target.value)}
+                />
+                <span>% of gig total after grace (100% to worker)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={cancelGraceInput}
+                  onChange={(event) => setCancelGraceInput(event.target.value)}
+                />
+                <span>grace minutes</span>
+                <button
+                  type="button"
+                  onClick={() => cancellationSettingsMutation.mutate()}
+                  disabled={cancellationSettingsMutation.isPending}
+                >
+                  {cancellationSettingsMutation.isPending ? "Saving..." : "Update cancellation policy"}
                 </button>
               </div>
             </section>
@@ -430,7 +541,10 @@ export function App() {
               isLoading={pendingQuery.isLoading}
               onApprove={(workerId) => approveMutation.mutate(workerId)}
               onReject={(workerId) => rejectMutation.mutate(workerId)}
-              actionsDisabled={approveMutation.isPending || rejectMutation.isPending}
+              onIdentityStatus={(workerId, status) => identityStatusMutation.mutate({ workerId, status })}
+              actionsDisabled={
+                approveMutation.isPending || rejectMutation.isPending || identityStatusMutation.isPending
+              }
             />
           </section>
         ) : null}
