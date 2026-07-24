@@ -41,16 +41,16 @@ export async function sendEmailVerification(userId: string, email: string): Prom
 
   const verifyUrl = `${apiBaseUrl()}/v1/auth/verify-email?token=${encodeURIComponent(rawToken)}`;
   const content = buildSimpleEmail({
-    title: "Verify your Duts email",
-    intro: "Thanks for joining Duts. Confirm your email address to finish setting up your account.",
+    title: "Verify your DUTS email",
+    intro: "Thanks for joining DUTS. Confirm your email address to finish setting up your account.",
     actionLabel: "Verify email",
     actionUrl: verifyUrl,
-    footer: "This link expires in 24 hours. If you didn’t create a Duts account, you can ignore this email."
+    footer: "This link expires in 24 hours. If you didn’t create a DUTS account, you can ignore this email."
   });
 
   await sendTransactionalEmail({
     to: email,
-    subject: "Verify your Duts email",
+    subject: "Verify your DUTS email",
     text: content.text,
     html: content.html
   });

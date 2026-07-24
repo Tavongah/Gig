@@ -58,7 +58,7 @@ async function bootstrap(): Promise<void> {
   logProductionReadinessWarnings();
 
   httpServer.listen(env.PORT, "0.0.0.0", () => {
-    console.log(`GIGFLOW API listening on 0.0.0.0:${env.PORT} (${env.NODE_ENV})`);
+    console.log(`DUTS API listening on 0.0.0.0:${env.PORT} (${env.NODE_ENV})`);
   });
 
   void connectRedisWithRetry();

@@ -13,7 +13,7 @@ const hasAndroidFirebase = existsSync(path.resolve(__dirname, googleServicesJson
 
 export default {
   expo: {
-    name: "Duts",
+    name: "DUTS",
     slug: "gigflow",
     owner: "tdutumas-team",
     scheme: "gigflow",
@@ -38,7 +38,7 @@ export default {
       icon: "./assets/icon.png",
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
-          "Duts uses your location to show nearby gigs and match you with local workers.",
+          "DUTS uses your location to show nearby gigs and match you with local workers.",
         ITSAppUsesNonExemptEncryption: false,
         UIBackgroundModes: ["remote-notification"]
       },
@@ -75,14 +75,14 @@ export default {
       [
         "expo-image-picker",
         {
-          photosPermission: "Duts uses your photos so you can set a profile picture."
+          photosPermission: "DUTS uses your photos so you can set a profile picture."
         }
       ],
       [
         "expo-location",
         {
           locationWhenInUsePermission:
-            "Duts uses your location to show nearby gigs and match you with local workers.",
+            "DUTS uses your location to show nearby gigs and match you with local workers.",
           isIosBackgroundLocationEnabled: false,
           isAndroidBackgroundLocationEnabled: false
         }

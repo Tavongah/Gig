@@ -324,7 +324,7 @@ export function WorkerRegisterScreen({ navigation }: Props) {
           <DutsCard className="gap-4 p-5">
             <Text className="text-xl font-black text-ink">Verification</Text>
             <Text className="text-sm text-muted">
-              Confirm each item so we can review your worker application. Duts may request documents during approval.
+              Confirm each item so we can review your worker application. DUTS may request documents during approval.
             </Text>
             {[
               { label: "I can provide government ID if requested", value: governmentIdAcknowledged, set: setGovernmentIdAcknowledged },

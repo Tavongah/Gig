@@ -1,4 +1,4 @@
-# GIGFLOW Payment Flow v2
+# DUTS Payment Flow v2
 
 ## Principle
 

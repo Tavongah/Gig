@@ -98,7 +98,7 @@ export function PaymentMethodsScreen() {
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 32 }}>
         <Text className="text-sm text-muted">
-          Manage cards linked to your Duts Stripe customer account. Cards used at checkout can appear here.
+          Manage cards linked to your DUTS Stripe customer account. Cards used at checkout can appear here.
         </Text>
 
         {loading ? (

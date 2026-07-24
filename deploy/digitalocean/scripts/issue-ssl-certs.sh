@@ -2,8 +2,8 @@
 # Obtain Let's Encrypt certificates (first run). Requires DNS pointing to this server.
 set -euo pipefail
 
-ROOT="${GIGFLOW_ROOT:-/opt/gigflow}"
-ENV_FILE="${GIGFLOW_ENV_FILE:-$ROOT/.env.production}"
+ROOT="${DUTS_ROOT:-/opt/DUTS}"
+ENV_FILE="${DUTS_ENV_FILE:-$ROOT/.env.production}"
 COMPOSE_FILE="$ROOT/deploy/digitalocean/docker-compose.prod.yml"
 
 # shellcheck disable=SC1090
@@ -22,13 +22,13 @@ fi
 mkdir -p "$ROOT/deploy/nginx/conf.d"
 
 # Temporary HTTP-only nginx for ACME
-cat > "$ROOT/deploy/nginx/conf.d/gigflow.conf" <<EOF
+cat > "$ROOT/deploy/nginx/conf.d/DUTS.conf" <<EOF
 server {
     listen 80;
     listen [::]:80;
     server_name $API_DOMAIN $ADMIN_DOMAIN $APP_DOMAIN $MARKETING_DOMAIN $ROOT_DOMAIN;
     location /.well-known/acme-challenge/ { root /var/www/certbot; }
-    location / { return 200 'GigFlow SSL setup\n'; add_header Content-Type text/plain; }
+    location / { return 200 'DUTS SSL setup\n'; add_header Content-Type text/plain; }
 }
 EOF
 

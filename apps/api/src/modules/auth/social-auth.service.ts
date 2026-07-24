@@ -24,7 +24,7 @@ export async function loginWithSocialProvider(input: SocialLoginInput) {
 
   const hasProviderEmail = Boolean(decoded.email);
   const email = decoded.email?.toLowerCase() ?? `${decoded.uid}@apple.private.gigflow.local`;
-  const fullName = decoded.name?.trim() || (hasProviderEmail ? email.split("@")[0] : "GIGFLOW User");
+  const fullName = decoded.name?.trim() || (hasProviderEmail ? email.split("@")[0] : "DUTS User");
   const emailVerified = hasProviderEmail ? Boolean(decoded.email_verified) : false;
   const authProvider = mapAuthProvider(input.provider);
   const intendedRole = input.intendedRole === "WORKER" ? UserRole.WORKER : UserRole.CLIENT;
@@ -69,7 +69,7 @@ export async function loginWithSocialProvider(input: SocialLoginInput) {
           ? {
               workerProfile: {
                 create: {
-                  bio: "New worker on GIGFLOW — profile pending completion.",
+                  bio: "New worker on DUTS — profile pending completion.",
                   city: "Pending",
                   serviceArea: "Pending",
                   workExperience: "Pending",

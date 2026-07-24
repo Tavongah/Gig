@@ -1,4 +1,4 @@
-# Deploy GIGFLOW to Render (step-by-step)
+# Deploy DUTS to Render (step-by-step)
 
 **Full pre-launch checklist:** [LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md)
 
@@ -20,7 +20,7 @@ Render builds from GitHub, not your laptop. Commit and push everything, especial
 ```bash
 cd Gig
 git add .
-git commit -m "Prepare GIGFLOW for Render deploy"
+git commit -m "Prepare DUTS for Render deploy"
 git push origin main
 ```
 

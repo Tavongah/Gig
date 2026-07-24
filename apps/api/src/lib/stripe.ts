@@ -48,7 +48,7 @@ export function isStripeConfigured(): boolean {
 export function getStripe(): Stripe {
   if (!isUsableStripeSecretKey(env.STRIPE_SECRET_KEY)) {
     throw new AppError(
-      "We couldn’t start the secure payment process. Please try again or contact Duts Support.",
+      "We couldn’t start the secure payment process. Please try again or contact DUTS Support.",
       503,
       "STRIPE_NOT_CONFIGURED",
       { stripe: "Stripe is not configured" }
@@ -84,7 +84,7 @@ export function toFriendlyPaymentStartError(error: unknown): AppError {
 
   if (/invalid api key|api key.*invalid|expired.*key/i.test(safe)) {
     return new AppError(
-      "Secure payments are temporarily unavailable. Please contact Duts Support.",
+      "Secure payments are temporarily unavailable. Please contact DUTS Support.",
       503,
       "STRIPE_KEY_INVALID"
     );
@@ -92,7 +92,7 @@ export function toFriendlyPaymentStartError(error: unknown): AppError {
 
   if (/success_url|cancel_url|url must be|not a valid url|https/i.test(safe)) {
     return new AppError(
-      "Payment return URLs are misconfigured. Please contact Duts Support.",
+      "Payment return URLs are misconfigured. Please contact DUTS Support.",
       503,
       "STRIPE_RETURN_URL_INVALID"
     );
@@ -107,7 +107,7 @@ export function toFriendlyPaymentStartError(error: unknown): AppError {
   }
 
   return new AppError(
-    "We couldn’t start the secure payment process. Please try again or contact Duts Support.",
+    "We couldn’t start the secure payment process. Please try again or contact DUTS Support.",
     502,
     "PAYMENT_START_FAILED"
   );

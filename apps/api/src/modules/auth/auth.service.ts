@@ -218,7 +218,7 @@ export async function requestPasswordReset(emailInput: string) {
 
     const resetUrl = passwordResetAppUrl(rawToken);
     const content = buildSimpleEmail({
-      title: "Reset your Duts password",
+      title: "Reset your DUTS password",
       intro: "We received a request to reset your password. Use the button below to choose a new one.",
       actionLabel: "Reset password",
       actionUrl: resetUrl,
@@ -228,7 +228,7 @@ export async function requestPasswordReset(emailInput: string) {
     try {
       await sendTransactionalEmail({
         to: normalized,
-        subject: "Reset your Duts password",
+        subject: "Reset your DUTS password",
         text: content.text,
         html: content.html
       });

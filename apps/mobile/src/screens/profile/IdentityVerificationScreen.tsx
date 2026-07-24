@@ -49,7 +49,7 @@ export function IdentityVerificationScreen() {
         user.accountStatus === "APPROVED" || user.isVerified
           ? "Approved to work"
           : user.accountStatus === "PENDING_APPROVAL"
-            ? "Pending Duts review"
+            ? "Pending DUTS review"
             : user.accountStatus === "REJECTED"
               ? "Not approved — contact Support"
               : "Complete worker application for review"
@@ -80,7 +80,7 @@ export function IdentityVerificationScreen() {
         <Text className="text-sm text-muted">
           {isWorker
             ? "These checks are tied to your worker application and account status."
-            : "Account verification status for your Duts profile."}
+            : "Account verification status for your DUTS profile."}
         </Text>
         <DutsCard className="overflow-hidden p-2">
           {rows.map((row, index) => (

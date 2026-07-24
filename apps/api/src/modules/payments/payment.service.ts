@@ -1109,7 +1109,7 @@ export async function createAdminRefund(
 
   if (!isStripeConfigured() || !payment.stripePaymentIntentId) {
     throw new AppError(
-      "We couldn’t start the secure payment process. Please try again or contact Duts Support.",
+      "We couldn’t start the secure payment process. Please try again or contact DUTS Support.",
       503,
       "STRIPE_NOT_CONFIGURED"
     );

@@ -6,7 +6,8 @@ import {
   getGigMatchingRadiusMiles,
   haversineMiles,
   isWithinMatchingRadius,
-  MAX_CHAT_MESSAGE_LENGTH
+  MAX_CHAT_MESSAGE_LENGTH,
+  brandSanitizeText
 } from "@gigflow/shared";
 import type { GigSize, GigUrgency, UserRole } from "@prisma/client";
 import { redis } from "../../config/redis.js";
@@ -113,9 +114,14 @@ async function resolveWorkerCategoryIds(userId: string, provided: string[]): Pro
 }
 
 export function notifyUser(io: Server, userId: string, payload: NotificationPayload): void {
-  io.to(`user:${userId}`).emit("notification", payload);
+  const sanitized: NotificationPayload = {
+    ...payload,
+    title: brandSanitizeText(payload.title),
+    body: brandSanitizeText(payload.body)
+  };
+  io.to(`user:${userId}`).emit("notification", sanitized);
   void import("../notifications/push.service.js")
-    .then(({ sendPushToUser }) => sendPushToUser(userId, payload))
+    .then(({ sendPushToUser }) => sendPushToUser(userId, sanitized))
     .catch((error) => console.warn("[push] notifyUser push failed", error));
 }
 

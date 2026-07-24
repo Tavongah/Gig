@@ -11,7 +11,7 @@ export function BrandLogo({ size = 72, style }: BrandLogoProps) {
   return (
     <Image
       source={logo}
-      accessibilityLabel="Duts"
+      accessibilityLabel="DUTS"
       style={[{ width: size, height: size, borderRadius: size * 0.22 }, style]}
     />
   );

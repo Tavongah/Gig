@@ -303,7 +303,7 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       }
     });
   } catch {
-    throw new Error("Unable to reach Duts right now. Check your internet connection and try again.");
+    throw new Error("Unable to reach DUTS right now. Check your internet connection and try again.");
   }
 
   if (!response.ok) {
@@ -330,7 +330,7 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       WORKER_NOT_APPROVED: "Your worker account must be approved before you can accept gigs.",
       PAYMENT_REQUIRED: "This gig is not paid yet. The customer must complete payment first.",
       EMAIL_NOT_VERIFIED: "Please verify your email before continuing. Check your inbox for the link.",
-      EMAIL_NOT_CONFIGURED: "Email delivery is not configured on the server yet. Contact Duts Support.",
+      EMAIL_NOT_CONFIGURED: "Email delivery is not configured on the server yet. Contact DUTS Support.",
       EMAIL_SEND_FAILED: "We couldn’t send that email right now. Please try again in a few minutes.",
       EMAIL_RESEND_RATE_LIMITED: "Too many verification emails sent. Please try again later.",
       INVALID_RESET_TOKEN: "That password reset link is invalid or expired. Request a new one.",

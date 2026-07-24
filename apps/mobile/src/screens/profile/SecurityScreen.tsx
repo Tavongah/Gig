@@ -36,7 +36,7 @@ export function SecurityScreen() {
   );
 
   function signOutThisDevice(): void {
-    Alert.alert("Sign out", "Sign out of Duts on this device?", [
+    Alert.alert("Sign out", "Sign out of DUTS on this device?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Sign out",

@@ -48,7 +48,7 @@ export async function getExpoPushTokenAsync(): Promise<string | null> {
 
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("duts-default", {
-      name: "Duts",
+      name: "DUTS",
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#6C3CE1"

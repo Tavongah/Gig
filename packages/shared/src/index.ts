@@ -266,7 +266,10 @@ export {
 
 export { DUTS_JOURNEY_LABELS, gigStatusLabel, type DutsJourneyStatus } from "./gig-status-map.js";
 
+export { APP_BRAND, brandSanitizeText } from "./brand.js";
+
 export { DUTS_FLOW_EVENTS, type DutsFlowEvent, type DutsFlowLogPayload } from "./flow-events.js";
+
 
 export function calculateTieredCommissionRate(totalCents: number): number {
   if (totalCents < 10_000) {

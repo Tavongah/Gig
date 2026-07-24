@@ -1,4 +1,4 @@
-# GigFlow on DigitalOcean — Production Deployment Guide
+# DUTS on DigitalOcean — Production Deployment Guide
 
 Launch architecture for **Connecticut MVP** with a path to **nationwide scale**. Target: **under $50/month** at launch on a single Droplet.
 
@@ -220,7 +220,7 @@ Optional: keep `gigflow.ink` DNS for a while with redirects, or drop it once tra
 
 ## iOS / Android push notifications
 
-Duts uses **Expo Push Notifications** (APNs under the hood on iOS).
+DUTS uses **Expo Push Notifications** (APNs under the hood on iOS).
 
 1. Deploy API so `DevicePushToken` migration runs (API container startup).
 2. In [Expo credentials](https://expo.dev/accounts/tdutumas-team/projects/gigflow/credentials): ensure an **Apple Push Notifications Key** is attached to the iOS credentials for `com.gigflow.ios`.

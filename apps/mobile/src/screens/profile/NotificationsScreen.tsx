@@ -58,7 +58,7 @@ export function NotificationsScreen() {
 
     if (key === "pushNotifications") {
       if (Platform.OS === "web") {
-        showAlert("Push on mobile", "Install the Duts iOS or Android app to enable lock-screen notifications.");
+        showAlert("Push on mobile", "Install the DUTS iOS or Android app to enable lock-screen notifications.");
         return;
       }
       setBusyKey(key);
@@ -68,7 +68,7 @@ export function NotificationsScreen() {
         if (value && !enabled) {
           showAlert(
             "Permission needed",
-            "Enable notifications for Duts in iOS Settings → Notifications to receive gig alerts."
+            "Enable notifications for DUTS in iOS Settings → Notifications to receive gig alerts."
           );
         }
       } finally {
@@ -87,7 +87,7 @@ export function NotificationsScreen() {
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 32 }}>
         <Text className="text-sm text-muted">
-          Choose how you prefer to hear from Duts. Push alerts work when the app is in the background.
+          Choose how you prefer to hear from DUTS. Push alerts work when the app is in the background.
         </Text>
         <DutsCard className="overflow-hidden p-2">
           {ROWS.map((row, index) => (

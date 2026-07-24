@@ -1,4 +1,4 @@
-# Security Checklist — GigFlow Production
+# Security Checklist — DUTS Production
 
 ## Authentication & authorization
 

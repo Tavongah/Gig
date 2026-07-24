@@ -64,7 +64,7 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
               This reset link is missing or invalid. Request a new one from Forgot password.
             </Text>
           ) : (
-            <Text className="text-sm text-muted">Enter a new password for your Duts account.</Text>
+            <Text className="text-sm text-muted">Enter a new password for your DUTS account.</Text>
           )}
           <TextInput
             className="rounded-2xl border border-border bg-surface px-4 py-4 text-ink"

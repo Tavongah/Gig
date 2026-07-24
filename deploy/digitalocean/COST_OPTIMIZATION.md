@@ -1,4 +1,4 @@
-# Cost Optimization — GigFlow on DigitalOcean
+# Cost Optimization — DUTS on DigitalOcean
 
 Target: **< $50/month** at Connecticut launch.
 

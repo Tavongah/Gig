@@ -1,4 +1,5 @@
 import { NotificationChannel, NotificationStatus, Prisma } from "@prisma/client";
+import { brandSanitizeText } from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
 import type { NotificationPayload } from "../realtime/realtime.service.js";
 
@@ -70,6 +71,8 @@ async function markInvalidTokens(tokens: string[]): Promise<void> {
  */
 export async function sendPushToUser(userId: string, payload: NotificationPayload): Promise<void> {
   try {
+    const title = brandSanitizeText(payload.title);
+    const body = brandSanitizeText(payload.body);
     const devices = await prisma.devicePushToken.findMany({
       where: { userId, enabled: true },
       select: { token: true }
@@ -79,8 +82,8 @@ export async function sendPushToUser(userId: string, payload: NotificationPayloa
     const messages = devices.map((device) => ({
       to: device.token,
       sound: "default" as const,
-      title: payload.title,
-      body: payload.body,
+      title,
+      body,
       data: {
         type: payload.type,
         gigId: payload.gigId ?? null
@@ -120,8 +123,8 @@ export async function sendPushToUser(userId: string, payload: NotificationPayloa
         gigId: payload.gigId,
         channel: NotificationChannel.PUSH,
         status: response.ok ? NotificationStatus.SENT : NotificationStatus.FAILED,
-        title: payload.title,
-        body: payload.body,
+        title,
+        body,
         payload: {
           type: payload.type,
           gigId: payload.gigId ?? null

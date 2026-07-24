@@ -47,11 +47,11 @@ export function createApp(io: Server) {
 
   app.get("/", (_req, res) => {
     res.json({
-      name: "GigFlow API",
+      name: "DUTS API",
       version: "0.1.0",
       health: "/health",
       ready: "/ready",
-      docs: "https://github.com/gigflow/gigflow/blob/main/README.md"
+      docs: "https://github.com/Tavongah/Gig/blob/main/README.md"
     });
   });
 

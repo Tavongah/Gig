@@ -109,7 +109,7 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
   return (
     <section className="login">
       <p className="eyebrow">Admin access</p>
-      <h1>Sign in to GIGFLOW Ops</h1>
+      <h1>Sign in to DUTS Ops</h1>
       <p className="notice">Sign in with your admin account. After seeding, use admin@gigflow.local (rotate the password before public launch).</p>
       <label>
         Email
@@ -332,7 +332,7 @@ export function App() {
   return (
     <main>
       <aside>
-        <div className="logo">GIGFLOW</div>
+        <div className="logo">DUTS</div>
         <nav>
           {(
             [

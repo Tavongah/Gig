@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# First-time Ubuntu 24.04 LTS hardening + Docker install for GigFlow.
+# First-time Ubuntu 24.04 LTS hardening + Docker install for DUTS.
 # Run as root: curl -fsSL ... | bash   OR   sudo bash server-bootstrap.sh
 set -euo pipefail
 

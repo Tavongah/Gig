@@ -39,7 +39,7 @@ export async function sendTransactionalEmail(input: TransactionalEmailInput): Pr
     }
 
     throw new AppError(
-      "Email delivery is not configured. Please contact Duts Support.",
+      "Email delivery is not configured. Please contact DUTS Support.",
       503,
       "EMAIL_NOT_CONFIGURED",
       { email: "Email delivery is not configured." }
@@ -54,7 +54,7 @@ export async function sendTransactionalEmail(input: TransactionalEmailInput): Pr
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        from: `Duts <${from}>`,
+        from: `DUTS <${from}>`,
         to: [to],
         subject: input.subject,
         text: input.text,
@@ -84,7 +84,7 @@ export async function sendTransactionalEmail(input: TransactionalEmailInput): Pr
     },
     body: JSON.stringify({
       personalizations: [{ to: [{ email: to }] }],
-      from: { email: from, name: "Duts" },
+      from: { email: from, name: "DUTS" },
       subject: input.subject,
       content: [
         { type: "text/plain", value: input.text },

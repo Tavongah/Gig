@@ -1,6 +1,6 @@
-# GigFlow
+# DUTS
 
-GigFlow is a production-minded MVP foundation for a real-time local services marketplace similar to Uber, Lyft, DoorDash, and TaskRabbit. Clients post short-term gigs; nearby workers receive live offers, accept work, complete jobs, and get paid after platform commission.
+DUTS is a production-minded MVP foundation for a real-time local services marketplace similar to Uber, Lyft, DoorDash, and TaskRabbit. Clients post short-term gigs; nearby workers receive live offers, accept work, complete jobs, and get paid after platform commission.
 
 ## System architecture
 

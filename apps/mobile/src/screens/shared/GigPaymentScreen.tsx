@@ -15,7 +15,7 @@ import type { RootStackParamList } from "../../navigation/types";
 type Props = NativeStackScreenProps<RootStackParamList, "GigPayment">;
 
 const FRIENDLY_PAYMENT_ERROR =
-  "We couldn’t prepare the secure payment. Please try again or contact Duts Support.";
+  "We couldn’t prepare the secure payment. Please try again or contact DUTS Support.";
 
 function LineItem({ label, value }: { label: string; value: string }) {
   return (
@@ -211,7 +211,7 @@ export function GigPaymentScreen({ navigation, route }: Props) {
         {!stripeReady ? (
           <DutsCard className="gap-4 p-5">
             <Text className="text-sm text-danger">
-              Secure payments are temporarily unavailable. Please try again later or contact Duts Support.
+              Secure payments are temporarily unavailable. Please try again later or contact DUTS Support.
             </Text>
             {apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1") ? (
               <AppButton

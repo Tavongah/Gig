@@ -1,4 +1,4 @@
-# GIGFLOW Launch Checklist
+# DUTS Launch Checklist
 
 Use this before deploy (few days out) and again before taking real payments.
 

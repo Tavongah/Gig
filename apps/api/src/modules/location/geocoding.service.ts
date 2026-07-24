@@ -4,7 +4,7 @@ import { env } from "../../config/env.js";
 import { AppError } from "../../lib/errors.js";
 
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org";
-const USER_AGENT = "GIGFLOW/1.0 (local-dev)";
+const USER_AGENT = "DUTS/1.0 (local-dev)";
 
 interface NominatimAddress {
   house_number?: string;

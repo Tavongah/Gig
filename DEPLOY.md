@@ -1,6 +1,6 @@
-# GigFlow Deployment Guide
+# DUTS Deployment Guide
 
-This guide gets GigFlow from local development to a hosted MVP you can operate immediately.
+This guide gets DUTS from local development to a hosted MVP you can operate immediately.
 
 ## Architecture at launch
 

@@ -96,7 +96,7 @@ export function RegisterSelectionScreen({ navigation }: Props) {
 
   function continueWithEmail(): void {
     if (!intendedRole) {
-      setSelectionError("Please choose how you want to use Duts.");
+      setSelectionError("Please choose how you want to use DUTS.");
       return;
     }
     setSelectionError(null);

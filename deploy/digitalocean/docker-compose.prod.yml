@@ -1,4 +1,4 @@
-# GigFlow production stack — single DigitalOcean Droplet (launch tier, ~$35–45/mo).
+# DUTS production stack — single DigitalOcean Droplet (launch tier, ~$35–45/mo).
 # Usage (on server): docker compose --env-file /opt/gigflow/.env.production -f deploy/digitalocean/docker-compose.prod.yml up -d
 
 name: gigflow
