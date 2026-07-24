@@ -107,7 +107,7 @@ If `/ready` is 503:
 ### Admin
 
 Open `https://gigflow-admin.onrender.com`  
-Login: `admin@gigflow.local` with the password from `ADMIN_SEED_PASSWORD` (seeded on first deploy)
+Login: `info@duts.tech` with the password from `ADMIN_SEED_PASSWORD` (seeded on first deploy)
 
 ### Mobile (testers)
 

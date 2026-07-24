@@ -158,7 +158,7 @@ npm run dev:mobile
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@gigflow.local | Set via `ADMIN_SEED_PASSWORD` in API env |
+| Admin | info@duts.tech | Set via `ADMIN_SEED_PASSWORD` in API env |
 | Client | client@gigflow.local | Demo123! |
 | Worker | worker@gigflow.local | Demo123! |
 

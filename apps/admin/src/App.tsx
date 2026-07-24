@@ -94,7 +94,7 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
 }
 
 function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("info@duts.tech");
   const [password, setPassword] = useState("");
 
   const loginMutation = useMutation({
@@ -122,16 +122,27 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <section className="login">
+      <img className="login-logo" src="/logo.png" alt="DUTS" />
       <p className="eyebrow">Admin access</p>
       <h1>Sign in to DUTS Ops</h1>
-      <p className="notice">Sign in with your admin account. After seeding, use admin@gigflow.local (rotate the password before public launch).</p>
+      <p className="notice">Use info@duts.tech with the password from ADMIN_SEED_PASSWORD.</p>
       <label>
         Email
-        <input value={email} onChange={(event) => setEmail(event.target.value)} />
+        <input
+          type="email"
+          autoComplete="username"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
       </label>
       <label>
         Password
-        <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        <input
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
       </label>
       <button type="button" onClick={() => loginMutation.mutate()} disabled={loginMutation.isPending}>
         {loginMutation.isPending ? "Signing in..." : "Sign in"}
@@ -411,7 +422,10 @@ export function App() {
   return (
     <main>
       <aside>
-        <div className="logo">DUTS</div>
+        <div className="brand">
+          <img className="brand-logo" src="/logo.png" alt="DUTS" />
+        </div>
+        <div className="brand-mark" aria-hidden="true" />
         <nav>
           {(
             [

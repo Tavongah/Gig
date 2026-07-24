@@ -1,12 +1,36 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap");
+
 :root {
-  color: #e5eefc;
-  background: #07111f;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --orange: #ff7a18;
+  --pink: #ff3d81;
+  --purple: #7b3fe4;
+  --blue: #3b82f6;
+  --teal: #12c6c3;
+  --brand: #7b3fe4;
+  --bg: #ffffff;
+  --surface: #f8fafc;
+  --ink: #111827;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --error: #dc2626;
+  --gradient: linear-gradient(135deg, var(--orange), var(--pink), var(--purple), var(--blue), var(--teal));
+  color: var(--ink);
+  background: var(--surface);
+  font-family: Manrope, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 0% 0%, rgba(255, 122, 24, 0.08), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(123, 63, 228, 0.08), transparent 45%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(18, 198, 195, 0.07), transparent 45%),
+    var(--surface);
+  min-height: 100vh;
 }
 
 main {
@@ -16,41 +40,65 @@ main {
 }
 
 aside {
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  background: #0b1728;
-  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  padding: 28px 24px;
 }
 
-.logo {
-  color: #21c07a;
-  font-size: 28px;
-  font-weight: 900;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo,
+.login-logo {
+  display: block;
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+
+.login-logo {
+  height: 52px;
+  margin-bottom: 4px;
+}
+
+.brand-mark {
+  height: 4px;
+  width: 72px;
+  border-radius: 999px;
+  background: var(--gradient);
+  margin-top: 14px;
 }
 
 nav {
   display: grid;
-  gap: 10px;
-  margin-top: 40px;
+  gap: 8px;
+  margin-top: 36px;
 }
 
 nav a,
 nav button {
   background: transparent;
   border: 0;
-  border-radius: 18px;
-  color: #b8c4d8;
+  border-radius: 14px;
+  color: var(--muted);
   cursor: pointer;
   font: inherit;
-  padding: 14px 16px;
+  font-weight: 600;
+  padding: 12px 14px;
   text-align: left;
 }
 
-nav a:first-child,
 nav a:hover,
 nav button.nav-active,
 nav button:hover {
-  background: rgba(33, 192, 122, 0.14);
-  color: #fff;
+  background: linear-gradient(135deg, rgba(255, 122, 24, 0.1), rgba(123, 63, 228, 0.1));
+  color: var(--ink);
 }
 
 nav button {
@@ -62,25 +110,26 @@ nav button {
 }
 
 .nav-badge {
-  background: #f7941d;
+  background: var(--gradient);
   border-radius: 999px;
-  color: #07111f;
+  color: #fff;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 800;
   min-width: 22px;
   padding: 2px 8px;
   text-align: center;
 }
 
 .alert-panel {
-  border-color: rgba(247, 148, 29, 0.45);
+  border-color: rgba(255, 122, 24, 0.35);
+  background: linear-gradient(180deg, #fff7ed, #fff);
 }
 
 .alert-panel button {
-  background: #f7941d;
+  background: var(--gradient);
   border: 0;
-  border-radius: 16px;
-  color: #07111f;
+  border-radius: 14px;
+  color: #fff;
   cursor: pointer;
   font-weight: 800;
   margin-top: 8px;
@@ -88,11 +137,15 @@ nav button {
 }
 
 .highlight-card {
-  border-color: rgba(247, 148, 29, 0.45);
+  border-color: rgba(255, 122, 24, 0.4);
+  box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.12);
 }
 
 .highlight-card strong {
-  color: #f7941d;
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .data-table {
@@ -103,13 +156,13 @@ nav button {
 
 .data-table th,
 .data-table td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border);
   padding: 12px 10px;
   text-align: left;
 }
 
 .data-table th {
-  color: #97a6ba;
+  color: var(--muted);
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -117,23 +170,24 @@ nav button {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .actions button {
-  background: rgba(33, 192, 122, 0.2);
-  border: 1px solid rgba(33, 192, 122, 0.35);
+  background: rgba(123, 63, 228, 0.1);
+  border: 1px solid rgba(123, 63, 228, 0.25);
   border-radius: 12px;
-  color: #21c07a;
+  color: var(--brand);
   cursor: pointer;
   font-weight: 700;
   padding: 8px 12px;
 }
 
 .actions button:last-child {
-  background: rgba(255, 99, 99, 0.12);
-  border-color: rgba(255, 99, 99, 0.35);
-  color: #ff8f8f;
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.25);
+  color: var(--error);
 }
 
 .content {
@@ -144,33 +198,39 @@ header {
   align-items: center;
   display: flex;
   justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .eyebrow {
-  color: #21c07a;
+  color: var(--brand);
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
+  margin: 0 0 8px;
 }
 
 h1 {
-  font-size: 44px;
-  line-height: 1;
+  font-size: 40px;
+  line-height: 1.05;
   margin: 0;
+  letter-spacing: -0.03em;
 }
 
 .commission,
 .notice {
-  border: 1px solid rgba(33, 192, 122, 0.35);
+  border: 1px solid rgba(123, 63, 228, 0.25);
   border-radius: 999px;
-  color: #21c07a;
+  color: var(--brand);
   font-weight: 800;
   padding: 12px 18px;
+  background: rgba(123, 63, 228, 0.06);
 }
 
 .notice {
-  border-radius: 20px;
+  border-radius: 16px;
+  display: block;
 }
 
 .grid {
@@ -180,26 +240,50 @@ h1 {
   margin-top: 36px;
 }
 
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+
+  aside {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
 article,
 .panel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 28px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 20px;
   padding: 24px;
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.04);
 }
 
 article span {
-  color: #97a6ba;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 article strong {
   display: block;
   font-size: 32px;
   margin-top: 12px;
+  letter-spacing: -0.02em;
 }
 
 .panel {
   margin-top: 24px;
+}
+
+.panel h2 {
+  margin-top: 0;
 }
 
 li {
@@ -211,53 +295,80 @@ li {
   min-height: 100vh;
   place-items: center;
   padding: 24px;
+  background:
+    radial-gradient(ellipse 70% 50% at 20% 10%, rgba(255, 122, 24, 0.16), transparent 55%),
+    radial-gradient(ellipse 60% 45% at 90% 20%, rgba(255, 61, 129, 0.12), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 70% 90%, rgba(18, 198, 195, 0.14), transparent 50%),
+    var(--surface);
 }
 
 .login {
-  width: min(480px, 100%);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 28px;
-  padding: 32px;
+  width: min(440px, 100%);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 36px 32px;
   display: grid;
   gap: 16px;
+  box-shadow: 0 20px 50px rgba(17, 24, 39, 0.08);
+}
+
+.login::before {
+  content: "";
+  display: block;
+  height: 4px;
+  width: 100%;
+  border-radius: 999px;
+  background: var(--gradient);
+  margin: -8px 0 4px;
 }
 
 .login label {
   display: grid;
   gap: 8px;
-  color: #97a6ba;
+  color: var(--muted);
   font-size: 14px;
+  font-weight: 600;
 }
 
 .login input {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  color: #fff;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--ink);
   padding: 14px 16px;
+  font: inherit;
+}
+
+.login input:focus {
+  outline: 2px solid rgba(123, 63, 228, 0.35);
+  border-color: var(--brand);
 }
 
 .login button,
 .commission-form button,
 .sign-out {
-  background: #21c07a;
+  background: var(--gradient);
   border: 0;
-  border-radius: 16px;
-  color: #07111f;
+  border-radius: 14px;
+  color: #fff;
   cursor: pointer;
   font-weight: 800;
+  font: inherit;
   padding: 14px 18px;
 }
 
 .sign-out {
   margin-top: auto;
   width: 100%;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--border);
 }
 
-aside {
-  display: flex;
-  flex-direction: column;
+.sign-out:hover {
+  border-color: rgba(123, 63, 228, 0.4);
+  color: var(--brand);
 }
 
 .commission-form {
@@ -269,10 +380,25 @@ aside {
 }
 
 .commission-form input {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  color: #fff;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--ink);
   padding: 12px 14px;
   width: 96px;
+  font: inherit;
+}
+
+.identity-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.identity-thumbs img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
 }

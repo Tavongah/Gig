@@ -307,7 +307,7 @@ curl https://api.YOURDOMAIN.com/health
 curl https://api.YOURDOMAIN.com/ready
 ```
 
-Admin: `https://admin.YOURDOMAIN.com` → `admin@gigflow.local`  
+Admin: `https://admin.YOURDOMAIN.com` → `info@duts.tech`  
 Customer/worker web app: `https://app.YOURDOMAIN.com`
 
 ### Adding the web app to an existing Droplet

@@ -46,7 +46,7 @@ npm run dev --workspace @gigflow/mobile  # Expo dev server
 
 **Verify:**
 - `GET http://localhost:4000/health` → `{ ok: true, checks: { database: "up", redis: "up" } }`
-- Admin login: `admin@gigflow.local` via dashboard sign-in
+- Admin login: `info@duts.tech` via dashboard sign-in
 - Mobile: create client + worker accounts, post gig, accept as worker
 
 ### Full Docker stack (API included)
@@ -112,7 +112,7 @@ Deploy `apps/admin/dist` to any static host.
 - Publish directory: `apps/admin/dist`
 - Env: `VITE_API_URL=https://your-api.onrender.com/v1`
 
-Sign in with `admin@gigflow.local` (seeded) or promote a user to `ADMIN` in the database.
+Sign in with `info@duts.tech` (seeded) or promote a user to `ADMIN` in the database.
 
 ---
 

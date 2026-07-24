@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { AccountStatus, LaunchPhase, PrismaClient } from "@prisma/client";
+import { AccountStatus, LaunchPhase, PrismaClient, UserRole } from "@prisma/client";
 import { hashPassword } from "../src/lib/password.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -98,32 +98,43 @@ async function main(): Promise<void> {
   }
 
   const adminPasswordHash = await hashPassword(adminPassword);
-  await prisma.user.upsert({
-    where: { email: "admin@gigflow.local" },
-    update: {
-      fullName: "DUTS Admin",
-      roles: ["ADMIN", "CLIENT"],
-      defaultRole: "ADMIN",
-      accountStatus: AccountStatus.ACTIVE,
-      passwordHash: adminPasswordHash,
-      emailVerified: true,
-      phoneVerified: true,
-      profileCompleted: true,
-      isVerified: true
-    },
-    create: {
-      email: "admin@gigflow.local",
-      fullName: "DUTS Admin",
-      roles: ["ADMIN", "CLIENT"],
-      defaultRole: "ADMIN",
-      accountStatus: AccountStatus.ACTIVE,
-      passwordHash: adminPasswordHash,
-      emailVerified: true,
-      phoneVerified: true,
-      profileCompleted: true,
-      isVerified: true
+  const adminEmail = "info@duts.tech";
+  const legacyAdminEmail = "admin@gigflow.local";
+  const adminData = {
+    fullName: "DUTS Admin",
+    roles: [UserRole.ADMIN, UserRole.CLIENT],
+    defaultRole: UserRole.ADMIN,
+    accountStatus: AccountStatus.ACTIVE,
+    passwordHash: adminPasswordHash,
+    emailVerified: true,
+    phoneVerified: true,
+    profileCompleted: true,
+    isVerified: true
+  };
+
+  const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
+  const legacyAdmin = await prisma.user.findUnique({ where: { email: legacyAdminEmail } });
+
+  if (legacyAdmin && !existingAdmin) {
+    await prisma.user.update({
+      where: { id: legacyAdmin.id },
+      data: { email: adminEmail, ...adminData }
+    });
+  } else {
+    await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: adminData,
+      create: { email: adminEmail, ...adminData }
+    });
+    if (legacyAdmin && legacyAdmin.id !== existingAdmin?.id) {
+      await prisma.user.update({
+        where: { id: legacyAdmin.id },
+        data: {
+          roles: legacyAdmin.roles.filter((role) => role !== UserRole.ADMIN)
+        }
+      });
     }
-  });
+  }
 
   const demoPasswordHash = await hashPassword("Demo123!");
   const lawnCategory = await prisma.serviceCategory.findUnique({ where: { slug: "lawn-cutting" } });
@@ -248,7 +259,7 @@ async function main(): Promise<void> {
   }
 
   console.log("Seeded MVP categories, commission, admin, and demo client/worker accounts.");
-  console.log("  admin@gigflow.local — password from ADMIN_SEED_PASSWORD in apps/api/.env");
+  console.log("  info@duts.tech — password from ADMIN_SEED_PASSWORD in apps/api/.env");
   console.log("  client@gigflow.local / Demo123!");
   console.log("  worker@gigflow.local / Demo123! (approved worker)");
 }

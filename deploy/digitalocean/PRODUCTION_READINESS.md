@@ -16,7 +16,7 @@ Complete before accepting real customer payments in Connecticut.
 - [ ] `.env.production` complete (see `.env.production.example`)
 - [ ] `CORS_ORIGINS` includes admin + mobile web origins
 - [ ] `API_PUBLIC_URL` matches public API URL
-- [ ] Admin loads and login works (`admin@gigflow.local`)
+- [ ] Admin loads and login works (`info@duts.tech`)
 
 ## Stripe
 

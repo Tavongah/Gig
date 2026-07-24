@@ -93,7 +93,7 @@ Check API logs for `[production-readiness]` — should show no blockers once env
 
 | Role | Email | Password | Notes |
 |------|-------|----------|-------|
-| Admin | admin@gigflow.local | `ADMIN_SEED_PASSWORD` in `apps/api/.env` | Rotate before public launch |
+| Admin | info@duts.tech | `ADMIN_SEED_PASSWORD` in `apps/api/.env` | Rotate before public launch |
 | Client | client@gigflow.local | Demo123! | Verified, ready to post gigs |
 | Worker | worker@gigflow.local | Demo123! | Approved worker with categories |
 

@@ -105,7 +105,7 @@ const adminPassword = process.env.ADMIN_SEED_PASSWORD ?? "Admin123!";
 
 const admin = await req("/auth/login", {
   method: "POST",
-  body: { email: "admin@gigflow.local", password: adminPassword }
+  body: { email: "info@duts.tech", password: adminPassword }
 });
 
 await req(`/admin/workers/${workerPending.user.id}/approve`, { method: "POST", token: admin.token });
