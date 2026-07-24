@@ -39,6 +39,9 @@ export default {
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
           "DUTS uses your location to show nearby gigs and match you with local workers.",
+        NSCameraUsageDescription: "DUTS uses your camera so you can take a profile picture.",
+        NSPhotoLibraryUsageDescription: "DUTS uses your photos so you can set a profile picture.",
+        NSPhotoLibraryAddUsageDescription: "DUTS saves cropped profile photos to your library when needed.",
         ITSAppUsesNonExemptEncryption: false,
         UIBackgroundModes: ["remote-notification"]
       },
@@ -55,7 +58,10 @@ export default {
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
       ],
       ...(hasAndroidFirebase ? { googleServicesFile: googleServicesJson } : {})
     },
@@ -75,7 +81,8 @@ export default {
       [
         "expo-image-picker",
         {
-          photosPermission: "DUTS uses your photos so you can set a profile picture."
+          photosPermission: "DUTS uses your photos so you can set a profile picture.",
+          cameraPermission: "DUTS uses your camera so you can take a profile picture."
         }
       ],
       [

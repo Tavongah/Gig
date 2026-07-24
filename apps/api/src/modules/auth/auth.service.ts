@@ -16,7 +16,7 @@ import { env } from "../../config/env.js";
 import { AppError } from "../../lib/errors.js";
 import { createResetToken, hashPassword, hashResetToken, verifyPassword } from "../../lib/password.js";
 import { buildSimpleEmail, sendTransactionalEmail } from "../../lib/email.js";
-import { isSpacesConfigured, uploadPrivateObject, uploadPublicObject } from "../../lib/spaces.js";
+import { isSpacesConfigured, uploadPrivateObject, uploadPublicObject, createUploadSignedUrl, assertObjectKeyOwnedByUser, publicUrlForObjectKey } from "../../lib/spaces.js";
 import { normalizePhoneNumber } from "./access.service.js";
 import { passwordResetAppUrl, sendEmailVerification } from "./verification.service.js";
 
@@ -408,8 +408,8 @@ export async function getCurrentUser(userId: string) {
   return getAuthenticatedUser(userId);
 }
 
-const MAX_AVATAR_DATA_URL_CHARS = 600_000;
-const MAX_AVATAR_BYTES = 450_000;
+const MAX_AVATAR_DATA_URL_CHARS = 1_200_000;
+const MAX_AVATAR_BYTES = 900_000;
 
 function parseAvatarDataUrl(dataUrl: string): { contentType: string; buffer: Buffer } {
   const match = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl.trim());
@@ -454,14 +454,23 @@ export async function updateUserAvatarFromDataUrl(userId: string, dataUrl: strin
   let avatarUrl: string;
   try {
     if (isSpacesConfigured()) {
-      const uploaded = await uploadPublicObject({
-        purpose: "worker-profile",
-        userId,
-        fileName: `avatar.${extension}`,
-        contentType,
-        body: buffer
-      });
-      avatarUrl = uploaded.publicUrl;
+      try {
+        const uploaded = await uploadPublicObject({
+          purpose: "worker-profile",
+          userId,
+          fileName: `avatar.${extension}`,
+          contentType,
+          body: buffer
+        });
+        avatarUrl = uploaded.publicUrl;
+      } catch (spacesError) {
+        // Never block profile photos if object storage misconfigured — store compressed data URL.
+        console.warn("[avatar] spaces_upload_failed_falling_back", {
+          userId,
+          message: spacesError instanceof Error ? spacesError.message : String(spacesError)
+        });
+        avatarUrl = `data:${contentType};base64,${buffer.toString("base64")}`;
+      }
     } else {
       avatarUrl = `data:${contentType};base64,${buffer.toString("base64")}`;
       console.warn("[avatar] Spaces not configured — storing compressed data URL on user record.");
@@ -482,6 +491,39 @@ export async function updateUserAvatarFromDataUrl(userId: string, dataUrl: strin
     include: userInclude
   });
 
+  return sanitizeUser(user);
+}
+
+export async function createAvatarUploadSession(userId: string) {
+  if (!isSpacesConfigured()) {
+    throw new AppError("STORAGE_NOT_CONFIGURED", 503, "STORAGE_NOT_CONFIGURED", {
+      avatarUrl: "Photo storage is temporarily unavailable. Try again shortly."
+    });
+  }
+
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { roles: true }
+  });
+  const purpose = user.roles.includes(UserRole.WORKER) ? "worker-profile" : "customer-photo";
+
+  return createUploadSignedUrl({
+    purpose,
+    userId,
+    fileName: "avatar.jpg",
+    contentType: "image/jpeg",
+    expiresInSeconds: 900
+  });
+}
+
+export async function confirmAvatarUpload(userId: string, objectKey: string) {
+  assertObjectKeyOwnedByUser(objectKey, userId);
+  const avatarUrl = publicUrlForObjectKey(objectKey);
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { avatarUrl },
+    include: userInclude
+  });
   return sanitizeUser(user);
 }
 

@@ -345,6 +345,9 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       INVALID_VERIFICATION_TOKEN: "That verification link is invalid or expired. Request a new one.",
       PHONE_NOT_VERIFIED: "Phone verification is not required right now. Continue with email verification.",
       PROFILE_INCOMPLETE: "Complete your profile before continuing.",
+      PROFILE_PHOTO_REQUIRED: "Upload a profile photo before continuing.",
+      UPLOAD_FAILED: "Photo upload failed. Please try a smaller photo or try again.",
+      INVALID_AVATAR: "That photo could not be used. Try a JPEG or PNG under a few megabytes.",
       EMAIL_IN_USE: "That email is already registered.",
       PHONE_IN_USE: "That phone number is already linked to another account.",
       OTP_RATE_LIMITED: "Too many code requests. Try again later.",
@@ -430,6 +433,45 @@ export const api = {
       { method: "POST", body: JSON.stringify({ imageDataUrl }) },
       token
     ),
+  getAvatarUploadUrl: (token: string) =>
+    request<{ uploadUrl: string; objectKey: string; publicUrl: string }>(
+      "/auth/me/avatar/upload-url",
+      {},
+      token
+    ),
+  confirmAvatarUpload: (objectKey: string, token: string) =>
+    request<{ user: ApiUser }>(
+      "/auth/me/avatar/confirm",
+      { method: "POST", body: JSON.stringify({ objectKey }) },
+      token
+    ),
+  /** Prefer signed Spaces PUT; fall back to JSON data-URL upload. */
+  uploadProfilePhoto: async (
+    photo: { dataUrl: string; base64: string },
+    token: string
+  ): Promise<{ user: ApiUser }> => {
+    try {
+      const signed = await api.getAvatarUploadUrl(token);
+      const { base64ToUint8Array } = await import("./pick-profile-photo");
+      const bytes = base64ToUint8Array(photo.base64);
+      const body =
+        typeof Blob !== "undefined"
+          ? new Blob([bytes], { type: "image/jpeg" })
+          : bytes;
+      const put = await fetch(signed.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "image/jpeg" },
+        body
+      });
+      if (!put.ok) {
+        const detail = await put.text().catch(() => "");
+        throw new Error(`Direct upload failed (${put.status}). ${detail.slice(0, 120)}`.trim());
+      }
+      return api.confirmAvatarUpload(signed.objectKey, token);
+    } catch {
+      return api.uploadAvatar(photo.dataUrl, token);
+    }
+  },
   changePassword: (
     payload: { currentPassword: string; password: string; confirmPassword: string },
     token: string

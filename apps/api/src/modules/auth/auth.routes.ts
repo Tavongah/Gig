@@ -16,8 +16,11 @@ import {
   resetPassword,
   updateAuthenticatedProfile,
   updateUserAvatarFromDataUrl,
+  createAvatarUploadSession,
+  confirmAvatarUpload,
   deleteAuthenticatedAccount
 } from "./auth.service.js";
+import { isSpacesConfigured } from "../../lib/spaces.js";
 import { completeUserProfile, loginWithSocialProvider } from "./social-auth.service.js";
 import {
   requestPhoneOtp,
@@ -173,15 +176,45 @@ const avatarUploadSchema = z.object({
   imageDataUrl: z
     .string()
     .min(32, "Profile photo is required")
-    .max(600_000, "Image is too large. Try a smaller photo.")
+    .max(1_200_000, "Image is too large. Try a smaller photo.")
     .refine((value) => /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(value), {
       message: "Upload a JPEG, PNG, or WebP photo."
     })
 });
 
+const avatarConfirmSchema = z.object({
+  objectKey: z.string().min(8).max(400)
+});
+
 authRouter.patch("/me", validateBody(updateProfileSchema), async (req, res, next) => {
   try {
     const user = await updateAuthenticatedProfile(req.auth!.userId, req.body);
+    res.json({ user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.get("/me/avatar/upload-url", async (req, res, next) => {
+  try {
+    if (!isSpacesConfigured()) {
+      res.status(503).json({
+        success: false,
+        error: "STORAGE_NOT_CONFIGURED",
+        message: "Direct photo upload is temporarily unavailable."
+      });
+      return;
+    }
+    const session = await createAvatarUploadSession(req.auth!.userId);
+    res.json(session);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/me/avatar/confirm", validateBody(avatarConfirmSchema), async (req, res, next) => {
+  try {
+    const user = await confirmAvatarUpload(req.auth!.userId, req.body.objectKey);
     res.json({ user });
   } catch (error) {
     next(error);

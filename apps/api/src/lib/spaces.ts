@@ -61,13 +61,13 @@ export async function createUploadSignedUrl(input: {
   fileName: string;
   contentType: string;
   expiresInSeconds?: number;
-}): Promise<{ uploadUrl: string; objectKey: string; publicUrl: string | null }> {
+}): Promise<{ uploadUrl: string; objectKey: string; publicUrl: string }> {
   const objectKey = buildObjectKey(input.purpose, input.userId, input.fileName);
+  // Do not sign with ACL — DigitalOcean Spaces frequently rejects ACL on presigned PUTs.
   const command = new PutObjectCommand({
     Bucket: getBucket(),
     Key: objectKey,
-    ContentType: input.contentType,
-    ACL: "private"
+    ContentType: input.contentType
   });
 
   const uploadUrl = await getSignedUrl(getSpacesClient(), command, {
@@ -77,8 +77,33 @@ export async function createUploadSignedUrl(input: {
   return {
     uploadUrl,
     objectKey,
-    publicUrl: env.SPACES_CDN_URL ? `${env.SPACES_CDN_URL.replace(/\/$/, "")}/${objectKey}` : null
+    publicUrl: publicUrlForObjectKey(objectKey)
   };
+}
+
+export function publicUrlForObjectKey(objectKey: string): string {
+  if (env.SPACES_CDN_URL) {
+    return `${env.SPACES_CDN_URL.replace(/\/$/, "")}/${objectKey}`;
+  }
+
+  const bucket = getBucket();
+  const endpoint = (env.SPACES_ENDPOINT ?? env.S3_ENDPOINT ?? "").replace(/\/$/, "");
+  if (endpoint.includes("digitaloceanspaces.com")) {
+    const host = endpoint.replace(/^https?:\/\//, "");
+    return `https://${bucket}.${host}/${objectKey}`;
+  }
+  return `${endpoint}/${bucket}/${objectKey}`;
+}
+
+export function assertObjectKeyOwnedByUser(objectKey: string, userId: string): void {
+  const allowed = Object.values(PURPOSE_PREFIX).some((prefix) =>
+    objectKey.startsWith(`${prefix}/${userId}/`)
+  );
+  if (!allowed) {
+    throw new AppError("FORBIDDEN", 403, "FORBIDDEN", {
+      storage: "Invalid upload target."
+    });
+  }
 }
 
 export async function createDownloadSignedUrl(objectKey: string, expiresInSeconds = 900): Promise<string> {
@@ -100,38 +125,22 @@ export async function uploadPublicObject(input: {
 }): Promise<{ objectKey: string; publicUrl: string }> {
   const objectKey = buildObjectKey(input.purpose, input.userId, input.fileName);
   const bucket = getBucket();
+  const client = getSpacesClient();
 
-  await getSpacesClient().send(
+  // Avoid ACL headers — DigitalOcean Spaces commonly rejects them.
+  await client.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: objectKey,
       Body: input.body,
       ContentType: input.contentType,
-      ACL: "public-read",
       CacheControl: "public, max-age=31536000, immutable"
     })
   );
 
-  if (env.SPACES_CDN_URL) {
-    return {
-      objectKey,
-      publicUrl: `${env.SPACES_CDN_URL.replace(/\/$/, "")}/${objectKey}`
-    };
-  }
-
-  const endpoint = (env.SPACES_ENDPOINT ?? env.S3_ENDPOINT ?? "").replace(/\/$/, "");
-  // DigitalOcean Spaces virtual-host style: https://bucket.region.digitaloceanspaces.com/key
-  if (endpoint.includes("digitaloceanspaces.com")) {
-    const host = endpoint.replace(/^https?:\/\//, "");
-    return {
-      objectKey,
-      publicUrl: `https://${bucket}.${host}/${objectKey}`
-    };
-  }
-
   return {
     objectKey,
-    publicUrl: `${endpoint}/${bucket}/${objectKey}`
+    publicUrl: publicUrlForObjectKey(objectKey)
   };
 }
 
@@ -152,7 +161,6 @@ export async function uploadPrivateObject(input: {
       Key: objectKey,
       Body: input.body,
       ContentType: input.contentType,
-      ACL: "private",
       CacheControl: "private, max-age=0, no-store"
     })
   );

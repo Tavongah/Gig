@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Alert, ScrollView, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { CompositeNavigationProp } from "@react-navigation/native";
@@ -104,8 +104,9 @@ export function ClientHomeScreen() {
     const preferred = POPULAR_SERVICE_SLUGS.map((slug) => bySlug.get(slug)).filter(
       (category): category is NonNullable<typeof category> => Boolean(category)
     );
-    if (preferred.length >= 4) return preferred.slice(0, 4);
-    return mvp.slice(0, 4);
+    const preferredIds = new Set(preferred.map((category) => category.id));
+    const rest = mvp.filter((category) => !preferredIds.has(category.id));
+    return [...preferred, ...rest];
   }, [categoriesQuery.data?.mvp]);
 
   return (
@@ -150,24 +151,22 @@ export function ClientHomeScreen() {
         ) : null}
 
         <View className="gap-3">
-          <View className="flex-row items-center justify-between px-1">
-            <Text className="text-sm font-bold uppercase tracking-wider text-muted">Popular Services</Text>
-            <Pressable onPress={() => navigation.navigate("PostGig")} hitSlop={8}>
-              <Text className="text-sm font-bold text-brand">See all →</Text>
-            </Pressable>
-          </View>
+          <Text className="px-1 text-sm font-bold uppercase tracking-wider text-muted">Popular Services</Text>
 
-          <View className="flex-row flex-wrap justify-between gap-y-3">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 12, paddingHorizontal: 2, paddingBottom: 4 }}
+          >
             {popularServices.map((category) => (
-              <View key={category.id} className="w-[48%]">
+              <View key={category.id} style={{ width: 168 }}>
                 <ServiceCategoryCard
                   category={category}
-                  compact
                   onPress={() => navigation.navigate("PostGig", { serviceCategoryId: category.id })}
                 />
               </View>
             ))}
-          </View>
+          </ScrollView>
         </View>
       </View>
     </TabScreen>

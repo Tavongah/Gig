@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../lib/api";
 import { showAlert } from "../../lib/confirm";
 import { initials } from "../../lib/format";
-import { pickProfilePhotoDataUrl } from "../../lib/pick-profile-photo";
+import { pickProfilePhoto } from "../../lib/pick-profile-photo";
 import { Screen } from "../../components/Screen";
 import { DutsCard } from "../../components/DutsCard";
 import { FormInput } from "../../components/FormInput";
@@ -36,6 +36,7 @@ export function EditProfileScreen() {
   const session = useSessionStore((state) => state.session)!;
   const profile = useSessionStore((state) => state.profile);
   const setProfile = useSessionStore((state) => state.setProfile);
+  const setSession = useSessionStore((state) => state.setSession);
 
   const initial = splitName(profile?.fullName ?? session.user.fullName);
   const [firstName, setFirstName] = useState(initial.firstName);
@@ -56,27 +57,35 @@ export function EditProfileScreen() {
     setUploadingPhoto(true);
     setError(null);
     setUploadProgress("Opening camera / gallery…");
+    const previousUrl = profile?.avatarUrl ?? session.user.avatarUrl ?? null;
     try {
-      const dataUrl = await pickProfilePhotoDataUrl();
-      if (!dataUrl) {
+      const photo = await pickProfilePhoto();
+      if (!photo) {
         setUploadProgress(null);
         return;
       }
 
-      setAvatarUrl(dataUrl);
+      setAvatarUrl(photo.dataUrl);
       setUploadProgress("Uploading photo…");
-      const avatarResult = await api.uploadAvatar(dataUrl, session.token);
+      const avatarResult = await api.uploadProfilePhoto(
+        { dataUrl: photo.dataUrl, base64: photo.base64 },
+        session.token
+      );
       const nextUrl = avatarResult.user.avatarUrl ?? null;
       if (!nextUrl) {
         throw new Error("Upload succeeded but no photo URL was returned. Try again.");
       }
       setAvatarUrl(nextUrl);
       setProfile({ ...(profile ?? session.user), ...avatarResult.user });
+      setSession({ ...session, user: { ...session.user, ...avatarResult.user } });
       setUploadProgress(null);
-      showAlert("Photo saved", "Your profile picture was uploaded.");
+      showAlert("Photo saved", "Your profile picture was uploaded. You can go online now.");
     } catch (err) {
       setUploadProgress(null);
-      setError(err instanceof Error ? err.message : "Could not upload photo.");
+      setAvatarUrl(previousUrl);
+      const message = err instanceof Error ? err.message : "Could not upload photo.";
+      setError(message);
+      showAlert("Upload failed", message);
     } finally {
       setUploadingPhoto(false);
     }
@@ -109,7 +118,9 @@ export function EditProfileScreen() {
         },
         session.token
       );
-      setProfile({ ...(profile ?? session.user), ...user, avatarUrl });
+      const merged = { ...(profile ?? session.user), ...user, avatarUrl };
+      setProfile(merged);
+      setSession({ ...session, user: { ...session.user, ...merged } });
       showAlert("Saved", "Your profile was updated.");
       navigation.goBack();
     } catch (err) {
@@ -156,7 +167,7 @@ export function EditProfileScreen() {
           </Pressable>
           {uploadProgress ? <Text className="text-xs text-muted">{uploadProgress}</Text> : null}
           <Text className="text-center text-xs text-muted">
-            Use camera or gallery. Photos are cropped and compressed before upload.
+            Use camera or gallery. Photos are compressed automatically before upload.
           </Text>
         </DutsCard>
 
