@@ -104,6 +104,18 @@ export default function GrowthPlatformSection({
           transition={reduced ? { duration: 0 } : { duration: 0.8, ease: EASE }}
           aria-hidden="true"
         >
+          <div className="duts-growth-scene">
+            <div className="duts-growth-scene__photo">
+              <img
+                src="/images/stories/growth-cleaning.jpg"
+                alt=""
+                width={1400}
+                height={1050}
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+            <div className="duts-growth-scene__browser">
           <div className="duts-browser">
             <div className="duts-browser__bar">
               <span className="duts-browser__dot" />
@@ -111,7 +123,7 @@ export default function GrowthPlatformSection({
               <span className="duts-browser__dot" />
               <span className="duts-browser__url">
                 <span className="duts-browser__lock" />
-                yourbusiness.com
+                greenlineclean.com
               </span>
             </div>
 
@@ -128,7 +140,7 @@ export default function GrowthPlatformSection({
 
               <div className="duts-mock__body">
                 <div className="duts-mock__hero">
-                  <span className="duts-mock__badge">Trusted local experts</span>
+                  <span className="duts-mock__badge">Demo · Greenline Cleaning</span>
                   <span className="duts-mock__h1" />
                   <span className="duts-mock__h1 duts-mock__h1--short" />
                   <span className="duts-mock__text" />
@@ -189,6 +201,8 @@ export default function GrowthPlatformSection({
                   </span>
                 </span>
               </div>
+            </div>
+          </div>
             </div>
           </div>
         </motion.div>

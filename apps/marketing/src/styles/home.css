@@ -2195,3 +2195,640 @@
     transition: none;
   }
 }
+
+/* =========================================================================
+   PHASE 2 — photography, product UI, sticky story, industry gallery
+   ========================================================================= */
+
+.duts-section--light {
+  background: #f3f5f8;
+  color: #0f172a;
+}
+
+.duts-section--light .duts-section__lead,
+.duts-section--light .duts-section__title {
+  color: inherit;
+}
+
+.duts-section--light .duts-section__lead {
+  color: #475569;
+}
+
+.duts-section--light .duts-eyebrow {
+  color: #0284c7;
+}
+
+.duts-section--light .duts-eyebrow__pip {
+  background: #0284c7;
+  box-shadow: 0 0 12px rgba(2, 132, 199, 0.45);
+}
+
+.duts-demo-tag {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 4;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(7, 9, 15, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e2e8f0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+
+.duts-photo-story__grid {
+  display: grid;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+@media (min-width: 960px) {
+  .duts-photo-story__grid {
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 3rem;
+  }
+
+  .duts-photo-story[data-reverse="true"] .duts-photo-story__media {
+    order: 2;
+  }
+
+  .duts-photo-story[data-reverse="true"] .duts-photo-story__copy {
+    order: 1;
+  }
+}
+
+.duts-photo-story__media {
+  position: relative;
+  border-radius: 28px;
+  overflow: hidden;
+  min-height: 420px;
+  border: 1px solid var(--border);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+}
+
+.duts-photo-story--light .duts-photo-story__media {
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+}
+
+.duts-photo-story__media > img {
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  object-fit: cover;
+  display: block;
+}
+
+.duts-photo-story__media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(7, 9, 15, 0.05), rgba(7, 9, 15, 0.55));
+  pointer-events: none;
+}
+
+.duts-photo-story__float {
+  position: absolute;
+  z-index: 3;
+  right: 1.1rem;
+  bottom: 1.1rem;
+  left: 1.1rem;
+  max-width: 360px;
+  margin-left: auto;
+}
+
+@media (min-width: 720px) {
+  .duts-photo-story__float {
+    left: auto;
+    width: min(360px, 52%);
+  }
+}
+
+.duts-ui-card {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(7, 9, 15, 0.86);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  padding: 1rem 1.05rem 1.1rem;
+  color: #f8fafc;
+}
+
+.duts-ui-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+  margin-bottom: 0.85rem;
+  font-size: 0.78rem;
+}
+
+.duts-ui-card__head strong {
+  font-size: 0.92rem;
+}
+
+.duts-ui-card__head span {
+  color: #94a3b8;
+}
+
+.duts-ui-card__quote {
+  margin: 0 0 0.85rem;
+  color: #cbd5e1;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.duts-chat {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.duts-chat__bubble {
+  max-width: 92%;
+  padding: 0.7rem 0.85rem;
+  border-radius: 14px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.duts-chat__bubble--in {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border-bottom-left-radius: 4px;
+}
+
+.duts-chat__bubble--out {
+  margin-left: auto;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.25), rgba(59, 130, 246, 0.28));
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  color: #f0f9ff;
+  border-bottom-right-radius: 4px;
+}
+
+.duts-chat__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.duts-chat__actions span {
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.duts-ui-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin: 0 0 0.85rem;
+  padding: 0;
+  list-style: none;
+}
+
+.duts-ui-meta li {
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.duts-ui-meta span {
+  display: block;
+  color: #94a3b8;
+  font-size: 0.68rem;
+  margin-bottom: 0.15rem;
+}
+
+.duts-ui-meta strong {
+  font-size: 0.86rem;
+}
+
+.duts-pipeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.duts-pipeline span {
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.duts-pipeline .is-done {
+  color: #a7f3d0;
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.duts-pipeline .is-active {
+  color: #dff9ff;
+  border-color: rgba(34, 211, 238, 0.4);
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.duts-extract {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.duts-extract li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.88rem;
+}
+
+.duts-extract em {
+  font-style: normal;
+  color: #34d399;
+  font-weight: 700;
+}
+
+/* Sticky intelligence */
+.duts-sticky__intro {
+  margin-bottom: 2.5rem;
+}
+
+.duts-sticky__layout {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (min-width: 980px) {
+  .duts-sticky__layout {
+    grid-template-columns: 0.9fr 1.1fr;
+    gap: 2.5rem;
+    align-items: start;
+  }
+
+  .duts-sticky__panel {
+    position: sticky;
+    top: 6.5rem;
+  }
+
+  .duts-sticky__mobile-card {
+    display: none;
+  }
+}
+
+.duts-sticky__core {
+  border-radius: 28px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  background:
+    radial-gradient(circle at 30% 20%, rgba(34, 211, 238, 0.18), transparent 45%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  padding: 1.75rem;
+  min-height: 240px;
+  box-shadow: var(--glow);
+}
+
+.duts-sticky__core span {
+  display: inline-block;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  font-weight: 700;
+  margin-bottom: 0.85rem;
+}
+
+.duts-sticky__core strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  letter-spacing: -0.03em;
+  margin-bottom: 0.75rem;
+}
+
+.duts-sticky__core p {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.duts-sticky__dots {
+  display: flex;
+  gap: 0.45rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.duts-sticky__dots li {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.duts-sticky__dots li[data-active="true"] {
+  border-color: rgba(34, 211, 238, 0.45);
+  color: #dff9ff;
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.duts-sticky__stages {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 980px) {
+  .duts-sticky__stages {
+    gap: 0;
+  }
+
+  .duts-sticky__stage {
+    min-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 2rem 0;
+    border: 0;
+    background: transparent;
+    opacity: 0.35;
+    transition: opacity 0.3s ease;
+  }
+
+  .duts-sticky__stage[data-active="true"] {
+    opacity: 1;
+  }
+}
+
+.duts-sticky__stage {
+  padding: 1.35rem;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.duts-sticky__n {
+  display: block;
+  color: var(--cyan);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.duts-sticky__stage h3 {
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  margin-bottom: 0.65rem;
+}
+
+.duts-sticky__stage p {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  max-width: 36rem;
+}
+
+.duts-sticky__mobile-card {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  background: rgba(34, 211, 238, 0.08);
+  color: #e0f2fe;
+  font-size: 0.9rem;
+}
+
+/* Industries gallery */
+.duts-industries-gallery__layout {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 2.5rem;
+}
+
+@media (min-width: 960px) {
+  .duts-industries-gallery__layout {
+    grid-template-columns: 0.85fr 1.15fr;
+    gap: 1.5rem;
+    align-items: stretch;
+  }
+}
+
+.duts-industries-gallery__tabs {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.duts-industries-gallery__tabs button {
+  text-align: left;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 16px;
+  padding: 0.95rem 1.05rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.duts-industries-gallery__tabs button span {
+  display: block;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.2rem;
+}
+
+.duts-industries-gallery__tabs button em {
+  font-style: normal;
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.duts-industries-gallery__tabs button:hover,
+.duts-industries-gallery__tabs button.is-active {
+  border-color: rgba(2, 132, 199, 0.35);
+  background: #fff;
+  transform: translateX(2px);
+}
+
+.duts-industries-gallery__tabs button.is-active em {
+  color: #0284c7;
+}
+
+.duts-industries-gallery__photo {
+  position: relative;
+  border-radius: 24px;
+  overflow: hidden;
+  min-height: 420px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
+}
+
+.duts-industries-gallery__photo img {
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  object-fit: cover;
+}
+
+.duts-industries-gallery__caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1.5rem;
+  background: linear-gradient(180deg, transparent, rgba(7, 9, 15, 0.82));
+  color: #f8fafc;
+}
+
+.duts-industries-gallery__caption strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.45rem;
+}
+
+.duts-industries-gallery__caption p {
+  margin: 0;
+  color: #cbd5e1;
+  line-height: 1.55;
+  max-width: 36rem;
+}
+
+.duts-brandband {
+  display: grid;
+  gap: 2rem;
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .duts-brandband {
+    grid-template-columns: 1.05fr 0.95fr;
+  }
+}
+
+.duts-brandband__photo {
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+}
+
+.duts-brandband__photo img {
+  width: 100%;
+  height: auto;
+  display: block;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.duts-markets {
+  font-size: 0.95rem;
+}
+
+.duts-growth-scene {
+  position: relative;
+  border-radius: 28px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  min-height: 460px;
+}
+
+.duts-growth-scene__photo {
+  position: absolute;
+  inset: 0;
+}
+
+.duts-growth-scene__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.duts-growth-scene__photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(7, 9, 15, 0.15), rgba(7, 9, 15, 0.72));
+}
+
+.duts-growth-scene__browser {
+  position: relative;
+  z-index: 2;
+  margin: 1.25rem;
+  max-width: 420px;
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .duts-photo-story__media,
+  .duts-photo-story__media > img,
+  .duts-industries-gallery__photo,
+  .duts-industries-gallery__photo img {
+    min-height: 340px;
+  }
+
+  .duts-ui-card {
+    font-size: 0.92em;
+  }
+
+  .duts-sticky__stage {
+    min-height: 0 !important;
+    opacity: 1 !important;
+  }
+}
+
+/* Hero depth upgrade */
+.duts-hero {
+  position: relative;
+  isolation: isolate;
+}
+
+.duts-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse at 50% 30%, #000 20%, transparent 75%);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.duts-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.duts-btn--primary:hover {
+  transform: translateY(-2px);
+}
+
+.site-header {
+  transition: background 0.25s ease, border-color 0.25s ease, backdrop-filter 0.25s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .duts-industries-gallery__tabs button:hover {
+    transform: none;
+  }
+}

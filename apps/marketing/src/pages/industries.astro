@@ -1,32 +1,13 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { industries } from "../data/site";
+import { IndustriesGallery } from "../components/react/IndustriesGallery";
 import "../styles/home.css";
 ---
 
 <BaseLayout
   title="Industries"
-  description="DUTS AI supports home services, professional services, real estate, retail, hospitality, healthcare, education and growing SMEs."
+  description="DUTS AI supports home services, professional services, real estate, retail, hospitality and growing SMEs with practical AI."
   canonicalPath="/industries"
 >
-  <section class="page-hero">
-    <div class="container">
-      <p class="eyebrow">Industries</p>
-      <h1>Built for real operating businesses.</h1>
-      <p>Each market has different pressures. The goal is the same: respond faster, work smarter and grow.</p>
-    </div>
-  </section>
-
-  <section class="section section--tight">
-    <div class="container duts-industries">
-      {
-        industries.map((item) => (
-          <article class="duts-industry reveal">
-            <h3>{item.name}</h3>
-            <p>{item.useCase}</p>
-          </article>
-        ))
-      }
-    </div>
-  </section>
+  <IndustriesGallery client:only="react" />
 </BaseLayout>

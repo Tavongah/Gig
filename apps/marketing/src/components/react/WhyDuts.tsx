@@ -24,7 +24,7 @@ export default function WhyDuts({
   const reduced = usePrefersReducedMotion();
 
   return (
-    <section className="duts-section duts-why" aria-labelledby="duts-why-title">
+    <section className="duts-section duts-section--light duts-why" aria-labelledby="duts-why-title">
       <div className="duts-container duts-why__grid">
         <motion.header
           className="duts-section__head"

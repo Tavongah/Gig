@@ -2,18 +2,18 @@ import "../../styles/home.css";
 import { HeroSection } from "./HeroSection";
 import { TrustStrip } from "./TrustStrip";
 import { SolutionsSection, type Solution } from "./SolutionsSection";
+import { SolutionStories } from "./SolutionStories";
 import { GrowthPlatformSection } from "./GrowthPlatformSection";
-import { DutsIntelligenceDiagram } from "./DutsIntelligenceDiagram";
+import { StickyIntelligence } from "./StickyIntelligence";
 import { HowItWorksSection } from "./HowItWorksSection";
 import { ProductsVsSolutions } from "./ProductsVsSolutions";
-import { IndustriesSection } from "./IndustriesSection";
+import { IndustriesGallery } from "./IndustriesGallery";
 import { WhyDuts } from "./WhyDuts";
 import { AIPathfinder } from "./AIPathfinder";
 import { BrandBand } from "./BrandBand";
 import { FinalCTA } from "./FinalCTA";
 
 type Step = { n: string; title: string; body: string };
-type Industry = { name: string; useCase: string };
 type Principle = { title: string; body: string };
 type PathOption = {
   id: string;
@@ -25,13 +25,12 @@ type PathOption = {
 export function HomePage({
   solutions,
   steps,
-  industries,
   principles,
   pathfinderOptions
 }: {
   solutions: Solution[];
   steps: Step[];
-  industries: Industry[];
+  industries?: unknown;
   principles: Principle[];
   pathfinderOptions: PathOption[];
 }) {
@@ -39,12 +38,18 @@ export function HomePage({
     <>
       <HeroSection />
       <TrustStrip />
-      <SolutionsSection solutions={solutions} />
+      <SolutionStories />
+      <SolutionsSection
+        solutions={solutions}
+        eyebrow="All capabilities"
+        title="A complete set of practical AI building blocks."
+        lead="Explore the full range — then start with the one problem costing you the most time or customers."
+      />
       <GrowthPlatformSection />
-      <DutsIntelligenceDiagram />
+      <StickyIntelligence />
       <HowItWorksSection steps={steps} />
       <ProductsVsSolutions />
-      <IndustriesSection industries={industries} />
+      <IndustriesGallery />
       <WhyDuts principles={principles} />
       <AIPathfinder options={pathfinderOptions} />
       <BrandBand />
