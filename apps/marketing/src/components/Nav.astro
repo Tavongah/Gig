@@ -1,160 +1,89 @@
 ---
-import { appLinks } from "../data/site";
+import { navLinks, BRAND } from "../data/site";
 
-const links = [
-  { href: "/", label: "Home" },
-  { href: "/services", label: "Services" },
-  { href: "/how-it-works", label: "How It Works" },
-  { href: "/become-a-worker", label: "Become a Worker" },
-  { href: "/about", label: "About" },
-  { href: "/faq", label: "FAQ" },
-  { href: "/contact", label: "Contact" }
-];
-
-const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
+const pathname = Astro.url.pathname;
 ---
 
-<header class="nav" id="top">
-  <div class="container nav__inner">
-    <a class="nav__brand" href="/" aria-label="DUTS home">
-      <img src="/logo.png" alt="DUTS" width="108" height="36" />
+<header class="site-header" id="site-header">
+  <div class="container nav-inner">
+    <a class="brand" href="/" aria-label={`${BRAND.name} home`}>
+      <img src="/brand/duts-ai-logo.jpg" alt="DUTS AI" width="160" height="160" />
     </a>
 
-    <button class="nav__toggle" type="button" aria-expanded="false" aria-controls="nav-menu" id="nav-toggle">
-      <span class="sr-only">Menu</span>
-      <span></span><span></span><span></span>
-    </button>
-
-    <nav class="nav__menu" id="nav-menu" aria-label="Primary">
-      <ul>
-        {
-          links.map((link) => {
-            const isActive = link.href === currentPath || (link.href !== "/" && currentPath.startsWith(link.href));
-            return (
-              <li>
-                <a href={link.href} class:list={[{ "is-active": isActive }]} aria-current={isActive ? "page" : undefined}>
-                  {link.label}
-                </a>
-              </li>
-            );
-          })
-        }
-      </ul>
-      <div class="nav__actions">
-        <a class="btn btn--ghost btn--sm" href={appLinks.login}>Login</a>
-        <a class="btn btn--primary btn--sm" href={appLinks.requestHelp}>Request Help</a>
-      </div>
+    <nav class="nav-links" aria-label="Primary">
+      {
+        navLinks.map((link) => (
+          <a
+            class="nav-link"
+            href={link.href}
+            aria-current={pathname === link.href || pathname.startsWith(link.href + "/") ? "page" : undefined}
+          >
+            {link.label}
+          </a>
+        ))
+      }
     </nav>
+
+    <div class="nav-actions">
+      <a class="btn btn--ghost" href="/solutions">Explore Solutions</a>
+      <a class="btn btn--primary" href="/contact">Talk to DUTS</a>
+    </div>
+
+    <button
+      class="mobile-toggle"
+      type="button"
+      aria-expanded="false"
+      aria-controls="mobile-nav"
+      id="mobile-toggle"
+    >
+      <span class="sr-only">Menu</span>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+      </svg>
+    </button>
+  </div>
+
+  <div class="container mobile-panel" id="mobile-nav" hidden>
+    {
+      navLinks.map((link) => (
+        <a class="nav-link" href={link.href}>
+          {link.label}
+        </a>
+      ))
+    }
+    <a class="btn btn--ghost" href="/solutions">Explore Solutions</a>
+    <a class="btn btn--primary" href="/contact">Talk to DUTS</a>
   </div>
 </header>
 
 <style>
-  .nav {
-    position: sticky;
-    top: 0;
-    z-index: 50;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(229, 231, 235, 0.6);
-  }
-  .nav__inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 76px;
-    gap: 1rem;
-  }
-  .nav__brand img {
-    height: 32px;
-    width: auto;
-  }
-  .nav__toggle {
-    display: none;
-    width: 44px;
-    height: 44px;
-    border: 0;
-    background: transparent;
-    padding: 10px;
-    flex-direction: column;
-    justify-content: center;
-    gap: 5px;
-    cursor: pointer;
-  }
-  .nav__toggle span {
-    display: block;
-    height: 2px;
-    width: 100%;
-    background: var(--ink);
-    border-radius: 2px;
-    transition: transform 0.2s ease;
-  }
-  .nav__menu {
-    display: flex;
-    align-items: center;
-    gap: 2rem;
-  }
-  .nav__menu ul {
-    display: flex;
-    list-style: none;
-    gap: 0.25rem;
-    margin: 0;
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
     padding: 0;
-  }
-  .nav__menu a {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--muted);
-    padding: 0.5rem 0.75rem;
-    border-radius: 8px;
-    transition: color 0.2s ease;
-  }
-  .nav__menu a:hover,
-  .nav__menu a.is-active {
-    background: var(--gradient);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-  .nav__actions {
-    display: flex;
-    gap: 0.625rem;
-  }
-  @media (max-width: 1024px) {
-    .nav__toggle {
-      display: flex;
-    }
-    .nav__menu {
-      display: none;
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 76px;
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-      padding: 1.25rem 1.25rem 1.5rem;
-      flex-direction: column;
-      align-items: stretch;
-      box-shadow: var(--shadow);
-    }
-    .nav__menu.is-open {
-      display: flex;
-    }
-    .nav__menu ul {
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-    .nav__actions {
-      flex-direction: column;
-      margin-top: 0.5rem;
-    }
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
   }
 </style>
 
 <script>
-  const toggle = document.getElementById("nav-toggle");
-  const menu = document.getElementById("nav-menu");
+  const header = document.getElementById("site-header");
+  const toggle = document.getElementById("mobile-toggle");
+  const panel = document.getElementById("mobile-nav");
+
+  const onScroll = () => {
+    header?.classList.toggle("is-scrolled", window.scrollY > 8);
+  };
+  onScroll();
+  window.addEventListener("scroll", onScroll, { passive: true });
+
   toggle?.addEventListener("click", () => {
-    const open = menu?.classList.toggle("is-open");
-    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    const open = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!open));
+    panel?.classList.toggle("is-open", !open);
+    if (panel) panel.hidden = open;
   });
 </script>

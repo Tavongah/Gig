@@ -1,0 +1,45 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { solutions } from "../data/site";
+import "../styles/home.css";
+---
+
+<BaseLayout
+  title="Solutions"
+  description="Practical AI solutions for customer support, lead follow-up, document intelligence, automation and integrations."
+  canonicalPath="/solutions"
+>
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">Solutions</p>
+      <h1>AI that fits how your business already works.</h1>
+      <p>
+        We start with the business problem, then design AI that connects to your tools, knowledge
+        and customer channels.
+      </p>
+      <div class="btn-row">
+        <a class="btn btn--primary" href="/contact">Discuss a Solution</a>
+        <a class="btn btn--ghost" href="/#pathfinder">Find your starting point</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container" style="display:grid;gap:1rem;">
+      {
+        solutions.map((item) => (
+          <article class="duts-solutions__card reveal" id={item.id}>
+            <h2 style="font-size:1.45rem;margin-bottom:0.5rem;">{item.name}</h2>
+            <p>{item.summary}</p>
+            <p class="duts-solutions__outcome">{item.outcome}</p>
+            <div class="duts-solutions__caps">
+              {item.capabilities.map((cap) => (
+                <span>{cap}</span>
+              ))}
+            </div>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+</BaseLayout>

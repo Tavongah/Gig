@@ -1,166 +1,65 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import CtaButton from "../components/CtaButton.astro";
-import ServiceCard from "../components/ServiceCard.astro";
-import TrustCard from "../components/TrustCard.astro";
-import Timeline from "../components/Timeline.astro";
-import FaqAccordion from "../components/FaqAccordion.astro";
-import PhoneMockup from "../components/PhoneMockup.astro";
-import CtaSection from "../components/CtaSection.astro";
-import { appLinks, faqs, services, trustItems, whyDuts, SITE_URL } from "../data/site";
+import { HomePage } from "../components/react/HomePage";
+import {
+  BRAND,
+  SITE_URL,
+  SUPPORT_EMAIL,
+  solutions,
+  howSteps,
+  industries,
+  principles,
+  pathfinderOptions
+} from "../data/site";
 
-const orgLd = {
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  name: "DUTS",
-  url: SITE_URL,
-  logo: `${SITE_URL}/logo.png`,
-  description: "Book trusted local help in minutes for everyday services.",
-  sameAs: []
-};
+const title = "DUTS AI | AI Solutions Built for Business Growth";
+const description =
+  "DUTS AI builds intelligent products, AI agents and business automation that help companies attract customers, improve operations and grow.";
 
-const webLd = {
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  name: "DUTS",
-  url: SITE_URL,
-  potentialAction: {
-    "@type": "SearchAction",
-    target: `${SITE_URL}/services`,
-    "query-input": "required name=search_term_string"
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: BRAND.name,
+    url: SITE_URL,
+    email: SUPPORT_EMAIL,
+    description,
+    logo: new URL("/brand/duts-ai-logo.jpg", SITE_URL).toString(),
+    sameAs: []
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: BRAND.name,
+    url: SITE_URL,
+    description
   }
-};
+];
 ---
 
-<BaseLayout
-  title="DUTS — Book trusted local help in minutes"
-  description="Find trusted local workers for moving, cleaning, lawn care, furniture assembly, junk removal, event help, car detailing, and more."
-  canonicalPath="/"
-  jsonLd={[orgLd, webLd]}
->
-  <!-- Hero -->
-  <section class="hero">
-    <div class="container hero__grid">
-      <div class="hero__copy reveal">
-        <h1>Book trusted local help in minutes.</h1>
-        <p class="hero__sub">
-          Moving, cleaning, lawn care, furniture assembly, junk removal and more—all from trusted local workers.
+<BaseLayout title={title} description={description} canonicalPath="/" jsonLd={jsonLd}>
+  <noscript>
+    <section class="page-hero">
+      <div class="container">
+        <p class="eyebrow">Practical AI for real businesses</p>
+        <h1>AI that helps businesses sell, serve and grow.</h1>
+        <p>
+          DUTS AI builds intelligent products and custom AI solutions that help businesses attract
+          customers, automate operations and work smarter.
         </p>
-        <div class="btn-group">
-          <CtaButton href={appLinks.requestHelp} label="Request Help" />
-          <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
+        <div class="btn-row">
+          <a class="btn btn--primary" href="/contact">Talk to DUTS</a>
+          <a class="btn btn--ghost" href="/solutions">Explore AI Solutions</a>
         </div>
       </div>
-      <PhoneMockup />
-    </div>
-  </section>
-
-  <!-- Services -->
-  <section class="section section--surface" id="services" aria-labelledby="services-heading">
-    <div class="container">
-      <header class="section__header">
-        <p class="section__label">Services</p>
-        <h2 id="services-heading" class="section__title">Everyday help, ready nearby</h2>
-        <p class="section__lead">Transparent starting prices. Local matching. Secure payments.</p>
-      </header>
-      <div class="grid-3">
-        {services.map((service) => <ServiceCard service={service} />)}
-      </div>
-    </div>
-  </section>
-
-  <!-- Trust -->
-  <section class="section" id="trust" aria-labelledby="trust-heading">
-    <div class="container">
-      <header class="section__header section__header--center">
-        <p class="section__label">Why trust DUTS</p>
-        <h2 id="trust-heading" class="section__title section__title--center">Built for trust, speed, and clarity</h2>
-        <p class="section__lead section__lead--center">
-          A technology platform designed to make finding reliable local help simple and secure.
-        </p>
-      </header>
-      <div class="grid-3">
-        {trustItems.map((item) => (
-          <TrustCard title={item.title} body={item.body} icon={item.icon} />
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <!-- How it works -->
-  <section class="section section--surface" id="how" aria-labelledby="how-heading">
-    <div class="container">
-      <header class="section__header section__header--center">
-        <p class="section__label">How it works</p>
-        <h2 id="how-heading" class="section__title section__title--center">Four simple steps</h2>
-      </header>
-      <Timeline />
-      <div style="text-align: center; margin-top: 3rem">
-        <CtaButton href="/how-it-works" label="See the full flow" variant="ghost" />
-      </div>
-    </div>
-  </section>
-
-  <!-- Why DUTS -->
-  <section class="section section--surface" aria-labelledby="why-heading">
-    <div class="container">
-      <header class="section__header section__header--center">
-        <p class="section__label">Why DUTS</p>
-        <h2 id="why-heading" class="section__title section__title--center">A marketplace you can trust</h2>
-      </header>
-      <div class="grid-2">
-        {whyDuts.map((item) => (
-          <TrustCard title={item.title} body={item.body} icon={item.icon} />
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <CtaSection />
-
-  <!-- FAQ preview -->
-  <section class="section" id="faq" aria-labelledby="faq-heading">
-    <div class="container container--narrow">
-      <header class="section__header">
-        <p class="section__label">FAQ</p>
-        <h2 id="faq-heading" class="section__title">Quick answers</h2>
-      </header>
-      <FaqAccordion items={faqs.slice(0, 5)} />
-      <p style="margin-top: 2rem">
-        <a class="link" href="/faq">View all FAQs →</a>
-      </p>
-    </div>
-  </section>
+    </section>
+  </noscript>
+  <HomePage
+    client:only="react"
+    solutions={[...solutions]}
+    steps={[...howSteps]}
+    industries={[...industries]}
+    principles={[...principles]}
+    pathfinderOptions={[...pathfinderOptions]}
+  />
 </BaseLayout>
-
-<style>
-  .hero {
-    padding: clamp(3rem, 8vw, 6rem) 0 clamp(2rem, 5vw, 4rem);
-    background: var(--bg);
-  }
-  .hero__grid {
-    display: grid;
-    gap: 3rem;
-    align-items: center;
-  }
-  @media (min-width: 960px) {
-    .hero__grid {
-      grid-template-columns: 1fr 1fr;
-      gap: 4rem;
-    }
-  }
-  .hero h1 {
-    font-size: clamp(2.5rem, 6vw, 4.25rem);
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    line-height: 1.05;
-    max-width: 14ch;
-    margin-bottom: 1.25rem;
-  }
-  .hero__sub {
-    font-size: clamp(1.0625rem, 2vw, 1.25rem);
-    max-width: 36rem;
-    line-height: 1.7;
-    margin-bottom: 2rem;
-  }
-</style>

@@ -4,27 +4,17 @@ import { SUPPORT_EMAIL } from "../data/site";
 ---
 
 <BaseLayout
-  title="Terms of Service"
-  description="DUTS terms of service overview for customers and workers using the platform."
+  title="Terms"
+  description="Terms information for DUTS AI."
   canonicalPath="/terms"
 >
-  <section class="section">
-    <div class="container container--narrow legal">
-      <h1>Terms of Service</h1>
+  <section class="page-hero">
+    <div class="container">
+      <h1>Terms</h1>
       <p>
-        By using DUTS, you agree to use the platform lawfully, provide accurate information, and respect other users.
-        Workers and customers are responsible for completing jobs professionally and following local laws.
-      </p>
-      <p>
-        Questions? Email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Complete terms are also available in the
-        DUTS app.
+        Questions about DUTS AI terms of use can be sent to
+        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
     </div>
   </section>
 </BaseLayout>
-
-<style>
-  .legal h1 { font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 800; margin-bottom: 1.5rem; }
-  .legal p { font-size: 1.0625rem; line-height: 1.75; }
-  .legal a { color: var(--purple); font-weight: 600; }
-</style>

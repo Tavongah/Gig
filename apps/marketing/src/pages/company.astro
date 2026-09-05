@@ -1,0 +1,65 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { BRAND, markets, principles } from "../data/site";
+import "../styles/home.css";
+---
+
+<BaseLayout
+  title="Company"
+  description="DUTS AI is a modern AI technology company building products and custom solutions that help businesses sell, serve and grow."
+  canonicalPath="/company"
+>
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">Company</p>
+      <h1>{BRAND.name}</h1>
+      <p>{BRAND.tagline}</p>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container duts-brandband">
+      <div>
+        <h2 class="section-title section-title--wide">Ideas today. A brighter tomorrow.</h2>
+        <p class="section-copy">
+          DUTS AI creates both ready-to-use products and custom AI solutions. We help businesses
+          attract customers, automate repetitive work, improve customer service and grow — without
+          requiring a technical background to get started.
+        </p>
+        <p class="duts-markets" style="text-align:left;margin-top:1.25rem;">
+          Built for ambitious businesses everywhere.
+          <br />
+          <strong>{markets.join(" · ")}</strong>
+        </p>
+        <div class="btn-row">
+          <a class="btn btn--primary" href="/contact">Talk to DUTS</a>
+        </div>
+      </div>
+      <div class="duts-brandband__photo">
+        <img
+          src="/brand/duts-office.jpg"
+          alt="DUTS AI branding in a premium workspace"
+          width="1200"
+          height="900"
+          loading="lazy"
+        />
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">What we believe</h2>
+      <div class="duts-why">
+        {
+          principles.map((item) => (
+            <article class="duts-why__card reveal">
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+</BaseLayout>

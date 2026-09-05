@@ -1,27 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://www.duts.tech/</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/services</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/services/moving-assistance</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/services/house-cleaning</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/services/room-cleaning</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/services/lawn-cutting</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/services/short-term-labor</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/services/car-detailing</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/services/furniture-assembly</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/services/junk-removal</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/services/event-help</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/how-it-works</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://www.duts.tech/become-a-worker</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://www.duts.tech/about</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://www.duts.tech/faq</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://www.duts.tech/safety</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://www.duts.tech/pricing</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://www.duts.tech/contact</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://www.duts.tech/privacy</loc><changefreq>yearly</changefreq></url>
-  <url><loc>https://www.duts.tech/terms</loc><changefreq>yearly</changefreq></url>
-  <url><loc>https://www.duts.tech/hartford</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/new-haven</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/bridgeport</loc><changefreq>weekly</changefreq></url>
-  <url><loc>https://www.duts.tech/stamford</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://www.duts.tech/</loc></url>
+  <url><loc>https://www.duts.tech/products</loc></url>
+  <url><loc>https://www.duts.tech/solutions</loc></url>
+  <url><loc>https://www.duts.tech/industries</loc></url>
+  <url><loc>https://www.duts.tech/how-it-works</loc></url>
+  <url><loc>https://www.duts.tech/company</loc></url>
+  <url><loc>https://www.duts.tech/contact</loc></url>
+  <url><loc>https://www.duts.tech/privacy</loc></url>
+  <url><loc>https://www.duts.tech/terms</loc></url>
 </urlset>

@@ -1,0 +1,39 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { products } from "../data/site";
+import "../styles/home.css";
+---
+
+<BaseLayout
+  title="Products"
+  description="Ready-to-use DUTS AI products designed around common business needs — from lead capture to customer support."
+  canonicalPath="/products"
+>
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">Products</p>
+      <h1>AI products built for speed.</h1>
+      <p>
+        Start with ready-to-use capabilities when you need results quickly. Expand into custom
+        solutions as your workflows grow more complex.
+      </p>
+      <div class="btn-row">
+        <a class="btn btn--primary" href="/contact">Talk to DUTS</a>
+        <a class="btn btn--ghost" href="/solutions">View Solutions</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container duts-industries">
+      {
+        products.map((item) => (
+          <article class="duts-industry reveal">
+            <h3>{item.name}</h3>
+            <p>{item.description}</p>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+</BaseLayout>

@@ -1,136 +1,50 @@
 ---
-import { appLinks, services, SUPPORT_EMAIL, SUPPORT_PHONE } from "../data/site";
+import { BRAND, SUPPORT_EMAIL, products, customSolutions } from "../data/site";
+const year = new Date().getFullYear();
 ---
 
-<footer class="footer">
-  <div class="container footer__top">
-    <div class="footer__brand">
-      <a href="/" aria-label="DUTS home">
-        <img src="/logo.png" alt="DUTS" width="108" height="36" />
-      </a>
-      <p>Book trusted local help in minutes. A modern marketplace for everyday services.</p>
-      <div class="footer__social" aria-label="Social links">
-        <a href="https://instagram.com" rel="noopener noreferrer" target="_blank" aria-label="Instagram">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z M17.5 6.5h.01"/></svg>
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="/">
+          <img src="/brand/duts-ai-logo.jpg" alt="DUTS AI" width="160" height="160" />
         </a>
-        <a href="https://facebook.com" rel="noopener noreferrer" target="_blank" aria-label="Facebook">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
-        </a>
-        <a href="https://linkedin.com" rel="noopener noreferrer" target="_blank" aria-label="LinkedIn">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z M2 9h4v12H2z M4 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
-        </a>
+        <p>{BRAND.tagline}</p>
+        <p class="muted" style="margin-top:1.25rem">
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+        </p>
+      </div>
+
+      <div class="footer-col">
+        <h3>Products</h3>
+        {products.map((p) => <a href="/products">{p.name}</a>)}
+      </div>
+
+      <div class="footer-col">
+        <h3>Solutions</h3>
+        {customSolutions.map((s) => <a href="/solutions">{s.name}</a>)}
+        <a href="/solutions">Custom AI Development</a>
+      </div>
+
+      <div class="footer-col">
+        <h3>Company</h3>
+        <a href="/company">About</a>
+        <a href="/industries">Industries</a>
+        <a href="/how-it-works">How It Works</a>
+        <a href="/contact">Contact</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
       </div>
     </div>
 
-    <div class="footer__col">
-      <h3>Services</h3>
-      <ul>
-        {services.slice(0, 6).map((s) => (
-          <li><a href={`/services/${s.slug}`}>{s.name}</a></li>
-        ))}
-        <li><a href="/services">All services</a></li>
-      </ul>
+    <div class="footer-bottom">
+      <p>© {year} DUTS AI. All rights reserved.</p>
+      <div class="socials">
+        <a href="https://www.linkedin.com/" rel="noopener noreferrer" target="_blank">LinkedIn</a>
+        <a href="https://www.facebook.com/" rel="noopener noreferrer" target="_blank">Facebook</a>
+        <a href="https://www.instagram.com/" rel="noopener noreferrer" target="_blank">Instagram</a>
+      </div>
     </div>
-
-    <div class="footer__col">
-      <h3>Company</h3>
-      <ul>
-        <li><a href="/about">About</a></li>
-        <li><a href="/become-a-worker">Become a Worker</a></li>
-        <li><a href="/how-it-works">How It Works</a></li>
-        <li><a href="/pricing">Pricing</a></li>
-        <li><a href="/safety">Safety</a></li>
-        <li><a href="/faq">FAQ</a></li>
-      </ul>
-    </div>
-
-    <div class="footer__col">
-      <h3>Support</h3>
-      <ul>
-        <li><a href="/contact">Contact</a></li>
-        <li><a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></li>
-        <li><a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, "")}`}>{SUPPORT_PHONE}</a></li>
-        <li><a href={appLinks.login}>Login</a></li>
-        <li><a href={appLinks.requestHelp}>Request Help</a></li>
-        <li><a href="/privacy">Privacy</a></li>
-        <li><a href="/terms">Terms</a></li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="container footer__bottom">
-    <p>© {new Date().getFullYear()} DUTS. All rights reserved.</p>
   </div>
 </footer>
-
-<style>
-  .footer {
-    background: var(--surface);
-    padding: 4rem 0 2rem;
-  }
-  .footer__top {
-    display: grid;
-    gap: 2.5rem;
-    grid-template-columns: 1fr;
-  }
-  @media (min-width: 768px) {
-    .footer__top {
-      grid-template-columns: 1.5fr 1fr 1fr 1fr;
-    }
-  }
-  .footer__brand img {
-    height: 32px;
-    width: auto;
-    margin-bottom: 1rem;
-  }
-  .footer__brand p {
-    font-size: 0.9375rem;
-    max-width: 28ch;
-    line-height: 1.6;
-  }
-  .footer__social {
-    display: flex;
-    gap: 1rem;
-    margin-top: 1.5rem;
-  }
-  .footer__social a {
-    color: var(--muted);
-    transition: color 0.2s ease;
-  }
-  .footer__social a:hover {
-    color: var(--purple);
-  }
-  .footer__col h3 {
-    font-size: 0.8125rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ink);
-    margin-bottom: 1rem;
-  }
-  .footer__col ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 0.625rem;
-  }
-  .footer__col a {
-    font-size: 0.9375rem;
-    color: var(--muted);
-    transition: color 0.2s ease;
-  }
-  .footer__col a:hover {
-    color: var(--purple);
-  }
-  .footer__bottom {
-    margin-top: 3rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border);
-  }
-  .footer__bottom p {
-    margin: 0;
-    font-size: 0.8125rem;
-    color: var(--muted);
-  }
-</style>

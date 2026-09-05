@@ -4,27 +4,17 @@ import { SUPPORT_EMAIL } from "../data/site";
 ---
 
 <BaseLayout
-  title="Privacy Policy"
-  description="DUTS privacy policy overview. Read how we handle account and service information."
+  title="Privacy"
+  description="Privacy information for DUTS AI."
   canonicalPath="/privacy"
 >
-  <section class="section">
-    <div class="container container--narrow legal">
-      <h1>Privacy Policy</h1>
+  <section class="page-hero">
+    <div class="container">
+      <h1>Privacy</h1>
       <p>
-        DUTS respects your privacy. We collect account, location, and job details needed to match customers with workers
-        and process payments. We do not sell your personal information.
-      </p>
-      <p>
-        For questions, contact <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Full policy text is also available
-        in the DUTS app.
+        DUTS AI respects your privacy. For questions about how we handle information, contact
+        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
     </div>
   </section>
 </BaseLayout>
-
-<style>
-  .legal h1 { font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 800; margin-bottom: 1.5rem; }
-  .legal p { font-size: 1.0625rem; line-height: 1.75; }
-  .legal a { color: var(--purple); font-weight: 600; }
-</style>

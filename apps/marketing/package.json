@@ -10,9 +10,15 @@
     "typecheck": "node -e \"console.log('@gigflow/marketing: OK')\""
   },
   "dependencies": {
-    "astro": "^5.13.0"
+    "@astrojs/react": "^6.0.5",
+    "astro": "^5.13.0",
+    "framer-motion": "^13.2.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
     "typescript": "^6.0.3"
   }
 }

@@ -1,30 +1,26 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import PageHeader from "../components/PageHeader.astro";
-import Timeline from "../components/Timeline.astro";
-import CtaSection from "../components/CtaSection.astro";
-import CtaButton from "../components/CtaButton.astro";
-import { appLinks } from "../data/site";
+import { HowItWorksSection } from "../components/react/HowItWorksSection";
+import { howSteps } from "../data/site";
+import "../styles/home.css";
 ---
 
 <BaseLayout
   title="How It Works"
-  description="See how DUTS works: choose a service, describe your job, get matched with a local worker, and complete the job."
+  description="From business problem to working AI in four clear stages — discovery, opportunity, build and scale."
   canonicalPath="/how-it-works"
 >
-  <section class="section">
+  <section class="page-hero">
     <div class="container">
-      <PageHeader
-        label="How It Works"
-        title="From request to done—clear and fast"
-        lead="Four simple steps to get trusted local help when you need it."
-      />
-      <Timeline />
-      <div class="btn-group" style="margin-top: 3rem">
-        <CtaButton href={appLinks.requestHelp} label="Request Help" />
-        <CtaButton href={appLinks.becomeWorker} label="Become a Worker" variant="ghost" />
-      </div>
+      <p class="eyebrow">Process</p>
+      <h1>Simple path. Serious engineering.</h1>
+      <p>We keep the process clear so business owners can move from idea to working AI without the jargon.</p>
     </div>
   </section>
-  <CtaSection showLogin={false} />
+  <HowItWorksSection client:only="react" steps={[...howSteps]} />
+  <section class="section section--tight">
+    <div class="container" style="text-align:center;">
+      <a class="btn btn--primary" href="/contact">Talk to DUTS</a>
+    </div>
+  </section>
 </BaseLayout>
