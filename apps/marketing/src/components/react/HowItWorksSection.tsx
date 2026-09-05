@@ -52,13 +52,7 @@ export default function HowItWorksSection({
           </motion.div>
         </motion.header>
 
-        <motion.ol
-          className="duts-how__steps"
-          variants={staggerContainer(reduced, 0.12)}
-          initial="hidden"
-          whileInView="visible"
-          viewport={VIEWPORT_WIDE}
-        >
+        <div className="duts-how__timeline">
           <motion.span
             className="duts-how__spine"
             aria-hidden="true"
@@ -68,19 +62,27 @@ export default function HowItWorksSection({
             transition={reduced ? { duration: 0 } : { duration: 1.1, ease: EASE }}
           />
 
-          {steps.map((step) => (
-            <motion.li className="duts-how__step" key={step.n} variants={fadeUp(reduced, 22)}>
-              <span className="duts-how__marker">
-                <span className="duts-how__marker-ring" aria-hidden="true" />
-                <span className="duts-how__marker-n">{step.n}</span>
-              </span>
-              <div className="duts-how__content">
-                <h3 className="duts-how__title">{step.title}</h3>
-                <p className="duts-how__body">{step.body}</p>
-              </div>
-            </motion.li>
-          ))}
-        </motion.ol>
+          <motion.ol
+            className="duts-how__steps"
+            variants={staggerContainer(reduced, 0.12)}
+            initial="hidden"
+            whileInView="visible"
+            viewport={VIEWPORT_WIDE}
+          >
+            {steps.map((step) => (
+              <motion.li className="duts-how__step" key={step.n} variants={fadeUp(reduced, 22)}>
+                <span className="duts-how__marker">
+                  <span className="duts-how__marker-ring" aria-hidden="true" />
+                  <span className="duts-how__marker-n">{step.n}</span>
+                </span>
+                <div className="duts-how__content">
+                  <h3 className="duts-how__title">{step.title}</h3>
+                  <p className="duts-how__body">{step.body}</p>
+                </div>
+              </motion.li>
+            ))}
+          </motion.ol>
+        </div>
       </div>
     </section>
   );

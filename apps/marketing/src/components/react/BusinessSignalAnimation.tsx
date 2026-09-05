@@ -33,7 +33,7 @@ const OUTPUTS = [
 ];
 
 type Point = { x: number; y: number };
-type Link = { d: string; anchor: Point };
+type Link = { label: string; d: string; anchor: Point };
 
 function distribute(count: number, from: number, to: number): number[] {
   if (count < 2) return [(from + to) / 2];
@@ -53,18 +53,18 @@ function buildLinks(labels: string[], side: "in" | "out"): Link[] {
   const anchorX = side === "in" ? IN_X : OUT_X;
   const spread = side === "in" ? distribute(labels.length, 58, 382) : distribute(labels.length, 84, 356);
 
-  return spread.map((y, i) => {
+  return labels.map((label, i) => {
     const t = labels.length < 2 ? 0.5 : i / (labels.length - 1);
     // Inputs fan into the left arc (150deg -> 210deg), outputs leave the right arc (30deg -> -30deg).
     const core = side === "in" ? arcPoint(150 + 60 * t) : arcPoint(30 - 60 * t);
-    const anchor = { x: anchorX, y };
+    const anchor = { x: anchorX, y: spread[i] ?? CORE.y };
 
     const d =
       side === "in"
         ? `M ${anchor.x} ${anchor.y} C ${anchor.x + CONTROL_RUN} ${anchor.y}, ${core.x - CONTROL_RUN} ${core.y}, ${core.x} ${core.y}`
         : `M ${core.x} ${core.y} C ${core.x + CONTROL_RUN} ${core.y}, ${anchor.x - CONTROL_RUN} ${anchor.y}, ${anchor.x} ${anchor.y}`;
 
-    return { d, anchor };
+    return { label, d, anchor };
   });
 }
 
@@ -178,45 +178,55 @@ export default function BusinessSignalAnimation() {
           ))}
         </svg>
 
-        {INPUTS.map((label, i) => (
-          <motion.span
+        {INPUT_LINKS.map(({ label, anchor }, i) => (
+          <span
             key={label}
-            className="duts-signal__chip duts-signal__chip--in"
+            className="duts-signal__slot duts-signal__slot--in"
             style={{
-              top: pct(INPUT_LINKS[i].anchor.y, VB_H),
-              right: pct(VB_W - IN_X, VB_W),
-              animationDelay: `${i * 0.42}s`
+              top: pct(anchor.y, VB_H),
+              right: pct(VB_W - IN_X, VB_W)
             }}
-            data-reduced={reduced ? "true" : "false"}
-            initial={{ opacity: 0, x: -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={reduced ? { duration: 0 } : { duration: 0.55, delay: 0.15 + i * 0.09, ease: EASE }}
           >
-            <span className="duts-signal__chip-dot" />
-            {label}
-          </motion.span>
+            <motion.span
+              className="duts-signal__chip duts-signal__chip--in"
+              style={{ animationDelay: `${i * 0.42}s` }}
+              data-reduced={reduced ? "true" : "false"}
+              initial={{ opacity: 0, x: -16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={reduced ? { duration: 0 } : { duration: 0.55, delay: 0.15 + i * 0.09, ease: EASE }}
+            >
+              <span className="duts-signal__chip-dot" />
+              {label}
+            </motion.span>
+          </span>
         ))}
 
-        {OUTPUTS.map((label, i) => (
-          <motion.span
+        {OUTPUT_LINKS.map(({ label, anchor }, i) => (
+          <span
             key={label}
-            className="duts-signal__chip duts-signal__chip--out"
+            className="duts-signal__slot duts-signal__slot--out"
             style={{
-              top: pct(OUTPUT_LINKS[i].anchor.y, VB_H),
-              left: pct(OUT_X, VB_W),
-              animationDelay: `${0.6 + i * 0.42}s`
+              top: pct(anchor.y, VB_H),
+              left: pct(OUT_X, VB_W)
             }}
-            data-reduced={reduced ? "true" : "false"}
-            initial={{ opacity: 0, x: 16 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={reduced ? { duration: 0 } : { duration: 0.55, delay: 0.5 + i * 0.09, ease: EASE }}
           >
-            <span className="duts-signal__chip-dot duts-signal__chip-dot--out" />
-            {label}
-          </motion.span>
+            <motion.span
+              className="duts-signal__chip duts-signal__chip--out"
+              style={{ animationDelay: `${0.6 + i * 0.42}s` }}
+              data-reduced={reduced ? "true" : "false"}
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={reduced ? { duration: 0 } : { duration: 0.55, delay: 0.5 + i * 0.09, ease: EASE }}
+            >
+              <span className="duts-signal__chip-dot duts-signal__chip-dot--out" />
+              {label}
+            </motion.span>
+          </span>
         ))}
 
-        <SignalCore reduced={reduced} />
+        <div className="duts-signal__core-slot">
+          <SignalCore reduced={reduced} />
+        </div>
       </div>
 
       <div className="duts-signal__compact">

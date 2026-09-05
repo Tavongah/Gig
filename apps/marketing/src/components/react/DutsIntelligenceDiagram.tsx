@@ -36,11 +36,17 @@ function arcPoint(angleDeg: number) {
 
 const NODE_YS = distribute(NODES.length, 42, 478);
 
-const NODE_PATHS = NODE_YS.map((y, i) => {
+/** Node metadata paired with its rail position and the wire that reaches it. */
+const NODE_LINKS = NODES.map((node, i) => {
+  const y = NODE_YS[i] ?? CORE.y;
   const t = NODES.length < 2 ? 0.5 : i / (NODES.length - 1);
   const start = arcPoint(80 - 160 * t);
   const run = 74;
-  return `M ${start.x} ${start.y} C ${start.x + run} ${start.y}, ${NODE_X - run} ${y}, ${NODE_X} ${y}`;
+  return {
+    ...node,
+    y,
+    d: `M ${start.x} ${start.y} C ${start.x + run} ${start.y}, ${NODE_X - run} ${y}, ${NODE_X} ${y}`
+  };
 });
 
 const KNOWLEDGE_PATH = `M ${KNOWLEDGE_X} ${CORE.y} C ${KNOWLEDGE_X + 30} ${CORE.y}, ${CORE.x - CORE.r - 30} ${CORE.y}, ${CORE.x - CORE.r} ${CORE.y}`;
@@ -150,11 +156,11 @@ export default function DutsIntelligenceDiagram({
               transition={reduced ? { duration: 0 } : { duration: 0.7, ease: EASE }}
             />
 
-            {NODE_PATHS.map((d, i) => (
-              <g key={`wire-${i}`}>
-                <path d={d} className="duts-diagram__wire-base" />
+            {NODE_LINKS.map((link, i) => (
+              <g key={`wire-${link.name}`}>
+                <path d={link.d} className="duts-diagram__wire-base" />
                 <motion.path
-                  d={d}
+                  d={link.d}
                   stroke="url(#dutsDiagramOut)"
                   strokeWidth={1.6}
                   strokeLinecap="round"
@@ -168,8 +174,8 @@ export default function DutsIntelligenceDiagram({
               </g>
             ))}
 
-            {NODE_YS.map((y, i) => (
-              <circle key={`node-dot-${i}`} cx={NODE_X} cy={y} r={3.2} className="duts-diagram__dot" />
+            {NODE_LINKS.map((link) => (
+              <circle key={`node-dot-${link.name}`} cx={NODE_X} cy={link.y} r={3.2} className="duts-diagram__dot" />
             ))}
             <circle cx={KNOWLEDGE_X} cy={CORE.y} r={3.2} className="duts-diagram__dot" />
           </svg>
@@ -188,21 +194,23 @@ export default function DutsIntelligenceDiagram({
             <CoreBadge reduced={reduced} />
           </div>
 
-          {NODES.map((node, i) => (
-            <motion.div
+          {NODE_LINKS.map((node, i) => (
+            <div
               key={node.name}
               className="duts-diagram__slot duts-diagram__slot--node"
-              style={{ left: pct(NODE_X, VB_W), top: pct(NODE_YS[i], VB_H) }}
-              initial={{ opacity: reduced ? 1 : 0, x: reduced ? 0 : 14 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
-              transition={reduced ? { duration: 0 } : { duration: 0.5, delay: 0.5 + i * 0.08, ease: EASE }}
+              style={{ left: pct(NODE_X, VB_W), top: pct(node.y, VB_H) }}
             >
-              <span className="duts-diagram__node">
+              <motion.span
+                className="duts-diagram__node"
+                initial={{ opacity: reduced ? 1 : 0, x: reduced ? 0 : 14 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={reduced ? { duration: 0 } : { duration: 0.5, delay: 0.5 + i * 0.08, ease: EASE }}
+              >
                 <span className="duts-diagram__node-name">{node.name}</span>
                 <span className="duts-diagram__node-caption">{node.caption}</span>
-              </span>
-            </motion.div>
+              </motion.span>
+            </div>
           ))}
         </div>
 

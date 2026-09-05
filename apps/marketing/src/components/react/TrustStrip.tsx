@@ -26,8 +26,9 @@ export default function TrustStrip({
 }: TrustStripProps) {
   const reduced = usePrefersReducedMotion();
   const items = labels.length ? labels : DEFAULT_LABELS;
-  // The track is duplicated so translating it by -50% loops seamlessly.
-  const track = [...items, ...items];
+  // The track is duplicated so translating it by -50% loops seamlessly. With the
+  // animation paused the copy would be visible, so it is dropped instead.
+  const track = reduced ? [...items] : [...items, ...items];
 
   return (
     <section className="duts-trust" aria-label="Industries served">
