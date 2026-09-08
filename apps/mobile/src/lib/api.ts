@@ -40,7 +40,9 @@ export interface ApiUser {
     backgroundCheckCompleted?: boolean;
     backgroundCheckConsent?: boolean;
     governmentIdAcknowledged?: boolean;
-    serviceCategories: Array<{ id: string; name: string }>;
+    deliveryEligible?: boolean;
+    transportMode?: string | null;
+    serviceCategories: Array<{ id: string; name: string; slug?: string }>;
   } | null;
 }
 
@@ -77,6 +79,8 @@ export interface WorkerProfileSummary {
   completedGigCount?: number;
   currentLatitude?: number | string | null;
   currentLongitude?: number | string | null;
+  transportMode?: string | null;
+  deliveryEligible?: boolean;
 }
 
 export interface GigPerson {
@@ -153,6 +157,7 @@ export interface GigDetail {
   title: string;
   description: string;
   status: string;
+  fulfillmentType?: "LOCAL_HELP" | "DELIVERY" | string;
   urgency: string;
   totalCents: number;
   taxCents?: number;
@@ -186,9 +191,10 @@ export interface GigDetail {
   createdAt: string;
   estimatedHours?: number | string;
   distanceMiles?: number;
+  estimatedDistanceKm?: number | string | null;
   estimatedResponseMinutes?: number;
   assignedWorkerId?: string | null;
-  serviceCategory?: { id: string; name: string };
+  serviceCategory?: { id: string; name: string; slug?: string };
   client?: GigPerson;
   assignments?: GigAssignment[];
   paymentStatus?: string;
@@ -204,6 +210,34 @@ export interface GigDetail {
   cancellationReason?: string | null;
   cancelledBy?: string | null;
   travelDurationSeconds?: number | null;
+  /** Delivery fields (courier-safe payloads omit sensitive contacts pre-accept). */
+  pickupContactName?: string | null;
+  pickupContactPhone?: string | null;
+  pickupInstructions?: string | null;
+  dropoffCity?: string | null;
+  dropoffRegion?: string | null;
+  dropoffFormattedAddress?: string | null;
+  dropoffAddressLine1?: string | null;
+  dropoffLatitude?: string | number | null;
+  dropoffLongitude?: string | number | null;
+  dropoffContactName?: string | null;
+  dropoffContactPhone?: string | null;
+  dropoffInstructions?: string | null;
+  packageCategory?: string | null;
+  packageDescription?: string | null;
+  packageSize?: string | null;
+  offer?: {
+    id: string;
+    fulfillmentType?: string;
+    title?: string;
+    pickupArea?: string;
+    dropoffArea?: string | null;
+    packageCategory?: string | null;
+    packageDescription?: string | null;
+    estimatedDistanceKm?: number | null;
+    distanceToPickupMiles?: number | null;
+    estimatedEarningsCents?: number;
+  };
 }
 
 export interface ChatMessage {
@@ -358,7 +392,21 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       FIREBASE_NOT_CONFIGURED: "Social sign-in is not configured on the server yet.",
       DEV_PAYMENT_DISABLED: "Payment bypass is disabled in production. Configure Stripe on the server.",
       GPS_REQUIRED: "Location is required for this action.",
-      GPS_VERIFICATION_FAILED: "Move closer to the customer's address before continuing."
+      GPS_VERIFICATION_FAILED: "Move closer to the customer's address before continuing.",
+      DELIVERY_DISTANCE_EXCEEDED:
+        "That delivery is outside our current service area. Try a closer drop-off.",
+      INVALID_PICKUP_PIN: "That pickup code is incorrect. Ask the sender for the current code.",
+      INVALID_DELIVERY_PIN: "That delivery code is incorrect. Ask the recipient for the current code.",
+      PICKUP_PIN_LOCKED:
+        "Too many incorrect attempts. Pickup verification is temporarily locked. Ask the customer to regenerate the codes.",
+      DELIVERY_PIN_LOCKED:
+        "Too many incorrect attempts. Delivery verification is temporarily locked. Ask the customer to regenerate the codes.",
+      DELIVERY_CANCEL_AFTER_PICKUP:
+        "This delivery can’t be cancelled after the package was collected. Contact support if you need help.",
+      NOT_A_DELIVERY: "This action is only for deliveries.",
+      COURIER_NOT_ASSIGNED: "Only the assigned courier can continue this delivery.",
+      INVALID_TRANSPORT_MODE: "Choose Walking, Bicycle, or Public Transport / Kombi.",
+      PIN_REGEN_NOT_ALLOWED: "Codes can’t be regenerated for this delivery anymore."
     };
     const message =
       fieldMessages.length > 0
@@ -456,8 +504,8 @@ export const api = {
       const bytes = base64ToUint8Array(photo.base64);
       const body =
         typeof Blob !== "undefined"
-          ? new Blob([bytes], { type: "image/jpeg" })
-          : bytes;
+          ? new Blob([bytes as BlobPart], { type: "image/jpeg" })
+          : (bytes as BodyInit);
       const put = await fetch(signed.uploadUrl, {
         method: "PUT",
         headers: { "Content-Type": "image/jpeg" },
@@ -719,5 +767,115 @@ export const api = {
   createReview: (gigId: string, payload: CreateReviewInput, token: string) =>
     request<{ review: GigReview }>(`/gigs/${gigId}/reviews`, { method: "POST", body: JSON.stringify(payload) }, token),
   getGigReviews: (gigId: string, token: string) =>
-    request<{ reviews: GigReview[] }>(`/gigs/${gigId}/reviews`, {}, token)
+    request<{ reviews: GigReview[] }>(`/gigs/${gigId}/reviews`, {}, token),
+
+  quoteDelivery: (payload: Record<string, unknown>, token: string) =>
+    request<{ success?: boolean; quote: DeliveryQuote }>("/gigs/deliveries/quote", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }, token),
+
+  createDelivery: (
+    payload: Record<string, unknown>,
+    token: string,
+    options?: { idempotencyKey?: string; orderSource?: "APP" | "WEB" }
+  ) =>
+    request<{
+      success?: boolean;
+      gigId: string;
+      status: string;
+      delivery: GigDetail;
+      secrets: { pickupPin: string; deliveryPin: string } | null;
+      idempotentReplay?: boolean;
+    }>(
+      "/gigs/deliveries",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: {
+          ...(options?.idempotencyKey ? { "Idempotency-Key": options.idempotencyKey } : {}),
+          ...(options?.orderSource ? { "x-order-source": options.orderSource } : { "x-order-source": "APP" })
+        }
+      },
+      token
+    ),
+
+  regenerateDeliveryPins: (gigId: string, token: string) =>
+    request<{ success?: boolean; secrets: { pickupPin: string; deliveryPin: string } }>(
+      `/gigs/${gigId}/delivery/regenerate-pins`,
+      { method: "POST" },
+      token
+    ),
+
+  startTravelToPickup: (gigId: string, token: string) =>
+    request<{ success?: boolean; gig: GigDetail }>(
+      `/gigs/${gigId}/delivery/start-travel-to-pickup`,
+      { method: "POST" },
+      token
+    ),
+
+  arriveAtPickup: (gigId: string, token: string, location: { latitude: number; longitude: number }) =>
+    request<{ success?: boolean; gig: GigDetail }>(
+      `/gigs/${gigId}/delivery/arrive-at-pickup`,
+      { method: "POST", body: JSON.stringify(location) },
+      token
+    ),
+
+  verifyPickupPin: (gigId: string, token: string, pin: string) =>
+    request<{ success?: boolean; gig: GigDetail }>(
+      `/gigs/${gigId}/delivery/verify-pickup`,
+      { method: "POST", body: JSON.stringify({ pin }) },
+      token
+    ),
+
+  startTravelToDropoff: (gigId: string, token: string) =>
+    request<{ success?: boolean; gig: GigDetail }>(
+      `/gigs/${gigId}/delivery/start-travel-to-dropoff`,
+      { method: "POST" },
+      token
+    ),
+
+  arriveAtDropoff: (gigId: string, token: string, location: { latitude: number; longitude: number }) =>
+    request<{ success?: boolean; gig: GigDetail }>(
+      `/gigs/${gigId}/delivery/arrive-at-dropoff`,
+      { method: "POST", body: JSON.stringify(location) },
+      token
+    ),
+
+  verifyDeliveryPin: (
+    gigId: string,
+    token: string,
+    pin: string,
+    location?: { latitude: number; longitude: number }
+  ) =>
+    request<{ success?: boolean; ok?: boolean; delivery: GigDetail }>(
+      `/gigs/${gigId}/delivery/verify-delivery`,
+      { method: "POST", body: JSON.stringify({ pin, ...location }) },
+      token
+    ),
+
+  setDeliveryEligibility: (
+    payload: { transportMode: "WALKING" | "BICYCLE" | "PUBLIC_TRANSPORT"; enabled?: boolean },
+    token: string
+  ) =>
+    request<{
+      profile: ApiUser["workerProfile"];
+      deliveryEligible: boolean;
+      transportMode: string | null;
+    }>("/workers/delivery-eligibility", { method: "POST", body: JSON.stringify(payload) }, token)
 };
+
+export interface DeliveryQuote {
+  currency: string;
+  distanceKm: number;
+  maxDistanceKm: number;
+  withinMaxDistance: boolean;
+  baseFeeCents: number;
+  distanceFeeCents: number;
+  subtotalCents: number;
+  minimumFeeCents: number;
+  totalCents: number;
+  platformFeeCents: number;
+  workerPayoutCents: number;
+  pricingNote: string;
+}

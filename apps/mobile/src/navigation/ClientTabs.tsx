@@ -17,7 +17,7 @@ const TAB_CONFIG: Record<
 > = {
   Home: { label: "Home", icon: "home-outline", iconFocused: "home" },
   Support: { label: "Support", icon: "help-circle-outline", iconFocused: "help-circle" },
-  MyGigs: { label: "My Gigs", icon: "list-outline", iconFocused: "list" },
+  MyGigs: { label: "Activity", icon: "list-outline", iconFocused: "list" },
   Profile: { label: "Profile", icon: "person-outline", iconFocused: "person" }
 };
 

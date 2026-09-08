@@ -5,8 +5,11 @@ import { AppError } from "../../lib/errors.js";
 export function normalizePhoneNumber(phone: string): string {
   const digits = phone.replace(/[^\d+]/g, "");
   if (digits.startsWith("+")) return digits;
+  // Zimbabwe local mobile (9 digits starting with 7) → +263
+  if (/^7\d{8}$/.test(digits)) return `+263${digits}`;
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  if (digits.length === 12 && digits.startsWith("263")) return `+${digits}`;
   return digits.startsWith("+") ? digits : `+${digits}`;
 }
 

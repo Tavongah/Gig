@@ -8,6 +8,7 @@ import { createAdminRefund, releaseAuthorizedPayment } from "../payments/payment
 import { creditWorkerCancellationFee } from "../payments/worker-earnings.service.js";
 import { isCapturedLifecycle } from "../payments/payment-status.js";
 import { getSocketServer } from "../../lib/socket.js";
+import { logDutsFlow } from "../../lib/flow-log.js";
 
 const DEFAULT_FEE_PERCENT = 0.25;
 const DEFAULT_GRACE_MINUTES = 5;
@@ -276,6 +277,8 @@ export async function applyClientCancellation(input: {
 
   const workerId = gig.assignments[0]?.workerId ?? gig.assignedWorkerId;
 
+  const isDelivery = gig.fulfillmentType === "DELIVERY";
+
   if (feeCents > 0) {
     const settled = await settleCancellationFeePayment(gigId, feeCents);
     if (settled.paid && workerId) {
@@ -293,14 +296,18 @@ export async function applyClientCancellation(input: {
       if (io) {
         notifyUser(io, workerId, {
           type: "GIG_CANCELLED",
-          title: "Client cancelled the job",
-          body: `The client cancelled "${gig.title}". A cancellation fee has been credited to your account.`,
+          title: isDelivery ? "Customer cancelled the delivery" : "Client cancelled the job",
+          body: isDelivery
+            ? "The customer cancelled this delivery. A cancellation fee has been credited to your account."
+            : `The client cancelled "${gig.title}". A cancellation fee has been credited to your account.`,
           gigId
         });
         notifyUser(io, workerId, {
           type: "CANCELLATION_FEE_RECEIVED",
           title: "Cancellation fee received",
-          body: `A cancellation fee for "${gig.title}" was added to your earnings.`,
+          body: isDelivery
+            ? "A cancellation fee for this delivery was added to your earnings."
+            : `A cancellation fee for "${gig.title}" was added to your earnings.`,
           gigId
         });
         notifyUser(io, clientId, {
@@ -313,8 +320,10 @@ export async function applyClientCancellation(input: {
     } else if (io && workerId) {
       notifyUser(io, workerId, {
         type: "GIG_CANCELLED",
-        title: "Client cancelled the job",
-        body: `The client cancelled "${gig.title}".`,
+        title: isDelivery ? "Customer cancelled the delivery" : "Client cancelled the job",
+        body: isDelivery
+          ? "The customer cancelled this delivery."
+          : `The client cancelled "${gig.title}".`,
         gigId
       });
     }
@@ -323,10 +332,14 @@ export async function applyClientCancellation(input: {
     if (io && workerId) {
       notifyUser(io, workerId, {
         type: "GIG_CANCELLED",
-        title: "Client cancelled the job",
-        body: enRoute
-          ? `The client cancelled "${gig.title}" during the free cancellation window.`
-          : `The client cancelled "${gig.title}".`,
+        title: isDelivery ? "Customer cancelled the delivery" : "Client cancelled the job",
+        body: isDelivery
+          ? enRoute
+            ? "The customer cancelled this delivery during the free cancellation window."
+            : "The customer cancelled this delivery."
+          : enRoute
+            ? `The client cancelled "${gig.title}" during the free cancellation window.`
+            : `The client cancelled "${gig.title}".`,
         gigId
       });
     }
@@ -335,14 +348,27 @@ export async function applyClientCancellation(input: {
   if (io) {
     notifyUser(io, clientId, {
       type: "CANCELLATION_SUCCESS",
-      title: "Cancellation successful",
+      title: isDelivery ? "Delivery cancelled" : "Cancellation successful",
       body:
         feeCents > 0
           ? "You cancelled after the 5-minute grace period. A cancellation fee has been charged."
           : enRoute
             ? "You cancelled during the free grace period. No cancellation fee was charged."
-            : `Your booking "${gig.title}" was cancelled.`,
+            : isDelivery
+              ? "Your delivery was cancelled."
+              : `Your booking "${gig.title}" was cancelled.`,
       gigId
+    });
+  }
+
+  if (isDelivery) {
+    logDutsFlow("DELIVERY_CANCELLED", {
+      gigId,
+      userId: clientId,
+      userRole: "CLIENT",
+      fulfillmentType: "DELIVERY",
+      feeCents,
+      withinGrace
     });
   }
 

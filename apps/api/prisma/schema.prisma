@@ -28,6 +28,9 @@ enum GigStatus {
   WORKER_ASSIGNED
   WORKER_EN_ROUTE
   WORKER_ARRIVED
+  PACKAGE_COLLECTED
+  EN_ROUTE_TO_DROPOFF
+  ARRIVED_AT_DROPOFF
   IN_PROGRESS
   WAITING_EXTRA_TIME_APPROVAL
   WAITING_CUSTOMER_CONFIRMATION
@@ -35,6 +38,34 @@ enum GigStatus {
   CANCELLED
   DRAFT
   DISPUTED
+}
+
+enum FulfillmentType {
+  LOCAL_HELP
+  DELIVERY
+}
+
+enum OrderSource {
+  APP
+  WEB
+  WHATSAPP
+}
+
+enum TransportMode {
+  WALKING
+  BICYCLE
+  PUBLIC_TRANSPORT
+  MOTORBIKE
+  CAR
+}
+
+enum PackageCategory {
+  DOCUMENTS
+  FOOD
+  GROCERIES
+  CLOTHING
+  SMALL_PARCEL
+  OTHER
 }
 
 enum PricingType {
@@ -177,6 +208,8 @@ model User {
   chatMessages       ChatMessage[]
   auditLogs          AuditLog[]
   earningsTransactions WorkerEarningsTransaction[]
+  ownedMerchants       Merchant[]                  @relation("MerchantOwner")
+  commerceOrders       CommerceOrder[]             @relation("CommerceCustomerOrders")
 }
 
 model DevicePushToken {
@@ -225,6 +258,10 @@ model WorkerProfile {
   serviceArea              String?
   workExperience           String?
   hasVehicle               Boolean           @default(false)
+  /** Courier transport for DUTS Delivery. LOCAL_HELP workers may leave null. */
+  transportMode            TransportMode?
+  /** Courier opted into DUTS Delivery matching. Requires Phase-1 transportMode. */
+  deliveryEligible         Boolean           @default(false)
   backgroundCheckConsent   Boolean           @default(false)
   backgroundCheckCompleted Boolean           @default(false)
   governmentIdAcknowledged Boolean           @default(false)
@@ -290,6 +327,8 @@ model Gig {
   title                 String
   description           String
   status                GigStatus         @default(POSTED)
+  fulfillmentType       FulfillmentType   @default(LOCAL_HELP)
+  orderSource           OrderSource       @default(APP)
   paymentStatus         PaymentLifecycle  @default(PAYMENT_PENDING)
   pricingType           PricingType       @default(HOURLY)
   paymentIntentId       String?
@@ -329,6 +368,38 @@ model Gig {
   formattedAddress      String?
   latitude              Decimal         @db.Decimal(9, 6)
   longitude             Decimal         @db.Decimal(9, 6)
+  /** DUTS Delivery: pickup (mirrors legacy location for matching when fulfillmentType=DELIVERY). */
+  pickupContactName     String?
+  pickupContactPhone    String?
+  pickupInstructions    String?
+  dropoffAddressLine1   String?
+  dropoffAddressLine2   String?
+  dropoffCity           String?
+  dropoffRegion         String?
+  dropoffPostalCode     String?
+  dropoffCountry        String?
+  dropoffFormattedAddress String?
+  dropoffLatitude       Decimal?        @db.Decimal(9, 6)
+  dropoffLongitude      Decimal?        @db.Decimal(9, 6)
+  dropoffContactName    String?
+  dropoffContactPhone   String?
+  dropoffInstructions   String?
+  packageCategory       PackageCategory?
+  packageDescription    String?
+  packageSize           String?
+  packagePhotoUrl       String?
+  packageNotes          String?
+  estimatedDistanceKm   Decimal?        @db.Decimal(8, 3)
+  /** Hashed verification codes — never return raw values from generic serializers. */
+  pickupPin             String?
+  deliveryPin           String?
+  pickupPinFailCount    Int             @default(0)
+  deliveryPinFailCount  Int             @default(0)
+  pickupPinLockedUntil  DateTime?
+  deliveryPinLockedUntil DateTime?
+  pickupVerifiedAt      DateTime?
+  deliveryVerifiedAt    DateTime?
+  prohibitedItemsAck    Boolean         @default(false)
   photoUrls             String[]        @default([])
   priceBreakdown        Json
   totalCents            Int
@@ -341,6 +412,7 @@ model Gig {
   reviews               Review[]
   chatThread            ChatThread?
   notifications         Notification[]
+  commerceOrder         CommerceOrder?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
@@ -527,6 +599,17 @@ model PlatformSetting {
   id                         String   @id @default("default")
   cancellationFeePercent     Decimal  @default(0.25) @db.Decimal(4, 3)
   cancellationGraceMinutes   Int      @default(5)
+  /** DUTS Delivery Phase 1 — Harare defaults (USD cents). Temporary until market pricing is finalized. */
+  deliveryMaxDistanceKm      Decimal  @default(10) @db.Decimal(6, 2)
+  deliveryBaseFeeCents       Int      @default(200)
+  deliveryPricePerKmCents    Int      @default(50)
+  deliveryMinimumFeeCents    Int      @default(200)
+  /** Stage 4 marketplace: max distance from customer to merchant (km). */
+  marketplaceMerchantRadiusKm Decimal @default(5) @db.Decimal(6, 2)
+  /** Optional flat service fee on commerce orders (USD cents). */
+  marketplaceServiceFeeCents Int      @default(0)
+  /** Merchant commission rate on item subtotal (0–1). Configurable; not final economics. */
+  marketplaceMerchantCommissionRate Decimal @default(0.10) @db.Decimal(4, 3)
   updatedAt                  DateTime @updatedAt
   createdAt                  DateTime @default(now())
 }
@@ -540,4 +623,192 @@ model AuditLog {
   entityId  String
   metadata  Json?
   createdAt DateTime @default(now())
+}
+
+// ─── Stage 4: WhatsApp shopping marketplace ─────────────────────────────────
+
+enum MerchantCategory {
+  TUCK_SHOP
+  GROCERY
+  BAKERY
+  FOOD
+  HOUSEHOLD
+  OTHER
+}
+
+enum CommerceOrderStatus {
+  DRAFT
+  CUSTOMER_CONFIRMED
+  MERCHANT_PENDING
+  MERCHANT_ACCEPTED
+  READY_FOR_PICKUP
+  COURIER_ASSIGNED
+  PICKED_UP
+  OUT_FOR_DELIVERY
+  DELIVERED
+  MERCHANT_REJECTED
+  CANCELLED
+  PAYMENT_FAILED
+}
+
+enum CommercePaymentStatus {
+  PENDING
+  DUE_ON_DELIVERY
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+  NOT_REQUIRED
+}
+
+enum CommercePaymentMethod {
+  TEST_BYPASS
+  CASH
+  STRIPE
+  ECOCASH
+  ONEMONEY
+}
+
+enum WhatsAppParty {
+  CUSTOMER
+  MERCHANT
+}
+
+enum WhatsAppConversationState {
+  IDLE
+  AWAITING_LOCATION
+  BUILDING_CART
+  AWAITING_PRODUCT_CHOICE
+  AWAITING_ORDER_CONFIRMATION
+  AWAITING_PAYMENT
+  ORDER_ACTIVE
+  MERCHANT_ONBOARDING
+  MERCHANT_MENU
+}
+
+model Merchant {
+  id              String           @id @default(uuid())
+  name            String
+  ownerUserId     String?
+  owner           User?            @relation("MerchantOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  contactName     String
+  phone           String
+  whatsappPhone   String           @unique
+  locationLabel   String
+  latitude        Decimal          @db.Decimal(9, 6)
+  longitude       Decimal          @db.Decimal(9, 6)
+  category        MerchantCategory @default(TUCK_SHOP)
+  logoUrl         String?
+  isActive        Boolean          @default(true)
+  acceptsOrders   Boolean          @default(true)
+  openingHours    String?
+  products        Product[]
+  orders          CommerceOrder[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([isActive, acceptsOrders])
+  @@index([latitude, longitude])
+}
+
+model Product {
+  id              String   @id @default(uuid())
+  merchantId      String
+  merchant        Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  name            String
+  normalizedName  String
+  description     String?
+  category        String?
+  priceCents      Int
+  currency        String   @default("usd")
+  available       Boolean  @default(true)
+  quantityApprox  Int?
+  unit            String?
+  imageUrl        String?
+  searchAliases   String[] @default([])
+  archived        Boolean  @default(false)
+  orderItems      CommerceOrderItem[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([merchantId, archived, available])
+  @@index([normalizedName])
+}
+
+model CommerceOrder {
+  id                   String                @id @default(uuid())
+  orderNumber          Int                   @unique @default(autoincrement())
+  customerId           String
+  customer             User                  @relation("CommerceCustomerOrders", fields: [customerId], references: [id], onDelete: Restrict)
+  merchantId           String
+  merchant             Merchant              @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  status               CommerceOrderStatus   @default(DRAFT)
+  paymentStatus        CommercePaymentStatus @default(PENDING)
+  paymentMethod        CommercePaymentMethod @default(CASH)
+  orderSource          OrderSource           @default(WHATSAPP)
+  subtotalCents        Int
+  deliveryFeeCents     Int
+  serviceFeeCents      Int                   @default(0)
+  totalCents           Int
+  currency             String                @default("usd")
+  deliveryLabel        String
+  deliveryLatitude     Decimal               @db.Decimal(9, 6)
+  deliveryLongitude    Decimal               @db.Decimal(9, 6)
+  linkedDeliveryGigId  String?               @unique
+  linkedDeliveryGig    Gig?                  @relation(fields: [linkedDeliveryGigId], references: [id], onDelete: SetNull)
+  customerWhatsAppPhone String?
+  notes                String?
+  /** Merchant must accept/reject before this time (Stage 4.5 timeout). */
+  merchantRespondBy    DateTime?
+  items                CommerceOrderItem[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  confirmedAt          DateTime?
+  merchantAcceptedAt   DateTime?
+  readyAt              DateTime?
+  deliveredAt          DateTime?
+  cancelledAt          DateTime?
+
+  @@index([merchantId, status])
+  @@index([customerId, status])
+  @@index([status])
+}
+
+model CommerceOrderItem {
+  id                   String        @id @default(uuid())
+  orderId              String
+  order                CommerceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId            String?
+  product              Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productNameSnapshot  String
+  quantity             Int
+  unitPriceCents       Int
+  lineTotalCents       Int
+  unavailableMarked    Boolean       @default(false)
+  createdAt            DateTime      @default(now())
+}
+
+model WhatsAppConversation {
+  id               String                    @id @default(uuid())
+  phoneNormalized  String
+  party            WhatsAppParty
+  state            WhatsAppConversationState @default(IDLE)
+  merchantId       String?
+  customerUserId   String?
+  /** Draft cart, pending product choices, last order id, etc. */
+  contextJson      Json                      @default("{}")
+  updatedAt        DateTime                  @updatedAt
+  createdAt        DateTime                  @default(now())
+
+  @@unique([phoneNormalized, party])
+  @@index([merchantId])
+}
+
+model WhatsAppInboundMessage {
+  id                 String   @id @default(uuid())
+  providerMessageId  String   @unique
+  phoneNormalized    String
+  party              WhatsAppParty?
+  processedAt        DateTime @default(now())
+  summary            String?
 }

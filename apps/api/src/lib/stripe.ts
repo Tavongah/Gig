@@ -22,22 +22,32 @@ export function isUsableStripePublishableKey(key: string | undefined | null): bo
 }
 
 export function assertStripeConfiguredForProduction(): void {
-  if (env.NODE_ENV !== "production") return;
+  const appEnv = (process.env.APP_ENV ?? env.NODE_ENV).toLowerCase();
+  const requiresStripe = env.NODE_ENV === "production" || appEnv === "pilot" || appEnv === "staging";
+  if (!requiresStripe) return;
 
   if (!isUsableStripeSecretKey(env.STRIPE_SECRET_KEY)) {
     throw new Error(
-      "Production requires a real STRIPE_SECRET_KEY (sk_test_… or sk_live_…). Placeholder or REPLACE_ values are not allowed."
+      `${appEnv} requires a real STRIPE_SECRET_KEY (sk_test_… for pilot, or sk_live_…). Placeholder values are not allowed.`
     );
   }
 
   if (!env.STRIPE_WEBHOOK_SECRET?.trim()) {
-    throw new Error("Production requires STRIPE_WEBHOOK_SECRET for verified Stripe webhooks.");
+    throw new Error(`${appEnv} requires STRIPE_WEBHOOK_SECRET for verified Stripe webhooks.`);
   }
 
   if (!isUsableStripePublishableKey(env.STRIPE_PUBLISHABLE_KEY)) {
     throw new Error(
-      "Production requires a real STRIPE_PUBLISHABLE_KEY (pk_test_… or pk_live_…). Placeholder values are not allowed."
+      `${appEnv} requires a real STRIPE_PUBLISHABLE_KEY (pk_test_… for pilot, or pk_live_…).`
     );
+  }
+
+  if (appEnv === "pilot" || appEnv === "staging") {
+    if (env.STRIPE_SECRET_KEY?.startsWith("sk_live_")) {
+      console.warn(
+        `[stripe] ${appEnv} is using a LIVE secret key. Prefer sk_test_ until the Harare pilot is intentionally live.`
+      );
+    }
   }
 }
 

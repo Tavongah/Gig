@@ -11,7 +11,13 @@ export function logDutsFlow(
     [key: string]: string | number | boolean | null | undefined;
   } = {}
 ): void {
-  if (process.env.NODE_ENV === "production" && process.env.DUTS_FLOW_LOGS !== "1") {
+  const appEnv = (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development").toLowerCase();
+  // Always allow in non-production; in production require DUTS_FLOW_LOGS=1 or APP_ENV=pilot.
+  if (
+    process.env.NODE_ENV === "production" &&
+    appEnv !== "pilot" &&
+    process.env.DUTS_FLOW_LOGS !== "1"
+  ) {
     return;
   }
   const { gigId, userId, userRole, platform = "api", ...meta } = fields;

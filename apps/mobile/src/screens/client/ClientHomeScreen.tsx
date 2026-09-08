@@ -114,12 +114,21 @@ export function ClientHomeScreen() {
       <View className="flex-1 gap-4 pb-2">
         <HeroBanner
           showLogo
-          title="Need an extra pair of hands today?"
-          subtitle="Book trusted local help in minutes."
+          title="Send a package across town"
+          subtitle="Fast local delivery — or book trusted help nearby."
         >
           <View className="mt-1 gap-2">
-            <AppButton label="Request Help" onPress={() => navigation.navigate("PostGig")} variant="primary" />
-            <Text className="text-center text-xs text-muted">✓ Verified workers • Secure payments</Text>
+            <AppButton
+              label="Send a Package"
+              onPress={() => navigation.navigate("DeliveryRequest")}
+              variant="primary"
+            />
+            <AppButton
+              label="Request Help"
+              onPress={() => navigation.navigate("PostGig")}
+              variant="secondary"
+            />
+            <Text className="text-center text-xs text-muted">✓ Local couriers • Verified workers</Text>
           </View>
         </HeroBanner>
 
@@ -141,12 +150,20 @@ export function ClientHomeScreen() {
         ) : activeGig ? (
           <ActiveGigCard
             gig={activeGig}
-            onTrack={() =>
+            onTrack={() => {
+              if (activeGig.fulfillmentType === "DELIVERY") {
+                if (isSearching(activeGig.status)) {
+                  navigation.navigate("GigSelectWorkers", { gigId: activeGig.id });
+                  return;
+                }
+                navigation.navigate("DeliveryJob", { gigId: activeGig.id });
+                return;
+              }
               navigation.navigate(
                 isSearching(activeGig.status) ? "GigSelectWorkers" : "GigTracking",
                 { gigId: activeGig.id }
-              )
-            }
+              );
+            }}
           />
         ) : null}
 

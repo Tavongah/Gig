@@ -2,45 +2,31 @@ import { Router } from "express";
 
 import type { Server } from "socket.io";
 
-import { createGigSchema, gigEstimateSchema } from "@gigflow/shared";
-
+import {
+  createDeliverySchema,
+  createGigSchema,
+  gigEstimateSchema,
+  verifyDeliveryPinSchema
+} from "@gigflow/shared";
 import { UserRole } from "@prisma/client";
-
 import { requireApprovedWorker, requireAuth, requireRole } from "../../middleware/auth.js";
-
 import { validateBody } from "../../middleware/validate.js";
 import { assertDevOnlyPaymentBypass } from "../../lib/production-guards.js";
-
 import { z } from "zod";
-
 import {
-
   acceptGig,
-
   createGig,
-
   estimateGig,
-
   findNearbyGigs,
-
   getGigDetail,
-
   listCategories,
-
   listChatMessages,
-
   listClientGigs,
-
   listWorkerGigs,
-
   publishGigWithoutPayment,
-
   sendChatMessage,
-
   updateGigStatus
-
 } from "./gig.service.js";
-
 import {
   approveExtraTime,
   approveGigCompletion,
@@ -53,7 +39,17 @@ import {
   selectWorkerForGig,
   withdrawWorkerInterest
 } from "./gig-workflow.service.js";
-
+import {
+  arriveAtDropoff,
+  arriveAtPickup,
+  createDelivery,
+  quoteDelivery,
+  regenerateDeliveryPins,
+  startTravelToDropoff,
+  startTravelToPickup,
+  verifyDeliveryPinAndComplete,
+  verifyPickupPin
+} from "./delivery.service.js";
 
 
 const statusUpdateSchema = z.object({
@@ -168,7 +164,185 @@ export function createGigRouter(io: Server): Router {
 
   });
 
+  const deliveryLocationSchema = z.object({
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional()
+  });
 
+  router.post(
+    "/deliveries/quote",
+    requireAuth,
+    requireRole(UserRole.CLIENT, UserRole.ADMIN),
+    async (req, res, next) => {
+      try {
+        const quote = await quoteDelivery(req.body);
+        res.json({ success: true, quote });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/deliveries",
+    requireAuth,
+    requireRole(UserRole.CLIENT, UserRole.ADMIN),
+    validateBody(createDeliverySchema),
+    async (req, res, next) => {
+      try {
+        const headerKey = req.get("Idempotency-Key") ?? req.get("idempotency-key");
+        const sourceHeader = req.get("x-order-source");
+        const orderSource =
+          sourceHeader === "WEB" || sourceHeader === "WHATSAPP" || sourceHeader === "APP"
+            ? sourceHeader
+            : undefined;
+        const result = await createDelivery(req.auth!.userId, req.body, io, {
+          idempotencyKey: typeof headerKey === "string" ? headerKey : null,
+          orderSource
+        });
+        res.status(201).json({
+          success: true,
+          gigId: result.delivery.id,
+          status: result.delivery.status,
+          delivery: result.delivery,
+          secrets: result.secrets,
+          idempotentReplay: result.idempotentReplay
+        });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/regenerate-pins",
+    requireAuth,
+    requireRole(UserRole.CLIENT, UserRole.ADMIN),
+    async (req, res, next) => {
+      try {
+        const result = await regenerateDeliveryPins(String(req.params.gigId), req.auth!.userId);
+        res.json({ success: true, ...result });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/start-travel-to-pickup",
+    requireAuth,
+    requireApprovedWorker,
+    async (req, res, next) => {
+      try {
+        const gig = await startTravelToPickup(String(req.params.gigId), req.auth!.userId, io);
+        res.json({ success: true, gig });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/arrive-at-pickup",
+    requireAuth,
+    requireApprovedWorker,
+    validateBody(deliveryLocationSchema),
+    async (req, res, next) => {
+      try {
+        const { latitude, longitude } = req.body as { latitude?: number; longitude?: number };
+        if (latitude == null || longitude == null) {
+          res.status(400).json({ error: "GPS_REQUIRED", code: "GPS_REQUIRED" });
+          return;
+        }
+        const gig = await arriveAtPickup(
+          String(req.params.gigId),
+          req.auth!.userId,
+          { latitude, longitude },
+          io
+        );
+        res.json({ success: true, gig });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/verify-pickup",
+    requireAuth,
+    requireApprovedWorker,
+    validateBody(verifyDeliveryPinSchema),
+    async (req, res, next) => {
+      try {
+        const gig = await verifyPickupPin(String(req.params.gigId), req.auth!.userId, req.body.pin, io);
+        res.json({ success: true, gig });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/start-travel-to-dropoff",
+    requireAuth,
+    requireApprovedWorker,
+    async (req, res, next) => {
+      try {
+        const gig = await startTravelToDropoff(String(req.params.gigId), req.auth!.userId, io);
+        res.json({ success: true, gig });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/arrive-at-dropoff",
+    requireAuth,
+    requireApprovedWorker,
+    validateBody(deliveryLocationSchema),
+    async (req, res, next) => {
+      try {
+        const { latitude, longitude } = req.body as { latitude?: number; longitude?: number };
+        if (latitude == null || longitude == null) {
+          res.status(400).json({ error: "GPS_REQUIRED", code: "GPS_REQUIRED" });
+          return;
+        }
+        const gig = await arriveAtDropoff(
+          String(req.params.gigId),
+          req.auth!.userId,
+          { latitude, longitude },
+          io
+        );
+        res.json({ success: true, gig });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/verify-delivery",
+    requireAuth,
+    requireApprovedWorker,
+    validateBody(verifyDeliveryPinSchema),
+    async (req, res, next) => {
+      try {
+        const result = await verifyDeliveryPinAndComplete(
+          String(req.params.gigId),
+          req.auth!.userId,
+          req.body.pin,
+          io,
+          req.body.latitude != null && req.body.longitude != null
+            ? { latitude: req.body.latitude, longitude: req.body.longitude }
+            : undefined
+        );
+        res.json({ success: true, ...result });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
 
   router.post("/:gigId/publish", requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN), async (req, res, next) => {
 

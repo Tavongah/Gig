@@ -1,6 +1,14 @@
 export type RootStackParamList = {
   MainTabs: undefined;
   PostGig: { serviceCategoryId?: string; preferredWorkerId?: string } | undefined;
+  DeliveryRequest: undefined;
+  DeliveryPins: {
+    gigId: string;
+    pickupPin: string;
+    deliveryPin: string;
+    replay?: boolean;
+  };
+  DeliveryJob: { gigId: string };
   GigDetail: { gigId: string };
   WorkerMatching: { gigId: string };
   GigTracking: { gigId: string };
@@ -12,6 +20,7 @@ export type RootStackParamList = {
   PaymentFailed: { gigId?: string } | undefined;
   WorkerStripeConnect: undefined;
   WorkerWorkPreferences: undefined;
+  WorkerDeliverySetup: undefined;
   EditProfile: undefined;
   Addresses: undefined;
   PaymentMethods: undefined;

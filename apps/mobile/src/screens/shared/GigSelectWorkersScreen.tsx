@@ -56,6 +56,7 @@ export function GigSelectWorkersScreen({ navigation, route }: Props) {
 
   const interests = interestsQuery.data?.interests ?? [];
   const gig = gigQuery.data?.gig;
+  const isDelivery = gig?.fulfillmentType === "DELIVERY";
   const rematching = isCustomerRematching(gig?.status ?? "", gig?.paymentStatus, gig?.payment?.status);
   const stage = resolveCustomerJourneyStage({
     status: gig?.status ?? "POSTED",
@@ -68,12 +69,22 @@ export function GigSelectWorkersScreen({ navigation, route }: Props) {
       <View className="gap-4">
         <View className="gap-2">
           <Text className="text-2xl font-black text-ink">
-            {rematching ? "Finding another worker" : "Choose your worker"}
+            {rematching
+              ? isDelivery
+                ? "Finding another courier"
+                : "Finding another worker"
+              : isDelivery
+                ? "Choose your courier"
+                : "Choose your worker"}
           </Text>
           <Text className="text-sm text-muted">
             {rematching
-              ? "Your previous worker cancelled. We’re searching for another available worker nearby."
-              : customerJourneyHeadline(stage)}
+              ? isDelivery
+                ? "Your previous courier cancelled. We’re searching for another available courier nearby."
+                : "Your previous worker cancelled. We’re searching for another available worker nearby."
+              : isDelivery
+                ? "Select a courier to continue your delivery."
+                : customerJourneyHeadline(stage)}
           </Text>
         </View>
 

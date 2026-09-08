@@ -91,6 +91,7 @@ export interface GigOfferPayload {
   estimatedHours: number;
   distanceMiles?: number;
   locationSummary?: string;
+  fulfillmentType?: string;
 }
 
 export interface NotificationPayload {
@@ -406,7 +407,11 @@ export async function broadcastGigOffer(io: Server, payload: GigOfferPayload): P
     }
 
     const roundedDistance = Math.round(distanceMiles * 10) / 10;
-    const notificationBody = `$${(payload.workerPayoutCents / 100).toFixed(0)} • ${roundedDistance} miles away • ${locationSummary}`;
+    const isDelivery = payload.fulfillmentType === "DELIVERY";
+    const distanceKm = (roundedDistance * 1.60934).toFixed(1);
+    const notificationBody = isDelivery
+      ? `You earn $${(payload.workerPayoutCents / 100).toFixed(2)} · ${distanceKm} km to pickup · ${locationSummary}`
+      : `$${(payload.workerPayoutCents / 100).toFixed(0)} • ${roundedDistance} miles away • ${locationSummary}`;
     const offer = {
       gigId: payload.gigId,
       title: payload.title,
@@ -418,13 +423,14 @@ export async function broadcastGigOffer(io: Server, payload: GigOfferPayload): P
       urgency: payload.urgency,
       estimatedHours: payload.estimatedHours,
       distanceMiles: roundedDistance,
-      locationSummary
+      locationSummary,
+      fulfillmentType: payload.fulfillmentType
     };
 
     io.to(`user:${worker.userId}`).emit("gig:offer", offer);
     notifyUser(io, worker.userId, {
       type: "NEW_GIG_AVAILABLE",
-      title: `New ${payload.serviceCategoryName} Gig Available`,
+      title: isDelivery ? "New delivery available" : `New ${payload.serviceCategoryName} Gig Available`,
       body: notificationBody,
       gigId: payload.gigId
     });

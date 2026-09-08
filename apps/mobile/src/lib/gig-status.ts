@@ -1,9 +1,14 @@
+import { deliveryCustomerStatusLabel } from "./delivery-status";
+
 export const TRACKING_STATUSES = [
   "SEARCHING_FOR_WORKER",
   "WORKER_SELECTED",
   "WORKER_ASSIGNED",
   "WORKER_EN_ROUTE",
   "WORKER_ARRIVED",
+  "PACKAGE_COLLECTED",
+  "EN_ROUTE_TO_DROPOFF",
+  "ARRIVED_AT_DROPOFF",
   "IN_PROGRESS",
   "WAITING_EXTRA_TIME_APPROVAL",
   "WAITING_CUSTOMER_CONFIRMATION",
@@ -17,6 +22,9 @@ export const ACTIVE_CLIENT_STATUSES = [
   "WORKER_ASSIGNED",
   "WORKER_EN_ROUTE",
   "WORKER_ARRIVED",
+  "PACKAGE_COLLECTED",
+  "EN_ROUTE_TO_DROPOFF",
+  "ARRIVED_AT_DROPOFF",
   "IN_PROGRESS",
   "WAITING_EXTRA_TIME_APPROVAL",
   "WAITING_CUSTOMER_CONFIRMATION"
@@ -26,6 +34,9 @@ export const ACTIVE_WORKER_STATUSES = [
   "WORKER_ASSIGNED",
   "WORKER_EN_ROUTE",
   "WORKER_ARRIVED",
+  "PACKAGE_COLLECTED",
+  "EN_ROUTE_TO_DROPOFF",
+  "ARRIVED_AT_DROPOFF",
   "IN_PROGRESS",
   "WAITING_EXTRA_TIME_APPROVAL",
   "WAITING_CUSTOMER_CONFIRMATION"
@@ -46,7 +57,10 @@ export function statusIndex(status: string): number {
   return 0;
 }
 
-export function statusLabel(status: string): string {
+export function statusLabel(status: string, fulfillmentType?: string | null): string {
+  if (fulfillmentType === "DELIVERY") {
+    return deliveryCustomerStatusLabel(status);
+  }
   switch (status) {
     case "POSTED":
     case "SEARCHING_FOR_WORKER":
@@ -59,6 +73,12 @@ export function statusLabel(status: string): string {
       return "Worker en route";
     case "WORKER_ARRIVED":
       return "Worker arrived";
+    case "PACKAGE_COLLECTED":
+      return "Package collected";
+    case "EN_ROUTE_TO_DROPOFF":
+      return "En route to drop-off";
+    case "ARRIVED_AT_DROPOFF":
+      return "Arrived at drop-off";
     case "IN_PROGRESS":
       return "In progress";
     case "WAITING_EXTRA_TIME_APPROVAL":
@@ -133,7 +153,9 @@ export function statusColor(status: string): string {
   }
 }
 
-export function nextWorkerAction(status: string): { label: string; next: string; requiresLocation?: boolean } | null {
+export function nextWorkerAction(status: string, fulfillmentType?: string | null): { label: string; next: string; requiresLocation?: boolean } | null {
+  // Delivery uses dedicated endpoints — never drive LOCAL_HELP status PATCH here.
+  if (fulfillmentType === "DELIVERY") return null;
   if (status === "WORKER_ASSIGNED") return { label: "Start travel", next: "WORKER_EN_ROUTE" };
   if (status === "WORKER_EN_ROUTE") return { label: "I'm here", next: "WORKER_ARRIVED", requiresLocation: true };
   if (status === "WORKER_ARRIVED") return { label: "Start gig", next: "IN_PROGRESS", requiresLocation: true };
@@ -141,7 +163,17 @@ export function nextWorkerAction(status: string): { label: string; next: string;
   return null;
 }
 
-export function canClientCancel(status: string): boolean {
+export function canClientCancel(status: string, fulfillmentType?: string | null): boolean {
+  if (fulfillmentType === "DELIVERY") {
+    return (
+      status === "POSTED" ||
+      status === "SEARCHING_FOR_WORKER" ||
+      status === "WORKER_SELECTED" ||
+      status === "WORKER_ASSIGNED" ||
+      status === "WORKER_EN_ROUTE" ||
+      status === "WORKER_ARRIVED"
+    );
+  }
   return (
     status === "POSTED" ||
     status === "SEARCHING_FOR_WORKER" ||
@@ -179,7 +211,15 @@ export function isSearching(status: string): boolean {
 }
 
 export function showTrackingMap(status: string): boolean {
-  return ["WORKER_ASSIGNED", "WORKER_EN_ROUTE", "WORKER_ARRIVED", "IN_PROGRESS"].includes(status);
+  return [
+    "WORKER_ASSIGNED",
+    "WORKER_EN_ROUTE",
+    "WORKER_ARRIVED",
+    "PACKAGE_COLLECTED",
+    "EN_ROUTE_TO_DROPOFF",
+    "ARRIVED_AT_DROPOFF",
+    "IN_PROGRESS"
+  ].includes(status);
 }
 
 export function needsClientReview(status: string): boolean {

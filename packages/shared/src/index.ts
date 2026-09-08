@@ -9,6 +9,9 @@ export const gigStatuses = [
   "WORKER_ASSIGNED",
   "WORKER_EN_ROUTE",
   "WORKER_ARRIVED",
+  "PACKAGE_COLLECTED",
+  "EN_ROUTE_TO_DROPOFF",
+  "ARRIVED_AT_DROPOFF",
   "IN_PROGRESS",
   "WAITING_EXTRA_TIME_APPROVAL",
   "WAITING_CUSTOMER_CONFIRMATION",
@@ -270,6 +273,28 @@ export { APP_BRAND, brandSanitizeText } from "./brand.js";
 
 export { DUTS_FLOW_EVENTS, type DutsFlowEvent, type DutsFlowLogPayload } from "./flow-events.js";
 
+export {
+  merchantCategories,
+  merchantCategoryLabels,
+  commerceOrderStatuses,
+  commercePaymentStatuses,
+  whatsappParties,
+  whatsappConversationStates,
+  commerceCustomerStatusCopy,
+  normalizeProductSearchName,
+  expandSearchTerms,
+  PRODUCT_ALIAS_MAP,
+  createMerchantSchema,
+  upsertProductSchema,
+  DEFAULT_MARKETPLACE_MERCHANT_RADIUS_KM,
+  type MerchantCategory,
+  type CommerceOrderStatus,
+  type CommercePaymentStatus,
+  type WhatsAppParty,
+  type WhatsAppConversationState,
+  type RequestedShoppingItem
+} from "./commerce.js";
+
 
 export function calculateTieredCommissionRate(totalCents: number): number {
   if (totalCents < 10_000) {
@@ -339,3 +364,5 @@ export function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: n
 export function estimateResponseMinutes(distanceMiles: number): number {
   return locationEstimateResponseMinutes(distanceMiles);
 }
+
+export * from "./delivery.js";

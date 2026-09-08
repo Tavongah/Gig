@@ -15,6 +15,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { AcceptGigAnimation } from "../../components/AcceptGigAnimation";
 import { NearbyGigCard } from "../../components/NearbyGigCard";
 import { BrandLogo } from "../../components/BrandLogo";
+import { openGigForRole } from "../../lib/open-gig";
 import { useWorkerOnline } from "../../hooks/useWorkerOnline";
 import { useSocketEvents } from "../../hooks/useSocket";
 import { useWorkerFlowRecovery } from "../../hooks/useGigFlowRecovery";
@@ -125,7 +126,12 @@ export function WorkerHomeScreen() {
         onDone={() => {
           setShowAcceptAnimation(false);
           if (acceptedGigId) {
-            navigation.replace("WorkerMatching", { gigId: acceptedGigId });
+            const accepted = offers.find((g) => g.id === acceptedGigId) ?? nearbyQuery.data?.gigs?.find((g) => g.id === acceptedGigId);
+            if (accepted?.fulfillmentType === "DELIVERY") {
+              navigation.replace("DeliveryJob", { gigId: acceptedGigId });
+            } else {
+              navigation.replace("WorkerMatching", { gigId: acceptedGigId });
+            }
             setAcceptedGigId(null);
           }
         }}
@@ -139,12 +145,22 @@ export function WorkerHomeScreen() {
 
         {activeGig ? (
           <DutsCard className="gap-3 border border-brand/20 p-4">
-            <Text className="text-xs font-bold uppercase tracking-wider text-brand">Active Gig</Text>
-            <Text className="text-lg font-black text-ink">{activeGig.serviceCategory?.name ?? activeGig.title}</Text>
-            <Text className="text-sm text-muted">Continue your assigned job.</Text>
+            <Text className="text-xs font-bold uppercase tracking-wider text-brand">
+              {activeGig.fulfillmentType === "DELIVERY" ? "Active delivery" : "Active Gig"}
+            </Text>
+            <Text className="text-lg font-black text-ink">
+              {activeGig.fulfillmentType === "DELIVERY"
+                ? `${activeGig.city}${activeGig.dropoffCity ? ` → ${activeGig.dropoffCity}` : ""}`
+                : (activeGig.serviceCategory?.name ?? activeGig.title)}
+            </Text>
+            <Text className="text-sm text-muted">
+              {activeGig.fulfillmentType === "DELIVERY"
+                ? "Continue your assigned delivery."
+                : "Continue your assigned job."}
+            </Text>
             <AppButton
-              label="Continue Active Gig"
-              onPress={() => navigation.navigate("GigDetail", { gigId: activeGig.id })}
+              label={activeGig.fulfillmentType === "DELIVERY" ? "Continue delivery" : "Continue Active Gig"}
+              onPress={() => openGigForRole(navigation, activeGig, "WORKER")}
             />
           </DutsCard>
         ) : null}
@@ -198,6 +214,12 @@ export function WorkerHomeScreen() {
                 <Text className="text-center text-sm font-semibold text-brand">Set up work preferences →</Text>
               </Pressable>
             ) : null}
+
+            {!profile?.workerProfile?.deliveryEligible ? (
+              <Pressable onPress={() => navigation.navigate("WorkerDeliverySetup")}>
+                <Text className="text-center text-sm font-semibold text-brand">Enable courier deliveries →</Text>
+              </Pressable>
+            ) : null}
           </View>
         </DutsCard>
 
@@ -223,8 +245,13 @@ export function WorkerHomeScreen() {
                 <NearbyGigCard
                   key={gig.id}
                   gig={gig}
-                  onView={() => navigation.navigate("GigDetail", { gigId: gig.id })}
-                  onAccept={() => confirmAccept(gig.id, gig.title)}
+                  onView={() => openGigForRole(navigation, gig, "WORKER")}
+                  onAccept={() =>
+                    confirmAccept(
+                      gig.id,
+                      gig.fulfillmentType === "DELIVERY" ? "this delivery" : gig.title
+                    )
+                  }
                   onDecline={() => declineOffer(gig.id)}
                   acceptDisabled={acceptMutation.isPending && acceptingId === gig.id}
                 />

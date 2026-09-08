@@ -10,6 +10,7 @@ import {
   CANCELLED_STATUSES,
   COMPLETED_STATUSES
 } from "../../lib/gig-status";
+import { openGigForRole } from "../../lib/open-gig";
 import { EmptyState } from "../../components/EmptyState";
 import { GigCard } from "../../components/GigCard";
 import { Screen } from "../../components/Screen";
@@ -72,14 +73,23 @@ export function MyGigsActivityScreen() {
         />
 
         {filtered.length === 0 ? (
-          <EmptyState emoji="📋" title="No gigs here" description="Your gigs for this filter will appear here." />
+          <EmptyState
+            emoji="📋"
+            title={perspective === "CLIENT" ? "No deliveries here" : "No jobs here"}
+            description={
+              perspective === "CLIENT"
+                ? "Your deliveries and help requests for this filter will appear here."
+                : "Your delivery and Local Help jobs for this filter will appear here."
+            }
+          />
         ) : (
           <View className="gap-4">
             {filtered.map((gig) => (
               <GigCard
                 key={gig.id}
                 gig={gig}
-                onPress={() => navigation.navigate("GigDetail", { gigId: gig.id })}
+                showWorkerEarnings={perspective === "WORKER"}
+                onPress={() => openGigForRole(navigation, gig, perspective)}
               />
             ))}
           </View>

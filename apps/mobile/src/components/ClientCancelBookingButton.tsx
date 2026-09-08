@@ -15,7 +15,7 @@ import { LoadingButton } from "./LoadingButton";
 type Props = {
   gig: Pick<
     GigDetail,
-    "id" | "status" | "cancellationGraceEndsAt" | "cancellationFeeCents"
+    "id" | "status" | "cancellationGraceEndsAt" | "cancellationFeeCents" | "fulfillmentType"
   >;
   /** Optional label override */
   label?: string;
@@ -29,6 +29,7 @@ export function ClientCancelBookingButton({ gig, label = "Cancel booking" }: Pro
   const session = useSessionStore((state) => state.session)!;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const queryClient = useQueryClient();
+  const isDelivery = gig.fulfillmentType === "DELIVERY";
 
   const cancelMutation = useMutation({
     mutationFn: () => api.cancelGig(gig.id, session.token),
@@ -37,17 +38,19 @@ export function ClientCancelBookingButton({ gig, label = "Cancel booking" }: Pro
       void queryClient.invalidateQueries({ queryKey: ["my-gigs"] });
       const fee = result.gig.cancellationFeeCents ?? 0;
       showAlert(
-        "Booking cancelled",
+        isDelivery ? "Delivery cancelled" : "Booking cancelled",
         fee > 0
           ? "You cancelled after the 5-minute grace period. A cancellation fee has been charged."
-          : "Your booking was cancelled."
+          : isDelivery
+            ? "Your delivery request was cancelled."
+            : "Your booking was cancelled."
       );
       navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
     },
     onError: (error: Error) => showAlert("Could not cancel", error.message)
   });
 
-  if (!canClientCancel(gig.status)) {
+  if (!canClientCancel(gig.status, gig.fulfillmentType)) {
     return null;
   }
 
@@ -58,10 +61,12 @@ export function ClientCancelBookingButton({ gig, label = "Cancel booking" }: Pro
       loading={cancelMutation.isPending}
       onPress={() =>
         showConfirm(
-          clientCancelMayIncurFee(gig) ? "Cancel with fee?" : "Cancel booking?",
-          clientCancelConfirmMessage(gig),
+          clientCancelMayIncurFee(gig) ? "Cancel with fee?" : isDelivery ? "Cancel delivery?" : "Cancel booking?",
+          isDelivery
+            ? "Cancel this delivery request? You will not be charged if payment has not been captured."
+            : clientCancelConfirmMessage(gig),
           () => cancelMutation.mutate(),
-          { confirmLabel: "Cancel booking", destructive: true }
+          { confirmLabel: isDelivery ? "Cancel delivery" : "Cancel booking", destructive: true }
         )
       }
     />

@@ -11,14 +11,14 @@ import {
   CANCELLED_STATUSES,
   COMPLETED_STATUSES
 } from "../../lib/gig-status";
+import { openGigForRole } from "../../lib/open-gig";
 import { TabScreen } from "../../components/TabScreen";
 import { HeroBanner } from "../../components/HeroBanner";
 import { GigCard } from "../../components/GigCard";
 import { EmptyState } from "../../components/EmptyState";
 import { PendingPaymentCard } from "../../components/PendingPaymentCard";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
-import { gigAwaitingWorkerSelection, gigNeedsPayment } from "../../lib/gig-payment";
-import { needsClientReview } from "../../lib/gig-status";
+import { gigNeedsPayment } from "../../lib/gig-payment";
 import { useSocketEvents } from "../../hooks/useSocket";
 import type { ClientTabParamList, RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
@@ -66,28 +66,32 @@ export function ClientMyGigsScreen() {
 
   const emptyCopy = {
     active: {
-      emoji: "📍",
-      title: "No active gigs",
-      description: "Request your first gig and get matched with nearby workers.",
-      actionLabel: "Request a Gig",
-      onAction: () => navigation.navigate("PostGig")
+      emoji: "📦",
+      title: "No active deliveries or gigs",
+      description: "Send a package or request local help to get started.",
+      actionLabel: "Send a Package",
+      onAction: () => navigation.navigate("DeliveryRequest")
     },
     completed: {
       emoji: "✅",
-      title: "No completed gigs yet",
-      description: "Completed gigs will show up here after workers finish the job."
+      title: "No completed activity yet",
+      description: "Finished deliveries and jobs will show up here."
     },
     cancelled: {
       emoji: "🚫",
-      title: "No cancelled gigs",
-      description: "Cancelled gigs will appear here if you cancel an open job."
+      title: "No cancelled activity",
+      description: "Cancelled deliveries and gigs appear here."
     }
   }[tab];
 
   return (
     <TabScreen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32, gap: 16 }}>
-        <HeroBanner eyebrow="My bookings" title="Your requests" subtitle="Track matching, live jobs, and completed work." />
+        <HeroBanner
+          eyebrow="My activity"
+          title="My Deliveries & Help"
+          subtitle="Track packages, courier matches, and local help jobs."
+        />
 
         <SegmentedTabs
           tabs={[
@@ -123,22 +127,19 @@ export function ClientMyGigsScreen() {
           <View className="gap-4">
             {filteredGigs.map((gig) => {
               const worker = gig.assignments?.[0]?.worker;
+              const isDelivery = gig.fulfillmentType === "DELIVERY";
               return (
                 <GigCard
                   key={gig.id}
                   gig={gig}
-                  subtitle={worker ? `Worker: ${worker.fullName}` : undefined}
-                  onPress={() => {
-                    if (gigAwaitingWorkerSelection(gig)) {
-                      navigation.navigate("GigSelectWorkers", { gigId: gig.id });
-                      return;
-                    }
-                    if (needsClientReview(gig.status)) {
-                      navigation.navigate("GigCompletionReview", { gigId: gig.id });
-                      return;
-                    }
-                    navigation.navigate("GigTracking", { gigId: gig.id });
-                  }}
+                  subtitle={
+                    worker
+                      ? `${isDelivery ? "Courier" : "Worker"}: ${worker.fullName}`
+                      : isDelivery
+                        ? "Finding a courier…"
+                        : undefined
+                  }
+                  onPress={() => openGigForRole(navigation, gig, "CLIENT")}
                 />
               );
             })}

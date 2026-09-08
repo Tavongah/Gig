@@ -62,7 +62,7 @@ interface AdminGig {
   client?: { fullName: string };
 }
 
-type AdminTab = "overview" | "pending" | "users" | "gigs";
+type AdminTab = "overview" | "pending" | "users" | "gigs" | "commerce";
 
 function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -342,6 +342,43 @@ export function App() {
     enabled: authenticated && activeTab === "gigs"
   });
 
+  const merchantsQuery = useQuery({
+    queryKey: ["admin-commerce-merchants"],
+    queryFn: () =>
+      apiRequest<{
+        merchants: Array<{
+          id: string;
+          name: string;
+          whatsappPhone: string;
+          locationLabel: string;
+          isActive: boolean;
+          acceptsOrders: boolean;
+          _count: { products: number; orders: number };
+        }>;
+      }>("/admin/commerce/merchants"),
+    enabled: authenticated && activeTab === "commerce"
+  });
+
+  const commerceOrdersQuery = useQuery({
+    queryKey: ["admin-commerce-orders"],
+    queryFn: () =>
+      apiRequest<{
+        orders: Array<{
+          id: string;
+          orderNumber: number;
+          status: string;
+          paymentStatus: string;
+          orderSource: string;
+          totalCents: number;
+          merchant?: { name: string };
+          customer?: { fullName: string; phoneNumber: string | null };
+          linkedDeliveryGig?: { id: string; status: string } | null;
+          createdAt: string;
+        }>;
+      }>("/admin/commerce/orders"),
+    enabled: authenticated && activeTab === "commerce"
+  });
+
   const approveMutation = useMutation({
     mutationFn: (workerId: string) => apiRequest(`/admin/workers/${workerId}/approve`, { method: "POST" }),
     onSuccess: () => {
@@ -432,7 +469,8 @@ export function App() {
               ["Overview", "overview"],
               ["Pending workers", "pending"],
               ["Users", "users"],
-              ["Gigs", "gigs"]
+              ["Gigs", "gigs"],
+              ["Commerce", "commerce"]
             ] as const
           ).map(([label, tab]) => (
             <button key={tab} type="button" className={activeTab === tab ? "nav-active" : ""} onClick={() => setActiveTab(tab)}>
@@ -617,6 +655,78 @@ export function App() {
               </tbody>
             </table>
           </section>
+        ) : null}
+
+        {activeTab === "commerce" ? (
+          <>
+            <section className="panel">
+              <h2>Merchants</h2>
+              {merchantsQuery.error ? <p className="notice">{merchantsQuery.error.message}</p> : null}
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>WhatsApp</th>
+                    <th>Location</th>
+                    <th>Open</th>
+                    <th>Products</th>
+                    <th>Orders</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(merchantsQuery.data?.merchants ?? []).map((m) => (
+                    <tr key={m.id}>
+                      <td>{m.name}</td>
+                      <td>{m.whatsappPhone}</td>
+                      <td>{m.locationLabel}</td>
+                      <td>{m.acceptsOrders && m.isActive ? "Yes" : "No"}</td>
+                      <td>{m._count.products}</td>
+                      <td>{m._count.orders}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+            <section className="panel">
+              <h2>Commerce orders</h2>
+              {commerceOrdersQuery.error ? <p className="notice">{commerceOrdersQuery.error.message}</p> : null}
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Shop</th>
+                    <th>Customer</th>
+                    <th>Source</th>
+                    <th>Status</th>
+                    <th>Payment</th>
+                    <th>Total</th>
+                    <th>Delivery gig</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(commerceOrdersQuery.data?.orders ?? []).map((o) => (
+                    <tr key={o.id}>
+                      <td>{o.orderNumber}</td>
+                      <td>{o.merchant?.name ?? "—"}</td>
+                      <td>
+                        {o.customer?.fullName ?? "—"}
+                        {o.customer?.phoneNumber ? ` (${o.customer.phoneNumber})` : ""}
+                      </td>
+                      <td>{o.orderSource}</td>
+                      <td>{o.status}</td>
+                      <td>{o.paymentStatus}</td>
+                      <td>${(o.totalCents / 100).toFixed(2)}</td>
+                      <td>
+                        {o.linkedDeliveryGig
+                          ? `${o.linkedDeliveryGig.status}`
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          </>
         ) : null}
       </section>
     </main>

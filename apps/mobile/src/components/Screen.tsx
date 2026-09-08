@@ -28,7 +28,13 @@ export function Screen({ children }: PropsWithChildren) {
   return (
     <SafeAreaView style={styles.root}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView contentContainerStyle={styles.content}>{children}</ScrollView>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        {children}
+      </ScrollView>
     </SafeAreaView>
   );
 }

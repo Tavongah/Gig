@@ -158,7 +158,11 @@ async function captureCompletedGigPayment(
 }
 
 function emitWorkerEarningsUpdated(workerId: string) {
-  getSocketServer().to(`user:${workerId}`).emit("worker:earnings_updated", { workerId });
+  try {
+    getSocketServer().to(`user:${workerId}`).emit("worker:earnings_updated", { workerId });
+  } catch {
+    // Scripts/tests may complete earnings without a live Socket.IO server.
+  }
 }
 
 /** Credit 100% of a client travel-cancellation fee to the worker (no platform cut). */

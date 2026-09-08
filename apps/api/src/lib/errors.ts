@@ -38,7 +38,20 @@ export function mapErrorToResponse(error: unknown): {
       GIG_NOT_REVIEWABLE: 400,
       WORKER_NOT_ASSIGNED: 400,
       CANCEL_NOT_ALLOWED: 409,
-      DEV_PAYMENT_DISABLED: 403
+      DEV_PAYMENT_DISABLED: 403,
+      DELIVERY_DISTANCE_EXCEEDED: 400,
+      INVALID_PICKUP_PIN: 400,
+      INVALID_DELIVERY_PIN: 400,
+      NOT_A_DELIVERY: 400,
+      USE_DELIVERY_ENDPOINTS: 409,
+      DELIVERY_CANCEL_AFTER_PICKUP: 409,
+      COURIER_NOT_ASSIGNED: 403,
+      GPS_REQUIRED: 400,
+      PICKUP_PIN_LOCKED: 429,
+      DELIVERY_PIN_LOCKED: 429,
+      PIN_REGEN_NOT_ALLOWED: 409,
+      INVALID_TRANSPORT_MODE: 400,
+      WORKER_PROFILE_REQUIRED: 400
     };
 
     const status = known[error.message] ?? known[(error as Error & { code?: string }).code ?? ""] ?? 500;

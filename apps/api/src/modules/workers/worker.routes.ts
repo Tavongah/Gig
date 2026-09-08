@@ -16,6 +16,8 @@ import {
   updateWorkerLocation,
   updateWorkerPreferences
 } from "./worker.service.js";
+import { setDeliveryCourierEligibility } from "../gigs/delivery.service.js";
+import { enableDeliveryCourierSchema } from "@gigflow/shared";
 
 const nearbyQuerySchema = z.object({
   latitude: z.coerce.number().min(-90).max(90),
@@ -128,6 +130,26 @@ workerRouter.post(
     try {
       const link = await getWorkerWithdrawalOnboardingLink(req.auth!.userId);
       res.json(link);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+workerRouter.post(
+  "/delivery-eligibility",
+  requireAuth,
+  requireRole(UserRole.WORKER),
+  requireApprovedWorker,
+  validateBody(enableDeliveryCourierSchema),
+  async (req, res, next) => {
+    try {
+      const profile = await setDeliveryCourierEligibility(req.auth!.userId, req.body);
+      res.json({
+        profile,
+        deliveryEligible: profile.deliveryEligible,
+        transportMode: profile.transportMode
+      });
     } catch (error) {
       next(error);
     }

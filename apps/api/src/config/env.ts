@@ -13,6 +13,10 @@ const optionalString = z.preprocess(emptyToUndefined, z.string().optional());
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  /** Gig deployment lane: development | test | pilot | staging | production */
+  APP_ENV: z
+    .enum(["development", "test", "pilot", "staging", "production"])
+    .optional(),
   PORT: z.coerce.number().default(4000),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url().default("redis://localhost:6379"),
@@ -23,6 +27,10 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value === "true" || value === "1"),
+  /** Set to "false" to disable DUTS Delivery quote/create in this environment. */
+  DELIVERY_ENABLED: optionalString,
+  /** Seconds before auto-approve after delivery PIN (default 60). */
+  DELIVERY_AUTO_APPROVE_SECONDS: optionalString,
   FIREBASE_PROJECT_ID: optionalString,
   FIREBASE_CLIENT_EMAIL: optionalString,
   FIREBASE_PRIVATE_KEY: optionalString,
@@ -51,6 +59,10 @@ const envSchema = z.object({
   TWILIO_ACCOUNT_SID: optionalString,
   TWILIO_AUTH_TOKEN: optionalString,
   TWILIO_FROM_NUMBER: optionalString,
+  /** WhatsApp sender for WHATSAPP_PROVIDER=twilio, e.g. whatsapp:+14155238886 */
+  TWILIO_WHATSAPP_FROM: optionalString,
+  /** Exact public URL Twilio signs (defaults to {API_PUBLIC_URL}/v1/whatsapp/twilio). */
+  TWILIO_WHATSAPP_WEBHOOK_URL: optionalString,
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   SENTRY_DSN: optionalUrl,
   /** Log verification / reset links to API stdout when no email provider is configured (beta). */

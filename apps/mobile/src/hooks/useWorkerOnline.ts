@@ -71,6 +71,32 @@ export function useWorkerOnline() {
       return;
     }
 
+    const deliveryEligible = Boolean(profile.workerProfile?.deliveryEligible);
+    const transportOk = ["WALKING", "BICYCLE", "PUBLIC_TRANSPORT"].includes(
+      String(profile.workerProfile?.transportMode ?? "")
+    );
+    if (!deliveryEligible || !transportOk) {
+      showConfirm(
+        "Enable deliveries?",
+        "Choose Walking, Bicycle, or Public Transport / Kombi to receive delivery offers. Or continue online for Local Help only.",
+        () => navigation.navigate("WorkerDeliverySetup"),
+        {
+          confirmLabel: "Courier setup",
+          cancelLabel: "Local Help only",
+          onCancel: () => {
+            void completeGoOnline();
+          }
+        }
+      );
+      return;
+    }
+
+    await completeGoOnline();
+  }
+
+  async function completeGoOnline(): Promise<void> {
+    if (!profile) return;
+
     const travelDistanceMiles = Math.min(
       MAX_WORKER_TRAVEL_MILES,
       Math.max(1, Math.round(Number(preferences.travelDistanceMiles) || 10))

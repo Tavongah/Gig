@@ -14,9 +14,17 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "tsx prisma/seed.ts",
+    "db:setup-gig-dev": "tsx scripts/setup-gig-dev-db.ts",
     "test:auth": "tsx scripts/test-auth-flow.ts",
     "test:matching": "tsx scripts/test-matching-rematch.ts",
-    "test:payment-auth": "tsx scripts/test-payment-auth.ts"
+    "test:payment-auth": "tsx scripts/test-payment-auth.ts",
+    "test:delivery": "tsx scripts/test-delivery-lifecycle.ts",
+    "test:delivery-e2e": "tsx scripts/test-delivery-e2e-stage35.ts",
+    "test:commerce-whatsapp": "tsx scripts/test-commerce-whatsapp-stage4.ts",
+    "test:commerce-pilot-safety": "tsx scripts/test-commerce-pilot-safety.ts",
+    "test:commerce-conversation": "tsx scripts/test-commerce-conversation-stage46.ts",
+    "test:whatsapp-copy": "tsx scripts/test-whatsapp-copy-stage46a.ts",
+    "test:whatsapp-twilio": "tsx scripts/test-whatsapp-twilio-transport.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1085.0",

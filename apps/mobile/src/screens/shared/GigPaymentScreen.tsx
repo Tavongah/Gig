@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Linking, Platform, ScrollView, Text, View } from "react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import Constants from "expo-constants";
 import { formatMoney, formatHourlyRateLabel, isTimeBasedPricing } from "@gigflow/shared";
 import { api, apiUrl } from "../../lib/api";
 import { showAlert } from "../../lib/confirm";
@@ -17,6 +18,19 @@ type Props = NativeStackScreenProps<RootStackParamList, "GigPayment">;
 
 const FRIENDLY_PAYMENT_ERROR =
   "We couldn’t prepare the secure payment. Please try again or contact DUTS Support.";
+
+/** Dev-only bypass: never on pilot/staging/production app builds. */
+function allowDevPaymentBypass(): boolean {
+  const appEnv = String(
+    process.env.EXPO_PUBLIC_APP_ENV ??
+      (Constants.expoConfig?.extra as { appEnv?: string } | undefined)?.appEnv ??
+      "development"
+  ).toLowerCase();
+  if (appEnv === "pilot" || appEnv === "staging" || appEnv === "production") {
+    return false;
+  }
+  return apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1");
+}
 
 function LineItem({ label, value }: { label: string; value: string }) {
   return (
@@ -214,7 +228,7 @@ export function GigPaymentScreen({ navigation, route }: Props) {
             <Text className="text-sm text-danger">
               Secure payments are temporarily unavailable. Please try again later or contact DUTS Support.
             </Text>
-            {apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1") ? (
+            {allowDevPaymentBypass() ? (
               <AppButton
                 label={devPublishMutation.isPending ? "Continuing..." : "Continue without payment (dev only)"}
                 variant="secondary"

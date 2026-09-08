@@ -6,6 +6,7 @@ import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import type { CompositeNavigationProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../../lib/api";
+import { openGigForRole } from "../../lib/open-gig";
 import { showAlert, showConfirm } from "../../lib/confirm";
 import { ACTIVE_WORKER_STATUSES, COMPLETED_STATUSES } from "../../lib/gig-status";
 import { TabScreen } from "../../components/TabScreen";
@@ -130,7 +131,14 @@ export function WorkerNearbyGigsScreen() {
         onDone={() => {
           setShowAcceptAnimation(false);
           if (acceptedGigId) {
-            navigation.replace("WorkerMatching", { gigId: acceptedGigId });
+            const accepted =
+              availableGigs.find((g) => g.id === acceptedGigId) ??
+              myGigs.find((g) => g.id === acceptedGigId);
+            if (accepted?.fulfillmentType === "DELIVERY") {
+              navigation.replace("DeliveryJob", { gigId: acceptedGigId });
+            } else {
+              navigation.replace("WorkerMatching", { gigId: acceptedGigId });
+            }
             setAcceptedGigId(null);
           }
         }}
@@ -162,8 +170,13 @@ export function WorkerNearbyGigsScreen() {
                 <NearbyGigCard
                   key={gig.id}
                   gig={gig}
-                  onView={() => navigation.navigate("GigDetail", { gigId: gig.id })}
-                  onAccept={() => confirmAccept(gig.id, gig.title)}
+                  onView={() => openGigForRole(navigation, gig, "WORKER")}
+                  onAccept={() =>
+                    confirmAccept(
+                      gig.id,
+                      gig.fulfillmentType === "DELIVERY" ? "this delivery" : gig.title
+                    )
+                  }
                   acceptDisabled={acceptMutation.isPending && acceptingId === gig.id}
                 />
               ))}
@@ -217,10 +230,16 @@ export function WorkerNearbyGigsScreen() {
                   key={gig.id}
                   gig={gig}
                   showWorkerEarnings
-                  subtitle={gig.client ? `Client: ${gig.client.fullName}` : undefined}
-                  actionLabel="Manage gig"
-                  onAction={() => navigation.navigate("GigDetail", { gigId: gig.id })}
-                  onPress={() => navigation.navigate("GigDetail", { gigId: gig.id })}
+                  subtitle={
+                    gig.fulfillmentType === "DELIVERY"
+                      ? `${gig.city}${gig.dropoffCity ? ` → ${gig.dropoffCity}` : ""}`
+                      : gig.client
+                        ? `Client: ${gig.client.fullName}`
+                        : undefined
+                  }
+                  actionLabel={gig.fulfillmentType === "DELIVERY" ? "Manage delivery" : "Manage gig"}
+                  onAction={() => openGigForRole(navigation, gig, "WORKER")}
+                  onPress={() => openGigForRole(navigation, gig, "WORKER")}
                 />
               ))}
             </View>
@@ -237,7 +256,7 @@ export function WorkerNearbyGigsScreen() {
                   key={gig.id}
                   gig={gig}
                   showWorkerEarnings
-                  onPress={() => navigation.navigate("GigDetail", { gigId: gig.id })}
+                  onPress={() => openGigForRole(navigation, gig, "WORKER")}
                 />
               ))}
             </View>

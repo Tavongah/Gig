@@ -238,6 +238,11 @@ export function ProfileScreen() {
               label="Service Area"
               onPress={() => navigation.navigate("WorkerWorkPreferences")}
             />
+            <ProfileRow
+              icon="bicycle-outline"
+              label="Courier / Delivery setup"
+              onPress={() => navigation.navigate("WorkerDeliverySetup")}
+            />
             <ProfileRow icon="time-outline" label="Availability" onPress={() => navigation.navigate("Home")} />
             <ProfileRow icon="wallet-outline" label="Earnings" onPress={() => navigation.navigate("Earnings")} />
             <ProfileRow

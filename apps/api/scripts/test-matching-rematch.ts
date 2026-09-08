@@ -13,6 +13,9 @@ function assert(condition: unknown, message: string): void {
 assert(workerCancelOutcome("WORKER_ASSIGNED") === "REMATCH", "assigned cancel rematches");
 assert(workerCancelOutcome("WORKER_EN_ROUTE") === "REMATCH", "traveling cancel rematches");
 assert(workerCancelOutcome("WORKER_ARRIVED") === "REMATCH", "arrived cancel rematches");
+assert(workerCancelOutcome("PACKAGE_COLLECTED") === "BLOCKED", "post-pickup delivery cancel blocked");
+assert(workerCancelOutcome("EN_ROUTE_TO_DROPOFF") === "BLOCKED", "en-route dropoff cancel blocked");
+assert(workerCancelOutcome("ARRIVED_AT_DROPOFF") === "BLOCKED", "arrived dropoff cancel blocked");
 assert(workerCancelOutcome("IN_PROGRESS") === "DISPUTE", "in-progress goes to dispute");
 assert(workerCancelOutcome("COMPLETED") === "BLOCKED", "completed cannot cancel");
 assert(workerCancelOutcome("POSTED") === "BLOCKED", "matching-only is not selected-worker cancel");

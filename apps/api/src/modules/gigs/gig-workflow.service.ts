@@ -1,6 +1,7 @@
 import type { Server } from "socket.io";
 import {
   AccountStatus,
+  CommerceOrderStatus,
   GigInterestStatus,
   GigStatus,
   PaymentLifecycle,
@@ -164,13 +165,66 @@ export async function expressWorkerInterest(
   });
 
   if (io) {
+    const isDelivery = gig.fulfillmentType === "DELIVERY";
     notifyUser(io, gig.clientId, {
       type: "WORKER_INTERESTED",
-      title: "Worker interested",
-      body: `${worker.fullName} is interested in "${gig.title}".`,
+      title: isDelivery ? "Courier interested" : "Worker interested",
+      body: isDelivery
+        ? `${worker.fullName} is available for your delivery.`
+        : `${worker.fullName} is interested in "${gig.title}".`,
       gigId: gig.id
     });
     io.to(`user:${gig.clientId}`).emit("gig:interest", { gigId: gig.id, interest });
+  }
+
+  if (gig.fulfillmentType === "DELIVERY") {
+    const { logDutsFlow } = await import("../../lib/flow-log.js");
+    logDutsFlow("COURIER_INTEREST", {
+      gigId,
+      userId: workerId,
+      userRole: "WORKER",
+      fulfillmentType: "DELIVERY"
+    });
+
+    // Marketplace WhatsApp orders: customer is not in the app — auto-assign first interested courier.
+    // Concurrency: only one winner via conditional update on assignedWorkerId.
+    const commerce = await prisma.commerceOrder.findFirst({ where: { linkedDeliveryGigId: gigId } });
+    if (commerce) {
+      const claimed = await prisma.gig.updateMany({
+        where: {
+          id: gigId,
+          assignedWorkerId: null,
+          status: { in: [GigStatus.POSTED, GigStatus.SEARCHING_FOR_WORKER] }
+        },
+        data: { assignedWorkerId: workerId }
+      });
+      if (claimed.count === 1) {
+        await selectWorkerForGig(gigId, gig.clientId, workerId, io);
+        await activateGigAfterWorkerPayment(gigId, io ?? undefined);
+        await prisma.commerceOrder.update({
+          where: { id: commerce.id },
+          data: { status: CommerceOrderStatus.COURIER_ASSIGNED }
+        });
+        logDutsFlow("COURIER_ASSIGNED", {
+          gigId,
+          userId: workerId,
+          userRole: "WORKER",
+          fulfillmentType: "DELIVERY",
+          orderId: commerce.id
+        });
+        if (commerce.customerWhatsAppPhone) {
+          try {
+            const { notifyCustomerStatus } = await import("../whatsapp/merchant-handler.js");
+            await notifyCustomerStatus(
+              commerce.customerWhatsAppPhone,
+              `A courier has been assigned for order #${commerce.orderNumber}.`
+            );
+          } catch {
+            /* non-blocking */
+          }
+        }
+      }
+    }
   }
 
   return {
@@ -367,10 +421,13 @@ export async function selectWorkerForGig(gigId: string, clientId: string, worker
   ]);
 
   if (io) {
+    const isDelivery = gig.fulfillmentType === "DELIVERY";
     notifyUser(io, workerId, {
       type: "WORKER_SELECTED",
-      title: "You have been selected for this gig.",
-      body: `The customer selected you for "${gig.title}". Complete payment to start.`,
+      title: isDelivery ? "Customer selected you for this delivery" : "You have been selected for this gig.",
+      body: isDelivery
+        ? "Complete payment confirmation to unlock pickup details."
+        : `The customer selected you for "${gig.title}". Complete payment to start.`,
       gigId
     });
     io.to(`user:${workerId}`).emit("worker_selected", {
@@ -382,14 +439,18 @@ export async function selectWorkerForGig(gigId: string, clientId: string, worker
     for (const row of otherInterests) {
       notifyUser(io, row.workerId, {
         type: "WORKER_NOT_SELECTED",
-        title: "Another worker was selected",
-        body: "Another worker was selected for this gig.",
+        title: isDelivery ? "Another courier was selected" : "Another worker was selected",
+        body: isDelivery
+          ? "Another courier was selected for this delivery."
+          : "Another worker was selected for this gig.",
         gigId
       });
       io.to(`user:${row.workerId}`).emit("worker_not_selected", {
         gigId,
         workerId: row.workerId,
-        message: "Another worker was selected for this gig."
+        message: isDelivery
+          ? "Another courier was selected for this delivery."
+          : "Another worker was selected for this gig."
       });
     }
   }
@@ -658,6 +719,13 @@ export async function approveGigCompletion(gigId: string, clientId: string, io?:
     netEarningsCents: finalAmounts.workerPayoutCents
   });
 
+  try {
+    const { syncCommerceOrderFromGig } = await import("../commerce/order.service.js");
+    await syncCommerceOrderFromGig(gigId, GigStatus.COMPLETED);
+  } catch {
+    /* non-blocking */
+  }
+
   await prisma.gigAssignment.update({
     where: { id: gig.assignments[0].id },
     data: {
@@ -682,18 +750,22 @@ export async function approveGigCompletion(gigId: string, clientId: string, io?:
         : null;
     notifyUser(io, gig.assignments[0].workerId, {
       type: "GIG_COMPLETED",
-      title: "Gig completed",
+      title: gig.fulfillmentType === "DELIVERY" ? "Delivery complete" : "Gig completed",
       body: billableLabel
         ? `Gig completed. Final charge is based on ${billableLabel} of billable work.`
-        : `Payment confirmed for "${gig.title}".`,
+        : gig.fulfillmentType === "DELIVERY"
+          ? "Delivery complete. Your earnings were updated."
+          : `Payment confirmed for "${gig.title}".`,
       gigId
     });
     notifyUser(io, gig.clientId, {
       type: "GIG_COMPLETED",
-      title: "Gig completed",
+      title: gig.fulfillmentType === "DELIVERY" ? "Delivery complete" : "Gig completed",
       body: billableLabel
         ? `Gig completed. Your final charge is $${(finalAmounts.totalCents / 100).toFixed(2)} based on ${billableLabel} of billable work.`
-        : `Your booking for "${gig.title}" is complete.`,
+        : gig.fulfillmentType === "DELIVERY"
+          ? "Your delivery is complete. Thank you for using DUTS Delivery."
+          : `Your booking for "${gig.title}" is complete.`,
       gigId
     });
   }
@@ -702,11 +774,15 @@ export async function approveGigCompletion(gigId: string, clientId: string, io?:
 }
 
 export async function autoApproveStaleGigs(): Promise<number> {
+  const now = new Date();
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const gigs = await prisma.gig.findMany({
     where: {
       status: GigStatus.WAITING_CUSTOMER_CONFIRMATION,
-      updatedAt: { lte: cutoff }
+      OR: [
+        { autoApproveAt: { lte: now } },
+        { AND: [{ autoApproveAt: null }, { updatedAt: { lte: cutoff } }] }
+      ]
     },
     select: { id: true, clientId: true }
   });
@@ -1003,12 +1079,17 @@ export async function cancelAssignedWorkerAndRematch(
     io.to(`gig:${gigId}`).emit("gig:status", { gigId, status: GigStatus.SEARCHING_FOR_WORKER });
     notifyUser(io, gig.clientId, {
       type: "WORKER_CANCELLED_REMATCH",
-      title: "Finding another worker",
-      body: "Your previous worker cancelled. We’re searching for another available worker nearby.",
+      title: gig.fulfillmentType === "DELIVERY" ? "Finding another courier" : "Finding another worker",
+      body:
+        gig.fulfillmentType === "DELIVERY"
+          ? "Your previous courier cancelled. We’re searching for another available courier nearby."
+          : "Your previous worker cancelled. We’re searching for another available worker nearby.",
       gigId
     });
 
     // Re-broadcast to nearby workers (exclude cancelled worker via client filters / interest status).
+    const { syncCommerceOrderFromGig } = await import("../commerce/order.service.js");
+    await syncCommerceOrderFromGig(gigId, GigStatus.SEARCHING_FOR_WORKER).catch(() => undefined);
     const { broadcastGigOffer } = await import("../realtime/realtime.service.js");
     await broadcastGigOffer(io, {
       gigId: gig.id,
@@ -1024,7 +1105,8 @@ export async function cancelAssignedWorkerAndRematch(
       workerPayoutCents: gig.workerPayoutCents,
       startsAt: gig.startsAt.toISOString(),
       urgency: gig.urgency,
-      estimatedHours: Number(gig.estimatedHours)
+      estimatedHours: Number(gig.estimatedHours),
+      fulfillmentType: gig.fulfillmentType
     });
   }
 

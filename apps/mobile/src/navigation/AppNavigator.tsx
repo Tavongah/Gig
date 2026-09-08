@@ -17,6 +17,10 @@ import { EditProfileScreen } from "../screens/shared/EditProfileScreen";
 import { ChatScreen } from "../screens/shared/ChatScreen";
 import { ReviewScreen } from "../screens/shared/ReviewScreen";
 import { ClientPostScreen } from "../screens/client/ClientPostScreen";
+import { DeliveryRequestScreen } from "../screens/client/DeliveryRequestScreen";
+import { DeliveryPinsScreen } from "../screens/client/DeliveryPinsScreen";
+import { DeliveryJobScreen } from "../screens/shared/DeliveryJobScreen";
+import { WorkerDeliverySetupScreen } from "../screens/worker/WorkerDeliverySetupScreen";
 import { AddressesScreen } from "../screens/profile/AddressesScreen";
 import { PaymentMethodsScreen } from "../screens/profile/PaymentMethodsScreen";
 import { NotificationsScreen } from "../screens/profile/NotificationsScreen";
@@ -57,8 +61,16 @@ export function AppNavigator() {
     >
       <Stack.Screen name="MainTabs" component={RoleTabs} options={{ headerShown: false }} />
       <Stack.Screen name="PostGig" component={ClientPostScreen} options={{ title: "Request Help" }} />
+      <Stack.Screen name="DeliveryRequest" component={DeliveryRequestScreen} options={{ title: "Send a Package" }} />
+      <Stack.Screen name="DeliveryPins" component={DeliveryPinsScreen} options={{ title: "Delivery codes" }} />
+      <Stack.Screen name="DeliveryJob" component={DeliveryJobScreen} options={{ title: "Delivery" }} />
       <Stack.Screen name="GigDetail" component={GigDetailScreen} options={{ title: "Gig details" }} />
       <Stack.Screen name="WorkerMatching" component={WorkerMatchingScreen} options={{ title: "Matching" }} />
+      <Stack.Screen
+        name="WorkerDeliverySetup"
+        component={WorkerDeliverySetupScreen}
+        options={{ title: "Courier setup" }}
+      />
       <Stack.Screen name="GigSelectWorkers" component={GigSelectWorkersScreen} options={{ title: "Choose your worker" }} />
       <Stack.Screen name="GigWorkerSummary" component={GigWorkerSummaryScreen} options={{ title: "Worker summary" }} />
       <Stack.Screen name="GigPayment" component={GigPaymentScreen} options={{ title: "Confirm booking" }} />

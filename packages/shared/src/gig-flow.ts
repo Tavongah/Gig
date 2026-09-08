@@ -90,9 +90,16 @@ export function gigNeedsExtraTimeApproval(status: string): boolean {
   return status === "WAITING_EXTRA_TIME_APPROVAL";
 }
 
-/** Before IN_PROGRESS: rematch. During/after work start: dispute. */
+/** Before IN_PROGRESS: rematch. During/after work start: dispute. Post-pickup delivery: blocked. */
 export function workerCancelOutcome(status: string): "REMATCH" | "DISPUTE" | "BLOCKED" {
   if (status === "COMPLETED" || status === "CANCELLED") return "BLOCKED";
+  if (
+    status === "PACKAGE_COLLECTED" ||
+    status === "EN_ROUTE_TO_DROPOFF" ||
+    status === "ARRIVED_AT_DROPOFF"
+  ) {
+    return "BLOCKED";
+  }
   if (
     status === "IN_PROGRESS" ||
     status === "WAITING_CUSTOMER_CONFIRMATION" ||

@@ -4,7 +4,7 @@ import { env, resolveCorsOrigin } from "./config/env.js";
 import { prisma } from "./config/prisma.js";
 import { connectRedis, redis } from "./config/redis.js";
 import { createApp } from "./app.js";
-import { logProductionReadinessWarnings } from "./lib/production-guards.js";
+import { logProductionReadinessWarnings, assertGigOwnedDatabase } from "./lib/production-guards.js";
 import { assertStripeConfiguredForProduction } from "./lib/stripe.js";
 import { setSocketServer } from "./lib/socket.js";
 import { configureRealtime } from "./modules/realtime/realtime.service.js";
@@ -54,18 +54,29 @@ async function connectRedisWithRetry(maxAttempts = 30, delayMs = 5000): Promise<
 }
 
 async function bootstrap(): Promise<void> {
+  assertGigOwnedDatabase();
   assertStripeConfiguredForProduction();
   logProductionReadinessWarnings();
 
   httpServer.listen(env.PORT, "0.0.0.0", () => {
-    console.log(`DUTS API listening on 0.0.0.0:${env.PORT} (${env.NODE_ENV})`);
+    console.log(
+      `DUTS API listening on 0.0.0.0:${env.PORT} (NODE_ENV=${env.NODE_ENV}, APP_ENV=${process.env.APP_ENV ?? env.NODE_ENV})`
+    );
   });
 
   void connectRedisWithRetry();
 
+  // Delivery auto-approve is often ~60s — poll frequently enough for pilot.
   setInterval(() => {
     void import("./modules/gigs/gig-workflow.service.js").then(({ autoApproveStaleGigs }) => autoApproveStaleGigs());
-  }, 60 * 60 * 1000);
+  }, 30 * 1000);
+
+  // Commerce: expire merchant-pending WhatsApp orders past merchantRespondBy.
+  setInterval(() => {
+    void import("./modules/commerce/order.service.js").then(({ expireStaleMerchantPendingOrders }) =>
+      expireStaleMerchantPendingOrders().catch(() => undefined)
+    );
+  }, 60 * 1000);
 
   // Poll active timers so ESTIMATE_TIMER / auth-limit pauses do not depend only on Start Gig.
   setInterval(() => {

@@ -41,7 +41,8 @@ async function main() {
       email: customerEmail,
       phoneNumber: customerPhone,
       password,
-      confirmPassword: password
+      confirmPassword: password,
+      acceptTerms: true
     })
   });
   assert(register.status === 201, `register failed: ${register.status} ${JSON.stringify(register.body)}`);
@@ -57,7 +58,8 @@ async function main() {
       email: customerEmail,
       phoneNumber: `+1555${String(stamp + 1).slice(-7)}`,
       password,
-      confirmPassword: password
+      confirmPassword: password,
+      acceptTerms: true
     })
   });
   assert(dupEmail.status === 409, "duplicate email should be rejected");
@@ -104,7 +106,8 @@ async function main() {
       email: otherEmail,
       phoneNumber: customerPhone,
       password,
-      confirmPassword: password
+      confirmPassword: password,
+      acceptTerms: true
     })
   });
   assert(otherRegister.status === 409, "duplicate phone at signup should be rejected");
@@ -138,6 +141,8 @@ async function main() {
   console.log("8. Worker blocked from going online before verification + approval");
   const workerEmail = `auth-worker-${stamp}@example.com`;
   const workerPhone = `+1666${String(stamp).slice(-7)}`;
+  const tinyJpeg =
+    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAn/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAGfAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAQUCf//EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQMBAT8Bf//EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQIBAT8Bf//Z";
   const workerRegister = await request("/auth/register/worker", {
     method: "POST",
     body: JSON.stringify({
@@ -146,6 +151,7 @@ async function main() {
       phoneNumber: workerPhone,
       password,
       confirmPassword: password,
+      acceptTerms: true,
       bio: "Experienced helper available for local gigs around town every weekend.",
       serviceCategoryIds: [categoryId],
       city: "Atlanta",
@@ -155,7 +161,10 @@ async function main() {
       governmentIdAcknowledged: true,
       proofOfAddressAcknowledged: true,
       platformRulesAgreed: true,
-      backgroundCheckConsent: true
+      backgroundCheckConsent: true,
+      governmentIdType: "NATIONAL_ID",
+      profilePhotoDataUrl: tinyJpeg,
+      governmentIdFrontDataUrl: tinyJpeg
     })
   });
   assert(workerRegister.status === 201, `worker register failed: ${JSON.stringify(workerRegister.body)}`);

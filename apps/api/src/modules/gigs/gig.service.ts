@@ -377,8 +377,9 @@ export async function findNearbyGigs(workerId: string) {
   const travelRadiusMiles = Number(worker.workerProfile.travelDistanceMiles);
 
   const serviceCategoryIds = worker.workerProfile.serviceCategories.map((category) => category.id);
-
-
+  const courierDeliveryEligible =
+    Boolean(worker.workerProfile.deliveryEligible) &&
+    ["WALKING", "BICYCLE", "PUBLIC_TRANSPORT"].includes(String(worker.workerProfile.transportMode ?? ""));
 
   const gigs = await prisma.gig.findMany({
 
@@ -388,7 +389,11 @@ export async function findNearbyGigs(workerId: string) {
 
       serviceCategoryId: { in: serviceCategoryIds },
 
-      startsAt: { gte: new Date(Date.now() - 30 * 60 * 1000) }
+      startsAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
+
+      ...(courierDeliveryEligible
+        ? {}
+        : { NOT: { fulfillmentType: "DELIVERY" } })
 
     },
 
@@ -402,10 +407,8 @@ export async function findNearbyGigs(workerId: string) {
 
 
 
-  return gigs
-
+  const ranked = gigs
     .map((gig) => {
-
       const distanceMiles = haversineMiles(workerLat, workerLng, Number(gig.latitude), Number(gig.longitude));
       const gigRadiusMiles = getGigMatchingRadiusMiles(gig.urgency, gig.size);
       const roundedDistance = Math.round(distanceMiles * 10) / 10;
@@ -416,46 +419,36 @@ export async function findNearbyGigs(workerId: string) {
         gigRadiusMiles,
         estimatedResponseMinutes: estimateResponseMinutes(distanceMiles)
       };
-
     })
+    .filter((item) => item.distanceMiles <= Math.min(item.gigRadiusMiles, travelRadiusMiles))
+    .sort((a, b) => a.distanceMiles - b.distanceMiles || b.gig.workerPayoutCents - a.gig.workerPayoutCents)
+    .slice(0, 20);
 
-    .filter((item) =>
-      isWithinMatchingRadius(
-        workerLat,
-        workerLng,
-        Number(item.gig.latitude),
-        Number(item.gig.longitude),
-        item.gigRadiusMiles,
-        travelRadiusMiles
-      )
-    )
+  const { buildCourierOfferPayload } = await import("./delivery.service.js");
 
-    .sort((left, right) => {
+  return ranked.map((item) => {
+    const sanitized = sanitizeGigForViewer(item.gig, workerId, {
+      distanceMiles: item.distanceMiles,
+      viewerRoles: [UserRole.WORKER]
+    });
 
-      if (left.distanceMiles !== right.distanceMiles) {
-        return left.distanceMiles - right.distanceMiles;
-      }
-
-      if (right.gig.workerPayoutCents !== left.gig.workerPayoutCents) {
-        return right.gig.workerPayoutCents - left.gig.workerPayoutCents;
-      }
-
-      return right.gig.createdAt.getTime() - left.gig.createdAt.getTime();
-
-    })
-
-    .map((item) => ({
-      ...sanitizeGigForViewer(item.gig, workerId, {
+    if (item.gig.fulfillmentType === "DELIVERY") {
+      return {
+        ...sanitized,
         distanceMiles: item.distanceMiles,
-        viewerRoles: [UserRole.WORKER]
-      }),
+        estimatedResponseMinutes: item.estimatedResponseMinutes,
+        offer: buildCourierOfferPayload(item.gig, item.distanceMiles)
+      };
+    }
+
+    return {
+      ...sanitized,
       distanceMiles: item.distanceMiles,
       estimatedResponseMinutes: item.estimatedResponseMinutes
-    }));
+    };
+  });
 
 }
-
-
 
 export async function acceptGig(gigId: string, workerId: string, io?: Server) {
   return expressWorkerInterest(gigId, workerId, undefined, io);
@@ -494,40 +487,93 @@ const CANCELLABLE_STATUSES: GigStatus[] = [
 
 
 
-function notificationForStatus(status: GigStatus, gigTitle: string): NotificationPayload | null {
+function notificationForStatus(
+  status: GigStatus,
+  gigTitle: string,
+  fulfillmentType?: string
+): NotificationPayload | null {
+  const isDelivery = fulfillmentType === "DELIVERY";
 
   switch (status) {
-
     case GigStatus.WORKER_EN_ROUTE:
-
-      return { type: "WORKER_EN_ROUTE", title: "Worker on the way", body: `Your worker is heading to "${gigTitle}".`, gigId: undefined };
+      return isDelivery
+        ? {
+            type: "WORKER_EN_ROUTE",
+            title: "Courier heading to pickup",
+            body: "Your courier is on the way to the pickup location.",
+            gigId: undefined
+          }
+        : {
+            type: "WORKER_EN_ROUTE",
+            title: "Worker on the way",
+            body: `Your worker is heading to "${gigTitle}".`,
+            gigId: undefined
+          };
 
     case GigStatus.WORKER_ARRIVED:
-
-      return { type: "WORKER_ARRIVED", title: "Worker arrived", body: `Your worker has arrived for "${gigTitle}".`, gigId: undefined };
+      return isDelivery
+        ? {
+            type: "WORKER_ARRIVED",
+            title: "Courier at pickup",
+            body: "Your courier has arrived at the pickup location.",
+            gigId: undefined
+          }
+        : {
+            type: "WORKER_ARRIVED",
+            title: "Worker arrived",
+            body: `Your worker has arrived for "${gigTitle}".`,
+            gigId: undefined
+          };
 
     case GigStatus.IN_PROGRESS:
-
-      return { type: "GIG_STARTED", title: "Gig started", body: `Work has started on "${gigTitle}".`, gigId: undefined };
+      return {
+        type: "GIG_STARTED",
+        title: "Gig started",
+        body: `Work has started on "${gigTitle}".`,
+        gigId: undefined
+      };
 
     case GigStatus.WAITING_CUSTOMER_CONFIRMATION:
-
-      return { type: "GIG_REVIEW", title: "Review completion", body: `Please review and approve completion for "${gigTitle}".`, gigId: undefined };
+      return isDelivery
+        ? {
+            type: "DELIVERY_AWAITING_CONFIRMATION",
+            title: "Package delivered",
+            body: "Confirm your delivery is complete, or we’ll finish it automatically shortly.",
+            gigId: undefined
+          }
+        : {
+            type: "GIG_REVIEW",
+            title: "Review completion",
+            body: `Please review and approve completion for "${gigTitle}".`,
+            gigId: undefined
+          };
 
     case GigStatus.WAITING_EXTRA_TIME_APPROVAL:
-
-      return { type: "ESTIMATED_TIME_REACHED", title: "Booked time reached", body: `Approve extra time or finish "${gigTitle}".`, gigId: undefined };
+      return {
+        type: "ESTIMATED_TIME_REACHED",
+        title: "Booked time reached",
+        body: `Approve extra time or finish "${gigTitle}".`,
+        gigId: undefined
+      };
 
     case GigStatus.COMPLETED:
-
-      return { type: "GIG_COMPLETED", title: "Gig completed", body: `"${gigTitle}" was completed successfully.`, gigId: undefined };
+      return isDelivery
+        ? {
+            type: "DELIVERY_COMPLETED",
+            title: "Delivery complete",
+            body: "Your delivery is complete. Thank you for using DUTS Delivery.",
+            gigId: undefined
+          }
+        : {
+            type: "GIG_COMPLETED",
+            title: "Gig completed",
+            body: `"${gigTitle}" was completed successfully.`,
+            gigId: undefined
+          };
 
     default:
-
       return null;
-
   }
-
 }
 
 
@@ -583,6 +629,24 @@ export async function updateGigStatus(
 
   if (isAssignedWorker) {
 
+    if (gig.fulfillmentType === "DELIVERY") {
+      // Delivery uses dedicated PIN / drop-off endpoints after arrival at pickup.
+      if (
+        nextStatus === GigStatus.IN_PROGRESS ||
+        nextStatus === GigStatus.WAITING_CUSTOMER_CONFIRMATION ||
+        nextStatus === GigStatus.PACKAGE_COLLECTED ||
+        nextStatus === GigStatus.EN_ROUTE_TO_DROPOFF ||
+        nextStatus === GigStatus.ARRIVED_AT_DROPOFF ||
+        nextStatus === GigStatus.COMPLETED
+      ) {
+        throw new AppError(
+          "Use the delivery verification endpoints for this action.",
+          409,
+          "USE_DELIVERY_ENDPOINTS"
+        );
+      }
+    }
+
     const expected = workerTransitions[gig.status];
 
     if (expected !== nextStatus) {
@@ -604,7 +668,19 @@ export async function updateGigStatus(
 
   } else if (nextStatus === GigStatus.CANCELLED) {
 
-    if (!CANCELLABLE_STATUSES.includes(gig.status)) {
+    if (gig.fulfillmentType === "DELIVERY") {
+      const { assertDeliveryClientCancelAllowed } = await import("./delivery.service.js");
+      assertDeliveryClientCancelAllowed(gig.status);
+      const deliveryCancellable: GigStatus[] = [
+        ...CANCELLABLE_STATUSES,
+        GigStatus.WORKER_ARRIVED
+      ];
+      if (!deliveryCancellable.includes(gig.status)) {
+        throw new AppError("CANCEL_NOT_ALLOWED", 409, "CANCEL_NOT_ALLOWED", {
+          status: "This delivery can no longer be cancelled."
+        });
+      }
+    } else if (!CANCELLABLE_STATUSES.includes(gig.status)) {
 
       throw new AppError("CANCEL_NOT_ALLOWED", 409, "CANCEL_NOT_ALLOWED", {
 
@@ -799,9 +875,20 @@ export async function updateGigStatus(
     void checkTimerThreshold(gigId, io);
   }
 
+  // Never broadcast verification PINs over generic status channels.
+  const { pickupPin: _pickupPin, deliveryPin: _deliveryPin, ...safeGig } = updatedGig as typeof updatedGig & {
+    pickupPin?: string | null;
+    deliveryPin?: string | null;
+  };
+  const gigWithoutPins = {
+    ...safeGig,
+    pickupPin: undefined,
+    deliveryPin: undefined
+  };
+
   if (io) {
 
-    const notice = notificationForStatus(nextStatus, updatedGig.title);
+    const notice = notificationForStatus(nextStatus, updatedGig.title, updatedGig.fulfillmentType);
 
     if (notice) {
 
@@ -809,13 +896,13 @@ export async function updateGigStatus(
 
     }
 
-    io.to(`gig:${updatedGig.id}`).to(`user:${updatedGig.clientId}`).emit("gig:status", { gig: updatedGig });
+    io.to(`gig:${updatedGig.id}`).to(`user:${updatedGig.clientId}`).emit("gig:status", { gig: gigWithoutPins });
 
   }
 
 
 
-  return updatedGig;
+  return gigWithoutPins;
 
 }
 
@@ -847,7 +934,22 @@ export async function listWorkerGigs(workerId: string) {
         { assignments: { some: { workerId, cancelledAt: null } } },
         {
           assignedWorkerId: workerId,
-          status: { in: [GigStatus.WORKER_SELECTED, GigStatus.WORKER_ASSIGNED, GigStatus.WORKER_EN_ROUTE, GigStatus.WORKER_ARRIVED, GigStatus.IN_PROGRESS, GigStatus.WAITING_EXTRA_TIME_APPROVAL, GigStatus.WAITING_CUSTOMER_CONFIRMATION, GigStatus.COMPLETED, GigStatus.DISPUTED] }
+          status: {
+            in: [
+              GigStatus.WORKER_SELECTED,
+              GigStatus.WORKER_ASSIGNED,
+              GigStatus.WORKER_EN_ROUTE,
+              GigStatus.WORKER_ARRIVED,
+              GigStatus.PACKAGE_COLLECTED,
+              GigStatus.EN_ROUTE_TO_DROPOFF,
+              GigStatus.ARRIVED_AT_DROPOFF,
+              GigStatus.IN_PROGRESS,
+              GigStatus.WAITING_EXTRA_TIME_APPROVAL,
+              GigStatus.WAITING_CUSTOMER_CONFIRMATION,
+              GigStatus.COMPLETED,
+              GigStatus.DISPUTED
+            ]
+          }
         }
       ]
     },

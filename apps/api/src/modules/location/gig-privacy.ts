@@ -57,6 +57,16 @@ function stripInternalFinancials<T extends Record<string, unknown>>(gig: T): T {
   return rest as T;
 }
 
+/** Never leak verification PINs to couriers or anonymous viewers. */
+function stripDeliveryPins<T extends Record<string, unknown>>(gig: T, allowPins: boolean): T {
+  if (allowPins) return gig;
+  const { pickupPin: _p, deliveryPin: _d, ...rest } = gig as T & {
+    pickupPin?: unknown;
+    deliveryPin?: unknown;
+  };
+  return { ...rest, pickupPin: undefined, deliveryPin: undefined } as unknown as T;
+}
+
 /**
  * Role-aware gig payload. Financial privacy is enforced here — not only in the UI.
  */
@@ -136,11 +146,19 @@ export function sanitizeGigForViewer<T extends GigWithRelations>(
   }
 
   if (isAdmin) {
-    return { ...base, pricing, earnings };
+    return {
+      ...stripDeliveryPins(base as unknown as Record<string, unknown>, false),
+      pricing,
+      earnings
+    } as unknown as typeof base;
   }
 
   if (isClientOwner) {
-    const stripped = stripInternalFinancials(base as unknown as Record<string, unknown>);
+    const stripped = stripDeliveryPins(
+      stripInternalFinancials(base as unknown as Record<string, unknown>),
+      false
+    );
+    // Hashed PINs are never returned; customer uses create/regenerate secrets.
     return {
       ...stripped,
       totalCents: pricing.serviceAmountCents,
@@ -155,9 +173,31 @@ export function sanitizeGigForViewer<T extends GigWithRelations>(
   }
 
   if (isWorkerViewer) {
-    const stripped = stripInternalFinancials(base as unknown as Record<string, unknown>);
+    const stripped = stripDeliveryPins(
+      stripInternalFinancials(base as unknown as Record<string, unknown>),
+      false
+    );
+    // Pre-assignment: hide exact drop-off street details for deliveries (keep area).
+    let privacy = stripped;
+    if (
+      (gig as { fulfillmentType?: string }).fulfillmentType === "DELIVERY" &&
+      !isAssignedWorker &&
+      GIG_SEARCHING_STATUSES.includes(gig.status as (typeof GIG_SEARCHING_STATUSES)[number])
+    ) {
+      privacy = {
+        ...stripped,
+        dropoffAddressLine1: undefined,
+        dropoffAddressLine2: undefined,
+        dropoffPostalCode: undefined,
+        dropoffFormattedAddress: undefined,
+        dropoffLatitude: undefined,
+        dropoffLongitude: undefined,
+        dropoffContactPhone: undefined,
+        pickupContactPhone: undefined
+      };
+    }
     return {
-      ...stripped,
+      ...privacy,
       totalCents: earnings.netEarningsCents,
       workerPayoutCents: earnings.netEarningsCents,
       earnings,
@@ -172,5 +212,8 @@ export function sanitizeGigForViewer<T extends GigWithRelations>(
     } as unknown as typeof base;
   }
 
-  return stripInternalFinancials(base as unknown as Record<string, unknown>) as unknown as typeof base;
+  return stripDeliveryPins(
+    stripInternalFinancials(base as unknown as Record<string, unknown>),
+    false
+  ) as unknown as typeof base;
 }

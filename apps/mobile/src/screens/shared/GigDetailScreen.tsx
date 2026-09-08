@@ -46,8 +46,22 @@ export function GigDetailScreen() {
 
   const gig = gigQuery.data?.gig;
   const worker = gig?.assignments?.[0]?.worker;
-  const workerAction = gig ? nextWorkerAction(gig.status) : null;
+  const workerAction = gig ? nextWorkerAction(gig.status, gig.fulfillmentType) : null;
   const hasReview = (reviewsQuery.data?.reviews ?? []).some((review) => review.reviewer?.id === userId);
+
+  useEffect(() => {
+    if (gig?.fulfillmentType === "DELIVERY") {
+      navigation.replace("DeliveryJob", { gigId: gig.id });
+    }
+  }, [gig?.fulfillmentType, gig?.id, navigation]);
+
+  if (gig?.fulfillmentType === "DELIVERY") {
+    return (
+      <View className="flex-1 items-center justify-center" style={{ backgroundColor: DUTS.background }}>
+        <Text className="text-ink">Opening delivery…</Text>
+      </View>
+    );
+  }
 
   const socket = useSocket();
 

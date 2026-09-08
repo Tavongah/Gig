@@ -513,7 +513,8 @@ export async function activateGigAfterPayment(gigId: string): Promise<void> {
     workerPayoutCents: gig.workerPayoutCents,
     startsAt: gig.startsAt.toISOString(),
     urgency: gig.urgency,
-    estimatedHours: Number(gig.estimatedHours)
+    estimatedHours: Number(gig.estimatedHours),
+    fulfillmentType: gig.fulfillmentType
   });
 
   io.to(`user:${gig.clientId}`).emit("gig:payment_authorized", { gigId: gig.id });
@@ -545,16 +546,21 @@ export async function activateGigAfterWorkerPayment(gigId: string, io?: Server):
   });
 
   const socket = io ?? getSocketServer();
+  const isDelivery = gig.fulfillmentType === "DELIVERY";
   notifyUser(socket, gig.assignedWorkerId, {
     type: "PAYMENT_SECURED",
-    title: "You have been selected for this gig.",
-    body: `Payment received for "${gig.title}". You can start travel to the customer.`,
+    title: isDelivery ? "Delivery confirmed — go to pickup" : "You have been selected for this gig.",
+    body: isDelivery
+      ? "Payment secured. Pickup details are available — start your trip when ready."
+      : `Payment received for "${gig.title}". You can start travel to the customer.`,
     gigId
   });
   notifyUser(socket, gig.clientId, {
     type: "PAYMENT_CAPTURED",
-    title: "Booking confirmed",
-    body: "Your payment was received. The worker is paid after the gig is completed.",
+    title: isDelivery ? "Courier confirmed" : "Booking confirmed",
+    body: isDelivery
+      ? "Your courier is assigned. Share the Pickup PIN when they collect the package."
+      : "Your payment was received. The worker is paid after the gig is completed.",
     gigId
   });
   socket.to(`user:${gig.clientId}`).to(`user:${gig.assignedWorkerId}`).emit("gig:payment_authorized", { gigId });
@@ -566,6 +572,22 @@ export async function activateGigAfterWorkerPayment(gigId: string, io?: Server):
   });
   socket.to(`user:${gig.clientId}`).to(`user:${gig.assignedWorkerId}`).emit("gig:matched", { gigId });
   logPayment("worker_payment_captured", { gigId, workerId: gig.assignedWorkerId });
+
+  if (gig.fulfillmentType === "DELIVERY") {
+    const { logDutsFlow } = await import("../../lib/flow-log.js");
+    logDutsFlow("COURIER_ASSIGNED", {
+      gigId,
+      userId: gig.assignedWorkerId,
+      userRole: "WORKER",
+      fulfillmentType: "DELIVERY"
+    });
+    logDutsFlow("PAYMENT_AUTHORIZED", {
+      gigId,
+      userId: gig.clientId,
+      userRole: "CLIENT",
+      fulfillmentType: "DELIVERY"
+    });
+  }
 }
 
 async function broadcastPostedGig(gigId: string): Promise<void> {
@@ -575,7 +597,14 @@ async function broadcastPostedGig(gigId: string): Promise<void> {
   });
   if (!gig) return;
 
-  const io = getSocketServer();
+  let io: ReturnType<typeof getSocketServer>;
+  try {
+    io = getSocketServer();
+  } catch {
+    // Scripts/tests may create gigs without a running Socket.IO server.
+    return;
+  }
+
   await broadcastGigOffer(io, {
     gigId: gig.id,
     title: gig.title,
@@ -590,7 +619,8 @@ async function broadcastPostedGig(gigId: string): Promise<void> {
     workerPayoutCents: gig.workerPayoutCents,
     startsAt: gig.startsAt.toISOString(),
     urgency: gig.urgency,
-    estimatedHours: Number(gig.estimatedHours)
+    estimatedHours: Number(gig.estimatedHours),
+    fulfillmentType: gig.fulfillmentType
   });
 }
 
@@ -763,6 +793,13 @@ export async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentInt
   });
 
   logPayment("payment_failed", { gigId, paymentIntentId: paymentIntent.id });
+  const { logDutsFlow } = await import("../../lib/flow-log.js");
+  logDutsFlow("PAYMENT_FAILED", {
+    gigId,
+    userId: gig.clientId,
+    userRole: "CLIENT",
+    fulfillmentType: gig.fulfillmentType ?? undefined
+  });
 }
 
 export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session): Promise<void> {

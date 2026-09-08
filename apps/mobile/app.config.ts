@@ -38,7 +38,7 @@ export default {
       icon: "./assets/icon.png",
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
-          "DUTS uses your location to show nearby gigs and match you with local workers.",
+          "DUTS uses your location to set package pickup and drop-off points, show nearby work, and confirm courier arrival at pickup and delivery.",
         NSCameraUsageDescription: "DUTS uses your camera so you can take a profile picture.",
         NSPhotoLibraryUsageDescription: "DUTS uses your photos so you can set a profile picture.",
         NSPhotoLibraryAddUsageDescription: "DUTS saves cropped profile photos to your library when needed.",
@@ -89,7 +89,7 @@ export default {
         "expo-location",
         {
           locationWhenInUsePermission:
-            "DUTS uses your location to show nearby gigs and match you with local workers.",
+            "DUTS uses your location for package pickup/drop-off, nearby work, and to confirm courier arrival at pickup and delivery.",
           isIosBackgroundLocationEnabled: false,
           isAndroidBackgroundLocationEnabled: false
         }
@@ -97,6 +97,7 @@ export default {
     ],
     extra: {
       apiUrl,
+      appEnv: process.env.EXPO_PUBLIC_APP_ENV ?? "development",
       webUrl: process.env.EXPO_PUBLIC_WEB_URL ?? "",
       supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? "info@duts.tech",
       supportPhone: process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? "+12036769717",
