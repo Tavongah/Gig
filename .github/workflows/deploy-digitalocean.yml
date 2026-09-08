@@ -51,6 +51,8 @@ jobs:
       - name: Generate Prisma client
         working-directory: apps/api
         run: npx prisma generate
+      - name: Build shared package
+        run: npm run build --workspace @gigflow/shared
       - run: npm run typecheck
       - run: npm run build:api
       - run: npm run build --workspace @gigflow/admin

@@ -99,7 +99,7 @@ export async function upsertProductForMerchant(
   const normalizedName = normalizeProductSearchName(parsed.name);
   const aliases = [
     ...new Set([
-      ...parsed.searchAliases.map((a) => normalizeProductSearchName(a)),
+      ...(parsed.searchAliases ?? []).map((a: string) => normalizeProductSearchName(a)),
       ...expandSearchTerms(parsed.name)
     ])
   ].filter(Boolean);

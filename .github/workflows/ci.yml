@@ -57,6 +57,9 @@ jobs:
         working-directory: apps/api
         run: npx prisma generate
 
+      - name: Build shared package
+        run: npm run build --workspace @gigflow/shared
+
       - name: Typecheck
         run: npm run typecheck
 
