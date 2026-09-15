@@ -85,7 +85,7 @@ export async function handleCustomerWhatsAppMessage(
 
   const wa = getWhatsAppProvider();
   const commerceCustomer = await ensureWhatsAppCommerceCustomer(phone, msg.profileName);
-  const conv = await getOrCreateConversation(phone, WhatsAppParty.CUSTOMER, {
+  let conv = await getOrCreateConversation(phone, WhatsAppParty.CUSTOMER, {
     commerceCustomerId: commerceCustomer.id
   });
   let ctx = readContext(conv);
@@ -123,9 +123,22 @@ export async function handleCustomerWhatsAppMessage(
     return { handled: true };
   }
 
-  // ── Pending interaction: ORDER REVIEW (must short-circuit before product extraction)
+  // ── Pending interaction: ORDER REVIEW (confirm/change/cancel short-circuit)
   if (conv.state === WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION) {
-    return handleOrderReviewDecision(phone, customerId, conv.id, ctx, text, msg.buttonId);
+    const review = await handleOrderReviewDecision(
+      phone,
+      customerId,
+      conv.id,
+      ctx,
+      text,
+      msg.buttonId
+    );
+    if (review.handled) return review;
+    // Shopping edit while reviewing — continue as BUILDING_CART
+    conv = { ...conv, state: WhatsAppConversationState.BUILDING_CART };
+    const { prisma } = await import("../../config/prisma.js");
+    const refreshed = await prisma.whatsAppConversation.findUnique({ where: { id: conv.id } });
+    if (refreshed) ctx = readContext(refreshed);
   }
 
   // Cancel outside order-review (IDLE / cart / etc.)
@@ -874,7 +887,30 @@ async function handleOrderReviewDecision(
     return { handled: true };
   }
 
-  // Unrecognized while reviewing — re-prompt; do NOT run product search.
+  // Unrecognized while reviewing — if it looks like shopping/cart edit, leave review
+  // and let the main handler apply mutations. Otherwise re-prompt.
+  const intent = classifyShoppingIntent(text);
+  const shoppingEdit = [
+    "ADD_ITEM",
+    "REMOVE_ITEM",
+    "CHANGE_QUANTITY",
+    "REPLACE_ITEM",
+    "NEW_LIST",
+    "SHOW_CART",
+    "CLEAR_CART",
+    "CHECK_TOTAL",
+    "CHECK_PRICE",
+    "CHECK_AVAILABILITY",
+    "SET_BUDGET"
+  ].includes(intent.kind);
+  if (shoppingEdit || (await extractShoppingItemsWithOptionalAi(text)).length > 0) {
+    await updateConversation(convId, {
+      state: WhatsAppConversationState.BUILDING_CART,
+      context: ctx
+    });
+    return { handled: false };
+  }
+
   await wa.sendText(
     phone,
     ["Confirm order?", "", "1. Confirm", "2. Change", "3. Cancel"].join("\n")

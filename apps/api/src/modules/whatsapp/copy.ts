@@ -217,6 +217,16 @@ export function formatMerchantReady(orderNumber: number): string {
   return [`✓ Order #${orderNumber} ready`, "", "Finding a courier..."].join("\n");
 }
 
+/** READY succeeded at shop but delivery gig could not start — recoverable. */
+export function formatMerchantReadyDeliveryFailed(): string {
+  return [
+    "Order is ready.",
+    "",
+    "DUTS couldn't start delivery yet.",
+    "Please try READY again shortly."
+  ].join("\n");
+}
+
 export function formatCustomerMerchantAccepted(): string {
   return ["✓ Shop accepted your order.", "", "Preparing it now."].join("\n");
 }

@@ -32,6 +32,7 @@
     "test:commerce-paynow-official": "tsx scripts/test-commerce-paynow-official.ts",
     "test:commerce-identity": "tsx scripts/test-commerce-customer-identity.ts",
     "test:merchant-onboarding": "tsx scripts/test-merchant-onboarding-pilot.ts",
+    "test:merchant-ready-delivery": "tsx scripts/test-merchant-ready-delivery.ts",
     "test:meriden-test-merchant": "tsx scripts/test-meriden-test-merchant.ts",
     "seed:pilot-merchant": "tsx scripts/seed-pilot-merchant.ts",
     "seed:meriden-test-merchant": "tsx scripts/seed-meriden-test-merchant.ts"

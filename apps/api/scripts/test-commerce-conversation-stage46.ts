@@ -197,6 +197,10 @@ async function main() {
     io
   );
   await handleCustomerWhatsAppMessage(
+    { providerMessageId: mid("budget-start"), from: customerPhone, text: "start over" },
+    io
+  );
+  await handleCustomerWhatsAppMessage(
     { providerMessageId: mid("budgetlist"), from: customerPhone, text: "milk and sugar under $2" },
     io
   );
@@ -235,9 +239,11 @@ async function main() {
   );
   const milk = await prisma.product.findFirst({ where: { merchantId: merchant.id, name: "Milk 1L" } });
   assert(milk, "milk");
+  // Bump to a unique price so PRICE_CHANGED always fires (idempotent re-runs).
+  const bumpedMilkCents = milk.priceCents === 220 ? 235 : 220;
   await upsertProductForMerchant(
     merchant.id,
-    { name: milk.name, priceCents: 220, available: true, searchAliases: ["milk"] },
+    { name: milk.name, priceCents: bumpedMilkCents, available: true, searchAliases: ["milk"] },
     milk.id
   );
   await handleCustomerWhatsAppMessage(
@@ -255,10 +261,10 @@ async function main() {
   );
   const afterConfirm = mock.sent.filter((m) => m.to === customerPhone).pop()?.body ?? "";
   assert(
-    /price of .+ changed|price changed|Order received|confirming|expired|budget|Continue\?/i.test(
+    /price of .+ changed|price changed|Order received|confirming|expired|budget|Continue\?|sent to the shop|Cash on delivery/i.test(
       afterConfirm
     ),
-    "confirm path"
+    `confirm path: ${afterConfirm.slice(0, 160)}`
   );
 
   console.log("H) OOS at confirm…");

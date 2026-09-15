@@ -17,6 +17,7 @@ import { createDelivery } from "../gigs/delivery.service.js";
 import { estimateDeliveryFee } from "../gigs/delivery-pricing.service.js";
 import { getMarketplaceSettings, type BasketLine } from "./merchant.service.js";
 import { normalizePhoneNumber } from "../auth/access.service.js";
+import { normalizeMerchantPhone } from "./merchant.service.js";
 import { broadcastGigOffer } from "../realtime/realtime.service.js";
 import {
   assertCommercePaymentMethodAllowed,
@@ -29,6 +30,72 @@ import {
   resolveDeliveryClientUserId,
   ensureWhatsAppCommerceCustomer
 } from "./commerce-customer.service.js";
+
+/** True when value looks like a usable E.164 contact for delivery schema (min 7 chars). */
+export function isUsableDeliveryContactPhone(raw: string | null | undefined): boolean {
+  if (!raw?.trim()) return false;
+  try {
+    const n = normalizeMerchantPhone(raw);
+    return n.length >= 7 && n.length <= 24 && /^\+[1-9]\d{6,22}$/.test(n);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Pickup = shop. Prefer Merchant.phone, else Merchant.whatsappPhone.
+ * Never invent numbers; never use customer phone.
+ */
+export function resolveMerchantPickupContactPhone(merchant: {
+  phone?: string | null;
+  whatsappPhone?: string | null;
+}): string {
+  for (const raw of [merchant.phone, merchant.whatsappPhone]) {
+    if (!raw?.trim()) continue;
+    try {
+      const n = normalizeMerchantPhone(raw);
+      if (n.length >= 7 && n.length <= 24 && /^\+[1-9]\d{6,22}$/.test(n)) return n;
+    } catch {
+      /* try next */
+    }
+  }
+  throw new AppError(
+    "Shop contact phone is missing or invalid.",
+    409,
+    "DELIVERY_CONTACT_INVALID"
+  );
+}
+
+/**
+ * Dropoff = customer WhatsApp / CommerceCustomer contact.
+ * Never use merchant phone or invent numbers.
+ */
+export function resolveCustomerDropoffContactPhone(input: {
+  customerWhatsAppPhone?: string | null;
+  commerceWhatsappPhone?: string | null;
+  commercePrimaryPhone?: string | null;
+  linkedUserPhone?: string | null;
+}): string {
+  for (const raw of [
+    input.customerWhatsAppPhone,
+    input.commerceWhatsappPhone,
+    input.commercePrimaryPhone,
+    input.linkedUserPhone
+  ]) {
+    if (!raw?.trim()) continue;
+    try {
+      const n = normalizePhoneNumber(raw.trim());
+      if (n.length >= 7 && n.length <= 24 && /^\+[1-9]\d{6,22}$/.test(n)) return n;
+    } catch {
+      /* try next */
+    }
+  }
+  throw new AppError(
+    "Customer contact phone is missing or invalid.",
+    409,
+    "DELIVERY_CONTACT_INVALID"
+  );
+}
 
 /** Mark marketplace-linked delivery as paid (fee on CommerceOrder) and open courier matching. */
 export async function openMarketplaceDeliveryForCouriers(gigId: string, io: Server): Promise<void> {
@@ -400,59 +467,77 @@ export async function merchantMarkReadyForPickup(
     commerceCustomer?.displayName ||
     customer?.fullName ||
     "Customer";
-  const contactPhone =
-    order.customerWhatsAppPhone ||
-    commerceCustomer?.whatsappPhone ||
-    commerceCustomer?.primaryPhone ||
-    customer?.phoneNumber ||
-    merchant.phone;
+  const pickupContactPhone = resolveMerchantPickupContactPhone(merchant);
+  const dropoffContactPhone = resolveCustomerDropoffContactPhone({
+    customerWhatsAppPhone: order.customerWhatsAppPhone,
+    commerceWhatsappPhone: commerceCustomer?.whatsappPhone,
+    commercePrimaryPhone: commerceCustomer?.primaryPhone,
+    linkedUserPhone: customer?.phoneNumber
+  });
+  const pickupContactName = (merchant.contactName?.trim() || merchant.name).slice(0, 80);
 
-  const deliveryResult = await createDelivery(
-    deliveryClientId,
-    {
-      pickup: {
-        latitude: Number(merchant.latitude),
-        longitude: Number(merchant.longitude),
-        formattedAddress: `${merchant.name}, ${merchant.locationLabel}`,
-        addressLine1: merchant.locationLabel,
-        city: "Harare",
-        region: "Harare",
-        postalCode: "0000",
-        country: "ZW",
-        contactName: merchant.contactName,
-        contactPhone: merchant.phone,
-        instructions: `Marketplace order #${order.orderNumber}`
+  let deliveryResult: Awaited<ReturnType<typeof createDelivery>>;
+  try {
+    deliveryResult = await createDelivery(
+      deliveryClientId,
+      {
+        pickup: {
+          latitude: Number(merchant.latitude),
+          longitude: Number(merchant.longitude),
+          formattedAddress: `${merchant.name}, ${merchant.locationLabel}`,
+          addressLine1: merchant.locationLabel,
+          city: "Harare",
+          region: "Harare",
+          postalCode: "0000",
+          country: "ZW",
+          contactName: pickupContactName,
+          contactPhone: pickupContactPhone,
+          instructions: `Marketplace order #${order.orderNumber}`
+        },
+        dropoff: {
+          latitude: Number(order.deliveryLatitude),
+          longitude: Number(order.deliveryLongitude),
+          formattedAddress: order.deliveryLabel,
+          addressLine1: order.deliveryLabel,
+          city: "Harare",
+          region: "Harare",
+          postalCode: "0000",
+          country: "ZW",
+          contactName,
+          contactPhone: dropoffContactPhone,
+          instructions: `DUTS shop order #${order.orderNumber}`
+        },
+        package: {
+          category: PackageCategory.GROCERIES,
+          description: `Order #${order.orderNumber}: ${summary}`.slice(0, 240),
+          size: "SMALL",
+          notes: `Commerce order ${order.id}`
+        },
+        prohibitedItemsAck: true,
+        orderSource: "WHATSAPP"
       },
-      dropoff: {
-        latitude: Number(order.deliveryLatitude),
-        longitude: Number(order.deliveryLongitude),
-        formattedAddress: order.deliveryLabel,
-        addressLine1: order.deliveryLabel,
-        city: "Harare",
-        region: "Harare",
-        postalCode: "0000",
-        country: "ZW",
-        contactName,
-        contactPhone,
-        instructions: `DUTS shop order #${order.orderNumber}`
-      },
-      package: {
-        category: PackageCategory.GROCERIES,
-        description: `Order #${order.orderNumber}: ${summary}`.slice(0, 240),
-        size: "SMALL",
-        notes: `Commerce order ${order.id}`
-      },
-      prohibitedItemsAck: true,
-      orderSource: "WHATSAPP"
-    },
-    io,
-    {
-      idempotencyKey: `commerce-order-${order.id}`,
-      orderSource: "WHATSAPP",
-      bypassClientPostGate: true,
-      marketplaceCommerceOrderId: order.id
-    }
-  );
+      io,
+      {
+        idempotencyKey: `commerce-order-${order.id}`,
+        orderSource: "WHATSAPP",
+        bypassClientPostGate: true,
+        marketplaceCommerceOrderId: order.id
+      }
+    );
+  } catch (error) {
+    logDutsFlow("COMMERCE_READY_DELIVERY_FAILED", {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      merchantId,
+      reason: error instanceof Error ? error.name : "unknown"
+    });
+    if (error instanceof AppError) throw error;
+    throw new AppError(
+      "Could not start delivery for this order.",
+      502,
+      "DELIVERY_CREATE_FAILED"
+    );
+  }
 
   const gigId = (deliveryResult.delivery as { id: string }).id;
 

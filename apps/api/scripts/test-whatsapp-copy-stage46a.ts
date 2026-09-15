@@ -181,11 +181,21 @@ async function main() {
     "merchant unknown"
   );
 
-  const { formatMerchantAccepted, formatMerchantReady } = await import(
+  const { formatMerchantAccepted, formatMerchantReady, formatMerchantReadyDeliveryFailed } = await import(
     "../src/modules/whatsapp/copy.js"
   );
   includesAll(formatMerchantAccepted(1042), ["accepted", "prepare", "ready"], "merchant accept");
   includesAll(formatMerchantReady(1042), ["ready", "finding a courier"], "merchant ready");
+  includesAll(
+    formatMerchantReadyDeliveryFailed(),
+    ["order is ready", "couldn't start delivery", "try ready again"],
+    "merchant ready failed"
+  );
+  excludesAll(
+    formatMerchantReadyDeliveryFailed(),
+    ["contactphone", "zod", "prisma", "too_small"],
+    "merchant ready failed"
+  );
 
   console.log("Stage 4.6A WhatsApp copy assertions: PASS");
 }

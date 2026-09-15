@@ -31,7 +31,7 @@ import {
 import { getWhatsAppProvider } from "./provider.js";
 import type { InboundWhatsAppMessage } from "./customer-handler.js";
 import { sendCommerceNotification } from "./templates.js";
-import { formatMerchantAccepted, formatMerchantNewOrder, formatMerchantReady, formatCustomerMerchantAccepted, formatCustomerOrderReady, MERCHANT_HELP, money } from "./copy.js";
+import { formatMerchantAccepted, formatMerchantNewOrder, formatMerchantReady, formatMerchantReadyDeliveryFailed, formatCustomerMerchantAccepted, formatCustomerOrderReady, MERCHANT_HELP, money } from "./copy.js";
 
 function friendlyMerchantOrderStatus(status: string): string {
   switch (status) {
@@ -449,8 +449,33 @@ export async function handleMerchantWhatsAppMessage(
     await wa.sendText(phone, MERCHANT_HELP);
     return { handled: true };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Something went wrong.";
-    await wa.sendText(phone, message);
+    const { AppError } = await import("../../lib/errors.js");
+    if (error instanceof AppError) {
+      if (
+        error.code === "DELIVERY_CONTACT_INVALID" ||
+        error.code === "DELIVERY_CREATE_FAILED"
+      ) {
+        await wa.sendText(phone, formatMerchantReadyDeliveryFailed());
+        return { handled: true };
+      }
+      // Known business errors may be short human copy (never JSON/Zod dumps).
+      if (
+        error.message &&
+        error.message.length <= 200 &&
+        !error.message.trimStart().startsWith("[") &&
+        !error.message.includes('"code"') &&
+        !/zod|prisma|stack|validation/i.test(error.message)
+      ) {
+        await wa.sendText(phone, error.message);
+        return { handled: true };
+      }
+    }
+    console.error(
+      "[whatsapp:merchant] handler error",
+      error instanceof Error ? error.name : "unknown",
+      error instanceof Error ? error.message.slice(0, 120) : ""
+    );
+    await wa.sendText(phone, "Something went wrong. Please try again shortly.");
     return { handled: true };
   }
 }
