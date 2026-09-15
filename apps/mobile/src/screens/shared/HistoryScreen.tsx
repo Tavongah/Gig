@@ -4,6 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../../lib/api";
 import { HISTORY_STATUSES } from "../../lib/gig-status";
+import { openGigForRole } from "../../lib/open-gig";
 import { TabScreen } from "../../components/TabScreen";
 import { SectionHeader } from "../../components/SectionHeader";
 import { GigCard } from "../../components/GigCard";
@@ -41,7 +42,7 @@ export function HistoryScreen({ perspective }: HistoryScreenProps) {
               <GigCard
                 key={gig.id}
                 gig={gig}
-                onPress={() => navigation.navigate("GigDetail", { gigId: gig.id })}
+                onPress={() => openGigForRole(navigation, gig, perspective)}
               />
             ))}
           </View>

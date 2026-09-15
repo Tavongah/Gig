@@ -11,6 +11,7 @@
     "web:export": "expo export --platform web --output-dir dist-web",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:delivery-ui": "npx tsx scripts/test-delivery-ui.ts",
+    "test:courier-start-trip-ui": "npx tsx scripts/test-courier-start-trip-ui.ts",
     "eas:login": "npx eas-cli login",
     "eas:build:android": "npx eas-cli build --platform android --profile production",
     "eas:build:android:pilot": "npx eas-cli build --platform android --profile pilot",

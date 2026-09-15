@@ -48,23 +48,11 @@ export function GigDetailScreen() {
   const worker = gig?.assignments?.[0]?.worker;
   const workerAction = gig ? nextWorkerAction(gig.status, gig.fulfillmentType) : null;
   const hasReview = (reviewsQuery.data?.reviews ?? []).some((review) => review.reviewer?.id === userId);
+  const isDelivery = gig?.fulfillmentType === "DELIVERY";
 
-  useEffect(() => {
-    if (gig?.fulfillmentType === "DELIVERY") {
-      navigation.replace("DeliveryJob", { gigId: gig.id });
-    }
-  }, [gig?.fulfillmentType, gig?.id, navigation]);
-
-  if (gig?.fulfillmentType === "DELIVERY") {
-    return (
-      <View className="flex-1 items-center justify-center" style={{ backgroundColor: DUTS.background }}>
-        <Text className="text-ink">Opening delivery…</Text>
-      </View>
-    );
-  }
-
+  // Hooks must stay above any early return. Returning before these when gig loads as
+  // DELIVERY caused React minified error #300 ("Rendered fewer hooks than expected").
   const socket = useSocket();
-
   const { payWithStripe, isPaying } = useStripeCheckout();
 
   const invalidate = useCallback(() => {
@@ -73,24 +61,31 @@ export function GigDetailScreen() {
   }, [gigQuery, queryClient]);
 
   useEffect(() => {
-    if (!socket) return;
+    if (!isDelivery || !gig?.id) return;
+    navigation.replace("DeliveryJob", { gigId: gig.id });
+  }, [isDelivery, gig?.id, navigation]);
+
+  useEffect(() => {
+    if (!socket || isDelivery) return;
     socket.emit("gig:join", { gigId: route.params.gigId });
-  }, [socket, route.params.gigId]);
+  }, [socket, route.params.gigId, isDelivery]);
 
   useSocketEvents(
     useMemo(
       () => ({
-      "gig:matched": invalidate,
-      "gig:assigned": invalidate,
-      "gig:status": invalidate,
-      notification: (payload: { title: string; body: string }) => {
-        showAlert(payload.title, payload.body);
-      },
+        "gig:matched": invalidate,
+        "gig:assigned": invalidate,
+        "gig:status": invalidate,
+        notification: (payload: { title: string; body: string }) => {
+          if (isDelivery) return;
+          showAlert(payload.title, payload.body);
+        },
         "location:updated": (payload: { latitude: number; longitude: number }) => {
+          if (isDelivery) return;
           setWorkerLocation({ latitude: payload.latitude, longitude: payload.longitude });
         }
       }),
-      [invalidate]
+      [invalidate, isDelivery]
     )
   );
 
@@ -145,6 +140,40 @@ export function GigDetailScreen() {
     onError: (error: Error) => showAlert("Could not cancel", error.message)
   });
 
+  useEffect(() => {
+    if (
+      isDelivery ||
+      activeRole !== "CLIENT" ||
+      !gig ||
+      gig.status !== "COMPLETED" ||
+      !worker ||
+      hasReview ||
+      reviewsQuery.isLoading
+    ) {
+      return;
+    }
+    showConfirm(
+      "Leave a review?",
+      `Tell us how ${worker.fullName} did on this gig. Reviews are optional.`,
+      () => {
+        navigation.navigate("Review", { gigId: gig.id, workerName: worker.fullName });
+      },
+      {
+        confirmLabel: "Leave a Review",
+        cancelLabel: "Skip",
+        onCancel: () => navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] })
+      }
+    );
+  }, [
+    activeRole,
+    gig,
+    hasReview,
+    isDelivery,
+    navigation,
+    reviewsQuery.isLoading,
+    worker
+  ]);
+
   function confirmAccept(): void {
     if (!gig) return;
     showConfirm("Accept this gig?", "Are you sure you want to accept this gig?", () => acceptMutation.mutate(), {
@@ -173,28 +202,13 @@ export function GigDetailScreen() {
     );
   }
 
-  useEffect(() => {
-    if (
-      activeRole === "CLIENT" &&
-      gig?.status === "COMPLETED" &&
-      worker &&
-      !hasReview &&
-      !reviewsQuery.isLoading
-    ) {
-      showConfirm(
-        "Leave a review?",
-        `Tell us how ${worker.fullName} did on this gig. Reviews are optional.`,
-        () => {
-          navigation.navigate("Review", { gigId: gig.id, workerName: worker.fullName });
-        },
-        {
-          confirmLabel: "Leave a Review",
-          cancelLabel: "Skip",
-          onCancel: () => navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] })
-        }
-      );
-    }
-  }, [activeRole, gig?.id, gig?.status, hasReview, navigation, reviewsQuery.isLoading, worker]);
+  if (isDelivery) {
+    return (
+      <View className="flex-1 items-center justify-center" style={{ backgroundColor: DUTS.background }}>
+        <Text className="text-ink">Opening delivery…</Text>
+      </View>
+    );
+  }
 
   if (!gig) {
     return (
