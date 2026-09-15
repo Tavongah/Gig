@@ -141,8 +141,14 @@ function parseQtyQuery(part: string): RequestedShoppingItem | null {
     .trim();
 
   if (query.length < 2) return null;
-  // Reject non-product command fragments
-  if (/^(make|free|ignore|price|order|paid|ready|another)$/i.test(query)) return null;
+  // Reject checkout / payment command fragments — never treat as product names.
+  if (
+    /^(make|free|ignore|price|order|paid|ready|another|confirm|cancel|change|yes|ok|okay|checkout|cash|cod|eco|ecocash|onemoney|om|retry)$/i.test(
+      query
+    )
+  ) {
+    return null;
+  }
   if (/\bmake\b.*\bfree\b|\bfree\b/i.test(query) && !/\b(duty\s*free)\b/i.test(query)) return null;
   return { query: normalizeProductSearchName(query) || query, quantity };
 }
@@ -315,7 +321,7 @@ export function classifyShoppingIntent(text: string): ShoppingIntent {
     return { kind: "CLEAR_CART", confidence: "high" };
   }
   if (
-    /^(that'?s all|thats all|checkout|i'?m done|place order|confirm|done|finish|order now|send order)$/i.test(
+    /^(that'?s all|thats all|checkout|i'?m done|place order|confirm(?:\s+order)?|yes|ok|okay|done|finish|order now|send order)$/i.test(
       n
     )
   ) {

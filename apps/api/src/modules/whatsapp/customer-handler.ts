@@ -92,7 +92,7 @@ export async function handleCustomerWhatsAppMessage(
   const text = (msg.text || msg.buttonId || "").trim();
   const customerId = commerceCustomer.id;
 
-  // Expire stale draft quotes — keep location, drop prices
+  // Expire stale draft quotes — keep location, drop prices. Always return (no fall-through).
   if (
     isCartExpired(ctx.draftQuotedAt) &&
     (ctx.draftLines?.length || conv.state === WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION)
@@ -108,18 +108,13 @@ export async function handleCustomerWhatsAppMessage(
       activeOrderId: ctx.activeOrderId
     };
     await updateConversation(conv.id, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
-    if (text && !isConfirmIntent(text) && msg.buttonId !== "confirm_order") {
-      await wa.sendText(
-        phone,
-        "That price list expired. Tell me what you need and I'll check today's prices."
-      );
-    } else {
-      await wa.sendText(
-        phone,
-        "That price list expired. Tell me what you'd like to buy."
-      );
-      return { handled: true };
-    }
+    await wa.sendText(
+      phone,
+      isConfirmIntent(text) || isReviewButton(msg.buttonId, "confirm")
+        ? "That price list expired. Tell me what you'd like to buy."
+        : "That price list expired. Tell me what you need and I'll check today's prices."
+    );
+    return { handled: true };
   }
 
   if (isTrackIntent(text)) {
@@ -128,12 +123,13 @@ export async function handleCustomerWhatsAppMessage(
     return { handled: true };
   }
 
-  if (
-    msg.buttonId === "cancel_order" ||
-    (conv.state === WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION &&
-      (text.trim() === "3" || isCancelIntent(text) || /^cancel$/i.test(text.trim()))) ||
-    (conv.state !== WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION && isCancelIntent(text))
-  ) {
+  // ── Pending interaction: ORDER REVIEW (must short-circuit before product extraction)
+  if (conv.state === WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION) {
+    return handleOrderReviewDecision(phone, customerId, conv.id, ctx, text, msg.buttonId);
+  }
+
+  // Cancel outside order-review (IDLE / cart / etc.)
+  if (msg.buttonId === "cancel_order" || isReviewButton(msg.buttonId, "cancel") || isCancelIntent(text)) {
     ctx = { deliveryLat: ctx.deliveryLat, deliveryLng: ctx.deliveryLng, deliveryLabel: ctx.deliveryLabel };
     await updateConversation(conv.id, { state: WhatsAppConversationState.IDLE, context: ctx });
     const { formatOrderCancelled } = await import("./copy.js");
@@ -176,30 +172,26 @@ export async function handleCustomerWhatsAppMessage(
     return { handled: true };
   }
 
-  if (conv.state === WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION) {
-    if (msg.buttonId === "confirm_order" || text.trim() === "1" || isConfirmIntent(text)) {
-      return confirmDraftOrder(phone, customerId, conv.id, ctx);
-    }
-    if (msg.buttonId === "change_order" || text.trim() === "2" || isChangeIntent(text)) {
-      await updateConversation(conv.id, {
-        state: WhatsAppConversationState.BUILDING_CART,
-        context: ctx
-      });
-      await wa.sendText(
-        phone,
-        `${formatRequestedCart(ctx.requestedItems ?? [])}\n\nSay ADD, REMOVE, or change an item.`
-      );
-      return { handled: true };
-    }
-  }
-
+  // Pending: payment selection / payer phone — never product extraction
   if (conv.state === WhatsAppConversationState.AWAITING_PAYMENT) {
     return handlePaymentConversation(phone, customerId, conv.id, ctx, text, msg.buttonId);
   }
 
+  // Pending: product disambiguation — re-prompt on miss; do not fall through
   if (conv.state === WhatsAppConversationState.AWAITING_PRODUCT_CHOICE) {
     const choiceHandled = await tryApplyDisambiguation(phone, conv.id, ctx, text);
     if (choiceHandled) return choiceHandled;
+    const pending = ctx.pendingChoices?.[0];
+    if (pending?.options?.length) {
+      await wa.sendText(
+        phone,
+        formatDisambiguation(
+          pending.options.length === 2 ? `Which ${pending.query}?` : "Which one do you want?",
+          pending.options
+        )
+      );
+      return { handled: true };
+    }
   }
 
   // Need location for catalog-backed answers
@@ -255,13 +247,6 @@ export async function handleCustomerWhatsAppMessage(
         context: ctx
       });
       await wa.sendText(phone, "No problem. Which product did you want instead?");
-      return { handled: true };
-    }
-    if (conv.state === WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION) {
-      await wa.sendText(
-        phone,
-        "What would you like to change? Say ADD, REMOVE, or tell me the items."
-      );
       return { handled: true };
     }
     if (ctx.requestedItems?.length) {
@@ -813,6 +798,90 @@ async function applyProductChoice(
   return buildAndPresentQuote(phone, convId, ctx);
 }
 
+/** Twilio may send button id OR the visible title ("Confirm") as ButtonPayload. */
+function isReviewButton(
+  buttonId: string | undefined,
+  action: "confirm" | "change" | "cancel"
+): boolean {
+  if (!buttonId) return false;
+  const id = buttonId.trim().toLowerCase();
+  if (action === "confirm") return id === "confirm_order" || id === "confirm";
+  if (action === "change") return id === "change_order" || id === "change";
+  return id === "cancel_order" || id === "cancel";
+}
+
+/**
+ * Order-review pending state: CONFIRM / CHANGE / CANCEL only.
+ * Always returns — never falls through to product extraction.
+ */
+async function handleOrderReviewDecision(
+  phone: string,
+  customerId: string,
+  convId: string,
+  ctx: ConversationContext,
+  text: string,
+  buttonId?: string
+): Promise<{ handled: boolean }> {
+  const wa = getWhatsAppProvider();
+  const trimmed = text.trim();
+  const lower = trimmed.toLowerCase();
+
+  const isConfirm =
+    isReviewButton(buttonId, "confirm") ||
+    trimmed === "1" ||
+    isConfirmIntent(text) ||
+    /^(confirm(\s+order)?|yes|ok|okay)$/i.test(lower);
+
+  if (isConfirm) {
+    return confirmDraftOrder(phone, customerId, convId, ctx);
+  }
+
+  const isChange =
+    isReviewButton(buttonId, "change") ||
+    trimmed === "2" ||
+    isChangeIntent(text);
+
+  if (isChange) {
+    await updateConversation(convId, {
+      state: WhatsAppConversationState.BUILDING_CART,
+      context: ctx
+    });
+    await wa.sendText(
+      phone,
+      `${formatRequestedCart(ctx.requestedItems ?? [])}\n\nSay ADD, REMOVE, or change an item.`
+    );
+    return { handled: true };
+  }
+
+  const isCancel =
+    isReviewButton(buttonId, "cancel") ||
+    trimmed === "3" ||
+    isCancelIntent(text) ||
+    /^cancel(\s+order)?$/i.test(lower);
+
+  if (isCancel) {
+    const cleared = {
+      deliveryLat: ctx.deliveryLat,
+      deliveryLng: ctx.deliveryLng,
+      deliveryLabel: ctx.deliveryLabel
+    };
+    await updateConversation(convId, {
+      state: WhatsAppConversationState.IDLE,
+      context: cleared
+    });
+    const { formatOrderCancelled } = await import("./copy.js");
+    await wa.sendText(phone, formatOrderCancelled());
+    return { handled: true };
+  }
+
+  // Unrecognized while reviewing — re-prompt; do NOT run product search.
+  await wa.sendText(
+    phone,
+    ["Confirm order?", "", "1. Confirm", "2. Change", "3. Cancel"].join("\n")
+  );
+  return { handled: true };
+}
+
 async function confirmDraftOrder(
   phone: string,
   customerId: string,
@@ -890,6 +959,7 @@ async function handlePaymentConversation(
 
   if (
     buttonId === "pay_ecocash" ||
+    buttonId?.trim().toLowerCase() === "ecocash" ||
     isSelectEcoCashIntent(text) ||
     (phase === "SELECT_METHOD" && text.trim() === "1")
   ) {
@@ -912,6 +982,7 @@ async function handlePaymentConversation(
 
   if (
     buttonId === "pay_onemoney" ||
+    buttonId?.trim().toLowerCase() === "onemoney" ||
     isSelectOneMoneyIntent(text) ||
     (phase === "SELECT_METHOD" && text.trim() === "2")
   ) {
@@ -956,6 +1027,7 @@ async function handlePaymentConversation(
 
   if (
     buttonId === "pay_cash" ||
+    buttonId?.trim().toLowerCase() === "cash" ||
     isSelectCashIntent(text) ||
     text.trim().toUpperCase() === "CASH" ||
     (phase === "SELECT_METHOD" && text.trim() === "3") ||

@@ -236,6 +236,86 @@ async function main() {
     "EcoCash phone prompt"
   );
 
+  // ── Exact production bug: typed "Confirm" / "Cancel" / "Change" must NOT become products
+  console.log("4) Exact WA bug: typed Confirm → payment (not product search)…");
+  const phoneWordConfirm = `+2637715${suffix}`;
+  mock.clear();
+  await sendAs(phoneWordConfirm, "hi");
+  await sendAs(phoneWordConfirm, "location", {
+    text: undefined,
+    location: { latitude: 41.5435, longitude: -72.807, name: "Meriden, CT" }
+  });
+  await sendAs(phoneWordConfirm, "I want milk");
+  const reviewBeforeConfirm = mock.sent
+    .filter((m) => m.to === phoneWordConfirm)
+    .map((m) => m.body)
+    .reverse()
+    .find((b) => /your order/i.test(b));
+  assert(reviewBeforeConfirm, "order review before Confirm");
+  assert(!/payment:\s*cash/i.test(reviewBeforeConfirm!), "no premature cash before Confirm");
+
+  mock.clear();
+  await sendAs(phoneWordConfirm, "Confirm");
+  const afterWordConfirm = mock.sent.filter((m) => m.to === phoneWordConfirm).map((m) => m.body);
+  const joinedConfirm = afterWordConfirm.join("\n");
+  assert(/choose payment/i.test(joinedConfirm), "Confirm opens payment selection");
+  assert(/ecocash/i.test(joinedConfirm), "has EcoCash");
+  assert(/onemoney/i.test(joinedConfirm), "has OneMoney");
+  assert(/cash on delivery/i.test(joinedConfirm), "has Cash on delivery");
+  assert(!/not available right now:\s*confirm/i.test(joinedConfirm), "Confirm is not a product");
+  assert(!/couldn'?t find one nearby shop/i.test(joinedConfirm), "no shop-missing for Confirm");
+  assert(
+    (await prisma.commercePaymentAttempt.count({
+      where: { commerceOrder: { customerWhatsAppPhone: phoneWordConfirm } }
+    })) === 0,
+    "Confirm creates no Paynow attempt"
+  );
+  assert(
+    (await prisma.commerceOrder.count({ where: { customerWhatsAppPhone: phoneWordConfirm } })) === 0,
+    "Confirm alone creates no order / does not select CASH"
+  );
+
+  console.log("5) Exact WA bug: typed Cancel → cancelled (not product search)…");
+  const phoneWordCancel = `+2637716${suffix}`;
+  mock.clear();
+  await sendAs(phoneWordCancel, "hi");
+  await sendAs(phoneWordCancel, "location", {
+    text: undefined,
+    location: { latitude: 41.5435, longitude: -72.807, name: "Meriden, CT" }
+  });
+  await sendAs(phoneWordCancel, "I want milk");
+  mock.clear();
+  await sendAs(phoneWordCancel, "Cancel");
+  const afterWordCancel = mock.sent.filter((m) => m.to === phoneWordCancel).map((m) => m.body).join("\n");
+  assert(/order cancelled/i.test(afterWordCancel), "Cancel ack");
+  assert(!/not available right now:\s*cancel/i.test(afterWordCancel), "Cancel is not a product");
+  assert(
+    (await prisma.commercePaymentAttempt.count({
+      where: { commerceOrder: { customerWhatsAppPhone: phoneWordCancel } }
+    })) === 0,
+    "Cancel creates no Paynow attempt"
+  );
+  assert(
+    mock.sent.filter((m) => m.to === merchant.whatsappPhone).length === 0,
+    "Cancel notifies no merchant"
+  );
+
+  console.log("6) Exact WA bug: typed Change → cart edit (not payment / not product)…");
+  const phoneWordChange = `+2637717${suffix}`;
+  mock.clear();
+  await sendAs(phoneWordChange, "hi");
+  await sendAs(phoneWordChange, "location", {
+    text: undefined,
+    location: { latitude: 41.5435, longitude: -72.807, name: "Meriden, CT" }
+  });
+  await sendAs(phoneWordChange, "I want milk");
+  mock.clear();
+  await sendAs(phoneWordChange, "Change");
+  const afterWordChange = mock.sent.filter((m) => m.to === phoneWordChange).map((m) => m.body).join("\n");
+  assert(/add|remove|change/i.test(afterWordChange), "Change enters cart edit");
+  assert(!/choose payment/i.test(afterWordChange), "Change does not open payment");
+  assert(!/not available right now:\s*change/i.test(afterWordChange), "Change is not a product");
+
   console.log("OK — checkout payment-selection regression passed.");
   await prisma.$disconnect();
   io.close();
