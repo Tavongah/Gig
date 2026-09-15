@@ -57,7 +57,10 @@ async function notifyAfterProviderResult(result: {
         "../../whatsapp/merchant-handler.js"
       );
       const { formatEcoCashPaid } = await import("../../whatsapp/copy.js");
-      await notifyCustomerStatus(order.customerWhatsAppPhone, formatEcoCashPaid());
+      await notifyCustomerStatus(
+        order.customerWhatsAppPhone,
+        formatEcoCashPaid(order.totalCents)
+      );
       await notifyMerchantNewOrder(order);
 
       const { WhatsAppConversationState, WhatsAppParty } = await import("@prisma/client");

@@ -210,14 +210,17 @@ export function isTrackIntent(text: string): boolean {
 }
 
 export function isCancelIntent(text: string): boolean {
-  return /\b(cancel( my)? order|never ?mind)\b/i.test(text) && !/\bdon'?t cancel\b/i.test(text);
+  const t = prepareCustomerTextForMatching(text);
+  if (/\bdon'?t cancel\b/i.test(text) || /\bno,? cancel\b/i.test(t)) return false;
+  return (
+    /^(cancel|cancel order)$/i.test(t) ||
+    /\b(cancel( my)? order|never ?mind)\b/i.test(text)
+  );
 }
 
 export function isConfirmIntent(text: string): boolean {
   const n = prepareCustomerTextForMatching(text);
-  return /^(confirm|yes|ok|okay|place order|confirm order|that'?s all|thats all|done|checkout|finish)\b/i.test(
-    n
-  );
+  return /^(confirm|yes|ok|okay|place order|confirm order|that'?s all|thats all)\b/i.test(n);
 }
 
 export function isChangeIntent(text: string): boolean {

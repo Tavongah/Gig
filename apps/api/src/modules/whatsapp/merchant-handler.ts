@@ -31,7 +31,7 @@ import {
 import { getWhatsAppProvider } from "./provider.js";
 import type { InboundWhatsAppMessage } from "./customer-handler.js";
 import { sendCommerceNotification } from "./templates.js";
-import { formatMerchantNewOrder, MERCHANT_HELP, money } from "./copy.js";
+import { formatMerchantAccepted, formatMerchantNewOrder, formatMerchantReady, formatCustomerMerchantAccepted, formatCustomerOrderReady, MERCHANT_HELP, money } from "./copy.js";
 
 function friendlyMerchantOrderStatus(status: string): string {
   switch (status) {
@@ -61,12 +61,12 @@ export async function notifyMerchantNewOrder(
   const body = formatMerchantNewOrder({
     orderNumber: order.orderNumber,
     lines: order.items.map((i) => `${i.quantity} × ${i.productNameSnapshot}`),
-    itemsTotalCents: order.subtotalCents
+    itemsTotalCents: order.subtotalCents,
+    totalCents: order.totalCents
   });
   await sendCommerceNotification(order.merchant.whatsappPhone, "merchant_new_order", body, [
-    { id: `accept_${order.orderNumber}`, title: "Accept order" },
-    { id: `reject_${order.orderNumber}`, title: "Reject" },
-    { id: `ready_${order.orderNumber}`, title: "Ready later" }
+    { id: `accept_${order.orderNumber}`, title: "Accept" },
+    { id: `reject_${order.orderNumber}`, title: "Reject" }
   ]);
   const { logDutsFlow } = await import("../../lib/flow-log.js");
   logDutsFlow("COMMERCE_MERCHANT_NOTIFIED", {
@@ -179,7 +179,12 @@ export async function handleMerchantWhatsAppMessage(
   }
 
   try {
-    if (acceptBtn || /^accept\s+(\d+)$/i.test(text) || /^accept$/i.test(text)) {
+    if (
+      acceptBtn ||
+      /^accept\s+(\d+)$/i.test(text) ||
+      /^accept$/i.test(text) ||
+      /^(1|yes)$/i.test(text.trim())
+    ) {
       let num: number | null = acceptBtn
         ? Number(acceptBtn[1])
         : /^accept\s+(\d+)$/i.test(text)
@@ -188,20 +193,19 @@ export async function handleMerchantWhatsAppMessage(
       if (num == null) num = await resolveBareOrderNumber("accept");
       if (num == null) return { handled: true };
       const order = await merchantAcceptOrder(merchant.id, num);
-      await wa.sendText(
-        phone,
-        `Order #${order.orderNumber} accepted. Reply READY when it's packed.`
-      );
+      await wa.sendText(phone, formatMerchantAccepted(order.orderNumber));
       if (order.customerWhatsAppPhone) {
-        await notifyCustomerStatus(
-          order.customerWhatsAppPhone,
-          `Your order is being prepared by ${merchant.name}.`
-        );
+        await notifyCustomerStatus(order.customerWhatsAppPhone, formatCustomerMerchantAccepted());
       }
       return { handled: true };
     }
 
-    if (rejectBtn || /^reject\s+(\d+)$/i.test(text) || /^reject$/i.test(text)) {
+    if (
+      rejectBtn ||
+      /^reject\s+(\d+)$/i.test(text) ||
+      /^reject$/i.test(text) ||
+      /^(2|no)$/i.test(text.trim())
+    ) {
       let num: number | null = rejectBtn
         ? Number(rejectBtn[1])
         : /^reject\s+(\d+)$/i.test(text)
@@ -237,15 +241,9 @@ export async function handleMerchantWhatsAppMessage(
       if (!Number.isFinite(num)) num = await resolveBareOrderNumber("ready");
       if (num == null) return { handled: true };
       const { order } = await merchantMarkReadyForPickup(merchant.id, num, io);
-      await wa.sendText(
-        phone,
-        `Order #${order.orderNumber} is ready for pickup. We'll tell you when a courier is on the way.`
-      );
+      await wa.sendText(phone, formatMerchantReady(order.orderNumber));
       if (order.customerWhatsAppPhone) {
-        await notifyCustomerStatus(
-          order.customerWhatsAppPhone,
-          `Your order is ready. We're finding a courier.`
-        );
+        await notifyCustomerStatus(order.customerWhatsAppPhone, formatCustomerOrderReady());
       }
       return { handled: true };
     }

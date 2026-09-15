@@ -180,10 +180,13 @@ async function main() {
   );
   const ecoPending = mock.sent.filter((m) => m.to === customerPhone).pop()?.body ?? "";
   assert(
-    /Payment request created\. Waiting for payment confirmation/i.test(ecoPending),
+    /EcoCash payment request sent/i.test(ecoPending) &&
+      /Approve the payment on your phone/i.test(ecoPending) &&
+      /Waiting for confirmation/i.test(ecoPending),
     `test pending copy: ${ecoPending}`
   );
-  assert(!/We've sent an EcoCash payment request/i.test(ecoPending), "no live push claim in test");
+  assert(!/payment received|payment successful|order paid/i.test(ecoPending), "initiation != paid");
+  assert(!/payment received|order paid/i.test(ecoPending), "initiation != paid claim");
 
   const ecoOrder = await prisma.commerceOrder.findFirst({
     where: { merchantId: merchant.id },
@@ -200,7 +203,7 @@ async function main() {
   const ecoAttemptId = ecoOrder!.paymentAttempts[0]!.providerPaymentId!;
   assert(getPaynowTestTransportRecord(ecoAttemptId)?.status === "PENDING", "transport pending");
   assert(
-    !mock.sent.some((m) => m.to === merchantPhone && /New DUTS order/i.test(m.body)),
+    !mock.sent.some((m) => m.to === merchantPhone && /NEW ORDER/i.test(m.body)),
     "merchant not notified before PAID"
   );
 
@@ -263,7 +266,7 @@ async function main() {
   assert(paidOrder.paymentStatus === "PAID", "PAID");
   assert(paidOrder.status === "MERCHANT_PENDING", "MERCHANT_PENDING");
   assert(
-    mock.sent.some((m) => m.to === merchantPhone && /New DUTS order/i.test(m.body)),
+    mock.sent.some((m) => m.to === merchantPhone && /NEW ORDER/i.test(m.body)),
     "merchant after PAID"
   );
 
@@ -388,7 +391,10 @@ async function main() {
     where: { id: pendingAgain!.id }
   });
   assert(stillPending.paymentStatus === "PAYMENT_PENDING", "claim did not pay");
-  assert(mock.sent.some((m) => /provider notifies us|don't need to reply/i.test(m.body)), "claim ignored copy");
+  assert(
+    mock.sent.some((m) => /confirm when payment clears|try again|cash/i.test(m.body)),
+    "claim ignored copy"
+  );
 
   console.log("14) Merchant cannot mark customer payment PAID via READY…");
   // Merchant READY on unpaid order must not flip paymentStatus

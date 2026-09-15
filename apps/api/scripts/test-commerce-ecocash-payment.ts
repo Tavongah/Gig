@@ -176,7 +176,7 @@ async function main() {
     io
   );
   const pendingMsg = mock.sent.filter((m) => m.to === customerPhone).pop()?.body ?? "";
-  assert(/We've sent an EcoCash payment request/i.test(pendingMsg), `pending: ${pendingMsg}`);
+  assert(/EcoCash payment request sent/i.test(pendingMsg), `pending: ${pendingMsg}`);
 
   const order = await prisma.commerceOrder.findFirst({
     where: { merchantId: merchant.id },
@@ -197,7 +197,7 @@ async function main() {
 
   // Merchant must NOT be notified yet
   assert(
-    !mock.sent.some((m) => m.to === merchantPhone && /New DUTS order/i.test(m.body)),
+    !mock.sent.some((m) => m.to === merchantPhone && /NEW ORDER/i.test(m.body)),
     "merchant not notified before PAID"
   );
 
@@ -244,7 +244,7 @@ async function main() {
     "customer paid message"
   );
   assert(
-    mock.sent.some((m) => m.to === merchantPhone && /New DUTS order/i.test(m.body)),
+    mock.sent.some((m) => m.to === merchantPhone && /NEW ORDER/i.test(m.body)),
     "merchant notified after PAID"
   );
 

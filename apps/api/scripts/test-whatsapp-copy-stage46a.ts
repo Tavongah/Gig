@@ -121,7 +121,7 @@ async function main() {
     assert(classifyShoppingIntent(phrase).kind === "CORRECT", `CORRECT kind: ${phrase}`);
   }
 
-  // --- cart summary ---
+  // --- cart / order review summary ---
   const cart = formatOrderCartSummary({
     shopName: "Tariro Shop",
     lines: [
@@ -132,14 +132,34 @@ async function main() {
     subtotalCents: 770,
     deliveryFeeCents: 150,
     totalCents: 920,
-    footer: "Reply:\nADD, REMOVE, or CHECKOUT"
+    includeConfirmChoices: true
   });
   includesAll(
     cart,
-    ["your order", "2 × bread", "eggs", "mazoe", "items: $7.70", "delivery: $1.50", "total: $9.20", "checkout"],
+    ["your order", "2 × bread", "eggs", "mazoe", "items: $7.70", "delivery: $1.50", "total: $9.20", "1. confirm", "2. change"],
     "cart summary"
   );
-  excludesAll(cart, ["basket"], "cart summary");
+  excludesAll(
+    cart,
+    ["basket", "payment: cash", "confirm, change, or cancel", "PAYMENT_PENDING"],
+    "cart summary"
+  );
+
+  const {
+    formatPaymentMethodChoice,
+    formatEcoCashPending,
+    formatCashOrderConfirmed,
+    formatEcoCashPaid,
+    formatEcoCashFailed
+  } = await import("../src/modules/whatsapp/copy.js");
+  const pay = formatPaymentMethodChoice(498);
+  includesAll(pay, ["choose payment", "1. ecocash", "2. onemoney", "3. cash on delivery"], "payment choice");
+  excludesAll(pay, ["payment: cash on delivery", "PAYMENT_PENDING"], "payment choice");
+  includesAll(formatEcoCashPending(), ["payment request sent", "approve", "waiting"], "ecocash pending");
+  excludesAll(formatEcoCashPending(), ["payment received", "payment successful", "order paid"], "ecocash pending");
+  includesAll(formatCashOrderConfirmed(498), ["cash on delivery", "$4.98", "sent to the shop"], "cash confirmed");
+  includesAll(formatEcoCashPaid(498), ["payment received", "$4.98", "sent to the shop"], "paid");
+  includesAll(formatEcoCashFailed(), ["payment failed", "1. try again", "2. pay cash"], "failed");
 
   const requested = formatRequestedCart([]);
   includesAll(requested, ["cart is empty", "like to buy"], "empty cart");
@@ -148,10 +168,11 @@ async function main() {
   const mNew = formatMerchantNewOrder({
     orderNumber: 1042,
     lines: ["2 × Bread", "1 × Eggs", "1 × Mazoe 2L"],
-    itemsTotalCents: 770
+    itemsTotalCents: 770,
+    totalCents: 920
   });
-  includesAll(mNew, ["new duts order #1042", "2 × bread", "items: $7.70", "accept", "reject"], "merchant new");
-  excludesAll(mNew, ["merchant_pending", "fulfillment"], "merchant new");
+  includesAll(mNew, ["new order #1042", "2 × bread", "total: $9.20", "1. accept", "2. reject"], "merchant new");
+  excludesAll(mNew, ["merchant_pending", "fulfillment", "commerceorder"], "merchant new");
 
   // --- merchant help / unknown ---
   includesAll(
@@ -160,12 +181,11 @@ async function main() {
     "merchant unknown"
   );
 
-  // Merchant accept / ready copy constants (assert wording used by handler)
-  const acceptMsg = "Order #1042 accepted. Reply READY when it's packed.";
-  includesAll(acceptMsg, ["accepted", "ready", "packed"], "merchant accept");
-  const readyMsg =
-    "Order #1042 is ready for pickup. We'll tell you when a courier is on the way.";
-  includesAll(readyMsg, ["ready for pickup", "on the way"], "merchant ready");
+  const { formatMerchantAccepted, formatMerchantReady } = await import(
+    "../src/modules/whatsapp/copy.js"
+  );
+  includesAll(formatMerchantAccepted(1042), ["accepted", "prepare", "ready"], "merchant accept");
+  includesAll(formatMerchantReady(1042), ["ready", "finding a courier"], "merchant ready");
 
   console.log("Stage 4.6A WhatsApp copy assertions: PASS");
 }

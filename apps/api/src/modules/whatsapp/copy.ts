@@ -1,6 +1,6 @@
 /**
  * Stage 4.6A — WhatsApp copy helpers.
- * Keep messages short, natural, and action-oriented. No architecture changes.
+ * Keep messages short, clear, one decision per message.
  */
 
 export function money(cents: number): string {
@@ -32,7 +32,14 @@ export const MERCHANT_HELP = [
 export function formatCartLines(
   lines: Array<{ quantity: number; productName: string; lineTotalCents: number }>
 ): string {
-  return lines.map((l) => `• ${l.quantity} × ${l.productName} — ${money(l.lineTotalCents)}`).join("\n");
+  return lines.map((l) => `${l.quantity} × ${l.productName} — ${money(l.lineTotalCents)}`).join("\n");
+}
+
+/** Prefer human-readable delivery labels; keep coordinate strings as safe fallback. */
+export function formatCustomerDeliveryLabel(label: string | null | undefined): string | null {
+  const trimmed = String(label ?? "").trim();
+  if (!trimmed) return null;
+  return trimmed;
 }
 
 export function formatOrderCartSummary(input: {
@@ -43,11 +50,16 @@ export function formatOrderCartSummary(input: {
   serviceFeeCents?: number;
   totalCents: number;
   deliveryLabel?: string;
+  /** @deprecated Do not show payment before the customer selects a method. */
   paymentNote?: string;
   footer?: string;
+  /** When true, append Confirm / Change / Cancel numbered choices (plain-text fallback). */
+  includeConfirmChoices?: boolean;
 }): string {
+  const delivery = formatCustomerDeliveryLabel(input.deliveryLabel);
   const parts = [
-    "Your order:",
+    "Your order",
+    "",
     formatCartLines(input.lines),
     "",
     input.shopName ? `Shop: ${input.shopName}` : null,
@@ -57,11 +69,17 @@ export function formatOrderCartSummary(input: {
       ? `Service fee: ${money(input.serviceFeeCents)}`
       : null,
     `Total: ${money(input.totalCents)}`,
-    input.deliveryLabel ? `Deliver to: ${input.deliveryLabel}` : null,
-    input.paymentNote ?? null,
-    input.footer ?? null
+    delivery ? `Deliver to: ${delivery}` : null,
+    // Never show premature payment method on order review.
+    input.includeConfirmChoices
+      ? ["", "Confirm order?", "", "1. Confirm", "2. Change", "3. Cancel"].join("\n")
+      : input.footer ?? null
   ];
-  return parts.filter(Boolean).join("\n");
+  return parts.filter((p) => p != null && p !== "").join("\n");
+}
+
+export function formatOrderReviewPrompt(): string {
+  return "Confirm order?";
 }
 
 export function formatDisambiguation(
@@ -117,9 +135,13 @@ export function formatPriceChange(input: {
     .join("\n");
   return [
     detail,
-    `Your new total is ${money(input.totalCents)}. Continue?`,
+    `Your new total is ${money(input.totalCents)}.`,
     "",
-    "Reply CONFIRM or CHANGE."
+    "Confirm order?",
+    "",
+    "1. Confirm",
+    "2. Change",
+    "3. Cancel"
   ].join("\n");
 }
 
@@ -167,59 +189,101 @@ export function formatMerchantNewOrder(input: {
   orderNumber: number;
   lines: string[];
   itemsTotalCents: number;
+  totalCents?: number;
 }): string {
+  const total = input.totalCents ?? input.itemsTotalCents;
   return [
-    `*New DUTS order #${input.orderNumber}*`,
+    `NEW ORDER #${input.orderNumber}`,
     "",
     ...input.lines,
     "",
-    `Items: ${money(input.itemsTotalCents)}`,
+    `Total: ${money(total)}`,
     "",
-    "Reply:",
-    "ACCEPT",
-    "REJECT"
+    "1. ACCEPT",
+    "2. REJECT"
   ].join("\n");
 }
 
-export function formatPaymentMethodChoice(totalCents: number): string {
+export function formatMerchantAccepted(orderNumber: number): string {
   return [
-    `Your total is ${money(totalCents)}.`,
-    "Choose payment method:",
+    `Order #${orderNumber} accepted.`,
+    "",
+    "Prepare the order.",
+    "Reply READY when it can be collected."
+  ].join("\n");
+}
+
+export function formatMerchantReady(orderNumber: number): string {
+  return [`✓ Order #${orderNumber} ready`, "", "Finding a courier..."].join("\n");
+}
+
+export function formatCustomerMerchantAccepted(): string {
+  return ["✓ Shop accepted your order.", "", "Preparing it now."].join("\n");
+}
+
+export function formatCustomerOrderReady(): string {
+  return ["✓ Your order is ready.", "", "Finding a courier..."].join("\n");
+}
+
+export function formatPaymentMethodChoice(_totalCents?: number): string {
+  return [
+    "Choose payment",
+    "",
     "1. EcoCash",
     "2. OneMoney",
-    "3. Cash on delivery"
+    "3. Cash on delivery",
+    "",
+    "Reply 1, 2 or 3."
   ].join("\n");
 }
 
 export function formatEcoCashPrompt(): string {
-  return "Enter the EcoCash number you want to pay with.";
+  return [
+    "EcoCash",
+    "",
+    "Enter the EcoCash number you want to pay with.",
+    "",
+    "Example: 0771234567"
+  ].join("\n");
 }
 
 export function formatOneMoneyPrompt(): string {
-  return "Enter the OneMoney number you want to pay with.";
+  return [
+    "OneMoney",
+    "",
+    "Enter the OneMoney number you want to pay with.",
+    "",
+    "Example: 0712345678"
+  ].join("\n");
 }
 
 export function formatMobileMoneyPhonePrompt(method: "ECOCASH" | "ONEMONEY"): string {
   return method === "ONEMONEY" ? formatOneMoneyPrompt() : formatEcoCashPrompt();
 }
 
-export function formatEcoCashPending(displayLocal: string): string {
+export function formatEcoCashPending(_displayLocal?: string): string {
   return [
-    `We've sent an EcoCash payment request to ${displayLocal}.`,
-    "Please approve it on your phone."
+    "EcoCash payment request sent.",
+    "",
+    "Approve the payment on your phone.",
+    "",
+    "Waiting for confirmation..."
   ].join("\n");
 }
 
-export function formatOneMoneyPending(displayLocal: string): string {
+export function formatOneMoneyPending(_displayLocal?: string): string {
   return [
-    `We've sent a OneMoney payment request to ${displayLocal}.`,
-    "Please approve it on your phone."
+    "OneMoney payment request sent.",
+    "",
+    "Approve the payment on your phone.",
+    "",
+    "Waiting for confirmation..."
   ].join("\n");
 }
 
-/** Paynow local/test modes — controlled copy; do not forward provider strings. */
-export function formatPaynowTestPending(): string {
-  return "Payment request created. Waiting for payment confirmation.";
+/** Paynow local/test modes — never claim funds received at initiation. */
+export function formatPaynowTestPending(method: "ECOCASH" | "ONEMONEY" = "ECOCASH"): string {
+  return method === "ONEMONEY" ? formatOneMoneyPending() : formatEcoCashPending();
 }
 
 export function formatMobileMoneyPending(input: {
@@ -227,40 +291,53 @@ export function formatMobileMoneyPending(input: {
   displayLocal: string;
   paynowTestMode?: boolean;
 }): string {
-  if (input.paynowTestMode) return formatPaynowTestPending();
-  return input.method === "ONEMONEY"
-    ? formatOneMoneyPending(input.displayLocal)
-    : formatEcoCashPending(input.displayLocal);
+  void input.displayLocal;
+  void input.paynowTestMode;
+  return input.method === "ONEMONEY" ? formatOneMoneyPending() : formatEcoCashPending();
 }
 
-export function formatEcoCashPaid(): string {
-  return "Payment received ✅\nYour order has been confirmed.";
+export function formatEcoCashPaid(totalCents?: number): string {
+  return [
+    "✓ Payment received",
+    totalCents != null ? `Total: ${money(totalCents)}` : null,
+    "",
+    "Your order has been sent to the shop."
+  ]
+    .filter((x) => x != null && x !== "")
+    .join("\n");
+}
+
+export function formatCashOrderConfirmed(totalCents: number): string {
+  return [
+    "✓ Cash on delivery",
+    "",
+    `Total: ${money(totalCents)}`,
+    "",
+    "Pay when your order arrives.",
+    "",
+    "Your order has been sent to the shop."
+  ].join("\n");
+}
+
+export function formatOrderCancelled(): string {
+  return "Order cancelled.";
 }
 
 export function formatEcoCashFailed(): string {
-  return [
-    "The payment was not completed.",
-    "Reply RETRY to try again or CASH to pay on delivery."
-  ].join("\n");
+  return ["Payment failed.", "", "1. Try again", "2. Pay cash"].join("\n");
 }
 
 export function formatEcoCashExpired(): string {
-  return [
-    "The payment request expired.",
-    "Reply RETRY to send another request or CASH to pay on delivery."
-  ].join("\n");
+  return ["Payment request expired.", "", "1. Try again", "2. Pay cash"].join("\n");
 }
 
 export function formatMobileMoneyCancelled(): string {
-  return [
-    "The payment request was cancelled.",
-    "Reply RETRY to try again or CASH to pay on delivery."
-  ].join("\n");
+  return ["Payment cancelled.", "", "1. Try again", "2. Pay cash"].join("\n");
 }
 
 export function formatClaimPaidIgnored(): string {
   return [
-    "We'll confirm payment when the provider notifies us — you don't need to reply here.",
-    "If the request failed, reply RETRY or CASH."
+    "We'll confirm when payment clears.",
+    "If it failed, reply 1 to try again or 2 for cash."
   ].join("\n");
 }

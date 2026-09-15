@@ -24,6 +24,7 @@
     "test:commerce-pilot-safety": "tsx scripts/test-commerce-pilot-safety.ts",
     "test:commerce-conversation": "tsx scripts/test-commerce-conversation-stage46.ts",
     "test:whatsapp-copy": "tsx scripts/test-whatsapp-copy-stage46a.ts",
+    "test:checkout-payment-selection": "tsx scripts/test-checkout-payment-selection.ts",
     "test:whatsapp-robustness": "tsx scripts/test-whatsapp-conversation-robustness.ts",
     "test:whatsapp-twilio": "tsx scripts/test-whatsapp-twilio-transport.ts",
     "test:commerce-ecocash": "tsx scripts/test-commerce-ecocash-payment.ts",

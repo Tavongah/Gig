@@ -209,7 +209,7 @@ resetWhatsAppProviderForTests();
   console.log("5) Merchant WhatsApp accept + readyâ€¦");
   const merchantOutBefore = mock.sent.length;
   assert(
-    mock.sent.some((m) => m.to === merchantPhone && /New DUTS order/i.test(m.body)),
+    mock.sent.some((m) => m.to === merchantPhone && /NEW ORDER/i.test(m.body)),
     "merchant notified"
   );
 

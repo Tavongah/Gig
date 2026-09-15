@@ -7,7 +7,6 @@ import {
 } from "../commerce/merchant.service.js";
 import {
   createConfirmedCommerceOrder,
-  formatOrderSummaryWhatsApp,
   formatOrderTrackMessage,
   getCustomerActiveOrder,
   quoteBasketTotals
@@ -26,6 +25,7 @@ import {
   extractShoppingItemsWithOptionalAi,
   isSameAgainIntent,
   isCancelIntent,
+  isChangeIntent,
   isClaimPaidIntent,
   isConfirmIntent,
   isRetryPaymentIntent,
@@ -52,6 +52,7 @@ import {
   formatMissingItems,
   formatOrderCartSummary,
   formatPaymentMethodChoice,
+  formatCashOrderConfirmed,
   formatPriceChange,
   formatShopSwitch,
   money,
@@ -127,10 +128,16 @@ export async function handleCustomerWhatsAppMessage(
     return { handled: true };
   }
 
-  if (msg.buttonId === "cancel_order" || isCancelIntent(text)) {
+  if (
+    msg.buttonId === "cancel_order" ||
+    (conv.state === WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION &&
+      (text.trim() === "3" || isCancelIntent(text) || /^cancel$/i.test(text.trim()))) ||
+    (conv.state !== WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION && isCancelIntent(text))
+  ) {
     ctx = { deliveryLat: ctx.deliveryLat, deliveryLng: ctx.deliveryLng, deliveryLabel: ctx.deliveryLabel };
     await updateConversation(conv.id, { state: WhatsAppConversationState.IDLE, context: ctx });
-    await wa.sendText(phone, "Okay — cancelled. Tell me what you'd like whenever you're ready.");
+    const { formatOrderCancelled } = await import("./copy.js");
+    await wa.sendText(phone, formatOrderCancelled());
     return { handled: true };
   }
 
@@ -169,11 +176,21 @@ export async function handleCustomerWhatsAppMessage(
     return { handled: true };
   }
 
-  if (
-    conv.state === WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION &&
-    (msg.buttonId === "confirm_order" || isConfirmIntent(text))
-  ) {
-    return confirmDraftOrder(phone, customerId, conv.id, ctx);
+  if (conv.state === WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION) {
+    if (msg.buttonId === "confirm_order" || text.trim() === "1" || isConfirmIntent(text)) {
+      return confirmDraftOrder(phone, customerId, conv.id, ctx);
+    }
+    if (msg.buttonId === "change_order" || text.trim() === "2" || isChangeIntent(text)) {
+      await updateConversation(conv.id, {
+        state: WhatsAppConversationState.BUILDING_CART,
+        context: ctx
+      });
+      await wa.sendText(
+        phone,
+        `${formatRequestedCart(ctx.requestedItems ?? [])}\n\nSay ADD, REMOVE, or change an item.`
+      );
+      return { handled: true };
+    }
   }
 
   if (conv.state === WhatsAppConversationState.AWAITING_PAYMENT) {
@@ -323,11 +340,18 @@ export async function handleCustomerWhatsAppMessage(
   }
 
   if (intent.kind === "CHECKOUT") {
-    if (ctx.draftLines?.length) {
-      return confirmDraftOrder(phone, customerId, conv.id, ctx);
-    }
-    if (ctx.requestedItems?.length && ctx.deliveryLat != null) {
-      return buildAndPresentQuote(phone, conv.id, ctx);
+    // CHECKOUT always re-shows order review — never jumps straight to payment.
+    if (
+      (ctx.draftLines?.length || ctx.requestedItems?.length) &&
+      ctx.deliveryLat != null &&
+      ctx.deliveryLng != null
+    ) {
+      return buildAndPresentQuote(phone, conv.id, {
+        ...ctx,
+        requestedItems: ctx.requestedItems?.length
+          ? ctx.requestedItems
+          : (ctx.draftLines ?? []).map((l) => ({ query: l.productName, quantity: l.quantity }))
+      });
     }
     await wa.sendText(phone, "Your cart is empty. Tell me what you'd like to buy first.");
     return { handled: true };
@@ -710,7 +734,7 @@ async function buildAndPresentQuote(
     return { handled: true };
   }
 
-  const summary = formatOrderCartSummary({
+  const summaryCore = formatOrderCartSummary({
     shopName: basket.merchant.name,
     lines: basket.lines.map((l) => ({
       quantity: l.quantity,
@@ -721,9 +745,7 @@ async function buildAndPresentQuote(
     deliveryFeeCents: totals.deliveryFeeCents,
     serviceFeeCents: totals.serviceFeeCents,
     totalCents: totals.totalCents,
-    deliveryLabel: ctx.deliveryLabel ?? "your location",
-    paymentNote: "Payment: cash on delivery",
-    footer: "Reply:\nCONFIRM, CHANGE, or CANCEL"
+    deliveryLabel: ctx.deliveryLabel ?? undefined
   });
 
   const switchNote = basket.switchedFromPreferred
@@ -734,16 +756,31 @@ async function buildAndPresentQuote(
       }) + "\n\n"
     : "";
 
-  const body = switchNote + summary;
+  const buttonBody = `${switchNote}${summaryCore}\n\nConfirm order?`;
+  const textBody = formatOrderCartSummary({
+    shopName: basket.merchant.name,
+    lines: basket.lines.map((l) => ({
+      quantity: l.quantity,
+      productName: l.productName,
+      lineTotalCents: l.lineTotalCents
+    })),
+    subtotalCents: totals.subtotalCents,
+    deliveryFeeCents: totals.deliveryFeeCents,
+    serviceFeeCents: totals.serviceFeeCents,
+    totalCents: totals.totalCents,
+    deliveryLabel: ctx.deliveryLabel ?? undefined,
+    includeConfirmChoices: true
+  });
+  const plainBody = switchNote + textBody;
 
   try {
-    await wa.sendButtons(phone, body, [
-      { id: "confirm_order", title: "Confirm order" },
-      { id: "change_order", title: "Change order" },
+    await wa.sendButtons(phone, buttonBody, [
+      { id: "confirm_order", title: "Confirm" },
+      { id: "change_order", title: "Change" },
       { id: "cancel_order", title: "Cancel" }
     ]);
   } catch {
-    await wa.sendText(phone, body);
+    await wa.sendText(phone, plainBody);
   }
   return { handled: true };
 }
@@ -812,6 +849,7 @@ async function confirmDraftOrder(
     return { handled: true };
   }
 
+  // CONFIRM = order details ok. Payment stays unselected until explicit choice.
   ctx.paymentPhase = "SELECT_METHOD";
   ctx.paymentAttemptId = undefined;
   ctx.pendingPaymentOrderId = undefined;
@@ -821,12 +859,16 @@ async function confirmDraftOrder(
     state: WhatsAppConversationState.AWAITING_PAYMENT,
     context: ctx
   });
-  await wa.sendText(phone, formatPaymentMethodChoice(totals.totalCents));
-  await wa.sendButtons(phone, "How would you like to pay?", [
-    { id: "pay_ecocash", title: "EcoCash" },
-    { id: "pay_onemoney", title: "OneMoney" },
-    { id: "pay_cash", title: "Cash" }
-  ]);
+  const paymentBody = formatPaymentMethodChoice(totals.totalCents);
+  try {
+    await wa.sendButtons(phone, paymentBody, [
+      { id: "pay_ecocash", title: "EcoCash" },
+      { id: "pay_onemoney", title: "OneMoney" },
+      { id: "pay_cash", title: "Cash" }
+    ]);
+  } catch {
+    await wa.sendText(phone, paymentBody);
+  }
   return { handled: true };
 }
 
@@ -846,11 +888,15 @@ async function handlePaymentConversation(
     return { handled: true };
   }
 
-  if (buttonId === "pay_ecocash" || isSelectEcoCashIntent(text) || text.trim() === "1") {
+  if (
+    buttonId === "pay_ecocash" ||
+    isSelectEcoCashIntent(text) ||
+    (phase === "SELECT_METHOD" && text.trim() === "1")
+  ) {
     if (phase === "PENDING_PROVIDER") {
       await wa.sendText(
         phone,
-        "A payment request is already pending. Reply RETRY after it fails/expires, or CASH to pay on delivery."
+        "A payment request is already pending. Reply 1 to try again or 2 for cash."
       );
       return { handled: true };
     }
@@ -864,11 +910,15 @@ async function handlePaymentConversation(
     return { handled: true };
   }
 
-  if (buttonId === "pay_onemoney" || isSelectOneMoneyIntent(text) || text.trim() === "2") {
+  if (
+    buttonId === "pay_onemoney" ||
+    isSelectOneMoneyIntent(text) ||
+    (phase === "SELECT_METHOD" && text.trim() === "2")
+  ) {
     if (phase === "PENDING_PROVIDER") {
       await wa.sendText(
         phone,
-        "A payment request is already pending. Reply RETRY after it fails/expires, or CASH to pay on delivery."
+        "A payment request is already pending. Reply 1 to try again or 2 for cash."
       );
       return { handled: true };
     }
@@ -883,15 +933,11 @@ async function handlePaymentConversation(
   }
 
   if (
-    buttonId === "pay_cash" ||
-    isSelectCashIntent(text) ||
-    text.trim().toUpperCase() === "CASH" ||
-    text.trim() === "3"
+    isRetryPaymentIntent(text) ||
+    text.trim().toUpperCase() === "RETRY" ||
+    ((phase === "FAILED" || phase === "EXPIRED" || phase === "PENDING_PROVIDER") &&
+      text.trim() === "1")
   ) {
-    return finalizeCashPayment(phone, customerId, convId, ctx);
-  }
-
-  if (isRetryPaymentIntent(text) || text.trim().toUpperCase() === "RETRY") {
     if (ctx.pendingPaymentOrderId) {
       await cancelPendingPaymentAttempts(ctx.pendingPaymentOrderId);
     }
@@ -906,6 +952,17 @@ async function handlePaymentConversation(
     });
     await wa.sendText(phone, formatMobileMoneyPhonePrompt(method));
     return { handled: true };
+  }
+
+  if (
+    buttonId === "pay_cash" ||
+    isSelectCashIntent(text) ||
+    text.trim().toUpperCase() === "CASH" ||
+    (phase === "SELECT_METHOD" && text.trim() === "3") ||
+    ((phase === "FAILED" || phase === "EXPIRED" || phase === "PENDING_PROVIDER") &&
+      text.trim() === "2")
+  ) {
+    return finalizeCashPayment(phone, customerId, convId, ctx);
   }
 
   if (phase === "PENDING_PROVIDER") {
@@ -957,10 +1014,7 @@ async function finalizeCashPayment(
         state: WhatsAppConversationState.ORDER_ACTIVE,
         context: ctx
       });
-      await wa.sendText(
-        phone,
-        `${formatOrderSummaryWhatsApp(order)}\n\nOrder received. ${order.merchant.name} is confirming your order.\nPayment: cash on delivery.`
-      );
+      await wa.sendText(phone, formatCashOrderConfirmed(order.totalCents));
       const { notifyMerchantNewOrder } = await import("./merchant-handler.js");
       await notifyMerchantNewOrder(order);
       return { handled: true };
@@ -1008,10 +1062,7 @@ async function finalizeCashPayment(
       context: ctx
     });
 
-    await wa.sendText(
-      phone,
-      `${formatOrderSummaryWhatsApp(order)}\n\nOrder received. ${order.merchant.name} is confirming your order.\nPayment: cash on delivery.`
-    );
+    await wa.sendText(phone, formatCashOrderConfirmed(order.totalCents));
 
     const { notifyMerchantNewOrder } = await import("./merchant-handler.js");
     await notifyMerchantNewOrder(order);
@@ -1148,26 +1199,21 @@ async function handleOrderCreateError(
       const body =
         parsed.length && totals
           ? formatPriceChange({ changes: parsed, totalCents: totals.totalCents })
-          : [
-              parsed.length
+          : formatPriceChange({
+              changes: parsed.length
                 ? parsed
-                    .map(
-                      (c) =>
-                        `The price of ${c.name} changed from ${money(c.oldCents)} to ${money(c.newCents)}.`
-                    )
-                    .join("\n")
-                : changeDetail,
-              totals ? `Your new total is ${money(totals.totalCents)}. Continue?` : null,
-              "",
-              "Reply CONFIRM or CHANGE."
-            ]
-              .filter(Boolean)
-              .join("\n");
-      await wa.sendButtons(phone, body, [
-        { id: "confirm_order", title: "Confirm updated" },
-        { id: "change_order", title: "Change order" },
-        { id: "cancel_order", title: "Cancel" }
-      ]);
+                : [{ name: "Item", oldCents: 0, newCents: totals?.totalCents ?? 0 }],
+              totalCents: totals?.totalCents ?? 0
+            });
+      try {
+        await wa.sendButtons(phone, body.replace(/\n1\. Confirm[\s\S]*$/, "\n\nConfirm order?"), [
+          { id: "confirm_order", title: "Confirm" },
+          { id: "change_order", title: "Change" },
+          { id: "cancel_order", title: "Cancel" }
+        ]);
+      } catch {
+        await wa.sendText(phone, body);
+      }
       return { handled: true };
     }
   }
