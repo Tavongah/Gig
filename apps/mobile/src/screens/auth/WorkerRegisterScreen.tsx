@@ -354,12 +354,12 @@ export function WorkerRegisterScreen({ navigation }: Props) {
           <DutsCard className="gap-4 p-5">
             <Text className="text-xl font-black text-ink">Identity verification</Text>
             <Text className="text-sm text-muted">
-              Profile photo and government ID are required. Images are compressed before upload and stored securely.
+              Government ID is required. Profile photo is optional — you can add one later.
             </Text>
 
             <IdentityImageField
-              label="Profile photo"
-              hint="Required. Use camera or gallery. Preview before submitting."
+              label="Profile photo (optional)"
+              hint="Optional. Use camera or gallery. Preview before submitting."
               value={profilePhotoDataUrl}
               onChange={setProfilePhotoDataUrl}
               error={fieldErrors.profilePhotoDataUrl}
@@ -441,7 +441,8 @@ export function WorkerRegisterScreen({ navigation }: Props) {
             </Text>
             <Text className="text-sm text-muted">{bio}</Text>
             <Text className="text-sm text-muted">
-              Photo & ID: {profilePhotoDataUrl && governmentIdFrontDataUrl ? "Ready" : "Incomplete"} ·{" "}
+              Photo: {profilePhotoDataUrl ? "Added" : "Optional"} · ID:{" "}
+              {governmentIdFrontDataUrl ? "Ready" : "Needed"} ·{" "}
               {ID_TYPES.find((item) => item.id === governmentIdType)?.label ?? "ID type not selected"}
             </Text>
             <Text className="text-sm text-muted">Status after submit: pending admin approval</Text>

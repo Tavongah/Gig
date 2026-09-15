@@ -51,7 +51,6 @@ export function EditProfileScreen() {
   const email = profile?.email ?? session.user.email;
   const emailVerified = Boolean(profile?.emailVerified ?? session.user.emailVerified);
   const displayName = `${firstName} ${lastName}`.trim();
-  const photoRequired = !avatarUrl;
 
   async function pickAndUploadAvatar(): Promise<void> {
     setUploadingPhoto(true);
@@ -103,10 +102,6 @@ export function EditProfileScreen() {
       setError("Enter your first and last name.");
       return;
     }
-    if (!avatarUrl) {
-      setError("Profile photo is required. Upload a photo before saving.");
-      return;
-    }
 
     setSaving(true);
     setError(null);
@@ -139,7 +134,7 @@ export function EditProfileScreen() {
       >
         <DutsCard className="items-center gap-3 p-5">
           <Text className="text-center text-sm font-semibold text-ink">
-            Profile photo is required{photoRequired ? " — add one to continue" : ""}
+            Profile photo (optional)
           </Text>
           <Pressable
             onPress={() => void pickAndUploadAvatar()}
@@ -194,7 +189,7 @@ export function EditProfileScreen() {
             loadingLabel="Saving..."
             onPress={() => void handleSave()}
             loading={saving}
-            disabled={uploadingPhoto || !avatarUrl}
+            disabled={uploadingPhoto}
           />
         </DutsCard>
       </ScrollView>

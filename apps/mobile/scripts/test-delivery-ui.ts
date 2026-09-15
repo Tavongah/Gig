@@ -16,16 +16,29 @@ import { canClientCancel, nextWorkerAction, statusLabel } from "../src/lib/gig-s
 
 function run(): void {
   assert.equal(deliveryCustomerStatusLabel("SEARCHING_FOR_WORKER"), "Finding a courier");
-  assert.equal(deliveryCustomerStatusLabel("PACKAGE_COLLECTED"), "Package collected");
-  assert.equal(deliveryCustomerStatusLabel("EN_ROUTE_TO_DROPOFF"), "Package on the way");
-  assert.equal(deliveryCustomerStatusLabel("COMPLETED"), "Delivery complete");
+  assert.equal(deliveryCustomerStatusLabel("PACKAGE_COLLECTED"), "Order picked up");
+  assert.equal(deliveryCustomerStatusLabel("EN_ROUTE_TO_DROPOFF"), "On the way");
+  assert.equal(deliveryCustomerStatusLabel("COMPLETED"), "Delivered");
   assert.ok(!deliveryCustomerStatusLabel("WORKER_EN_ROUTE").includes("WORKER_EN_ROUTE"));
 
-  assert.equal(deliveryCourierStatusLabel("WORKER_ARRIVED"), "Collect package");
-  assert.equal(nextCourierDeliveryAction("WORKER_ASSIGNED")?.kind, "start_pickup_travel");
+  assert.equal(nextCourierDeliveryAction("WORKER_ASSIGNED")?.kind, "arrive_pickup");
+  assert.equal(nextCourierDeliveryAction("WORKER_ASSIGNED")?.label, "Arrived");
+  assert.equal(
+    (nextCourierDeliveryAction("WORKER_ASSIGNED") as { ensurePickupTravel?: boolean })?.ensurePickupTravel,
+    true
+  );
+  assert.equal(nextCourierDeliveryAction("WORKER_EN_ROUTE")?.kind, "arrive_pickup");
   assert.equal(nextCourierDeliveryAction("WORKER_ARRIVED")?.kind, "verify_pickup");
+  assert.equal(nextCourierDeliveryAction("WORKER_ARRIVED")?.label, "Picked up");
+  assert.equal(nextCourierDeliveryAction("PACKAGE_COLLECTED")?.kind, "arrive_dropoff");
   assert.equal(nextCourierDeliveryAction("ARRIVED_AT_DROPOFF")?.kind, "verify_delivery");
+  assert.equal(nextCourierDeliveryAction("ARRIVED_AT_DROPOFF")?.label, "Complete delivery");
   assert.equal(nextCourierDeliveryAction("IN_PROGRESS"), null);
+
+  assert.equal(deliveryCourierStatusLabel("WORKER_ASSIGNED"), "Directions to shop");
+  assert.equal(deliveryCourierStatusLabel("PACKAGE_COLLECTED"), "Directions to customer");
+  assert.ok(!deliveryCourierStatusLabel("WORKER_EN_ROUTE").includes("WORKER"));
+  assert.ok(!/"Start trip"/i.test(nextCourierDeliveryAction("WORKER_ASSIGNED")?.label ?? ""));
 
   assert.equal(canCancelDelivery("WORKER_ARRIVED"), true);
   assert.equal(canCancelDelivery("PACKAGE_COLLECTED"), false);
@@ -38,7 +51,7 @@ function run(): void {
   assert.equal(nextWorkerAction("WORKER_ARRIVED", "DELIVERY"), null);
   assert.ok(nextWorkerAction("WORKER_ARRIVED", "LOCAL_HELP"));
 
-  assert.equal(statusLabel("WORKER_EN_ROUTE", "DELIVERY"), "Courier heading to pickup");
+  assert.equal(statusLabel("WORKER_EN_ROUTE", "DELIVERY"), "Courier going to shop");
   assert.equal(statusLabel("WORKER_EN_ROUTE", "LOCAL_HELP"), "Worker en route");
   assert.equal(transportModeLabel("PUBLIC_TRANSPORT"), "Public Transport / Kombi");
 

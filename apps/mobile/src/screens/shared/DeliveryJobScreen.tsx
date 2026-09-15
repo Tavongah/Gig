@@ -12,6 +12,9 @@ import {
   deliveryCourierStatusLabel,
   deliveryCustomerHeadline,
   deliveryCustomerStatusLabel,
+  isDeliveryCompleteUi,
+  isDropoffPhase,
+  isPickupPhase,
   isPostPickupDelivery,
   nextCourierDeliveryAction,
   transportModeEmoji,
@@ -92,30 +95,30 @@ export function DeliveryJobScreen() {
 
   const actionMutation = useMutation({
     mutationFn: async () => {
-      if (!action) return;
+      if (!action || !gig) return;
       const gigId = route.params.gigId;
       const token = session.token;
 
-      if (action.kind === "start_pickup_travel") {
-        return api.startTravelToPickup(gigId, token);
-      }
       if (action.kind === "arrive_pickup") {
+        if (action.ensurePickupTravel || gig.status === "WORKER_ASSIGNED") {
+          await api.startTravelToPickup(gigId, token);
+        }
         const location = await getCurrentCoordinates();
         return api.arriveAtPickup(gigId, token, location);
       }
       if (action.kind === "verify_pickup") {
-        if (!/^\d{4,6}$/.test(pin.trim())) throw new Error("Enter the 4-digit pickup code.");
+        if (!/^\d{4,6}$/.test(pin.trim())) throw new Error("Enter the pickup code from the shop.");
         return api.verifyPickupPin(gigId, token, pin.trim());
       }
-      if (action.kind === "start_dropoff_travel") {
-        return api.startTravelToDropoff(gigId, token);
-      }
       if (action.kind === "arrive_dropoff") {
+        if (action.ensureDropoffTravel || gig.status === "PACKAGE_COLLECTED") {
+          await api.startTravelToDropoff(gigId, token);
+        }
         const location = await getCurrentCoordinates();
         return api.arriveAtDropoff(gigId, token, location);
       }
       if (action.kind === "verify_delivery") {
-        if (!/^\d{4,6}$/.test(pin.trim())) throw new Error("Enter the 4-digit delivery code.");
+        if (!/^\d{4,6}$/.test(pin.trim())) throw new Error("Enter the delivery code from the customer.");
         const location = await getCurrentCoordinates().catch(() => undefined);
         return api.verifyDeliveryPin(gigId, token, pin.trim(), location);
       }
@@ -132,7 +135,24 @@ export function DeliveryJobScreen() {
       const locationMsg = /location|gps|permission|geolocation/i.test(error.message)
         ? friendlyLocationError(error)
         : friendlyDeliveryError(error);
-      showAlert("Could not continue", locationMsg);
+      showAlert("Couldn't continue", locationMsg);
+    }
+  });
+
+  const ensureTravelMutation = useMutation({
+    mutationFn: async (phase: "pickup" | "dropoff") => {
+      const gigId = route.params.gigId;
+      const token = session.token;
+      if (phase === "pickup") {
+        if (gig?.status !== "WORKER_ASSIGNED") return null;
+        return api.startTravelToPickup(gigId, token);
+      }
+      if (gig?.status !== "PACKAGE_COLLECTED") return null;
+      return api.startTravelToDropoff(gigId, token);
+    },
+    onSuccess: () => invalidate(),
+    onError: (error: Error) => {
+      showAlert("Couldn't start directions", friendlyDeliveryError(error));
     }
   });
 
@@ -146,11 +166,41 @@ export function DeliveryJobScreen() {
         replay: false
       });
     },
-    onError: (error: Error) => showAlert("Could not regenerate", friendlyDeliveryError(error))
+    onError: (error: Error) => showAlert("Couldn't regenerate codes", friendlyDeliveryError(error))
   });
 
   function openMaps(lat?: string | number | null, lng?: string | number | null, label?: string): void {
-    void openExternalNavigation(lat, lng, label);
+    void openExternalNavigation(lat, lng, label).catch(() => {
+      showAlert("Couldn't open maps", "Please try again.");
+    });
+  }
+
+  async function openPickupDirections(): Promise<void> {
+    if (!gig) return;
+    if (gig.status === "WORKER_ASSIGNED" && !ensureTravelMutation.isPending) {
+      try {
+        await ensureTravelMutation.mutateAsync("pickup");
+      } catch {
+        /* alerted in onError */
+      }
+    }
+    const label = gig.locationSummary || `${gig.city}, ${gig.region}`;
+    openMaps(gig.latitude, gig.longitude, label);
+  }
+
+  async function openDropoffDirections(): Promise<void> {
+    if (!gig) return;
+    if (gig.status === "PACKAGE_COLLECTED" && !ensureTravelMutation.isPending) {
+      try {
+        await ensureTravelMutation.mutateAsync("dropoff");
+      } catch {
+        /* alerted in onError */
+      }
+    }
+    const label =
+      gig.dropoffFormattedAddress ||
+      (gig.dropoffCity ? `${gig.dropoffCity}${gig.dropoffRegion ? `, ${gig.dropoffRegion}` : ""}` : "Drop-off");
+    openMaps(gig.dropoffLatitude, gig.dropoffLongitude, label);
   }
 
   if (!gig) {
@@ -262,42 +312,50 @@ export function DeliveryJobScreen() {
 
       {activeRole === "WORKER" && gig.assignedWorkerId === session.user.id ? (
         <DutsCard className="gap-3 p-5">
-          {gig.status === "WORKER_ASSIGNED" || gig.status === "WORKER_EN_ROUTE" || gig.status === "WORKER_ARRIVED" ? (
+          {isPickupPhase(gig.status) ? (
             <>
-              {gig.pickupContactName ? <Row label="Pickup contact" value={gig.pickupContactName} /> : null}
-              {gig.pickupContactPhone ? (
+              <Text className="text-xs font-bold uppercase text-brand">Pickup</Text>
+              <Text className="text-xl font-black text-ink">{pickupArea}</Text>
+              {gig.pickupContactName ? <Row label="Shop contact" value={gig.pickupContactName} /> : null}
+              {gig.pickupInstructions ? <Row label="Notes" value={gig.pickupInstructions} /> : null}
+              {gig.status === "WORKER_ASSIGNED" || gig.status === "WORKER_EN_ROUTE" ? (
                 <LoadingButton
-                  label="Call pickup contact"
+                  label="Directions to shop"
                   variant="secondary"
-                  onPress={() => void Linking.openURL(`tel:${gig.pickupContactPhone}`)}
+                  loading={ensureTravelMutation.isPending}
+                  onPress={() => void openPickupDirections()}
                 />
               ) : null}
-              {gig.pickupInstructions ? <Row label="Instructions" value={gig.pickupInstructions} /> : null}
-              <LoadingButton
-                label="Open pickup in maps"
-                variant="secondary"
-                onPress={() => openMaps(gig.latitude, gig.longitude, "Pickup")}
-              />
             </>
           ) : null}
 
-          {gig.status === "PACKAGE_COLLECTED" ||
-          gig.status === "EN_ROUTE_TO_DROPOFF" ||
-          gig.status === "ARRIVED_AT_DROPOFF" ? (
+          {isDropoffPhase(gig.status) ? (
             <>
-              {gig.dropoffContactName ? <Row label="Recipient" value={gig.dropoffContactName} /> : null}
-              {gig.dropoffContactPhone ? (
+              <Text className="text-xs font-bold uppercase text-brand">Drop-off</Text>
+              <Text className="text-xl font-black text-ink">{dropoffArea}</Text>
+              {gig.dropoffContactName ? <Row label="Customer" value={gig.dropoffContactName} /> : null}
+              {gig.dropoffInstructions ? <Row label="Notes" value={gig.dropoffInstructions} /> : null}
+              {gig.status === "PACKAGE_COLLECTED" || gig.status === "EN_ROUTE_TO_DROPOFF" ? (
                 <LoadingButton
-                  label="Call recipient"
+                  label="Directions to customer"
                   variant="secondary"
-                  onPress={() => void Linking.openURL(`tel:${gig.dropoffContactPhone}`)}
+                  loading={ensureTravelMutation.isPending}
+                  onPress={() => void openDropoffDirections()}
                 />
               ) : null}
-              {gig.dropoffInstructions ? <Row label="Instructions" value={gig.dropoffInstructions} /> : null}
+            </>
+          ) : null}
+
+          {isDeliveryCompleteUi(gig.status) ? (
+            <>
+              <Text className="text-xl font-black text-ink">✓ Delivery complete</Text>
+              <Row
+                label="Earnings"
+                value={formatCents(gig.workerPayoutCents ?? gig.totalCents)}
+              />
               <LoadingButton
-                label="Open drop-off in maps"
-                variant="secondary"
-                onPress={() => openMaps(gig.dropoffLatitude, gig.dropoffLongitude, "Drop-off")}
+                label="Done"
+                onPress={() => navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] })}
               />
             </>
           ) : null}
@@ -308,8 +366,13 @@ export function DeliveryJobScreen() {
         <DutsCard className="gap-3 p-5">
           <Text className="text-sm font-bold text-ink">
             {action?.kind === "verify_pickup"
-              ? "Ask the sender for the Pickup PIN"
-              : "Ask the recipient for the Delivery PIN"}
+              ? "Enter pickup code"
+              : "Enter delivery code"}
+          </Text>
+          <Text className="text-sm text-muted">
+            {action?.kind === "verify_pickup"
+              ? "Ask the shop for the code."
+              : "Ask the customer for the code."}
           </Text>
           <TextInput
             value={pin}
@@ -325,10 +388,9 @@ export function DeliveryJobScreen() {
 
       {pinLocked ? (
         <DutsCard className="gap-2 bg-orange/10 p-5">
-          <Text className="font-bold text-orange">Verification locked</Text>
+          <Text className="font-bold text-orange">Code locked</Text>
           <Text className="text-sm text-ink">
-            Too many incorrect attempts. Ask the customer to regenerate the delivery codes or contact
-            support.
+            Too many incorrect attempts. Ask the customer to regenerate codes or contact support.
           </Text>
         </DutsCard>
       ) : null}
@@ -344,9 +406,9 @@ export function DeliveryJobScreen() {
 
         {activeRole === "WORKER" && isSearching(gig.status) ? (
           <LoadingButton
-            label="Accept delivery"
+            label="Accept"
             onPress={() =>
-              showConfirm("Accept this delivery?", "Express interest so the customer can select you.", () =>
+              showConfirm("Accept this delivery?", "You'll be assigned if selected.", () =>
                 acceptMutation.mutate()
               )
             }
@@ -354,7 +416,11 @@ export function DeliveryJobScreen() {
           />
         ) : null}
 
-        {activeRole === "WORKER" && action && !pinLocked ? (
+        {activeRole === "WORKER" &&
+        gig.assignedWorkerId === session.user.id &&
+        action &&
+        !pinLocked &&
+        !isDeliveryCompleteUi(gig.status) ? (
           <LoadingButton
             label={action.label}
             loading={actionMutation.isPending}
@@ -363,11 +429,13 @@ export function DeliveryJobScreen() {
           />
         ) : null}
 
-        <LoadingButton
-          label="Messages"
-          variant="secondary"
-          onPress={() => navigation.navigate("Chat", { gigId: gig.id, title: gig.title })}
-        />
+        {activeRole === "CLIENT" ? (
+          <LoadingButton
+            label="Messages"
+            variant="secondary"
+            onPress={() => navigation.navigate("Chat", { gigId: gig.id, title: gig.title })}
+          />
+        ) : null}
 
         {activeRole === "CLIENT" && canCancelDelivery(gig.status) ? (
           <ClientCancelBookingButton gig={gig} label="Cancel delivery" />
@@ -376,8 +444,7 @@ export function DeliveryJobScreen() {
         {activeRole === "CLIENT" && isPostPickupDelivery(gig.status) ? (
           <DutsCard className="gap-3 p-4">
             <Text className="text-center text-sm text-muted">
-              Need help with this delivery? Ordinary cancellation is not available after the package was
-              collected.
+              Need help with this delivery? Ordinary cancellation is not available after pickup.
             </Text>
             <LoadingButton
               label="Call support"

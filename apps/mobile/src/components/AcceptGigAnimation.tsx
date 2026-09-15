@@ -32,8 +32,8 @@ export function AcceptGigAnimation({ visible, onDone }: AcceptGigAnimationProps)
           <View className="h-16 w-16 items-center justify-center rounded-full bg-verified">
             <Text className="text-3xl">✓</Text>
           </View>
-          <Text className="text-center text-2xl font-black text-ink">Gig accepted!</Text>
-          <Text className="text-center text-sm text-muted">Head to the gig details to start travel.</Text>
+          <Text className="text-center text-2xl font-black text-ink">Accepted!</Text>
+          <Text className="text-center text-sm text-muted">Opening your delivery…</Text>
         </Animated.View>
       </View>
     </Modal>

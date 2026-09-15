@@ -109,7 +109,9 @@ export async function registerWorker(input: WorkerRegisterInput) {
     await assertPhoneAvailable(parsed.phoneNumber);
   }
 
-  const profilePhoto = parseAvatarDataUrl(parsed.profilePhotoDataUrl);
+  const profilePhoto = parsed.profilePhotoDataUrl?.trim()
+    ? parseAvatarDataUrl(parsed.profilePhotoDataUrl)
+    : null;
   const idFront = parseAvatarDataUrl(parsed.governmentIdFrontDataUrl);
   const idBack = parsed.governmentIdBackDataUrl
     ? parseAvatarDataUrl(parsed.governmentIdBackDataUrl)
@@ -158,25 +160,38 @@ export async function registerWorker(input: WorkerRegisterInput) {
   });
 
   try {
-    const avatarExt =
-      profilePhoto.contentType === "image/png"
+    if (profilePhoto) {
+      const avatarExt =
+        profilePhoto.contentType === "image/png"
+          ? "png"
+          : profilePhoto.contentType === "image/webp"
+            ? "webp"
+            : "jpg";
+      let avatarUrl: string;
+      if (isSpacesConfigured()) {
+        const uploaded = await uploadPublicObject({
+          purpose: "worker-profile",
+          userId: user.id,
+          fileName: `avatar.${avatarExt}`,
+          contentType: profilePhoto.contentType,
+          body: profilePhoto.buffer
+        });
+        avatarUrl = uploaded.publicUrl;
+      } else {
+        avatarUrl = `data:${profilePhoto.contentType};base64,${profilePhoto.buffer.toString("base64")}`;
+      }
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { avatarUrl }
+      });
+    }
+
+    const idExt =
+      idFront.contentType === "image/png"
         ? "png"
-        : profilePhoto.contentType === "image/webp"
+        : idFront.contentType === "image/webp"
           ? "webp"
           : "jpg";
-    let avatarUrl: string;
-    if (isSpacesConfigured()) {
-      const uploaded = await uploadPublicObject({
-        purpose: "worker-profile",
-        userId: user.id,
-        fileName: `avatar.${avatarExt}`,
-        contentType: profilePhoto.contentType,
-        body: profilePhoto.buffer
-      });
-      avatarUrl = uploaded.publicUrl;
-    } else {
-      avatarUrl = `data:${profilePhoto.contentType};base64,${profilePhoto.buffer.toString("base64")}`;
-    }
 
     let frontKey: string;
     let backKey: string | null = null;
@@ -184,7 +199,7 @@ export async function registerWorker(input: WorkerRegisterInput) {
       const front = await uploadPrivateObject({
         purpose: "verification-document",
         userId: user.id,
-        fileName: `id-front.${avatarExt}`,
+        fileName: `id-front.${idExt}`,
         contentType: idFront.contentType,
         body: idFront.buffer
       });
@@ -207,10 +222,6 @@ export async function registerWorker(input: WorkerRegisterInput) {
       console.warn("[identity] Spaces not configured — identity keys stored as local placeholders.");
     }
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { avatarUrl }
-    });
     await prisma.workerProfile.update({
       where: { userId: user.id },
       data: {

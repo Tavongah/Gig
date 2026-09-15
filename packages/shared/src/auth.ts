@@ -79,13 +79,19 @@ export const workerRegisterSchema = z
     hourlyRateCents: z.number().int().min(1000).max(50000).optional(),
     minJobAmountCents: z.number().int().min(1000).max(100000).default(5000),
     hasVehicle: z.boolean().default(false),
+    /** Optional — couriers may register without a profile photo. */
     profilePhotoDataUrl: z
       .string()
-      .min(32, "Profile photo is required")
       .max(400_000, "Profile photo is too large. Compress and try again.")
-      .refine((value) => /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(value), {
-        message: "Upload a JPEG, PNG, or WebP profile photo"
-      }),
+      .refine(
+        (value) =>
+          !value ||
+          value.length === 0 ||
+          (/^data:image\/(jpeg|jpg|png|webp);base64,/i.test(value) && value.length >= 32),
+        { message: "Upload a JPEG, PNG, or WebP profile photo" }
+      )
+      .optional()
+      .default(""),
     governmentIdType: z.enum(["DRIVERS_LICENSE", "STATE_ID", "NATIONAL_ID"], {
       error: "Select a government ID type"
     }),

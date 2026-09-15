@@ -105,7 +105,7 @@ export function WorkerHomeScreen() {
     { label: "Bio added", done: Boolean(profile?.workerProfile?.bio?.length) },
     { label: "Services selected", done: (profile?.workerProfile?.serviceCategories.length ?? 0) > 0 },
     { label: "Rates configured", done: Boolean(profile?.workerProfile?.hourlyRateCents) },
-    { label: "Profile photo", done: false }
+    { label: "Profile photo (optional)", done: Boolean(profile?.avatarUrl) }
   ];
 
   function confirmAccept(gigId: string, title: string): void {
@@ -146,7 +146,7 @@ export function WorkerHomeScreen() {
         {activeGig ? (
           <DutsCard className="gap-3 border border-brand/20 p-4">
             <Text className="text-xs font-bold uppercase tracking-wider text-brand">
-              {activeGig.fulfillmentType === "DELIVERY" ? "Active delivery" : "Active Gig"}
+              {activeGig.fulfillmentType === "DELIVERY" ? "Active delivery" : "Active job"}
             </Text>
             <Text className="text-lg font-black text-ink">
               {activeGig.fulfillmentType === "DELIVERY"
@@ -159,7 +159,7 @@ export function WorkerHomeScreen() {
                 : "Continue your assigned job."}
             </Text>
             <AppButton
-              label={activeGig.fulfillmentType === "DELIVERY" ? "Continue delivery" : "Continue Active Gig"}
+              label={activeGig.fulfillmentType === "DELIVERY" ? "Continue delivery" : "Continue job"}
               onPress={() => openGigForRole(navigation, activeGig, "WORKER")}
             />
           </DutsCard>

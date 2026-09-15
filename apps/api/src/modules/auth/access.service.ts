@@ -40,11 +40,7 @@ export function assertWorkerCanGoOnline(
       email: "Verify your email before going online."
     });
   }
-  if (!user.avatarUrl) {
-    throw new AppError("PROFILE_PHOTO_REQUIRED", 403, "PROFILE_PHOTO_REQUIRED", {
-      avatarUrl: "Upload a profile photo before going online."
-    });
-  }
+  // Profile photo is optional for couriers — do not block go-online / accept.
   if (!user.profileCompleted) {
     throw new AppError("PROFILE_INCOMPLETE", 403, "PROFILE_INCOMPLETE", {
       profile: "Complete your worker profile before going online."

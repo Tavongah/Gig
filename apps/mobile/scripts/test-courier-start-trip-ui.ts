@@ -28,8 +28,8 @@ function run(): void {
   // React 19 minified #300 = fewer hooks than expected (early return before hooks).
   assert.equal(
     nextCourierDeliveryAction("WORKER_ASSIGNED")?.kind,
-    "start_pickup_travel",
-    "Start Trip available when assigned"
+    "arrive_pickup",
+    "Start Trip not shown — Arrived maps start-travel automatically"
   );
   assert.equal(
     nextCourierDeliveryAction("WORKER_EN_ROUTE")?.kind,

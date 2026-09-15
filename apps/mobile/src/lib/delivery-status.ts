@@ -31,19 +31,19 @@ export function deliveryCustomerStatusLabel(status: string): string {
     case "WORKER_ASSIGNED":
       return "Courier assigned";
     case "WORKER_EN_ROUTE":
-      return "Courier heading to pickup";
+      return "Courier going to shop";
     case "WORKER_ARRIVED":
-      return "Courier arrived for pickup";
+      return "Courier at the shop";
     case "PACKAGE_COLLECTED":
-      return "Package collected";
+      return "Order picked up";
     case "EN_ROUTE_TO_DROPOFF":
-      return "Package on the way";
+      return "On the way";
     case "ARRIVED_AT_DROPOFF":
-      return "Courier arrived at destination";
+      return "Courier arrived";
     case "WAITING_CUSTOMER_CONFIRMATION":
       return "Delivered — confirming";
     case "COMPLETED":
-      return "Delivery complete";
+      return "Delivered";
     case "CANCELLED":
       return "Cancelled";
     case "DISPUTED":
@@ -63,19 +63,19 @@ export function deliveryCustomerHeadline(status: string): string {
     case "WORKER_ASSIGNED":
       return "Your courier is getting ready";
     case "WORKER_EN_ROUTE":
-      return "Your courier is heading to the pickup point";
+      return "Your courier is heading to the shop";
     case "WORKER_ARRIVED":
-      return "Share the Pickup PIN with your courier";
+      return "Courier is at the shop";
     case "PACKAGE_COLLECTED":
-      return "Package collected — heading to the drop-off";
+      return "Order picked up — heading to you";
     case "EN_ROUTE_TO_DROPOFF":
-      return "Your package is on the way";
+      return "Your order is on the way";
     case "ARRIVED_AT_DROPOFF":
-      return "Courier is at the destination — share the Delivery PIN with the recipient";
+      return "Courier has arrived — share the delivery code if asked";
     case "WAITING_CUSTOMER_CONFIRMATION":
       return "Delivery confirmed — finishing up";
     case "COMPLETED":
-      return "Your delivery is complete";
+      return "Your order was delivered";
     default:
       return deliveryCustomerStatusLabel(status);
   }
@@ -84,47 +84,52 @@ export function deliveryCustomerHeadline(status: string): string {
 export function deliveryCourierStatusLabel(status: string): string {
   switch (status) {
     case "WORKER_ASSIGNED":
-      return "Go to pickup";
     case "WORKER_EN_ROUTE":
-      return "Heading to pickup";
+      return "Directions to shop";
     case "WORKER_ARRIVED":
-      return "Collect package";
+      return "At the shop";
     case "PACKAGE_COLLECTED":
-      return "Start delivery";
     case "EN_ROUTE_TO_DROPOFF":
-      return "Heading to drop-off";
+      return "Directions to customer";
     case "ARRIVED_AT_DROPOFF":
-      return "Confirm delivery";
+      return "Complete delivery";
     case "WAITING_CUSTOMER_CONFIRMATION":
     case "COMPLETED":
-      return "Delivery done";
+      return "Delivery complete";
     default:
       return deliveryCustomerStatusLabel(status);
   }
 }
 
+/**
+ * Visible courier actions for marketplace delivery.
+ * start-travel transitions are applied automatically when needed (not separate buttons).
+ */
 export type CourierDeliveryAction =
-  | { kind: "start_pickup_travel"; label: string }
-  | { kind: "arrive_pickup"; label: string; requiresGps: true }
+  | { kind: "arrive_pickup"; label: string; requiresGps: true; ensurePickupTravel?: boolean }
   | { kind: "verify_pickup"; label: string }
-  | { kind: "start_dropoff_travel"; label: string }
-  | { kind: "arrive_dropoff"; label: string; requiresGps: true }
+  | { kind: "arrive_dropoff"; label: string; requiresGps: true; ensureDropoffTravel?: boolean }
   | { kind: "verify_delivery"; label: string };
 
 export function nextCourierDeliveryAction(status: string): CourierDeliveryAction | null {
   switch (status) {
     case "WORKER_ASSIGNED":
-      return { kind: "start_pickup_travel", label: "Start trip to pickup" };
+      return { kind: "arrive_pickup", label: "Arrived", requiresGps: true, ensurePickupTravel: true };
     case "WORKER_EN_ROUTE":
-      return { kind: "arrive_pickup", label: "I've arrived", requiresGps: true };
+      return { kind: "arrive_pickup", label: "Arrived", requiresGps: true };
     case "WORKER_ARRIVED":
-      return { kind: "verify_pickup", label: "Confirm pickup" };
+      return { kind: "verify_pickup", label: "Picked up" };
     case "PACKAGE_COLLECTED":
-      return { kind: "start_dropoff_travel", label: "Start delivery" };
+      return {
+        kind: "arrive_dropoff",
+        label: "Arrived",
+        requiresGps: true,
+        ensureDropoffTravel: true
+      };
     case "EN_ROUTE_TO_DROPOFF":
-      return { kind: "arrive_dropoff", label: "I've arrived", requiresGps: true };
+      return { kind: "arrive_dropoff", label: "Arrived", requiresGps: true };
     case "ARRIVED_AT_DROPOFF":
-      return { kind: "verify_delivery", label: "Confirm delivery" };
+      return { kind: "verify_delivery", label: "Complete delivery" };
     default:
       return null;
   }
@@ -147,6 +152,22 @@ export function isPostPickupDelivery(status: string): boolean {
     status === "EN_ROUTE_TO_DROPOFF" ||
     status === "ARRIVED_AT_DROPOFF"
   );
+}
+
+export function isPickupPhase(status: string): boolean {
+  return status === "WORKER_ASSIGNED" || status === "WORKER_EN_ROUTE" || status === "WORKER_ARRIVED";
+}
+
+export function isDropoffPhase(status: string): boolean {
+  return (
+    status === "PACKAGE_COLLECTED" ||
+    status === "EN_ROUTE_TO_DROPOFF" ||
+    status === "ARRIVED_AT_DROPOFF"
+  );
+}
+
+export function isDeliveryCompleteUi(status: string): boolean {
+  return status === "WAITING_CUSTOMER_CONFIRMATION" || status === "COMPLETED";
 }
 
 export function transportModeLabel(mode: string | null | undefined): string {

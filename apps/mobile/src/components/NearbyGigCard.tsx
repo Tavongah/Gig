@@ -1,10 +1,8 @@
 import { Pressable, Text, View } from "react-native";
-import { packageCategoryLabels, type PackageCategory } from "@gigflow/shared";
 import type { GigDetail } from "../lib/api";
 import { formatCents } from "../lib/format";
 import { AppButton } from "./AppButton";
 import { DutsCard } from "./DutsCard";
-import { StatusBadge } from "./StatusBadge";
 
 interface NearbyGigCardProps {
   gig: GigDetail;
@@ -14,69 +12,54 @@ interface NearbyGigCardProps {
   acceptDisabled?: boolean;
 }
 
-function milesToKmLabel(miles: number | null | undefined): string | null {
+function milesLabel(miles: number | null | undefined): string | null {
   if (miles == null || Number.isNaN(Number(miles))) return null;
-  return `${(Number(miles) * 1.60934).toFixed(1)} km`;
+  return `${Number(miles).toFixed(1)} mi`;
 }
 
 export function NearbyGigCard({ gig, onView, onAccept, onDecline, acceptDisabled }: NearbyGigCardProps) {
   const isDelivery = gig.fulfillmentType === "DELIVERY" || gig.offer?.fulfillmentType === "DELIVERY";
   const offer = gig.offer;
-  const packageLabel =
-    offer?.packageCategory && offer.packageCategory in packageCategoryLabels
-      ? packageCategoryLabels[offer.packageCategory as PackageCategory]
-      : offer?.packageCategory ?? gig.packageCategory ?? null;
 
   if (isDelivery) {
     const pickup = offer?.pickupArea ?? gig.locationSummary ?? `${gig.city}, ${gig.region}`;
-    const dropoff = offer?.dropoffArea ?? (gig.dropoffCity ? `${gig.dropoffCity}` : "Drop-off");
-    const deliveryKm =
+    const dropoff = offer?.dropoffArea ?? (gig.dropoffCity ? `${gig.dropoffCity}` : "Drop-off area");
+    const deliveryDist =
       offer?.estimatedDistanceKm != null
-        ? `${Number(offer.estimatedDistanceKm).toFixed(1)} km`
+        ? `${(Number(offer.estimatedDistanceKm) * 0.621371).toFixed(1)} mi`
         : gig.estimatedDistanceKm != null
-          ? `${Number(gig.estimatedDistanceKm).toFixed(1)} km`
+          ? `${(Number(gig.estimatedDistanceKm) * 0.621371).toFixed(1)} mi`
           : null;
-    const toPickup = milesToKmLabel(offer?.distanceToPickupMiles ?? gig.distanceMiles);
+    const toShop = milesLabel(offer?.distanceToPickupMiles ?? gig.distanceMiles);
     const earnings = offer?.estimatedEarningsCents ?? gig.workerPayoutCents ?? gig.totalCents;
 
     return (
       <DutsCard className="gap-4 p-5">
-        <View className="flex-row items-start justify-between gap-2">
-          <Pressable className="flex-1 gap-1" onPress={onView}>
-            <Text className="text-xs font-bold uppercase text-brand">New delivery</Text>
-            <Text className="text-xl font-black text-ink">{packageLabel ?? "Package"}</Text>
-          </Pressable>
-          <StatusBadge status={gig.status} fulfillmentType="DELIVERY" />
-        </View>
+        <Pressable className="gap-1" onPress={onView}>
+          <Text className="text-xs font-bold uppercase text-brand">Delivery available</Text>
+          <Text className="text-xl font-black text-ink">{pickup}</Text>
+        </Pressable>
 
         <View className="gap-2">
           <Text className="text-sm text-muted">
             Pickup <Text className="font-bold text-ink">{pickup}</Text>
           </Text>
-          <Text className="text-sm text-muted">
-            Drop-off <Text className="font-bold text-ink">{dropoff}</Text>
-          </Text>
-          {packageLabel ? (
+          {toShop ? (
             <Text className="text-sm text-muted">
-              Package <Text className="font-bold text-ink">{packageLabel}</Text>
+              Distance to shop <Text className="font-bold text-ink">{toShop}</Text>
             </Text>
           ) : null}
-        </View>
-
-        <View className="flex-row flex-wrap gap-2">
-          {deliveryKm ? (
-            <View className="rounded-full border border-border bg-surface px-3 py-1.5">
-              <Text className="text-xs font-bold text-muted">Delivery {deliveryKm}</Text>
-            </View>
+          <Text className="text-sm text-muted">
+            Drop-off area <Text className="font-bold text-ink">{dropoff}</Text>
+          </Text>
+          {deliveryDist ? (
+            <Text className="text-sm text-muted">
+              Estimated delivery <Text className="font-bold text-ink">{deliveryDist}</Text>
+            </Text>
           ) : null}
-          {toPickup ? (
-            <View className="rounded-full border border-border bg-surface px-3 py-1.5">
-              <Text className="text-xs font-bold text-muted">{toPickup} to pickup</Text>
-            </View>
-          ) : null}
-          <View className="rounded-full bg-hero px-3 py-1.5">
-            <Text className="text-xs font-bold text-brand">You earn {formatCents(earnings)}</Text>
-          </View>
+          <Text className="text-sm text-muted">
+            Earnings <Text className="font-bold text-ink">{formatCents(earnings)}</Text>
+          </Text>
         </View>
 
         <View className="flex-row gap-2">
@@ -84,14 +67,10 @@ export function NearbyGigCard({ gig, onView, onAccept, onDecline, acceptDisabled
             <View className="flex-1">
               <AppButton label="Decline" onPress={onDecline} variant="secondary" size="md" />
             </View>
-          ) : (
-            <View className="flex-1">
-              <AppButton label="View" onPress={onView} variant="secondary" size="md" />
-            </View>
-          )}
+          ) : null}
           <View className="flex-1">
             <AppButton
-              label="Accept delivery"
+              label="Accept"
               onPress={onAccept}
               disabled={acceptDisabled}
               variant="primary"
@@ -107,16 +86,19 @@ export function NearbyGigCard({ gig, onView, onAccept, onDecline, acceptDisabled
     <DutsCard className="gap-4 p-5">
       <View className="flex-row items-start justify-between gap-2">
         <Pressable className="flex-1 gap-1" onPress={onView}>
-          <Text className="text-xs font-bold uppercase text-brand">{gig.serviceCategory?.name ?? "Gig"}</Text>
+          <Text className="text-xs font-bold uppercase text-brand">
+            {gig.serviceCategory?.name ?? "Local help"}
+          </Text>
           <Text className="text-xl font-black text-ink">{gig.title}</Text>
         </Pressable>
-        <StatusBadge status={gig.status} />
       </View>
 
       <View className="flex-row flex-wrap gap-2">
         {gig.distanceMiles != null ? (
           <View className="rounded-full border border-border bg-surface px-3 py-1.5">
-            <Text className="text-xs font-bold text-muted">{gig.distanceLabel ?? `${gig.distanceMiles} mi away`}</Text>
+            <Text className="text-xs font-bold text-muted">
+              {gig.distanceLabel ?? `${gig.distanceMiles} mi away`}
+            </Text>
           </View>
         ) : null}
         {gig.locationSummary ? (
@@ -125,15 +107,9 @@ export function NearbyGigCard({ gig, onView, onAccept, onDecline, acceptDisabled
           </View>
         ) : null}
         <View className="rounded-full bg-hero px-3 py-1.5">
-          <Text className="text-xs font-bold text-brand">Your earnings {formatCents(gig.workerPayoutCents ?? 0)}</Text>
-        </View>
-        {gig.estimatedHours ? (
-          <View className="rounded-full border border-border bg-surface px-3 py-1.5">
-            <Text className="text-xs font-bold text-muted">{gig.estimatedHours}h est.</Text>
-          </View>
-        ) : null}
-        <View className="rounded-full bg-orange/10 px-3 py-1.5">
-          <Text className="text-xs font-bold text-orange">{gig.urgency}</Text>
+          <Text className="text-xs font-bold text-brand">
+            Your earnings {formatCents(gig.workerPayoutCents ?? 0)}
+          </Text>
         </View>
       </View>
 
@@ -144,7 +120,7 @@ export function NearbyGigCard({ gig, onView, onAccept, onDecline, acceptDisabled
           </View>
         ) : (
           <View className="flex-1">
-            <AppButton label="View Details" onPress={onView} variant="secondary" size="md" />
+            <AppButton label="View details" onPress={onView} variant="secondary" size="md" />
           </View>
         )}
         <View className="flex-1">

@@ -74,7 +74,7 @@ export function ClientTabs() {
     >
       <Tab.Screen name="Home" component={ClientHomeScreen} options={{ title: "Home" }} />
       <Tab.Screen name="Support" component={SupportHomeScreen} options={{ title: "Support" }} />
-      <Tab.Screen name="MyGigs" component={ClientMyGigsScreen} options={{ title: "My Gigs" }} />
+      <Tab.Screen name="MyGigs" component={ClientMyGigsScreen} options={{ title: "Orders" }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
     </Tab.Navigator>
   );

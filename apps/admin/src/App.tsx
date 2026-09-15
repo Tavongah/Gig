@@ -155,10 +155,10 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
 
 const cards = [
   ["Users", "users"],
-  ["Workers", "workers"],
+  ["Couriers", "workers"],
   ["Pending approvals", "pendingWorkers"],
-  ["Open gigs", "openGigs"],
-  ["Completed gigs", "completedGigs"],
+  ["Open jobs", "openGigs"],
+  ["Completed jobs", "completedGigs"],
   ["Gross volume", "grossVolumeCents"],
   ["Platform revenue", "platformRevenueCents"]
 ] as const;
@@ -451,10 +451,10 @@ export function App() {
           {(
             [
               ["Overview", "overview"],
-              ["Pending workers", "pending"],
+              ["Pending couriers", "pending"],
               ["Users", "users"],
-              ["Gigs", "gigs"],
-              ["Commerce", "commerce"]
+              ["Commerce", "commerce"],
+              ["Local Help", "gigs"]
             ] as const
           ).map(([label, tab]) => (
             <button key={tab} type="button" className={activeTab === tab ? "nav-active" : ""} onClick={() => setActiveTab(tab)}>
@@ -488,7 +488,7 @@ export function App() {
         {pendingCount > 0 && activeTab === "overview" ? (
           <section className="panel alert-panel">
             <h2>{pendingCount} worker application{pendingCount === 1 ? "" : "s"} awaiting review</h2>
-            <p>Review and approve workers so they can accept gigs on the platform.</p>
+            <p>Review and approve couriers so they can go online and accept deliveries.</p>
             <button type="button" onClick={() => setActiveTab("pending")}>
               Review pending workers
             </button>
@@ -616,7 +616,10 @@ export function App() {
 
         {activeTab === "gigs" ? (
           <section className="panel">
-            <h2>Posted gigs</h2>
+            <h2>Local Help jobs</h2>
+            <p className="notice" style={{ marginBottom: 12 }}>
+              Legacy Local Help listings. Marketplace shopping uses Commerce → Orders.
+            </p>
             {gigsQuery.error ? <p className="notice">{gigsQuery.error.message}</p> : null}
             <table className="data-table">
               <thead>
@@ -657,7 +660,7 @@ export function App() {
                     <th>Status</th>
                     <th>Payment</th>
                     <th>Total</th>
-                    <th>Delivery gig</th>
+                    <th>Delivery</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -158,13 +158,27 @@ export function ProfileScreen() {
           <AppButton label="Edit Profile" variant="secondary" onPress={() => navigation.navigate("EditProfile")} />
         </DutsCard>
 
-        {needsProfilePhoto(user) ? (
+        {needsProfilePhoto(user) && activeRole === "CLIENT" ? (
           <DutsCard className="gap-3 border border-danger/30 bg-danger/5 p-5">
-            <Text className="text-base font-black text-ink">Profile photo required</Text>
+            <Text className="text-base font-black text-ink">Profile photo recommended</Text>
             <Text className="text-sm leading-5 text-muted">
-              Existing accounts must upload a profile photo to post gigs or go online as a worker.
+              Add a profile photo before posting local help requests.
             </Text>
             <AppButton label="Upload profile photo" onPress={() => navigation.navigate("EditProfile")} />
+          </DutsCard>
+        ) : null}
+
+        {needsProfilePhoto(user) && activeRole === "WORKER" ? (
+          <DutsCard className="gap-3 border border-border bg-surface p-5">
+            <Text className="text-base font-black text-ink">Add a profile photo (optional)</Text>
+            <Text className="text-sm leading-5 text-muted">
+              You can go online and take deliveries without a photo. Add one anytime from Edit Profile.
+            </Text>
+            <AppButton
+              label="Add photo"
+              variant="secondary"
+              onPress={() => navigation.navigate("EditProfile")}
+            />
           </DutsCard>
         ) : null}
 
@@ -207,7 +221,7 @@ export function ProfileScreen() {
         </Section>
 
         <Section title="Activity">
-          <ProfileRow icon="list-outline" label="My Gigs" onPress={() => navigation.navigate("MyGigsActivity")} />
+          <ProfileRow icon="list-outline" label="My activity" onPress={() => navigation.navigate("MyGigsActivity")} />
           <ProfileRow
             icon="receipt-outline"
             label="Payment History"

@@ -32,10 +32,10 @@ export function HistoryScreen({ perspective }: HistoryScreenProps) {
   return (
     <TabScreen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32, gap: 16 }}>
-        <SectionHeader eyebrow="History" title="Past gigs" subtitle="Completed and closed jobs." />
+        <SectionHeader eyebrow="History" title="Past deliveries & jobs" subtitle="Completed and closed work." />
 
         {historyGigs.length === 0 ? (
-          <EmptyState emoji="📋" title="No history yet" description="Your completed gigs will show up here." />
+          <EmptyState emoji="📋" title="No history yet" description="Your completed deliveries and jobs will show up here." />
         ) : (
           <View className="gap-4">
             {historyGigs.map((gig) => (

@@ -26,7 +26,7 @@ export function ActiveGigCard({ gig, onTrack }: ActiveGigCardProps) {
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1 gap-1">
           <Text className="text-xs font-bold uppercase tracking-wider text-brand">
-            {isDelivery ? "Active delivery" : "Active Gig"}
+            {isDelivery ? "Active delivery" : "Active job"}
           </Text>
           <Text className="text-lg font-black text-ink">
             {isDelivery

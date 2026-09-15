@@ -95,7 +95,7 @@ export function WorkerNearbyGigsScreen() {
   );
 
   function confirmAccept(gigId: string, title: string): void {
-    showConfirm("Accept this gig?", `Are you sure you want to accept "${title}"?`, () => {
+    showConfirm("Accept this delivery?", `Accept "${title}"?`, () => {
       setAcceptingId(gigId);
       acceptMutation.mutate(gigId);
     }, { confirmLabel: "Accept" });
@@ -104,23 +104,23 @@ export function WorkerNearbyGigsScreen() {
   const emptyCopy = {
     available: {
       emoji: "📡",
-      title: "No available gigs",
-      description: "Go online from home to receive new gigs matching your services."
+      title: "No available deliveries",
+      description: "Go online from home to receive new deliveries near you."
     },
     matching: {
       emoji: "⏳",
       title: "No matching offers",
-      description: "Accept a nearby gig to wait for the customer to choose a worker."
+      description: "Accept a nearby delivery to wait for confirmation."
     },
     accepted: {
       emoji: "🧰",
-      title: "No active gig",
-      description: "Once a customer selects you and payment is secured, the gig appears here."
+      title: "No active delivery",
+      description: "Once you're assigned, your current delivery appears here."
     },
     completed: {
       emoji: "✅",
-      title: "No completed gigs",
-      description: "Completed gigs will appear here after you finish jobs."
+      title: "No completed deliveries",
+      description: "Finished deliveries will appear here."
     }
   }[tab];
 
@@ -145,9 +145,9 @@ export function WorkerNearbyGigsScreen() {
       />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32, gap: 16 }}>
         <HeroBanner
-          eyebrow="Nearby gigs"
-          title="Your gigs"
-          subtitle="Available gigs stay visible even while you have an active job."
+          eyebrow="Nearby"
+          title="Available deliveries"
+          subtitle="New deliveries stay visible even while you have an active job."
         />
 
         <SegmentedTabs
@@ -237,7 +237,7 @@ export function WorkerNearbyGigsScreen() {
                         ? `Client: ${gig.client.fullName}`
                         : undefined
                   }
-                  actionLabel={gig.fulfillmentType === "DELIVERY" ? "Manage delivery" : "Manage gig"}
+                  actionLabel={gig.fulfillmentType === "DELIVERY" ? "Manage delivery" : "Manage job"}
                   onAction={() => openGigForRole(navigation, gig, "WORKER")}
                   onPress={() => openGigForRole(navigation, gig, "WORKER")}
                 />

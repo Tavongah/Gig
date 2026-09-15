@@ -69,11 +69,10 @@ export function canCustomerPostGigs(user: ApiUser): boolean {
 }
 
 export function canWorkerGoOnline(user: ApiUser): boolean {
-  return Boolean(
-    user.emailVerified && user.profileCompleted && user.accountStatus === "APPROVED" && user.avatarUrl
-  );
+  return Boolean(user.emailVerified && user.profileCompleted && user.accountStatus === "APPROVED");
 }
 
+/** True when the user has no avatar — informational only; not a courier eligibility gate. */
 export function needsProfilePhoto(user: ApiUser): boolean {
   return !user.avatarUrl;
 }

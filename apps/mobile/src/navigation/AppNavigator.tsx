@@ -64,7 +64,7 @@ export function AppNavigator() {
       <Stack.Screen name="DeliveryRequest" component={DeliveryRequestScreen} options={{ title: "Send a Package" }} />
       <Stack.Screen name="DeliveryPins" component={DeliveryPinsScreen} options={{ title: "Delivery codes" }} />
       <Stack.Screen name="DeliveryJob" component={DeliveryJobScreen} options={{ title: "Delivery" }} />
-      <Stack.Screen name="GigDetail" component={GigDetailScreen} options={{ title: "Gig details" }} />
+      <Stack.Screen name="GigDetail" component={GigDetailScreen} options={{ title: "Details" }} />
       <Stack.Screen name="WorkerMatching" component={WorkerMatchingScreen} options={{ title: "Matching" }} />
       <Stack.Screen
         name="WorkerDeliverySetup"
@@ -87,7 +87,7 @@ export function AppNavigator() {
       <Stack.Screen name="Security" component={SecurityScreen} options={{ title: "Security" }} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: "Password" }} />
       <Stack.Screen name="IdentityVerification" component={IdentityVerificationScreen} options={{ title: "Identity verification" }} />
-      <Stack.Screen name="MyGigsActivity" component={MyGigsActivityScreen} options={{ title: "My gigs" }} />
+      <Stack.Screen name="MyGigsActivity" component={MyGigsActivityScreen} options={{ title: "Activity" }} />
       <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ title: "Payment history" }} />
       <Stack.Screen name="Receipts" component={ReceiptsScreen} options={{ title: "Receipts" }} />
       <Stack.Screen name="RatingsReviews" component={RatingsReviewsScreen} options={{ title: "Ratings & reviews" }} />
