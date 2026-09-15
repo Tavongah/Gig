@@ -24,6 +24,11 @@ import {
   paymentStatusForMethod,
   resolveCommercePaymentMethod
 } from "./payment-mode.js";
+import {
+  resolveCommerceCustomerForOrder,
+  resolveDeliveryClientUserId,
+  ensureWhatsAppCommerceCustomer
+} from "./commerce-customer.service.js";
 
 /** Mark marketplace-linked delivery as paid (fee on CommerceOrder) and open courier matching. */
 export async function openMarketplaceDeliveryForCouriers(gigId: string, io: Server): Promise<void> {
@@ -65,47 +70,9 @@ export async function openMarketplaceDeliveryForCouriers(gigId: string, io: Serv
   });
 }
 
-const WA_AVATAR =
-  "https://api.dicebear.com/9.x/shapes/svg?seed=duts-whatsapp";
-
-/** Lightweight WhatsApp shopper identity — no app install required. */
+/** @deprecated Use ensureWhatsAppCommerceCustomer — no longer creates User accounts. */
 export async function ensureWhatsAppCustomer(phone: string, displayName?: string) {
-  const phoneNormalized = normalizePhoneNumber(phone);
-  const existing = await prisma.user.findUnique({ where: { phoneNumber: phoneNormalized } });
-  if (existing) return existing;
-
-  const email = `wa_${phoneNormalized.replace(/\D/g, "")}@whatsapp.duts.local`;
-  const byEmail = await prisma.user.findUnique({ where: { email } });
-  if (byEmail) {
-    return prisma.user.update({
-      where: { id: byEmail.id },
-      data: {
-        phoneNumber: phoneNormalized,
-        phoneVerified: true,
-        emailVerified: true,
-        profileCompleted: true,
-        avatarUrl: byEmail.avatarUrl ?? WA_AVATAR
-      }
-    });
-  }
-
-  return prisma.user.create({
-    data: {
-      email,
-      phoneNumber: phoneNormalized,
-      fullName: displayName?.trim() || `WhatsApp ${phoneNormalized.slice(-4)}`,
-      phoneVerified: true,
-      emailVerified: true,
-      profileCompleted: true,
-      avatarUrl: WA_AVATAR,
-      roles: ["CLIENT"],
-      defaultRole: "CLIENT",
-      accountStatus: "ACTIVE",
-      country: "ZW",
-      city: "Harare",
-      region: "Harare"
-    }
-  });
+  return ensureWhatsAppCommerceCustomer(phone, displayName);
 }
 
 export async function quoteBasketTotals(input: {
@@ -134,7 +101,10 @@ export async function quoteBasketTotals(input: {
 }
 
 export async function createConfirmedCommerceOrder(input: {
-  customerId: string;
+  /** Authenticated app User id (optional for WhatsApp / guest). */
+  customerId?: string;
+  /** Preferred commerce identity id. */
+  commerceCustomerId?: string;
   merchantId: string;
   lines: BasketLine[];
   deliveryLabel: string;
@@ -143,6 +113,7 @@ export async function createConfirmedCommerceOrder(input: {
   customerWhatsAppPhone?: string;
   paymentMethod?: CommercePaymentMethod | string;
   paymentStatus?: CommercePaymentStatus;
+  orderSource?: OrderSource;
 }) {
   if (input.lines.length === 0) {
     throw new AppError("Basket is empty.", 400, "EMPTY_BASKET");
@@ -150,6 +121,14 @@ export async function createConfirmedCommerceOrder(input: {
   const paymentMethod = resolveCommercePaymentMethod(input.paymentMethod);
   assertCommercePaymentMethodAllowed(paymentMethod);
   const paymentStatus = input.paymentStatus ?? paymentStatusForMethod(paymentMethod);
+
+  const identity = await resolveCommerceCustomerForOrder({
+    commerceCustomerId: input.commerceCustomerId,
+    customerId: input.customerId
+  });
+  const customerId = identity.customerId;
+  const commerceCustomerId = identity.commerceCustomerId;
+  const orderSource = input.orderSource ?? OrderSource.WHATSAPP;
 
   const merchant = await prisma.merchant.findUniqueOrThrow({ where: { id: input.merchantId } });
   if (!merchant.isActive || !merchant.acceptsOrders) {
@@ -226,16 +205,27 @@ export async function createConfirmedCommerceOrder(input: {
     lines
   });
 
-  const merchantRespondBy = new Date(Date.now() + getMerchantResponseTimeoutSeconds() * 1000);
+  const isMobileMoney =
+    paymentMethod === CommercePaymentMethod.ECOCASH ||
+    paymentMethod === CommercePaymentMethod.ONEMONEY;
+  // Mobile money: hold merchant notify until provider webhook marks PAID.
+  const status = isMobileMoney
+    ? CommerceOrderStatus.CUSTOMER_CONFIRMED
+    : CommerceOrderStatus.MERCHANT_PENDING;
+  const merchantRespondBy = isMobileMoney
+    ? null
+    : new Date(Date.now() + getMerchantResponseTimeoutSeconds() * 1000);
+  const confirmedAt = isMobileMoney ? null : new Date();
 
   const order = await prisma.commerceOrder.create({
     data: {
-      customerId: input.customerId,
+      customerId,
+      commerceCustomerId,
       merchantId: input.merchantId,
-      status: CommerceOrderStatus.MERCHANT_PENDING,
+      status,
       paymentStatus,
       paymentMethod,
-      orderSource: OrderSource.WHATSAPP,
+      orderSource,
       subtotalCents: totals.subtotalCents,
       deliveryFeeCents: totals.deliveryFeeCents,
       serviceFeeCents: totals.serviceFeeCents,
@@ -247,7 +237,7 @@ export async function createConfirmedCommerceOrder(input: {
       customerWhatsAppPhone: input.customerWhatsAppPhone
         ? normalizePhoneNumber(input.customerWhatsAppPhone)
         : null,
-      confirmedAt: new Date(),
+      confirmedAt,
       merchantRespondBy,
       items: {
         create: lines.map((l) => ({
@@ -259,19 +249,20 @@ export async function createConfirmedCommerceOrder(input: {
         }))
       }
     },
-    include: { items: true, merchant: true, customer: true }
+    include: { items: true, merchant: true, customer: true, commerceCustomer: true }
   });
 
   logDutsFlow("COMMERCE_ORDER_CONFIRMED", {
     gigId: undefined,
-    userId: input.customerId,
+    userId: customerId ?? undefined,
     userRole: "CLIENT",
     orderId: order.id,
     orderNumber: order.orderNumber,
     merchantId: merchant.id,
     totalCents: order.totalCents,
     paymentMethod,
-    paymentStatus
+    paymentStatus,
+    commerceCustomerId
   });
 
   return order;
@@ -291,7 +282,7 @@ export async function merchantAcceptOrder(merchantId: string, orderIdOrNumber: s
     include: { items: true, merchant: true, customer: true }
   });
   logDutsFlow("COMMERCE_MERCHANT_ACCEPTED", {
-    userId: order.customerId,
+    userId: order.customerId ?? undefined,
     orderId: order.id,
     orderNumber: order.orderNumber
   });
@@ -312,7 +303,7 @@ export async function merchantRejectOrder(merchantId: string, orderIdOrNumber: s
     include: { items: true, merchant: true, customer: true }
   });
   logDutsFlow("COMMERCE_MERCHANT_REJECTED", {
-    userId: order.customerId,
+    userId: order.customerId ?? undefined,
     orderId: order.id,
     orderNumber: order.orderNumber,
     merchantId
@@ -398,11 +389,26 @@ export async function merchantMarkReadyForPickup(
   }
 
   const customer = order.customer;
+  const commerceCustomer = order.commerceCustomer;
   const merchant = order.merchant;
   const summary = order.items.map((i) => `${i.quantity}× ${i.productNameSnapshot}`).join(", ");
 
+  const deliveryClientId = await resolveDeliveryClientUserId(
+    commerceCustomer ?? { userId: customer?.id ?? null }
+  );
+  const contactName =
+    commerceCustomer?.displayName ||
+    customer?.fullName ||
+    "Customer";
+  const contactPhone =
+    order.customerWhatsAppPhone ||
+    commerceCustomer?.whatsappPhone ||
+    commerceCustomer?.primaryPhone ||
+    customer?.phoneNumber ||
+    merchant.phone;
+
   const deliveryResult = await createDelivery(
-    customer.id,
+    deliveryClientId,
     {
       pickup: {
         latitude: Number(merchant.latitude),
@@ -426,8 +432,8 @@ export async function merchantMarkReadyForPickup(
         region: "Harare",
         postalCode: "0000",
         country: "ZW",
-        contactName: customer.fullName,
-        contactPhone: order.customerWhatsAppPhone || customer.phoneNumber || merchant.phone,
+        contactName,
+        contactPhone,
         instructions: `DUTS shop order #${order.orderNumber}`
       },
       package: {
@@ -457,7 +463,7 @@ export async function merchantMarkReadyForPickup(
       readyAt: new Date(),
       linkedDeliveryGigId: gigId
     },
-    include: { items: true, merchant: true, customer: true, linkedDeliveryGig: true }
+    include: { items: true, merchant: true, customer: true, commerceCustomer: true, linkedDeliveryGig: true }
   });
 
   // Link must exist before opening courier matching (openMarketplace checks commerceOrder).
@@ -467,7 +473,7 @@ export async function merchantMarkReadyForPickup(
 
   logDutsFlow("COMMERCE_READY_FOR_PICKUP", {
     gigId,
-    userId: customer.id,
+    userId: customer?.id ?? commerceCustomer?.id ?? undefined,
     orderId: order.id,
     orderNumber: order.orderNumber
   });
@@ -495,7 +501,7 @@ export async function expireStaleMerchantPendingOrders(): Promise<number> {
     logDutsFlow("COMMERCE_MERCHANT_TIMEOUT", {
       orderId: order.id,
       orderNumber: order.orderNumber,
-      userId: order.customerId,
+      userId: order.customerId ?? undefined,
       merchantId: order.merchantId
     });
     if (order.customerWhatsAppPhone) {
@@ -544,16 +550,16 @@ export async function findMerchantOrder(merchantId: string, orderIdOrNumber: str
         ...(Number.isFinite(asNum) ? [{ orderNumber: asNum }] : [])
       ]
     },
-    include: { items: true, merchant: true, customer: true, linkedDeliveryGig: true }
+    include: { items: true, merchant: true, customer: true, commerceCustomer: true, linkedDeliveryGig: true }
   });
   if (!order) throw new AppError("Order not found.", 404, "ORDER_NOT_FOUND");
   return order;
 }
 
-export async function getCustomerActiveOrder(customerId: string) {
+export async function getCustomerActiveOrder(commerceCustomerId: string) {
   return prisma.commerceOrder.findFirst({
     where: {
-      customerId,
+      commerceCustomerId,
       status: {
         notIn: [
           CommerceOrderStatus.DELIVERED,
@@ -685,7 +691,7 @@ export async function syncCommerceOrderFromGig(gigId: string, gigStatus: GigStat
   if (next === CommerceOrderStatus.DELIVERED) {
     logDutsFlow("COMMERCE_DELIVERED", {
       gigId,
-      userId: order.customerId,
+      userId: order.customerId ?? undefined,
       orderId: order.id,
       orderNumber: order.orderNumber
     });

@@ -182,6 +182,19 @@ resetWhatsAppProviderForTests();
   );
   assert(dup.duplicate === true, "duplicate confirm blocked");
 
+  const payChoice = mock.sent
+    .filter((m) => m.to === customerPhone)
+    .slice(-4)
+    .map((m) => m.body)
+    .join("\n");
+  assert(/EcoCash|Cash on delivery|Choose payment|How would you like to pay/i.test(payChoice), `payment choice: ${payChoice}`);
+
+  // Keep Stage 4 COD path: select cash on delivery after confirm
+  await handleCustomerWhatsAppMessage(
+    { providerMessageId: `cust-cash-${Date.now()}`, from: customerPhone, buttonId: "pay_cash" },
+    io
+  );
+
   const order = await prisma.commerceOrder.findFirst({
     where: { merchantId: merchant.id },
     orderBy: { createdAt: "desc" },

@@ -12,7 +12,18 @@ import { AppError } from "../../lib/errors.js";
 import { normalizePhoneNumber } from "../auth/access.service.js";
 
 export function normalizeMerchantPhone(phone: string): string {
-  return normalizePhoneNumber(phone);
+  let candidate = phone.trim().replace(/[\s\-()]/g, "");
+  if (candidate.toLowerCase().startsWith("whatsapp:")) {
+    candidate = candidate.slice("whatsapp:".length);
+  }
+  // Zimbabwe local mobile: 07XXXXXXXX / 7XXXXXXXX → E.164 (+263…)
+  if (/^0?7\d{8}$/.test(candidate)) {
+    candidate = candidate.startsWith("0") ? `+263${candidate.slice(1)}` : `+263${candidate}`;
+  } else if (/^2637\d{8}$/.test(candidate)) {
+    candidate = `+${candidate}`;
+  }
+  // US NANP (10 digits / 1+10) and other E.164 (+1…, +44…) pass through normalizePhoneNumber.
+  return normalizePhoneNumber(candidate);
 }
 
 export async function getMarketplaceSettings() {
@@ -28,8 +39,8 @@ export async function getMarketplaceSettings() {
 
 export async function createMerchant(input: {
   name: string;
-  contactName: string;
-  phone: string;
+  contactName?: string;
+  phone?: string;
   whatsappPhone: string;
   locationLabel: string;
   latitude: number;
@@ -38,28 +49,107 @@ export async function createMerchant(input: {
   logoUrl?: string;
   openingHours?: string;
   ownerUserId?: string;
+  pilotArea?: string;
+  notes?: string;
+  isActive?: boolean;
+  acceptsOrders?: boolean;
 }) {
+  const { assertValidMerchantCoordinates } = await import("./merchant-onboarding.service.js");
+  assertValidMerchantCoordinates(input.latitude, input.longitude);
+
   const whatsappPhone = normalizeMerchantPhone(input.whatsappPhone);
   const existing = await prisma.merchant.findUnique({ where: { whatsappPhone } });
   if (existing) {
     throw new AppError("A merchant is already linked to this WhatsApp number.", 409, "MERCHANT_PHONE_TAKEN");
   }
 
+  const phone = normalizeMerchantPhone(input.phone?.trim() || input.whatsappPhone);
+  const contactName = (input.contactName?.trim() || input.name).trim();
+
   return prisma.merchant.create({
     data: {
       name: input.name.trim(),
-      contactName: input.contactName.trim(),
-      phone: normalizeMerchantPhone(input.phone),
+      contactName,
+      phone,
       whatsappPhone,
       locationLabel: input.locationLabel.trim(),
       latitude: input.latitude,
       longitude: input.longitude,
       category: input.category ?? MerchantCategory.TUCK_SHOP,
       logoUrl: input.logoUrl,
-      openingHours: input.openingHours,
+      openingHours: input.openingHours?.trim() || null,
       ownerUserId: input.ownerUserId,
-      isActive: true,
-      acceptsOrders: true
+      pilotArea: input.pilotArea?.trim() || null,
+      notes: input.notes?.trim() || null,
+      isActive: input.isActive ?? true,
+      acceptsOrders: input.acceptsOrders ?? true
+    }
+  });
+}
+
+export async function updateMerchant(
+  merchantId: string,
+  input: {
+    name?: string;
+    contactName?: string;
+    phone?: string;
+    whatsappPhone?: string;
+    locationLabel?: string;
+    latitude?: number;
+    longitude?: number;
+    category?: MerchantCategory;
+    logoUrl?: string | null;
+    openingHours?: string | null;
+    pilotArea?: string | null;
+    notes?: string | null;
+    isActive?: boolean;
+    acceptsOrders?: boolean;
+  }
+) {
+  const existing = await prisma.merchant.findUnique({ where: { id: merchantId } });
+  if (!existing) throw new AppError("Merchant not found.", 404, "MERCHANT_NOT_FOUND");
+
+  const lat = input.latitude ?? Number(existing.latitude);
+  const lng = input.longitude ?? Number(existing.longitude);
+  if (input.latitude != null || input.longitude != null) {
+    const { assertValidMerchantCoordinates } = await import("./merchant-onboarding.service.js");
+    assertValidMerchantCoordinates(lat, lng);
+  }
+
+  let whatsappPhone = existing.whatsappPhone;
+  if (input.whatsappPhone != null) {
+    whatsappPhone = normalizeMerchantPhone(input.whatsappPhone);
+    if (whatsappPhone !== existing.whatsappPhone) {
+      const taken = await prisma.merchant.findUnique({ where: { whatsappPhone } });
+      if (taken && taken.id !== merchantId) {
+        throw new AppError(
+          "A merchant is already linked to this WhatsApp number.",
+          409,
+          "MERCHANT_PHONE_TAKEN"
+        );
+      }
+    }
+  }
+
+  return prisma.merchant.update({
+    where: { id: merchantId },
+    data: {
+      ...(input.name != null ? { name: input.name.trim() } : {}),
+      ...(input.contactName != null ? { contactName: input.contactName.trim() } : {}),
+      ...(input.phone != null ? { phone: normalizeMerchantPhone(input.phone) } : {}),
+      ...(input.whatsappPhone != null ? { whatsappPhone } : {}),
+      ...(input.locationLabel != null ? { locationLabel: input.locationLabel.trim() } : {}),
+      ...(input.latitude != null ? { latitude: input.latitude } : {}),
+      ...(input.longitude != null ? { longitude: input.longitude } : {}),
+      ...(input.category != null ? { category: input.category } : {}),
+      ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl } : {}),
+      ...(input.openingHours !== undefined
+        ? { openingHours: input.openingHours?.trim() || null }
+        : {}),
+      ...(input.pilotArea !== undefined ? { pilotArea: input.pilotArea?.trim() || null } : {}),
+      ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
+      ...(input.isActive != null ? { isActive: input.isActive } : {}),
+      ...(input.acceptsOrders != null ? { acceptsOrders: input.acceptsOrders } : {})
     }
   });
 }
@@ -191,7 +281,7 @@ export type ProductMatch = {
   score: number;
 };
 
-function scoreProductMatch(product: Product, query: string): number {
+export function scoreProductMatch(product: Product, query: string): number {
   const terms = expandSearchTerms(query);
   const normalizedQuery = normalizeProductSearchName(query);
   const hay = `${product.normalizedName} ${product.searchAliases.join(" ")}`;
@@ -202,11 +292,15 @@ function scoreProductMatch(product: Product, query: string): number {
     else if (hay.includes(t)) score += 40;
     else if (t.includes(product.normalizedName) && product.normalizedName.length >= 3) score += 20;
     else {
-      // Light typo tolerance: edit distance ≤ 1 for tokens length ≥ 4
+      // Bounded typo tolerance: ≤1 for len≥4, ≤2 for len≥6
       const tokens = hay.split(/\s+/);
       for (const tok of tokens) {
-        if (tok.length >= 4 && t.length >= 4 && editDistanceAtMost1(tok, t)) {
+        if (tok.length >= 4 && t.length >= 4 && editDistanceAtMost(tok, t, 1)) {
           score += 25;
+          break;
+        }
+        if (tok.length >= 6 && t.length >= 6 && editDistanceAtMost(tok, t, 2)) {
+          score += 18;
           break;
         }
       }
@@ -219,29 +313,27 @@ function scoreProductMatch(product: Product, query: string): number {
   return score;
 }
 
-function editDistanceAtMost1(a: string, b: string): boolean {
+function editDistanceAtMost(a: string, b: string, max: number): boolean {
   if (a === b) return true;
-  if (Math.abs(a.length - b.length) > 1) return false;
-  let i = 0;
-  let j = 0;
-  let edits = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) {
-      i += 1;
-      j += 1;
-      continue;
+  if (Math.abs(a.length - b.length) > max) return false;
+  // Small strings: Levenshtein with early exit
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const dp: number[] = Array.from({ length: cols }, (_, j) => j);
+  for (let i = 1; i < rows; i++) {
+    let prev = dp[0]!;
+    dp[0] = i;
+    let rowMin = dp[0];
+    for (let j = 1; j < cols; j++) {
+      const tmp = dp[j]!;
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[j] = Math.min(dp[j]! + 1, dp[j - 1]! + 1, prev + cost);
+      prev = tmp;
+      rowMin = Math.min(rowMin, dp[j]!);
     }
-    edits += 1;
-    if (edits > 1) return false;
-    if (a.length > b.length) i += 1;
-    else if (b.length > a.length) j += 1;
-    else {
-      i += 1;
-      j += 1;
-    }
+    if (rowMin > max) return false;
   }
-  if (i < a.length || j < b.length) edits += 1;
-  return edits <= 1;
+  return dp[b.length]! <= max;
 }
 
 /** Safe unmatched-term log for catalog improvement (no PII beyond coords region). */

@@ -209,7 +209,8 @@ model User {
   auditLogs          AuditLog[]
   earningsTransactions WorkerEarningsTransaction[]
   ownedMerchants       Merchant[]                  @relation("MerchantOwner")
-  commerceOrders       CommerceOrder[]             @relation("CommerceCustomerOrders")
+  commerceOrders       CommerceOrder[]             @relation("CommerceOrderUser")
+  commerceCustomers    CommerceCustomer[]          @relation("CommerceCustomerUser")
 }
 
 model DevicePushToken {
@@ -653,6 +654,9 @@ enum CommerceOrderStatus {
 
 enum CommercePaymentStatus {
   PENDING
+  PAYMENT_PENDING
+  PAID
+  PAYMENT_FAILED
   DUE_ON_DELIVERY
   AUTHORIZED
   CAPTURED
@@ -702,6 +706,9 @@ model Merchant {
   isActive        Boolean          @default(true)
   acceptsOrders   Boolean          @default(true)
   openingHours    String?
+  /** Pilot area label, e.g. Glen Norah / MSU Senga — not a polygon. */
+  pilotArea       String?
+  notes           String?
   products        Product[]
   orders          CommerceOrder[]
   createdAt       DateTime         @default(now())
@@ -709,6 +716,7 @@ model Merchant {
 
   @@index([isActive, acceptsOrders])
   @@index([latitude, longitude])
+  @@index([pilotArea])
 }
 
 model Product {
@@ -735,11 +743,44 @@ model Product {
   @@index([normalizedName])
 }
 
+enum CommerceCustomerSource {
+  WHATSAPP
+  WEB_GUEST
+  APP
+}
+
+/**
+ * Internal commerce identity — WhatsApp / guest web / app users.
+ * WhatsApp shoppers do not require a User account.
+ */
+model CommerceCustomer {
+  id             String                  @id @default(uuid())
+  userId         String?
+  user           User?                   @relation("CommerceCustomerUser", fields: [userId], references: [id], onDelete: SetNull)
+  primaryPhone   String?
+  whatsappPhone  String?
+  displayName    String?
+  source         CommerceCustomerSource
+  orders         CommerceOrder[]
+  conversations  WhatsAppConversation[]
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@unique([whatsappPhone])
+  @@index([primaryPhone])
+  @@index([userId])
+  @@index([source])
+}
+
 model CommerceOrder {
   id                   String                @id @default(uuid())
   orderNumber          Int                   @unique @default(autoincrement())
-  customerId           String
-  customer             User                  @relation("CommerceCustomerOrders", fields: [customerId], references: [id], onDelete: Restrict)
+  /** Optional linked authenticated User (app). Nullable for WhatsApp / guest. */
+  customerId           String?
+  customer             User?                 @relation("CommerceOrderUser", fields: [customerId], references: [id], onDelete: Restrict)
+  /** Primary commerce identity (WhatsApp / guest / app). */
+  commerceCustomerId   String?
+  commerceCustomer     CommerceCustomer?     @relation(fields: [commerceCustomerId], references: [id], onDelete: Restrict)
   merchantId           String
   merchant             Merchant              @relation(fields: [merchantId], references: [id], onDelete: Restrict)
   status               CommerceOrderStatus   @default(DRAFT)
@@ -761,6 +802,7 @@ model CommerceOrder {
   /** Merchant must accept/reject before this time (Stage 4.5 timeout). */
   merchantRespondBy    DateTime?
   items                CommerceOrderItem[]
+  paymentAttempts      CommercePaymentAttempt[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   confirmedAt          DateTime?
@@ -771,7 +813,45 @@ model CommerceOrder {
 
   @@index([merchantId, status])
   @@index([customerId, status])
+  @@index([commerceCustomerId, status])
   @@index([status])
+}
+
+enum CommercePaymentAttemptStatus {
+  CREATED
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+model CommercePaymentAttempt {
+  id                 String                        @id @default(uuid())
+  commerceOrderId    String
+  commerceOrder      CommerceOrder                 @relation(fields: [commerceOrderId], references: [id], onDelete: Cascade)
+  provider           String
+  providerPaymentId  String?
+  /** Merchant-site reference sent to Paynow (unique). */
+  merchantReference  String?                       @unique
+  /** Paynow's own transaction reference when known. */
+  paynowReference    String?
+  /** Hash-validated Paynow poll URL only (SSRF-safe host). */
+  pollUrl            String?
+  payerPhone         String
+  amountCents        Int
+  currency           String                        @default("usd")
+  status             CommercePaymentAttemptStatus  @default(CREATED)
+  failureReason      String?
+  initiatedAt        DateTime                      @default(now())
+  expiresAt          DateTime?
+  confirmedAt        DateTime?
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  @@unique([provider, providerPaymentId])
+  @@index([commerceOrderId, status])
+  @@index([status, expiresAt])
 }
 
 model CommerceOrderItem {
@@ -789,19 +869,23 @@ model CommerceOrderItem {
 }
 
 model WhatsAppConversation {
-  id               String                    @id @default(uuid())
-  phoneNormalized  String
-  party            WhatsAppParty
-  state            WhatsAppConversationState @default(IDLE)
-  merchantId       String?
-  customerUserId   String?
+  id                   String                    @id @default(uuid())
+  phoneNormalized      String
+  party                WhatsAppParty
+  state                WhatsAppConversationState @default(IDLE)
+  merchantId           String?
+  /** @deprecated Prefer commerceCustomerId for shoppers. */
+  customerUserId       String?
+  commerceCustomerId   String?
+  commerceCustomer     CommerceCustomer?         @relation(fields: [commerceCustomerId], references: [id], onDelete: SetNull)
   /** Draft cart, pending product choices, last order id, etc. */
-  contextJson      Json                      @default("{}")
-  updatedAt        DateTime                  @updatedAt
-  createdAt        DateTime                  @default(now())
+  contextJson          Json                      @default("{}")
+  updatedAt            DateTime                  @updatedAt
+  createdAt            DateTime                  @default(now())
 
   @@unique([phoneNormalized, party])
   @@index([merchantId])
+  @@index([commerceCustomerId])
 }
 
 model WhatsAppInboundMessage {

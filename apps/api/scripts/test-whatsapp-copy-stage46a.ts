@@ -104,8 +104,12 @@ async function main() {
   excludesAll(missing, ["fulfill", "matching failed"], "out of stock path");
 
   // --- unknown input ---
-  includesAll(CUSTOMER_HELP, ["didn't quite get", "add bread", "remove eggs", "show cart", "checkout"], "unknown");
-  excludesAll(CUSTOMER_HELP, ["parser", "intent", "unknown intent"], "unknown");
+  includesAll(
+    CUSTOMER_HELP,
+    ["didn't quite get", "2 breads and eggs", "remove eggs", "total", "done"],
+    "unknown"
+  );
+  excludesAll(CUSTOMER_HELP, ["parser", "intent", "unknown intent", "invalid intent"], "unknown");
 
   // --- start over intent ---
   assert(isStartOverIntent("start again"), "start again");

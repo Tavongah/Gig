@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { CommercePilotPanel } from "./CommercePilotPanel";
 
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:4000/v1";
 const TOKEN_KEY = "gigflow_admin_token";
@@ -342,23 +343,6 @@ export function App() {
     enabled: authenticated && activeTab === "gigs"
   });
 
-  const merchantsQuery = useQuery({
-    queryKey: ["admin-commerce-merchants"],
-    queryFn: () =>
-      apiRequest<{
-        merchants: Array<{
-          id: string;
-          name: string;
-          whatsappPhone: string;
-          locationLabel: string;
-          isActive: boolean;
-          acceptsOrders: boolean;
-          _count: { products: number; orders: number };
-        }>;
-      }>("/admin/commerce/merchants"),
-    enabled: authenticated && activeTab === "commerce"
-  });
-
   const commerceOrdersQuery = useQuery({
     queryKey: ["admin-commerce-orders"],
     queryFn: () =>
@@ -659,34 +643,7 @@ export function App() {
 
         {activeTab === "commerce" ? (
           <>
-            <section className="panel">
-              <h2>Merchants</h2>
-              {merchantsQuery.error ? <p className="notice">{merchantsQuery.error.message}</p> : null}
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>WhatsApp</th>
-                    <th>Location</th>
-                    <th>Open</th>
-                    <th>Products</th>
-                    <th>Orders</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(merchantsQuery.data?.merchants ?? []).map((m) => (
-                    <tr key={m.id}>
-                      <td>{m.name}</td>
-                      <td>{m.whatsappPhone}</td>
-                      <td>{m.locationLabel}</td>
-                      <td>{m.acceptsOrders && m.isActive ? "Yes" : "No"}</td>
-                      <td>{m._count.products}</td>
-                      <td>{m._count.orders}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
+            <CommercePilotPanel apiRequest={apiRequest} />
             <section className="panel">
               <h2>Commerce orders</h2>
               {commerceOrdersQuery.error ? <p className="notice">{commerceOrdersQuery.error.message}</p> : null}

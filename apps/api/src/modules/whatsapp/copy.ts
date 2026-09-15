@@ -8,11 +8,11 @@ export function money(cents: number): string {
 }
 
 export const CUSTOMER_HELP = [
-  "I didn't quite get that. You can say:",
-  "• add bread",
-  "• remove eggs",
-  "• show cart",
-  "• checkout"
+  "I didn't quite get that. You can say something like:",
+  "'2 breads and eggs'",
+  "'remove eggs'",
+  "'total'",
+  "'done'"
 ].join("\n");
 
 export const CUSTOMER_HELP_FULL = [
@@ -178,5 +178,89 @@ export function formatMerchantNewOrder(input: {
     "Reply:",
     "ACCEPT",
     "REJECT"
+  ].join("\n");
+}
+
+export function formatPaymentMethodChoice(totalCents: number): string {
+  return [
+    `Your total is ${money(totalCents)}.`,
+    "Choose payment method:",
+    "1. EcoCash",
+    "2. OneMoney",
+    "3. Cash on delivery"
+  ].join("\n");
+}
+
+export function formatEcoCashPrompt(): string {
+  return "Enter the EcoCash number you want to pay with.";
+}
+
+export function formatOneMoneyPrompt(): string {
+  return "Enter the OneMoney number you want to pay with.";
+}
+
+export function formatMobileMoneyPhonePrompt(method: "ECOCASH" | "ONEMONEY"): string {
+  return method === "ONEMONEY" ? formatOneMoneyPrompt() : formatEcoCashPrompt();
+}
+
+export function formatEcoCashPending(displayLocal: string): string {
+  return [
+    `We've sent an EcoCash payment request to ${displayLocal}.`,
+    "Please approve it on your phone."
+  ].join("\n");
+}
+
+export function formatOneMoneyPending(displayLocal: string): string {
+  return [
+    `We've sent a OneMoney payment request to ${displayLocal}.`,
+    "Please approve it on your phone."
+  ].join("\n");
+}
+
+/** Paynow local/test modes — controlled copy; do not forward provider strings. */
+export function formatPaynowTestPending(): string {
+  return "Payment request created. Waiting for payment confirmation.";
+}
+
+export function formatMobileMoneyPending(input: {
+  method: "ECOCASH" | "ONEMONEY";
+  displayLocal: string;
+  paynowTestMode?: boolean;
+}): string {
+  if (input.paynowTestMode) return formatPaynowTestPending();
+  return input.method === "ONEMONEY"
+    ? formatOneMoneyPending(input.displayLocal)
+    : formatEcoCashPending(input.displayLocal);
+}
+
+export function formatEcoCashPaid(): string {
+  return "Payment received ✅\nYour order has been confirmed.";
+}
+
+export function formatEcoCashFailed(): string {
+  return [
+    "The payment was not completed.",
+    "Reply RETRY to try again or CASH to pay on delivery."
+  ].join("\n");
+}
+
+export function formatEcoCashExpired(): string {
+  return [
+    "The payment request expired.",
+    "Reply RETRY to send another request or CASH to pay on delivery."
+  ].join("\n");
+}
+
+export function formatMobileMoneyCancelled(): string {
+  return [
+    "The payment request was cancelled.",
+    "Reply RETRY to try again or CASH to pay on delivery."
+  ].join("\n");
+}
+
+export function formatClaimPaidIgnored(): string {
+  return [
+    "We'll confirm payment when the provider notifies us — you don't need to reply here.",
+    "If the request failed, reply RETRY or CASH."
   ].join("\n");
 }

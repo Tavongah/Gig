@@ -37,6 +37,9 @@ export type CommerceOrderStatus = (typeof commerceOrderStatuses)[number];
 
 export const commercePaymentStatuses = [
   "PENDING",
+  "PAYMENT_PENDING",
+  "PAID",
+  "PAYMENT_FAILED",
   "AUTHORIZED",
   "CAPTURED",
   "FAILED",
@@ -45,6 +48,16 @@ export const commercePaymentStatuses = [
   "DUE_ON_DELIVERY"
 ] as const;
 export type CommercePaymentStatus = (typeof commercePaymentStatuses)[number];
+
+export const commercePaymentAttemptStatuses = [
+  "CREATED",
+  "PENDING",
+  "PAID",
+  "FAILED",
+  "EXPIRED",
+  "CANCELLED"
+] as const;
+export type CommercePaymentAttemptStatus = (typeof commercePaymentAttemptStatuses)[number];
 
 export const commercePaymentMethods = [
   "TEST_BYPASS",
@@ -115,12 +128,12 @@ export function normalizeProductSearchName(name: string): string {
 export const PRODUCT_ALIAS_MAP: Record<string, string[]> = {
   coke: ["coca-cola", "coca cola", "coke", "coka", "coka cola"],
   "coca cola": ["coca-cola", "coke"],
-  mazoe: ["mazoe", "mazoe orange", "mazoe orange crush"],
-  bread: ["bread", "loaf", "loaves", "lobels"],
+  mazoe: ["mazoe", "mazoe orange", "mazoe orange crush", "mazo"],
+  bread: ["bread", "loaf", "loaves", "lobels", "bred"],
   eggs: ["egg", "eggs"],
-  milk: ["milk"],
-  sugar: ["sugar"],
-  oil: ["cooking oil", "oil"],
+  milk: ["milk", "mlk"],
+  sugar: ["sugar", "suger", "sugr"],
+  oil: ["cooking oil", "oil", "cookin oil"],
   rice: ["rice"],
   pepsi: ["pepsi"],
   soap: ["soap", "barra"],
@@ -147,8 +160,8 @@ export type RequestedShoppingItem = {
 
 export const createMerchantSchema = z.object({
   name: z.string().min(2).max(120),
-  contactName: z.string().min(2).max(100),
-  phone: z.string().min(7).max(24),
+  contactName: z.string().min(2).max(100).optional(),
+  phone: z.string().min(7).max(24).optional(),
   whatsappPhone: z.string().min(7).max(24),
   locationLabel: z.string().min(2).max(160),
   latitude: z.number().min(-90).max(90),
@@ -156,7 +169,28 @@ export const createMerchantSchema = z.object({
   category: z.enum(merchantCategories).default("TUCK_SHOP"),
   logoUrl: z.string().url().max(2048).optional(),
   openingHours: z.string().max(200).optional(),
-  ownerUserId: z.string().uuid().optional()
+  ownerUserId: z.string().uuid().optional(),
+  pilotArea: z.string().max(120).optional(),
+  notes: z.string().max(2000).optional(),
+  isActive: z.boolean().optional(),
+  acceptsOrders: z.boolean().optional()
+});
+
+export const updateMerchantSchema = z.object({
+  name: z.string().min(2).max(120).optional(),
+  contactName: z.string().min(2).max(100).optional(),
+  phone: z.string().min(7).max(24).optional(),
+  whatsappPhone: z.string().min(7).max(24).optional(),
+  locationLabel: z.string().min(2).max(160).optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+  category: z.enum(merchantCategories).optional(),
+  logoUrl: z.string().url().max(2048).nullable().optional(),
+  openingHours: z.string().max(200).nullable().optional(),
+  pilotArea: z.string().max(120).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  isActive: z.boolean().optional(),
+  acceptsOrders: z.boolean().optional()
 });
 
 export const upsertProductSchema = z.object({
@@ -173,3 +207,4 @@ export const upsertProductSchema = z.object({
 });
 
 export const DEFAULT_MARKETPLACE_MERCHANT_RADIUS_KM = 5;
+export const PILOT_READY_MIN_PRODUCTS = 10;

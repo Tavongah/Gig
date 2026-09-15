@@ -7,12 +7,12 @@ import {
 } from "../commerce/merchant.service.js";
 import {
   createConfirmedCommerceOrder,
-  ensureWhatsAppCustomer,
   formatOrderSummaryWhatsApp,
   formatOrderTrackMessage,
   getCustomerActiveOrder,
   quoteBasketTotals
 } from "../commerce/order.service.js";
+import { ensureWhatsAppCommerceCustomer } from "../commerce/commerce-customer.service.js";
 import {
   claimInboundMessage,
   getOrCreateConversation,
@@ -24,8 +24,14 @@ import { getWhatsAppProvider } from "./provider.js";
 import {
   classifyShoppingIntent,
   extractShoppingItemsWithOptionalAi,
+  isSameAgainIntent,
   isCancelIntent,
+  isClaimPaidIntent,
   isConfirmIntent,
+  isRetryPaymentIntent,
+  isSelectCashIntent,
+  isSelectEcoCashIntent,
+  isSelectOneMoneyIntent,
   isTrackIntent,
   type ShoppingIntent
 } from "./shopping-intent.js";
@@ -38,16 +44,27 @@ import {
   CUSTOMER_HELP,
   CUSTOMER_HELP_FULL,
   formatBudgetOver,
+  formatClaimPaidIgnored,
   formatCompactMutation,
   formatDisambiguation,
+  formatMobileMoneyPending,
+  formatMobileMoneyPhonePrompt,
   formatMissingItems,
   formatOrderCartSummary,
+  formatPaymentMethodChoice,
   formatPriceChange,
   formatShopSwitch,
   money,
   parsePriceChangeDetail
 } from "./copy.js";
 import { normalizePhoneNumber } from "../auth/access.service.js";
+import {
+  cancelPendingPaymentAttempts,
+  initiateMobileMoneyPaymentForOrder,
+  switchOrderToCashOnDelivery,
+  validateZimbabweMobileForEcoCash
+} from "../commerce/payments/payment.service.js";
+import { CommercePaymentMethod } from "@prisma/client";
 
 export type InboundWhatsAppMessage = {
   providerMessageId: string;
@@ -66,12 +83,13 @@ export async function handleCustomerWhatsAppMessage(
   if (!claimed) return { handled: true, duplicate: true };
 
   const wa = getWhatsAppProvider();
-  const customer = await ensureWhatsAppCustomer(phone, msg.profileName);
+  const commerceCustomer = await ensureWhatsAppCommerceCustomer(phone, msg.profileName);
   const conv = await getOrCreateConversation(phone, WhatsAppParty.CUSTOMER, {
-    customerUserId: customer.id
+    commerceCustomerId: commerceCustomer.id
   });
   let ctx = readContext(conv);
   const text = (msg.text || msg.buttonId || "").trim();
+  const customerId = commerceCustomer.id;
 
   // Expire stale draft quotes — keep location, drop prices
   if (
@@ -79,7 +97,7 @@ export async function handleCustomerWhatsAppMessage(
     (ctx.draftLines?.length || conv.state === WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION)
   ) {
     const { logDutsFlow } = await import("../../lib/flow-log.js");
-    logDutsFlow("COMMERCE_CART_EXPIRED", { userId: customer.id });
+    logDutsFlow("COMMERCE_CART_EXPIRED", { userId: customerId });
     ctx = {
       deliveryLat: ctx.deliveryLat,
       deliveryLng: ctx.deliveryLng,
@@ -104,7 +122,7 @@ export async function handleCustomerWhatsAppMessage(
   }
 
   if (isTrackIntent(text)) {
-    const order = await getCustomerActiveOrder(customer.id);
+    const order = await getCustomerActiveOrder(commerceCustomer.id);
     await wa.sendText(phone, formatOrderTrackMessage(order));
     return { handled: true };
   }
@@ -126,7 +144,7 @@ export async function handleCustomerWhatsAppMessage(
     await updateConversation(conv.id, {
       state: WhatsAppConversationState.BUILDING_CART,
       context: ctx,
-      customerUserId: customer.id
+      commerceCustomerId: commerceCustomer.id
     });
     if (ctx.requestedItems?.length) {
       return buildAndPresentQuote(phone, conv.id, ctx);
@@ -155,7 +173,11 @@ export async function handleCustomerWhatsAppMessage(
     conv.state === WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION &&
     (msg.buttonId === "confirm_order" || isConfirmIntent(text))
   ) {
-    return confirmDraftOrder(phone, customer.id, conv.id, ctx);
+    return confirmDraftOrder(phone, customerId, conv.id, ctx);
+  }
+
+  if (conv.state === WhatsAppConversationState.AWAITING_PAYMENT) {
+    return handlePaymentConversation(phone, customerId, conv.id, ctx, text, msg.buttonId);
   }
 
   if (conv.state === WhatsAppConversationState.AWAITING_PRODUCT_CHOICE) {
@@ -182,6 +204,25 @@ export async function handleCustomerWhatsAppMessage(
     if (ctx.requestedItems?.length) {
       await wa.sendText(phone, formatRequestedCart(ctx.requestedItems));
     }
+    return { handled: true };
+  }
+
+  if (isSameAgainIntent(text)) {
+    if (ctx.requestedItems?.length && ctx.deliveryLat != null) {
+      return buildAndPresentQuote(phone, conv.id, ctx);
+    }
+    if (ctx.requestedItems?.length) {
+      await updateConversation(conv.id, {
+        state: WhatsAppConversationState.AWAITING_LOCATION,
+        context: ctx
+      });
+      await wa.sendText(
+        phone,
+        "Please share your delivery location using WhatsApp's location button."
+      );
+      return { handled: true };
+    }
+    await wa.sendText(phone, "What would you like again? Tell me the items.");
     return { handled: true };
   }
 
@@ -283,7 +324,7 @@ export async function handleCustomerWhatsAppMessage(
 
   if (intent.kind === "CHECKOUT") {
     if (ctx.draftLines?.length) {
-      return confirmDraftOrder(phone, customer.id, conv.id, ctx);
+      return confirmDraftOrder(phone, customerId, conv.id, ctx);
     }
     if (ctx.requestedItems?.length && ctx.deliveryLat != null) {
       return buildAndPresentQuote(phone, conv.id, ctx);
@@ -332,7 +373,7 @@ export async function handleCustomerWhatsAppMessage(
 
     const { logDutsFlow } = await import("../../lib/flow-log.js");
     logDutsFlow("COMMERCE_CART_MUTATED", {
-      userId: customer.id,
+      userId: customerId,
       mutation: intent.kind,
       itemCount: applied.items.length
     });
@@ -497,23 +538,41 @@ async function tryApplyDisambiguation(
   const pending = ctx.pendingChoices?.[0];
   if (!pending) return null;
 
+  const prepared = text.trim().toLowerCase().replace(/[?.!]+/g, " ").replace(/\s+/g, " ").trim();
   let choice: number | null = null;
-  if (/^\d+$/.test(text)) choice = Number(text);
-  else if (/^(number\s*)?1\b|first|the first/i.test(text)) choice = 1;
-  else if (/^(number\s*)?2\b|second/i.test(text)) choice = 2;
-  else if (/^(number\s*)?3\b|third/i.test(text)) choice = 3;
+  if (/^\d+$/.test(prepared)) choice = Number(prepared);
+  else if (/^(number\s*)?(1|one)\b|first|the first/i.test(prepared)) choice = 1;
+  else if (/^(number\s*)?(2|two)\b|second|the second/i.test(prepared)) choice = 2;
+  else if (/^(number\s*)?(3|three)\b|third|the third/i.test(prepared)) choice = 3;
   else {
-    // Match by size / name fragment against option names
-    const n = text.toLowerCase();
-    const idx = pending.options.findIndex(
-      (o) =>
-        o.name.toLowerCase().includes(n) ||
-        (n.includes("2l") && /2\s*l/i.test(o.name)) ||
-        (n.includes("1l") && /1\s*l/i.test(o.name)) ||
-        (n.includes("500") && /500/i.test(o.name)) ||
-        (/(big|large)/i.test(n) && /2\s*l|2l/i.test(o.name))
-    );
-    if (idx >= 0) choice = idx + 1;
+    const n = prepared
+      .replace(/\b(the|a|an|one|please)\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const scored = pending.options.map((o, idx) => {
+      const name = o.name.toLowerCase();
+      let s = 0;
+      if (name.includes(n) || n.includes(name.split(/\s+/)[0] ?? "")) s += 40;
+      const tokens = n.split(/\s+/).filter((t) => t.length > 2);
+      for (const tok of tokens) {
+        if (name.includes(tok)) s += 20;
+      }
+      if (n.includes("2l") && /2\s*l|2l/i.test(o.name)) s += 25;
+      if (n.includes("1l") && /1\s*l|1l/i.test(o.name)) s += 25;
+      if (n.includes("500") && /500/i.test(o.name)) s += 25;
+      if (/(big|large)/i.test(n) && /2\s*l|2l/i.test(o.name)) s += 20;
+      if (/(small|smaller)/i.test(n) && /1\s*l|1l|500/i.test(o.name)) s += 20;
+      if (/(cheap|cheaper|lowest)/i.test(n)) s += 1000 - o.priceCents; // prefer lower price
+      if (/\borange\b/i.test(n) && /orange/i.test(o.name)) s += 30;
+      if (/\braspberry\b/i.test(n) && /raspberry/i.test(o.name)) s += 30;
+      return { idx, s };
+    });
+    scored.sort((a, b) => b.s - a.s);
+    if (scored[0] && scored[0].s >= 20) {
+      if (!scored[1] || scored[0].s - scored[1].s >= 10) {
+        choice = scored[0].idx + 1;
+      }
+    }
   }
 
   if (choice == null) return null;
@@ -568,9 +627,11 @@ async function buildAndPresentQuote(
         context: ctx
       });
       const title =
-        options.length === 2
-          ? `Which ${item.query}?`
-          : "Which one do you want?";
+        options.length >= 2 && item.query.length <= 12
+          ? `Did you mean:`
+          : options.length === 2
+            ? `Which ${item.query}?`
+            : "Which one do you want?";
       await wa.sendText(phone, formatDisambiguation(title, options));
       return { handled: true };
     }
@@ -745,21 +806,203 @@ async function confirmDraftOrder(
     return { handled: true };
   }
 
+  const totals = await quoteBasketTotalsFromContext(ctx);
+  if (!totals) {
+    await wa.sendText(phone, "That expired. Tell me what you'd like to buy again.");
+    return { handled: true };
+  }
+
+  ctx.paymentPhase = "SELECT_METHOD";
+  ctx.paymentAttemptId = undefined;
+  ctx.pendingPaymentOrderId = undefined;
+  ctx.payerPhoneDisplay = undefined;
+  ctx.selectedPaymentMethod = undefined;
+  await updateConversation(convId, {
+    state: WhatsAppConversationState.AWAITING_PAYMENT,
+    context: ctx
+  });
+  await wa.sendText(phone, formatPaymentMethodChoice(totals.totalCents));
+  await wa.sendButtons(phone, "How would you like to pay?", [
+    { id: "pay_ecocash", title: "EcoCash" },
+    { id: "pay_onemoney", title: "OneMoney" },
+    { id: "pay_cash", title: "Cash" }
+  ]);
+  return { handled: true };
+}
+
+async function handlePaymentConversation(
+  phone: string,
+  customerId: string,
+  convId: string,
+  ctx: ConversationContext,
+  text: string,
+  buttonId?: string
+) {
+  const wa = getWhatsAppProvider();
+  const phase = ctx.paymentPhase ?? "SELECT_METHOD";
+
+  if (isClaimPaidIntent(text)) {
+    await wa.sendText(phone, formatClaimPaidIgnored());
+    return { handled: true };
+  }
+
+  if (buttonId === "pay_ecocash" || isSelectEcoCashIntent(text) || text.trim() === "1") {
+    if (phase === "PENDING_PROVIDER") {
+      await wa.sendText(
+        phone,
+        "A payment request is already pending. Reply RETRY after it fails/expires, or CASH to pay on delivery."
+      );
+      return { handled: true };
+    }
+    ctx.selectedPaymentMethod = "ECOCASH";
+    ctx.paymentPhase = "ENTER_PAYMENT_PHONE";
+    await updateConversation(convId, {
+      state: WhatsAppConversationState.AWAITING_PAYMENT,
+      context: ctx
+    });
+    await wa.sendText(phone, formatMobileMoneyPhonePrompt("ECOCASH"));
+    return { handled: true };
+  }
+
+  if (buttonId === "pay_onemoney" || isSelectOneMoneyIntent(text) || text.trim() === "2") {
+    if (phase === "PENDING_PROVIDER") {
+      await wa.sendText(
+        phone,
+        "A payment request is already pending. Reply RETRY after it fails/expires, or CASH to pay on delivery."
+      );
+      return { handled: true };
+    }
+    ctx.selectedPaymentMethod = "ONEMONEY";
+    ctx.paymentPhase = "ENTER_PAYMENT_PHONE";
+    await updateConversation(convId, {
+      state: WhatsAppConversationState.AWAITING_PAYMENT,
+      context: ctx
+    });
+    await wa.sendText(phone, formatMobileMoneyPhonePrompt("ONEMONEY"));
+    return { handled: true };
+  }
+
+  if (
+    buttonId === "pay_cash" ||
+    isSelectCashIntent(text) ||
+    text.trim().toUpperCase() === "CASH" ||
+    text.trim() === "3"
+  ) {
+    return finalizeCashPayment(phone, customerId, convId, ctx);
+  }
+
+  if (isRetryPaymentIntent(text) || text.trim().toUpperCase() === "RETRY") {
+    if (ctx.pendingPaymentOrderId) {
+      await cancelPendingPaymentAttempts(ctx.pendingPaymentOrderId);
+    }
+    const method = ctx.selectedPaymentMethod ?? "ECOCASH";
+    ctx.selectedPaymentMethod = method;
+    ctx.paymentPhase = "ENTER_PAYMENT_PHONE";
+    ctx.paymentAttemptId = undefined;
+    ctx.payerPhoneDisplay = undefined;
+    await updateConversation(convId, {
+      state: WhatsAppConversationState.AWAITING_PAYMENT,
+      context: ctx
+    });
+    await wa.sendText(phone, formatMobileMoneyPhonePrompt(method));
+    return { handled: true };
+  }
+
+  if (phase === "PENDING_PROVIDER") {
+    const maybePhone = validateZimbabweMobileForEcoCash(text);
+    if (maybePhone.ok) {
+      await wa.sendText(
+        phone,
+        "A payment request is already pending. Reply RETRY after it fails/expires, or CASH to pay on delivery."
+      );
+      return { handled: true };
+    }
+    await wa.sendText(
+      phone,
+      "We're waiting for payment confirmation. Reply RETRY if it failed, or CASH to pay on delivery."
+    );
+    return { handled: true };
+  }
+
+  if (phase === "ENTER_PAYMENT_PHONE" || phase === "FAILED" || phase === "EXPIRED") {
+    return startMobileMoneyWithPayerPhone(phone, customerId, convId, ctx, text);
+  }
+
+  const totals = await quoteBasketTotalsFromContext(ctx);
+  await wa.sendText(phone, formatPaymentMethodChoice(totals?.totalCents ?? 0));
+  return { handled: true };
+}
+
+async function finalizeCashPayment(
+  phone: string,
+  customerId: string,
+  convId: string,
+  ctx: ConversationContext
+) {
+  const wa = getWhatsAppProvider();
+
+  if (ctx.pendingPaymentOrderId) {
+    try {
+      const order = await switchOrderToCashOnDelivery(ctx.pendingPaymentOrderId);
+      ctx.activeOrderId = order.id;
+      ctx.draftLines = undefined;
+      ctx.draftQuotedAt = undefined;
+      ctx.requestedItems = undefined;
+      ctx.paymentPhase = undefined;
+      ctx.paymentAttemptId = undefined;
+      ctx.pendingPaymentOrderId = undefined;
+      ctx.payerPhoneDisplay = undefined;
+      ctx.selectedPaymentMethod = undefined;
+      await updateConversation(convId, {
+        state: WhatsAppConversationState.ORDER_ACTIVE,
+        context: ctx
+      });
+      await wa.sendText(
+        phone,
+        `${formatOrderSummaryWhatsApp(order)}\n\nOrder received. ${order.merchant.name} is confirming your order.\nPayment: cash on delivery.`
+      );
+      const { notifyMerchantNewOrder } = await import("./merchant-handler.js");
+      await notifyMerchantNewOrder(order);
+      return { handled: true };
+    } catch (error) {
+      const err = error as Error & { code?: string };
+      await wa.sendText(phone, err.message || "Could not switch to cash on delivery.");
+      return { handled: true };
+    }
+  }
+
+  if (!ctx.draftLines?.length || !ctx.merchantId || ctx.deliveryLat == null || ctx.deliveryLng == null) {
+    await wa.sendText(phone, "That expired. Tell me what you'd like to buy again.");
+    await updateConversation(convId, {
+      state: WhatsAppConversationState.IDLE,
+      context: {
+        deliveryLat: ctx.deliveryLat,
+        deliveryLng: ctx.deliveryLng,
+        deliveryLabel: ctx.deliveryLabel
+      }
+    });
+    return { handled: true };
+  }
+
   try {
     const order = await createConfirmedCommerceOrder({
-      customerId,
+      commerceCustomerId: customerId,
       merchantId: ctx.merchantId,
       lines: ctx.draftLines,
       deliveryLabel: ctx.deliveryLabel || "Shared location",
       deliveryLatitude: ctx.deliveryLat,
       deliveryLongitude: ctx.deliveryLng,
-      customerWhatsAppPhone: phone
+      customerWhatsAppPhone: phone,
+      paymentMethod: CommercePaymentMethod.CASH
     });
 
     ctx.activeOrderId = order.id;
     ctx.draftLines = undefined;
     ctx.draftQuotedAt = undefined;
     ctx.requestedItems = undefined;
+    ctx.paymentPhase = undefined;
+    ctx.paymentAttemptId = undefined;
+    ctx.pendingPaymentOrderId = undefined;
     await updateConversation(convId, {
       state: WhatsAppConversationState.ORDER_ACTIVE,
       context: ctx
@@ -775,67 +1018,175 @@ async function confirmDraftOrder(
 
     return { handled: true };
   } catch (error) {
-    const err = error as Error & { code?: string; errors?: Record<string, string> };
-    if (err.code === "PRICE_CHANGED") {
-      const { logDutsFlow } = await import("../../lib/flow-log.js");
-      logDutsFlow("COMMERCE_PRICE_CHANGED", { merchantId: ctx.merchantId });
-      logDutsFlow("COMMERCE_QUOTE_INVALIDATED", { reason: "PRICE_CHANGED" });
-      const refreshed = err.errors?.lines ? (JSON.parse(err.errors.lines) as typeof ctx.draftLines) : null;
-      if (refreshed?.length) {
-        ctx.draftLines = refreshed;
-        ctx.draftQuotedAt = new Date().toISOString();
-        const totals = await quoteBasketTotalsFromContext(ctx);
-        await updateConversation(convId, {
-          state: WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION,
-          context: ctx
-        });
-        const changeDetail = err.errors?.changes || err.message.replace(
-          /^One price changed since your quote\.\s*/i,
-          ""
-        );
-        const parsed = parsePriceChangeDetail(changeDetail);
-        const body =
-          parsed.length && totals
-            ? formatPriceChange({ changes: parsed, totalCents: totals.totalCents })
-            : [
-                parsed.length
-                  ? parsed
-                      .map(
-                        (c) =>
-                          `The price of ${c.name} changed from ${money(c.oldCents)} to ${money(c.newCents)}.`
-                      )
-                      .join("\n")
-                  : changeDetail,
-                totals ? `Your new total is ${money(totals.totalCents)}. Continue?` : null,
-                "",
-                "Reply CONFIRM or CHANGE."
-              ]
-                .filter(Boolean)
-                .join("\n");
-        await wa.sendButtons(phone, body, [
-          { id: "confirm_order", title: "Confirm updated" },
-          { id: "change_order", title: "Change order" },
-          { id: "cancel_order", title: "Cancel" }
-        ]);
-        return { handled: true };
-      }
-    }
-    if (err.code === "PRODUCT_UNAVAILABLE" || err.code === "MERCHANT_CLOSED") {
-      const { logDutsFlow } = await import("../../lib/flow-log.js");
-      logDutsFlow("COMMERCE_PRODUCT_UNAVAILABLE", { merchantId: ctx.merchantId });
-      logDutsFlow("COMMERCE_QUOTE_INVALIDATED", { reason: err.code });
-      const itemHint =
-        err.code === "PRODUCT_UNAVAILABLE"
-          ? "That item is out of stock. Want to remove it or choose another?"
-          : "That shop is closed right now. Want to try different items, or say CANCEL?";
-      await wa.sendText(phone, itemHint);
-      ctx.draftLines = undefined;
-      await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
-      return { handled: true };
-    }
-    await wa.sendText(phone, "Couldn't place your order. Please try again or say HELP.");
+    return handleOrderCreateError(phone, customerId, convId, ctx, error);
+  }
+}
+
+async function startMobileMoneyWithPayerPhone(
+  phone: string,
+  customerId: string,
+  convId: string,
+  ctx: ConversationContext,
+  rawPhone: string
+) {
+  const wa = getWhatsAppProvider();
+  const validated = validateZimbabweMobileForEcoCash(rawPhone);
+  if (!validated.ok) {
+    await wa.sendText(phone, validated.reason);
     return { handled: true };
   }
+
+  const method =
+    ctx.selectedPaymentMethod === "ONEMONEY"
+      ? CommercePaymentMethod.ONEMONEY
+      : CommercePaymentMethod.ECOCASH;
+
+  try {
+    let orderId = ctx.pendingPaymentOrderId;
+    if (!orderId) {
+      if (!ctx.draftLines?.length || !ctx.merchantId || ctx.deliveryLat == null || ctx.deliveryLng == null) {
+        await wa.sendText(phone, "That expired. Tell me what you'd like to buy again.");
+        return { handled: true };
+      }
+      const order = await createConfirmedCommerceOrder({
+        commerceCustomerId: customerId,
+        merchantId: ctx.merchantId,
+        lines: ctx.draftLines,
+        deliveryLabel: ctx.deliveryLabel || "Shared location",
+        deliveryLatitude: ctx.deliveryLat,
+        deliveryLongitude: ctx.deliveryLng,
+        customerWhatsAppPhone: phone,
+        paymentMethod: method
+      });
+      orderId = order.id;
+      ctx.draftLines = undefined;
+      ctx.draftQuotedAt = undefined;
+      ctx.requestedItems = undefined;
+      ctx.activeOrderId = order.id;
+      ctx.pendingPaymentOrderId = order.id;
+    }
+
+    const { attempt, displayLocal, testMode, paymentMethod } =
+      await initiateMobileMoneyPaymentForOrder({
+        commerceOrderId: orderId,
+        payerPhoneRaw: rawPhone,
+        paymentMethod: method
+      });
+
+    ctx.selectedPaymentMethod =
+      paymentMethod === CommercePaymentMethod.ONEMONEY ? "ONEMONEY" : "ECOCASH";
+    ctx.paymentPhase = "PENDING_PROVIDER";
+    ctx.paymentAttemptId = attempt.id;
+    ctx.pendingPaymentOrderId = orderId;
+    ctx.payerPhoneDisplay = displayLocal;
+    await updateConversation(convId, {
+      state: WhatsAppConversationState.AWAITING_PAYMENT,
+      context: ctx
+    });
+    await wa.sendText(
+      phone,
+      formatMobileMoneyPending({
+        method: ctx.selectedPaymentMethod,
+        displayLocal,
+        paynowTestMode: testMode
+      })
+    );
+    return { handled: true };
+  } catch (error) {
+    const err = error as Error & { code?: string };
+    if (err.code === "PAYMENT_ALREADY_PENDING") {
+      await wa.sendText(phone, err.message);
+      return { handled: true };
+    }
+    if (
+      err.code === "PRICE_CHANGED" ||
+      err.code === "PRODUCT_UNAVAILABLE" ||
+      err.code === "EMPTY_BASKET" ||
+      err.code === "MERCHANT_CLOSED"
+    ) {
+      return handleOrderCreateError(phone, customerId, convId, ctx, error);
+    }
+    await wa.sendText(phone, err.message || "Could not start payment. Reply RETRY or CASH.");
+    ctx.paymentPhase = "FAILED";
+    await updateConversation(convId, {
+      state: WhatsAppConversationState.AWAITING_PAYMENT,
+      context: ctx
+    });
+    return { handled: true };
+  }
+}
+
+async function handleOrderCreateError(
+  phone: string,
+  _customerId: string,
+  convId: string,
+  ctx: ConversationContext,
+  error: unknown
+) {
+  const wa = getWhatsAppProvider();
+  const err = error as Error & { code?: string; errors?: Record<string, string> };
+  if (err.code === "PRICE_CHANGED") {
+    const { logDutsFlow } = await import("../../lib/flow-log.js");
+    logDutsFlow("COMMERCE_PRICE_CHANGED", { merchantId: ctx.merchantId });
+    logDutsFlow("COMMERCE_QUOTE_INVALIDATED", { reason: "PRICE_CHANGED" });
+    const refreshed = err.errors?.lines ? (JSON.parse(err.errors.lines) as typeof ctx.draftLines) : null;
+    if (refreshed?.length) {
+      ctx.draftLines = refreshed;
+      ctx.draftQuotedAt = new Date().toISOString();
+      ctx.paymentPhase = undefined;
+      ctx.pendingPaymentOrderId = undefined;
+      const totals = await quoteBasketTotalsFromContext(ctx);
+      await updateConversation(convId, {
+        state: WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION,
+        context: ctx
+      });
+      const changeDetail = err.errors?.changes || err.message.replace(
+        /^One price changed since your quote\.\s*/i,
+        ""
+      );
+      const parsed = parsePriceChangeDetail(changeDetail);
+      const body =
+        parsed.length && totals
+          ? formatPriceChange({ changes: parsed, totalCents: totals.totalCents })
+          : [
+              parsed.length
+                ? parsed
+                    .map(
+                      (c) =>
+                        `The price of ${c.name} changed from ${money(c.oldCents)} to ${money(c.newCents)}.`
+                    )
+                    .join("\n")
+                : changeDetail,
+              totals ? `Your new total is ${money(totals.totalCents)}. Continue?` : null,
+              "",
+              "Reply CONFIRM or CHANGE."
+            ]
+              .filter(Boolean)
+              .join("\n");
+      await wa.sendButtons(phone, body, [
+        { id: "confirm_order", title: "Confirm updated" },
+        { id: "change_order", title: "Change order" },
+        { id: "cancel_order", title: "Cancel" }
+      ]);
+      return { handled: true };
+    }
+  }
+  if (err.code === "PRODUCT_UNAVAILABLE" || err.code === "MERCHANT_CLOSED") {
+    const { logDutsFlow } = await import("../../lib/flow-log.js");
+    logDutsFlow("COMMERCE_PRODUCT_UNAVAILABLE", { merchantId: ctx.merchantId });
+    logDutsFlow("COMMERCE_QUOTE_INVALIDATED", { reason: err.code });
+    const itemHint =
+      err.code === "PRODUCT_UNAVAILABLE"
+        ? "That item is out of stock. Want to remove it or choose another?"
+        : "That shop is closed right now. Want to try different items, or say CANCEL?";
+    await wa.sendText(phone, itemHint);
+    ctx.draftLines = undefined;
+    ctx.paymentPhase = undefined;
+    await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
+    return { handled: true };
+  }
+  await wa.sendText(phone, "Couldn't place your order. Please try again or say HELP.");
+  return { handled: true };
 }
 
 async function quoteBasketTotalsFromContext(ctx: ConversationContext) {

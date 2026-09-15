@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Server } from "socket.io";
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
-import { createMerchantSchema, upsertProductSchema } from "@gigflow/shared";
+import { createMerchantSchema, updateMerchantSchema, upsertProductSchema } from "@gigflow/shared";
 import { requireAuth, requireRole } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
 import { prisma } from "../../config/prisma.js";
@@ -12,8 +12,15 @@ import {
   listMerchantProducts,
   setMerchantAcceptsOrders,
   setProductAvailability,
+  updateMerchant,
   upsertProductForMerchant
 } from "../commerce/merchant.service.js";
+import {
+  confirmBulkCatalogImport,
+  getMerchantReadiness,
+  previewBulkCatalogImport,
+  testMerchantBasket
+} from "../commerce/merchant-onboarding.service.js";
 import { getWhatsAppProvider } from "./provider.js";
 import { routeInboundWhatsApp } from "./merchant-handler.js";
 import type { InboundWhatsAppMessage } from "./customer-handler.js";
@@ -192,10 +199,35 @@ commerceAdminRouter.use(requireAuth, requireRole(UserRole.ADMIN));
 commerceAdminRouter.get("/merchants", async (_req, res, next) => {
   try {
     const merchants = await prisma.merchant.findMany({
-      include: { _count: { select: { products: true, orders: true } } },
+      include: {
+        _count: { select: { products: true, orders: true } },
+        products: { where: { archived: false, available: true }, select: { id: true } }
+      },
       orderBy: { createdAt: "desc" }
     });
-    res.json({ merchants });
+    res.json({
+      merchants: merchants.map(({ products, ...m }) => ({
+        ...m,
+        availableProductCount: products.length
+      }))
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+commerceAdminRouter.get("/merchants/:id", async (req, res, next) => {
+  try {
+    const merchant = await prisma.merchant.findUnique({
+      where: { id: String(req.params.id) },
+      include: { _count: { select: { products: true, orders: true } } }
+    });
+    if (!merchant) {
+      res.status(404).json({ error: "Merchant not found." });
+      return;
+    }
+    const readiness = await getMerchantReadiness(merchant.id);
+    res.json({ merchant, readiness });
   } catch (e) {
     next(e);
   }
@@ -204,7 +236,27 @@ commerceAdminRouter.get("/merchants", async (_req, res, next) => {
 commerceAdminRouter.post("/merchants", validateBody(createMerchantSchema), async (req, res, next) => {
   try {
     const merchant = await createMerchant(req.body);
-    res.status(201).json({ merchant });
+    const readiness = await getMerchantReadiness(merchant.id);
+    res.status(201).json({ merchant, readiness });
+  } catch (e) {
+    next(e);
+  }
+});
+
+commerceAdminRouter.patch("/merchants/:id", validateBody(updateMerchantSchema), async (req, res, next) => {
+  try {
+    const merchant = await updateMerchant(String(req.params.id), req.body);
+    const readiness = await getMerchantReadiness(merchant.id);
+    res.json({ merchant, readiness });
+  } catch (e) {
+    next(e);
+  }
+});
+
+commerceAdminRouter.get("/merchants/:id/readiness", async (req, res, next) => {
+  try {
+    const readiness = await getMerchantReadiness(String(req.params.id));
+    res.json({ readiness });
   } catch (e) {
     next(e);
   }
@@ -263,6 +315,67 @@ commerceAdminRouter.patch("/merchants/:id/accepts-orders", async (req, res, next
   }
 });
 
+commerceAdminRouter.post("/merchants/:id/catalog/preview", async (req, res, next) => {
+  try {
+    const merchantId = String(req.params.id);
+    const text = String(req.body?.text ?? "");
+    const existing = await listMerchantProducts(merchantId, true);
+    const preview = previewBulkCatalogImport(
+      text,
+      existing.map((p) => p.name)
+    );
+    res.json({ preview });
+  } catch (e) {
+    next(e);
+  }
+});
+
+commerceAdminRouter.post("/merchants/:id/catalog/import", async (req, res, next) => {
+  try {
+    const merchantId = String(req.params.id);
+    const text = String(req.body?.text ?? "");
+    const confirm = Boolean(req.body?.confirm);
+    if (!confirm) {
+      res.status(400).json({ error: "Set confirm=true after reviewing the preview." });
+      return;
+    }
+    const result = await confirmBulkCatalogImport(merchantId, text);
+    const readiness = await getMerchantReadiness(merchantId);
+    res.json({ ...result, readiness });
+  } catch (e) {
+    next(e);
+  }
+});
+
+commerceAdminRouter.post("/merchants/:id/test-basket", async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        customerLat: z.number().min(-90).max(90),
+        customerLng: z.number().min(-180).max(180),
+        items: z
+          .array(
+            z.object({
+              query: z.string().min(1).max(120),
+              quantity: z.number().int().min(1).max(50).default(1)
+            })
+          )
+          .min(1)
+          .max(30)
+      })
+      .parse(req.body);
+    const result = await testMerchantBasket({
+      merchantId: String(req.params.id),
+      customerLat: body.customerLat,
+      customerLng: body.customerLng,
+      items: body.items
+    });
+    res.json({ result });
+  } catch (e) {
+    next(e);
+  }
+});
+
 commerceAdminRouter.get("/orders", async (_req, res, next) => {
   try {
     const orders = await prisma.commerceOrder.findMany({
@@ -271,6 +384,7 @@ commerceAdminRouter.get("/orders", async (_req, res, next) => {
       include: {
         merchant: { select: { id: true, name: true } },
         customer: { select: { id: true, fullName: true, phoneNumber: true } },
+        commerceCustomer: { select: { id: true, displayName: true, whatsappPhone: true } },
         items: true,
         linkedDeliveryGig: { select: { id: true, status: true } }
       }

@@ -18,6 +18,7 @@ import { paymentRouter } from "./modules/payments/payment.routes.js";
 import { locationRouter } from "./modules/location/location.routes.js";
 import { pushRouter } from "./modules/notifications/push.routes.js";
 import { createWhatsAppRouter, commerceAdminRouter } from "./modules/whatsapp/whatsapp.routes.js";
+import { createCommercePaymentsRouter } from "./modules/commerce/payments/payments.routes.js";
 import { raw } from "express";
 
 export function createApp(io: Server) {
@@ -41,6 +42,9 @@ export function createApp(io: Server) {
   app.use("/v1/whatsapp/webhook", raw({ type: "application/json" }));
   // Twilio WhatsApp inbound is application/x-www-form-urlencoded
   app.use("/v1/whatsapp/twilio", express.urlencoded({ extended: false }));
+  // Paynow result callbacks are application/x-www-form-urlencoded
+  app.use("/v1/commerce/payments/paynow/callback", express.urlencoded({ extended: false }));
+  app.use("/v1/commerce/payments/webhook/paynow", express.urlencoded({ extended: false }));
 
   app.use(express.json({ limit: "15mb" }));
 
@@ -90,6 +94,7 @@ export function createApp(io: Server) {
   app.use("/v1", reviewRouter);
   app.use("/v1/admin", adminRouter);
   app.use("/v1/admin/commerce", commerceAdminRouter);
+  app.use("/v1/commerce/payments", createCommercePaymentsRouter());
   app.use("/v1/whatsapp", createWhatsAppRouter(io));
 
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {

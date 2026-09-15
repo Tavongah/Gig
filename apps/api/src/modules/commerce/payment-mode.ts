@@ -45,8 +45,9 @@ export function paymentStatusForMethod(method: CommercePaymentMethod): CommerceP
     case CommercePaymentMethod.STRIPE:
       return CommercePaymentStatus.PENDING;
     case CommercePaymentMethod.ECOCASH:
+      return CommercePaymentStatus.PAYMENT_PENDING;
     case CommercePaymentMethod.ONEMONEY:
-      return CommercePaymentStatus.PENDING;
+      return CommercePaymentStatus.PAYMENT_PENDING;
     default:
       return CommercePaymentStatus.PENDING;
   }

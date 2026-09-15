@@ -244,6 +244,15 @@ async function main() {
     { providerMessageId: mid("confirm1"), from: customerPhone, buttonId: "confirm_order" },
     io
   );
+  const afterConfirmChoice = mock.sent.filter((m) => m.to === customerPhone).pop()?.body ?? "";
+  assert(
+    /EcoCash|Cash on delivery|Choose payment|How would you like to pay/i.test(afterConfirmChoice),
+    `payment choice after confirm: ${afterConfirmChoice.slice(0, 120)}`
+  );
+  await handleCustomerWhatsAppMessage(
+    { providerMessageId: mid("cash1"), from: customerPhone, buttonId: "pay_cash" },
+    io
+  );
   const afterConfirm = mock.sent.filter((m) => m.to === customerPhone).pop()?.body ?? "";
   assert(
     /price of .+ changed|price changed|Order received|confirming|expired|budget|Continue\?/i.test(
@@ -278,19 +287,25 @@ async function main() {
     { providerMessageId: mid("confirm2"), from: customerPhone, buttonId: "confirm_order" },
     io
   );
+  await handleCustomerWhatsAppMessage(
+    { providerMessageId: mid("cash2"), from: customerPhone, buttonId: "pay_cash" },
+    io
+  );
   const oosMsg = mock.sent.map((m) => m.body).filter(Boolean).pop() ?? "";
   assert(
-    /unavailable|no longer|couldn|draft expired|not accepting|Sugar/i.test(oosMsg),
+    /unavailable|out of stock|no longer|couldn|draft expired|not accepting|Sugar/i.test(oosMsg),
     `oos: ${oosMsg.slice(0, 120)}`
   );
   await setProductAvailability(merchant.id, sugar.id, true);
 
   console.log("I) Merchant timeout…");
-  const customer = await prisma.user.findFirst({ where: { phoneNumber: customerPhone } });
+  const customer = await prisma.commerceCustomer.findUnique({
+    where: { whatsappPhone: customerPhone }
+  });
   assert(customer, "customer");
   const milkLive = await prisma.product.findUniqueOrThrow({ where: { id: milk.id } });
   const timeoutOrder = await createConfirmedCommerceOrder({
-    customerId: customer.id,
+    commerceCustomerId: customer.id,
     merchantId: merchant.id,
     lines: [
       {
@@ -317,7 +332,7 @@ async function main() {
   await setMerchantAcceptsOrders(merchant.id, false);
   try {
     await createConfirmedCommerceOrder({
-      customerId: customer.id,
+      commerceCustomerId: customer.id,
       merchantId: merchant.id,
       lines: [
         {
@@ -341,7 +356,7 @@ async function main() {
 
   console.log("K) Ready without courier + idempotent…");
   const orderK = await createConfirmedCommerceOrder({
-    customerId: customer.id,
+    commerceCustomerId: customer.id,
     merchantId: merchant.id,
     lines: [
       {
@@ -426,7 +441,7 @@ async function main() {
   });
   assert(bread, "bread");
   const orderO = await createConfirmedCommerceOrder({
-    customerId: customer.id,
+    commerceCustomerId: customer.id,
     merchantId: merchant.id,
     lines: [
       {
@@ -463,7 +478,9 @@ async function main() {
   });
   await setDeliveryCourierEligibility(worker.id, { transportMode: "BICYCLE", enabled: true });
   await expressWorkerInterest(gigId, worker.id, io);
-  const secrets = await regenerateDeliveryPins(gigId, readyO.customerId);
+  const gigClientId = readyO.linkedDeliveryGig?.clientId;
+  assert(gigClientId, "delivery gig client");
+  const secrets = await regenerateDeliveryPins(gigId, gigClientId);
   await startTravelToPickup(gigId, worker.id, io);
   await arriveAtPickup(gigId, worker.id, { latitude: lat, longitude: lng }, io);
   await verifyPickupPin(gigId, worker.id, secrets.secrets.pickupPin, io);
@@ -473,7 +490,7 @@ async function main() {
     latitude: lat + 0.002,
     longitude: lng + 0.002
   });
-  await approveGigCompletion(gigId, readyO.customerId, io);
+  await approveGigCompletion(gigId, gigClientId, io);
   assert(
     (await prisma.commerceOrder.findUniqueOrThrow({ where: { id: orderO.id } })).status === "DELIVERED",
     "delivered"

@@ -24,7 +24,16 @@
     "test:commerce-pilot-safety": "tsx scripts/test-commerce-pilot-safety.ts",
     "test:commerce-conversation": "tsx scripts/test-commerce-conversation-stage46.ts",
     "test:whatsapp-copy": "tsx scripts/test-whatsapp-copy-stage46a.ts",
-    "test:whatsapp-twilio": "tsx scripts/test-whatsapp-twilio-transport.ts"
+    "test:whatsapp-robustness": "tsx scripts/test-whatsapp-conversation-robustness.ts",
+    "test:whatsapp-twilio": "tsx scripts/test-whatsapp-twilio-transport.ts",
+    "test:commerce-ecocash": "tsx scripts/test-commerce-ecocash-payment.ts",
+    "test:commerce-paynow": "tsx scripts/test-commerce-paynow-payment.ts",
+    "test:commerce-paynow-official": "tsx scripts/test-commerce-paynow-official.ts",
+    "test:commerce-identity": "tsx scripts/test-commerce-customer-identity.ts",
+    "test:merchant-onboarding": "tsx scripts/test-merchant-onboarding-pilot.ts",
+    "test:meriden-test-merchant": "tsx scripts/test-meriden-test-merchant.ts",
+    "seed:pilot-merchant": "tsx scripts/seed-pilot-merchant.ts",
+    "seed:meriden-test-merchant": "tsx scripts/seed-meriden-test-merchant.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1085.0",

@@ -37,12 +37,28 @@ export type ConversationContext = {
   budgetCents?: number;
   /** ISO timestamp when draft quote was last priced */
   draftQuotedAt?: string;
+  /**
+   * WhatsApp mobile-money payment phase (MVP).
+   * SELECT_METHOD → ENTER_PAYMENT_PHONE → PENDING_PROVIDER → (RETRY / CASH fallback)
+   */
+  paymentPhase?:
+    | "SELECT_METHOD"
+    | "ENTER_PAYMENT_PHONE"
+    | "PENDING_PROVIDER"
+    | "FAILED"
+    | "EXPIRED";
+  paymentAttemptId?: string;
+  pendingPaymentOrderId?: string;
+  /** Display-local payer number last requested (not PIN). */
+  payerPhoneDisplay?: string;
+  /** EcoCash vs OneMoney selection for the pending mobile-money attempt. */
+  selectedPaymentMethod?: "ECOCASH" | "ONEMONEY";
 };
 
 export async function getOrCreateConversation(
   phone: string,
   party: WhatsAppParty,
-  extras?: { merchantId?: string; customerUserId?: string }
+  extras?: { merchantId?: string; customerUserId?: string; commerceCustomerId?: string }
 ) {
   const phoneNormalized = normalizePhoneNumber(phone);
   return prisma.whatsAppConversation.upsert({
@@ -53,11 +69,13 @@ export async function getOrCreateConversation(
       state: WhatsAppConversationState.IDLE,
       merchantId: extras?.merchantId,
       customerUserId: extras?.customerUserId,
+      commerceCustomerId: extras?.commerceCustomerId,
       contextJson: {}
     },
     update: {
       ...(extras?.merchantId ? { merchantId: extras.merchantId } : {}),
-      ...(extras?.customerUserId ? { customerUserId: extras.customerUserId } : {})
+      ...(extras?.customerUserId ? { customerUserId: extras.customerUserId } : {}),
+      ...(extras?.commerceCustomerId ? { commerceCustomerId: extras.commerceCustomerId } : {})
     }
   });
 }
@@ -76,6 +94,7 @@ export async function updateConversation(
     context?: ConversationContext;
     merchantId?: string | null;
     customerUserId?: string | null;
+    commerceCustomerId?: string | null;
   }
 ) {
   return prisma.whatsAppConversation.update({
@@ -84,7 +103,10 @@ export async function updateConversation(
       ...(data.state ? { state: data.state } : {}),
       ...(data.context ? { contextJson: data.context as Prisma.InputJsonValue } : {}),
       ...(data.merchantId !== undefined ? { merchantId: data.merchantId } : {}),
-      ...(data.customerUserId !== undefined ? { customerUserId: data.customerUserId } : {})
+      ...(data.customerUserId !== undefined ? { customerUserId: data.customerUserId } : {}),
+      ...(data.commerceCustomerId !== undefined
+        ? { commerceCustomerId: data.commerceCustomerId }
+        : {})
     }
   });
 }
