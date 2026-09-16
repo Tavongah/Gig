@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { MerchantLocationPicker } from "./MerchantLocationPicker";
+import { hasValidCoordinates } from "./merchantLocation";
 
 type ApiRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -80,6 +82,7 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
   const [testLng, setTestLng] = useState("");
   const [testResult, setTestResult] = useState<string>("");
   const [notice, setNotice] = useState<string>("");
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
 
   const merchantsQuery = useQuery({
     queryKey: ["admin-commerce-merchants"],
@@ -104,6 +107,15 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
 
   const saveMerchant = useMutation({
     mutationFn: async () => {
+      if (!hasValidCoordinates(form)) {
+        throw new Error("Set a valid shop location on the map before saving.");
+      }
+      if (!locationConfirmed) {
+        throw new Error("Confirm the shop location pin before saving.");
+      }
+      if (!form.locationLabel.trim()) {
+        throw new Error("Add a short location label (e.g. Glen Norah B, Harare).");
+      }
       const body = {
         name: form.name.trim(),
         contactName: form.contactName.trim() || undefined,
@@ -131,6 +143,7 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
     },
     onSuccess: (data) => {
       setSelectedId(data.merchant.id);
+      setLocationConfirmed(true);
       setNotice(`Saved ${data.merchant.name}. Readiness: ${data.readiness.status}`);
       void queryClient.invalidateQueries({ queryKey: ["admin-commerce-merchants"] });
       void queryClient.invalidateQueries({ queryKey: ["admin-commerce-merchant", data.merchant.id] });
@@ -262,6 +275,7 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
       isActive: m.isActive,
       acceptsOrders: m.acceptsOrders
     });
+    setLocationConfirmed(true);
     setTestLat(String(m.latitude));
     setTestLng(String(Number(m.longitude) + 0.002));
     setNotice("");
@@ -272,6 +286,7 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
   function startNew() {
     setSelectedId(null);
     setForm(emptyForm);
+    setLocationConfirmed(false);
     setNotice("");
     setBulkPreview(null);
     setTestResult("");
@@ -344,32 +359,11 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
             <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           </label>
           <label>
-            Address text
-            <input
-              value={form.locationLabel}
-              onChange={(e) => setForm({ ...form, locationLabel: e.target.value })}
-            />
-          </label>
-          <label>
             Pilot area
             <input
               value={form.pilotArea}
               onChange={(e) => setForm({ ...form, pilotArea: e.target.value })}
               placeholder="Glen Norah / MSU Senga"
-            />
-          </label>
-          <label>
-            Latitude
-            <input
-              value={form.latitude}
-              onChange={(e) => setForm({ ...form, latitude: e.target.value })}
-            />
-          </label>
-          <label>
-            Longitude
-            <input
-              value={form.longitude}
-              onChange={(e) => setForm({ ...form, longitude: e.target.value })}
             />
           </label>
           <label>
@@ -384,6 +378,26 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
             <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </label>
         </div>
+
+        <MerchantLocationPicker
+          apiRequest={apiRequest}
+          value={{
+            latitude: form.latitude,
+            longitude: form.longitude,
+            locationLabel: form.locationLabel
+          }}
+          onChange={(next) =>
+            setForm((prev) => ({
+              ...prev,
+              latitude: next.latitude,
+              longitude: next.longitude,
+              locationLabel: next.locationLabel
+            }))
+          }
+          confirmed={locationConfirmed}
+          onConfirmedChange={setLocationConfirmed}
+        />
+
         <div className="inline-checks">
           <label>
             <input

@@ -12,7 +12,7 @@ import {
 import { toGeoPointInput } from "./gig-privacy.js";
 
 const geocodeBodySchema = z.object({
-  query: z.string().trim().min(8).max(240).optional(),
+  query: z.string().trim().min(3).max(240).optional(),
   placeId: z.string().trim().min(3).max(200).optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional()

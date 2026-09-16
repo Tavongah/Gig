@@ -481,3 +481,166 @@ li {
   cursor: pointer;
   font: inherit;
 }
+
+/* Merchant location picker */
+.merchant-location {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.merchant-location-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.merchant-location-help {
+  margin: 0;
+}
+
+.merchant-location-gps {
+  min-height: 48px;
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  background: var(--brand);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.merchant-location-gps:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.merchant-location-search {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.merchant-location-search input {
+  min-height: 44px;
+}
+
+.merchant-location-suggestions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.merchant-location-suggestions button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.merchant-location-suggestions li:last-child button {
+  border-bottom: none;
+}
+
+.merchant-location-map {
+  height: min(320px, 55vh);
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  z-index: 0;
+}
+
+.merchant-location-status {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.merchant-location-status.tone-ok {
+  color: #047857;
+}
+
+.merchant-location-status.tone-warn {
+  color: #b45309;
+}
+
+.merchant-location-status.tone-err {
+  color: var(--error);
+}
+
+.merchant-location-label-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.merchant-location-confirm {
+  min-height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: #111827;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.merchant-location-confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.merchant-location-confirmed {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.merchant-location-confirmed p {
+  margin: 6px 0 10px;
+}
+
+.merchant-location-confirmed .secondary,
+.merchant-location button.secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.merchant-location-advanced {
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+}
+
+.merchant-location-advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .merchant-location-search {
+    grid-template-columns: 1fr;
+  }
+
+  .merchant-location-map {
+    height: min(280px, 50vh);
+  }
+}

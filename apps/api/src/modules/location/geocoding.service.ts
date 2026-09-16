@@ -286,8 +286,8 @@ export async function searchAddressSuggestions(query: string): Promise<AddressSu
   if (hasGoogleMapsKey()) {
     const url = new URL("https://maps.googleapis.com/maps/api/place/autocomplete/json");
     url.searchParams.set("input", trimmed);
-    url.searchParams.set("types", "address");
-    url.searchParams.set("components", "country:us");
+    // Zimbabwe + US merchants (tuck shops + Meriden pilot).
+    url.searchParams.set("components", "country:zw|country:us");
     url.searchParams.set("key", env.GOOGLE_MAPS_API_KEY!);
 
     const data = await fetchJson<GoogleAutocompleteResult>(url.toString());
@@ -307,7 +307,7 @@ export async function searchAddressSuggestions(query: string): Promise<AddressSu
   url.searchParams.set("format", "json");
   url.searchParams.set("addressdetails", "1");
   url.searchParams.set("limit", "5");
-  url.searchParams.set("countrycodes", "us");
+  url.searchParams.set("countrycodes", "zw,us");
 
   const results = await fetchJson<NominatimResult[]>(url.toString(), { "User-Agent": USER_AGENT });
   return (results ?? []).map((result) => ({
