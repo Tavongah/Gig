@@ -2,12 +2,13 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ClientHomeScreen } from "../screens/client/ClientHomeScreen";
-import { ClientMyGigsScreen } from "../screens/client/ClientMyGigsScreen";
+import { ShopHomeScreen, ShopSearchTabScreen } from "../screens/commerce/ShopHomeScreen";
+import { CommerceOrdersScreen } from "../screens/commerce/CommerceOrdersScreen";
+import { CartScreen } from "../screens/commerce/CartScreen";
 import { ProfileScreen } from "../screens/shared/ProfileScreen";
-import { SupportHomeScreen } from "../screens/support/SupportHomeScreen";
 import type { ClientTabParamList } from "./types";
 import { DUTS } from "../lib/theme";
+import { useCommerceCartStore } from "../stores/commerce-cart.store";
 
 const Tab = createBottomTabNavigator<ClientTabParamList>();
 
@@ -16,23 +17,44 @@ const TAB_CONFIG: Record<
   { label: string; icon: keyof typeof Ionicons.glyphMap; iconFocused: keyof typeof Ionicons.glyphMap }
 > = {
   Home: { label: "Home", icon: "home-outline", iconFocused: "home" },
-  Support: { label: "Support", icon: "help-circle-outline", iconFocused: "help-circle" },
-  MyGigs: { label: "Activity", icon: "list-outline", iconFocused: "list" },
-  Profile: { label: "Profile", icon: "person-outline", iconFocused: "person" }
+  Search: { label: "Search", icon: "search-outline", iconFocused: "search" },
+  Orders: { label: "Orders", icon: "receipt-outline", iconFocused: "receipt" },
+  Cart: { label: "Cart", icon: "cart-outline", iconFocused: "cart" },
+  Account: { label: "Account", icon: "person-outline", iconFocused: "person" }
 };
 
-function TabIcon({ routeName, focused }: { routeName: keyof ClientTabParamList; focused: boolean }) {
+function TabIcon({
+  routeName,
+  focused,
+  badge
+}: {
+  routeName: keyof ClientTabParamList;
+  focused: boolean;
+  badge?: number;
+}) {
   const config = TAB_CONFIG[routeName];
   const color = focused ? DUTS.purple : DUTS.navInactive;
 
   return (
     <View
       accessibilityRole="button"
-      accessibilityLabel={config.label}
+      accessibilityLabel={badge ? `${config.label}, ${badge} items` : config.label}
       accessibilityState={{ selected: focused }}
       className="min-h-[44px] min-w-[64px] items-center justify-center gap-0.5"
     >
-      <Ionicons name={focused ? config.iconFocused : config.icon} size={22} color={color} />
+      <View>
+        <Ionicons name={focused ? config.iconFocused : config.icon} size={22} color={color} />
+        {badge && badge > 0 ? (
+          <View
+            className="absolute -right-2 -top-1 min-w-[16px] items-center rounded-full px-1"
+            style={{ backgroundColor: DUTS.purple }}
+          >
+            <Text style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>
+              {badge > 99 ? "99+" : badge}
+            </Text>
+          </View>
+        ) : null}
+      </View>
       <Text
         numberOfLines={1}
         adjustsFontSizeToFit
@@ -49,6 +71,9 @@ function TabIcon({ routeName, focused }: { routeName: keyof ClientTabParamList; 
 export function ClientTabs() {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 8);
+  const cartCount = useCommerceCartStore((s) =>
+    s.lines.reduce((n, l) => n + l.quantity, 0)
+  );
 
   return (
     <Tab.Navigator
@@ -68,14 +93,19 @@ export function ClientTabs() {
           justifyContent: "center"
         },
         tabBarIcon: ({ focused }) => (
-          <TabIcon routeName={route.name as keyof ClientTabParamList} focused={focused} />
+          <TabIcon
+            routeName={route.name as keyof ClientTabParamList}
+            focused={focused}
+            badge={route.name === "Cart" ? cartCount : undefined}
+          />
         )
       })}
     >
-      <Tab.Screen name="Home" component={ClientHomeScreen} options={{ title: "Home" }} />
-      <Tab.Screen name="Support" component={SupportHomeScreen} options={{ title: "Support" }} />
-      <Tab.Screen name="MyGigs" component={ClientMyGigsScreen} options={{ title: "Orders" }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
+      <Tab.Screen name="Home" component={ShopHomeScreen} options={{ title: "Home" }} />
+      <Tab.Screen name="Search" component={ShopSearchTabScreen} options={{ title: "Search" }} />
+      <Tab.Screen name="Orders" component={CommerceOrdersScreen} options={{ title: "Orders" }} />
+      <Tab.Screen name="Cart" component={CartScreen} options={{ title: "Cart" }} />
+      <Tab.Screen name="Account" component={ProfileScreen} options={{ title: "Account" }} />
     </Tab.Navigator>
   );
 }

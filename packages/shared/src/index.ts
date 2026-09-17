@@ -281,6 +281,7 @@ export {
   whatsappParties,
   whatsappConversationStates,
   commerceCustomerStatusCopy,
+  commerceShopUiStatusLabel,
   normalizeProductSearchName,
   expandSearchTerms,
   PRODUCT_ALIAS_MAP,

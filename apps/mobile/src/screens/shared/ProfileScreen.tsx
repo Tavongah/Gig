@@ -19,7 +19,7 @@ import type { ClientTabParamList, RootStackParamList, WorkerTabParamList } from 
 import { useSessionStore } from "../../stores/session.store";
 
 type NavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<ClientTabParamList & WorkerTabParamList, "Profile">,
+  BottomTabNavigationProp<ClientTabParamList & WorkerTabParamList>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -272,6 +272,14 @@ export function ProfileScreen() {
             <ProfileRow icon="radio-outline" label="Go Online / Offline" onPress={() => navigation.navigate("Home")} />
           </Section>
         ) : null}
+
+        <Section title="Support">
+          <ProfileRow icon="help-circle-outline" label="FAQ" onPress={() => navigation.navigate("Faq")} />
+          <ProfileRow icon="shield-outline" label="Safety" onPress={() => navigation.navigate("Safety")} />
+          <ProfileRow icon="information-circle-outline" label={`About ${APP_NAME}`} onPress={() => navigation.navigate("AboutDuts")} />
+          <ProfileRow icon="document-outline" label="Privacy Policy" onPress={() => navigation.navigate("PrivacyPolicy")} />
+          <ProfileRow icon="reader-outline" label="Terms of Service" onPress={() => navigation.navigate("TermsOfService")} />
+        </Section>
 
         <Section title="Account actions">
           <ProfileRow icon="log-out-outline" label="Log Out" onPress={handleSignOut} danger />

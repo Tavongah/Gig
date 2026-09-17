@@ -862,7 +862,207 @@ export const api = {
       profile: ApiUser["workerProfile"];
       deliveryEligible: boolean;
       transportMode: string | null;
-    }>("/workers/delivery-eligibility", { method: "POST", body: JSON.stringify(payload) }, token)
+    }>("/workers/delivery-eligibility", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  commerceNearbyShops: (lat: number, lng: number, token: string) =>
+    request<{
+      shops: Array<{
+        id: string;
+        name: string;
+        category: string;
+        locationLabel: string;
+        distanceKm: number;
+        logoUrl: string | null;
+        openingHours: string | null;
+      }>;
+    }>(`/commerce/shops/nearby?lat=${lat}&lng=${lng}`, {}, token),
+
+  commerceNearbyProducts: (
+    params: { lat: number; lng: number; q?: string; category?: string; limit?: number },
+    token: string
+  ) => {
+    const qs = new URLSearchParams({
+      lat: String(params.lat),
+      lng: String(params.lng),
+      limit: String(params.limit ?? 40)
+    });
+    if (params.q) qs.set("q", params.q);
+    if (params.category) qs.set("category", params.category);
+    return request<{
+      products: Array<{
+        catalogProductId: string | null;
+        productId: string;
+        name: string;
+        brand: string | null;
+        sizeLabel: string | null;
+        category: string | null;
+        description: string | null;
+        imageUrl: string | null;
+        fromPriceCents: number;
+        currency: string;
+        offerCount: number;
+      }>;
+      shopsNearby: number;
+    }>(`/commerce/products?${qs.toString()}`, {}, token);
+  },
+
+  commerceCategories: (lat: number, lng: number, token: string) =>
+    request<{ categories: Array<{ name: string; count: number }> }>(
+      `/commerce/categories?lat=${lat}&lng=${lng}`,
+      {},
+      token
+    ),
+
+  commerceProductDetail: (
+    params: { lat: number; lng: number; catalogProductId?: string; productId?: string },
+    token: string
+  ) => {
+    const qs = new URLSearchParams({ lat: String(params.lat), lng: String(params.lng) });
+    if (params.catalogProductId) qs.set("catalogProductId", params.catalogProductId);
+    if (params.productId) qs.set("productId", params.productId);
+    return request<{
+      product: {
+        catalogProductId: string | null;
+        name: string;
+        brand: string | null;
+        sizeLabel: string | null;
+        category: string | null;
+        description: string | null;
+        imageUrl: string | null;
+      };
+      offers: Array<{
+        productId: string;
+        merchantId: string;
+        merchantName: string;
+        distanceKm: number;
+        priceCents: number;
+        currency: string;
+        available: boolean;
+      }>;
+      fromPriceCents: number | null;
+    }>(`/commerce/products/detail?${qs.toString()}`, {}, token);
+  },
+
+  commerceShop: (merchantId: string, lat: number, lng: number, token: string, q?: string) => {
+    const qs = new URLSearchParams({ lat: String(lat), lng: String(lng) });
+    if (q) qs.set("q", q);
+    return request<{
+      shop: {
+        id: string;
+        name: string;
+        category: string;
+        locationLabel: string;
+        distanceKm: number;
+        openingHours: string | null;
+        logoUrl: string | null;
+      };
+      products: Array<{
+        catalogProductId: string | null;
+        productId: string;
+        name: string;
+        brand: string | null;
+        sizeLabel: string | null;
+        category: string | null;
+        description: string | null;
+        imageUrl: string | null;
+        fromPriceCents: number;
+        currency: string;
+        offerCount: number;
+      }>;
+    }>(`/commerce/shops/${merchantId}?${qs.toString()}`, {}, token);
+  },
+
+  commerceCartQuote: (
+    payload: {
+      lat: number;
+      lng: number;
+      lines: Array<{ productId: string; quantity: number }>;
+    },
+    token: string
+  ) =>
+    request<{
+      merchant: { id: string; name: string; distanceKm: number };
+      lines: Array<{
+        productId: string;
+        productName: string;
+        quantity: number;
+        unitPriceCents: number;
+        lineTotalCents: number;
+        merchantId: string;
+      }>;
+      subtotalCents: number;
+      deliveryFeeCents: number;
+      serviceFeeCents: number;
+      totalCents: number;
+      currency: string;
+    }>("/commerce/cart/quote", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  commerceCheckout: (
+    payload: {
+      lat: number;
+      lng: number;
+      deliveryLabel: string;
+      lines: Array<{ productId: string; quantity: number }>;
+      paymentMethod?: "CASH" | "ECOCASH" | "ONEMONEY";
+      customerPhone?: string;
+    },
+    token: string
+  ) =>
+    request<{
+      order: {
+        id: string;
+        orderNumber: number;
+        status: string;
+        statusLabel: string;
+        totalCents: number;
+        currency: string;
+        merchantName: string;
+        paymentStatus: string;
+        paymentMethod: string;
+      };
+    }>("/commerce/cart/checkout", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  commerceOrders: (token: string) =>
+    request<{
+      orders: Array<{
+        id: string;
+        orderNumber: number;
+        status: string;
+        statusLabel: string;
+        totalCents: number;
+        currency: string;
+        merchantName: string;
+        itemCount: number;
+        createdAt: string;
+        paymentStatus: string;
+      }>;
+    }>("/commerce/orders", {}, token),
+
+  commerceOrder: (orderId: string, token: string) =>
+    request<{
+      order: {
+        id: string;
+        orderNumber: number;
+        status: string;
+        statusLabel: string;
+        totalCents: number;
+        subtotalCents: number;
+        deliveryFeeCents: number;
+        serviceFeeCents: number;
+        currency: string;
+        paymentStatus: string;
+        paymentMethod: string;
+        merchant: { id: string; name: string; locationLabel: string };
+        deliveryLabel: string;
+        items: Array<{
+          name: string;
+          quantity: number;
+          unitPriceCents: number;
+          lineTotalCents: number;
+        }>;
+        deliveryStatus: string | null;
+      };
+    }>(`/commerce/orders/${orderId}`, {}, token)
 };
 
 export interface DeliveryQuote {

@@ -36,6 +36,11 @@ import { FaqScreen } from "../screens/support/FaqScreen";
 import { AboutDutsScreen } from "../screens/support/AboutDutsScreen";
 import { PrivacyPolicyScreen } from "../screens/support/PrivacyPolicyScreen";
 import { TermsOfServiceScreen } from "../screens/support/TermsOfServiceScreen";
+import { ProductSearchScreen } from "../screens/commerce/ProductSearchScreen";
+import { ProductDetailScreen } from "../screens/commerce/ProductDetailScreen";
+import { ShopDetailScreen } from "../screens/commerce/ShopDetailScreen";
+import { CommerceCheckoutScreen } from "../screens/commerce/CommerceCheckoutScreen";
+import { CommerceOrderDetailScreen } from "../screens/commerce/CommerceOrderDetailScreen";
 import type { RootStackParamList } from "./types";
 import { useSessionStore } from "../stores/session.store";
 import { APP_NAME } from "../lib/brand";
@@ -98,6 +103,15 @@ export function AppNavigator() {
       <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ title: "Terms of Service" }} />
       <Stack.Screen name="Chat" component={ChatScreen} options={({ route }) => ({ title: route.params.title })} />
       <Stack.Screen name="Review" component={ReviewScreen} options={{ title: "Leave a review" }} />
+      <Stack.Screen name="ProductSearch" component={ProductSearchScreen} options={{ title: "Search" }} />
+      <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ title: "Product" }} />
+      <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{ title: "Shop" }} />
+      <Stack.Screen name="CommerceCheckout" component={CommerceCheckoutScreen} options={{ title: "Checkout" }} />
+      <Stack.Screen
+        name="CommerceOrderDetail"
+        component={CommerceOrderDetailScreen}
+        options={{ title: "Order" }}
+      />
     </Stack.Navigator>
   );
 }

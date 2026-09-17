@@ -19,9 +19,21 @@ import {
 } from "../../lib/addresses-store";
 import type { RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
+import { useShopLocationStore } from "../../stores/shop-location.store";
 import { DUTS } from "../../lib/theme";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "Addresses">;
+
+async function syncShopLocation(userId: string, address: SavedAddress | undefined): Promise<void> {
+  if (!address) return;
+  if (!Number.isFinite(address.latitude) || !Number.isFinite(address.longitude)) return;
+  await useShopLocationStore.getState().setLocation({
+    latitude: address.latitude,
+    longitude: address.longitude,
+    label: address.label || address.formattedAddress || "Saved address"
+  });
+  void userId;
+}
 
 export function AddressesScreen() {
   const navigation = useNavigation<Nav>();
@@ -95,6 +107,8 @@ export function AddressesScreen() {
         isDefault
       });
       setAddresses(next);
+      const preferred = next.find((a) => a.isDefault) ?? next[0];
+      await syncShopLocation(session.user.id, preferred);
       resetForm();
     } catch (error) {
       Alert.alert("Could not save", error instanceof Error ? error.message : "Try again.");
@@ -110,7 +124,7 @@ export function AddressesScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ gap: 16, paddingBottom: 32 }}
       >
-        <Text className="text-sm text-muted">Manage saved locations for faster gig requests.</Text>
+        <Text className="text-sm text-muted">Saved locations for delivery and requests.</Text>
 
         {addresses.map((address) => (
           <DutsCard key={address.id} className="gap-3 p-5">
@@ -125,13 +139,26 @@ export function AddressesScreen() {
               <Ionicons name="location-outline" size={22} color={DUTS.purple} />
             </View>
             <View className="flex-row flex-wrap gap-2">
+              <AppButton
+                label="Deliver here"
+                variant="secondary"
+                onPress={() => {
+                  void syncShopLocation(session.user.id, address).then(() => navigation.goBack());
+                }}
+              />
               <AppButton label="Edit" variant="secondary" onPress={() => startEdit(address)} />
               {!address.isDefault ? (
                 <AppButton
                   label="Set default"
                   variant="secondary"
                   onPress={() => {
-                    void setDefaultAddress(session.user.id, address.id).then(setAddresses);
+                    void setDefaultAddress(session.user.id, address.id).then(async (next) => {
+                      setAddresses(next);
+                      await syncShopLocation(
+                        session.user.id,
+                        next.find((a) => a.id === address.id)
+                      );
+                    });
                   }}
                 />
               ) : null}

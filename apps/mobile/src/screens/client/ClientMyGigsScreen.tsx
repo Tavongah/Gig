@@ -26,7 +26,7 @@ import { useSessionStore } from "../../stores/session.store";
 type TabValue = "active" | "completed" | "cancelled";
 
 type NavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<ClientTabParamList, "MyGigs">,
+  BottomTabNavigationProp<ClientTabParamList>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 

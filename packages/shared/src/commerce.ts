@@ -115,6 +115,50 @@ export function commerceCustomerStatusCopy(status: CommerceOrderStatus): string 
   }
 }
 
+/** Short shop-UI status labels (web/PWA). Does not change WhatsApp copy. */
+export function commerceShopUiStatusLabel(
+  status: CommerceOrderStatus,
+  deliveryGigStatus?: string | null
+): string {
+  if (deliveryGigStatus) {
+    const d = deliveryGigStatus.toUpperCase();
+    if (d.includes("ARRIVED") || d === "WORKER_ARRIVED") return "Courier arrived";
+    if (d === "IN_TRANSIT" || d === "OUT_FOR_DELIVERY" || d.includes("EN_ROUTE_DROP")) return "On the way";
+    if (d.includes("PICKED") || d === "PACKAGE_PICKED_UP") return "Order picked up";
+    if (d.includes("EN_ROUTE_PICKUP") || d.includes("GOING_TO_SHOP")) return "Courier going to shop";
+    if (d === "ASSIGNED" || d === "WORKER_ASSIGNED" || d === "ACCEPTED") return "Courier assigned";
+    if (d === "COMPLETED" || d === "DELIVERED") return "Delivered";
+  }
+
+  switch (status) {
+    case "DRAFT":
+      return "Waiting for shop";
+    case "CUSTOMER_CONFIRMED":
+    case "MERCHANT_PENDING":
+      return "Waiting for shop";
+    case "MERCHANT_ACCEPTED":
+      return "Shop preparing order";
+    case "READY_FOR_PICKUP":
+      return "Ready for pickup";
+    case "COURIER_ASSIGNED":
+      return "Courier assigned";
+    case "PICKED_UP":
+      return "Order picked up";
+    case "OUT_FOR_DELIVERY":
+      return "On the way";
+    case "DELIVERED":
+      return "Delivered";
+    case "MERCHANT_REJECTED":
+      return "Shop couldn't take order";
+    case "CANCELLED":
+      return "Cancelled";
+    case "PAYMENT_FAILED":
+      return "Payment failed";
+    default:
+      return "Order update";
+  }
+}
+
 export function normalizeProductSearchName(name: string): string {
   return name
     .toLowerCase()

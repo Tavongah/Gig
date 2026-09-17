@@ -39,13 +39,19 @@ export type RootStackParamList = {
   TermsOfService: undefined;
   Chat: { gigId: string; title: string };
   Review: { gigId: string; workerName: string };
+  ProductSearch: { q?: string; category?: string } | undefined;
+  ProductDetail: { catalogProductId?: string; productId?: string };
+  ShopDetail: { merchantId: string };
+  CommerceCheckout: undefined;
+  CommerceOrderDetail: { orderId: string };
 };
 
 export type ClientTabParamList = {
   Home: undefined;
-  Support: undefined;
-  MyGigs: undefined;
-  Profile: undefined;
+  Search: undefined;
+  Orders: undefined;
+  Cart: undefined;
+  Account: undefined;
 };
 
 export type WorkerTabParamList = {
