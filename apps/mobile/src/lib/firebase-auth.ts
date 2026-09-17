@@ -3,7 +3,13 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
 import { Platform } from "react-native";
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, OAuthProvider, signInWithCredential } from "firebase/auth";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  OAuthProvider,
+  signInWithCredential,
+  signInWithPopup
+} from "firebase/auth";
 
 type FirebaseExtras = {
   firebaseApiKey?: string;
@@ -47,7 +53,44 @@ function getFirebaseAuth() {
   return getAuth(app);
 }
 
+function mapFirebaseAuthError(error: unknown, providerLabel: string): Error {
+  const code =
+    typeof error === "object" && error && "code" in error ? String((error as { code: string }).code) : "";
+
+  if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+    return new Error(`${providerLabel} sign-in was canceled.`);
+  }
+  if (code === "auth/popup-blocked") {
+    return new Error(`${providerLabel} sign-in popup was blocked. Allow popups for this site and try again.`);
+  }
+  if (code === "auth/unauthorized-domain") {
+    return new Error(
+      "This domain is not authorized for Firebase sign-in. Add app.duts.tech under Authentication → Settings → Authorized domains."
+    );
+  }
+  if (error instanceof Error && error.message) {
+    return error;
+  }
+  return new Error(`${providerLabel} sign-in failed.`);
+}
+
+async function signInWithWebPopup(provider: GoogleAuthProvider | OAuthProvider, providerLabel: string): Promise<string> {
+  try {
+    const result = await signInWithPopup(getFirebaseAuth(), provider);
+    return result.user.getIdToken();
+  } catch (error) {
+    throw mapFirebaseAuthError(error, providerLabel);
+  }
+}
+
 export async function signInWithApplePopup(): Promise<string> {
+  if (Platform.OS === "web") {
+    const provider = new OAuthProvider("apple.com");
+    provider.addScope("email");
+    provider.addScope("name");
+    return signInWithWebPopup(provider, "Apple");
+  }
+
   if (Platform.OS !== "ios") {
     throw new Error("Apple Sign-In is available on iPhone and iPad.");
   }
@@ -92,5 +135,11 @@ export async function signInWithApplePopup(): Promise<string> {
 }
 
 export async function signInWithGooglePopup(): Promise<string> {
-  throw new Error("Google sign-in on iOS is not ready yet. Use Apple or email.");
+  if (Platform.OS === "web") {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    return signInWithWebPopup(provider, "Google");
+  }
+
+  throw new Error("Google sign-in on native apps is not ready yet. Use Apple or email, or open app.duts.tech in a browser.");
 }
