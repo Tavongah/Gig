@@ -13,7 +13,9 @@ type FirebaseCompat = {
     (): {
       signInWithPopup: (provider: unknown) => Promise<{ user: { getIdToken: () => Promise<string> } }>;
     };
-    GoogleAuthProvider: new () => unknown;
+    GoogleAuthProvider: new () => {
+      setCustomParameters: (params: Record<string, string>) => void;
+    };
     OAuthProvider: new (providerId: string) => { addScope: (scope: string) => unknown };
   };
 };
@@ -44,7 +46,12 @@ function loadScript(src: string): Promise<void> {
 }
 
 async function getFirebaseAuth(): Promise<ReturnType<FirebaseCompat["auth"]> | null> {
-  if (!extra?.firebaseApiKey || !extra.firebaseAuthDomain || !extra.firebaseProjectId) {
+  if (
+    !extra?.firebaseApiKey ||
+    !extra.firebaseAuthDomain ||
+    !extra.firebaseProjectId ||
+    !extra.firebaseAppId
+  ) {
     return null;
   }
   if (initPromise) return initPromise;
@@ -72,33 +79,75 @@ async function getFirebaseAuth(): Promise<ReturnType<FirebaseCompat["auth"]> | n
 }
 
 export function isFirebaseClientConfigured(): boolean {
-  return Boolean(extra?.firebaseApiKey && extra.firebaseAuthDomain && extra.firebaseProjectId);
+  return Boolean(
+    extra?.firebaseApiKey &&
+      extra.firebaseAuthDomain &&
+      extra.firebaseProjectId &&
+      extra.firebaseAppId
+  );
 }
 
 export function useFirebaseConfigured(): boolean {
   return isFirebaseClientConfigured();
 }
 
-async function signIn(provider: "google" | "apple"): Promise<string> {
-  const auth = await getFirebaseAuth();
-  if (!auth || !window.firebase) {
-    throw new Error("Firebase is not configured for social sign-in.");
+function mapFirebaseAuthError(error: unknown, providerLabel: string): Error {
+  const code =
+    typeof error === "object" && error && "code" in error ? String((error as { code: string }).code) : "";
+
+  if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+    return new Error(`${providerLabel} sign-in was canceled.`);
   }
+  if (code === "auth/popup-blocked") {
+    return new Error(
+      `${providerLabel} sign-in popup was blocked. Allow popups for this site and try again.`
+    );
+  }
+  if (code === "auth/unauthorized-domain") {
+    return new Error(
+      "This domain is not authorized for Firebase sign-in. Add app.duts.tech under Authentication → Settings → Authorized domains."
+    );
+  }
+  if (code === "auth/operation-not-allowed") {
+    return new Error(
+      `${providerLabel} sign-in is not enabled in Firebase. Enable it under Authentication → Sign-in method.`
+    );
+  }
+  if (error instanceof Error && error.message) {
+    return error;
+  }
+  return new Error(`${providerLabel} sign-in failed.`);
+}
 
-  const providerInstance =
-    provider === "google"
-      ? new window.firebase.auth.GoogleAuthProvider()
-      : (() => {
-          const apple = new window.firebase!.auth.OAuthProvider("apple.com");
-          apple.addScope("email");
-          apple.addScope("name");
-          return apple;
-        })();
+async function signIn(provider: "google" | "apple"): Promise<string> {
+  const providerLabel = provider === "google" ? "Google" : "Apple";
+  try {
+    const auth = await getFirebaseAuth();
+    if (!auth || !window.firebase) {
+      throw new Error("Firebase is not configured for social sign-in.");
+    }
 
-  const result = await auth.signInWithPopup(providerInstance);
-  const token = await result.user.getIdToken();
-  if (!token) throw new Error("Could not read a sign-in token.");
-  return token;
+    const providerInstance =
+      provider === "google"
+        ? (() => {
+            const google = new window.firebase.auth.GoogleAuthProvider();
+            google.setCustomParameters({ prompt: "select_account" });
+            return google;
+          })()
+        : (() => {
+            const apple = new window.firebase.auth.OAuthProvider("apple.com");
+            apple.addScope("email");
+            apple.addScope("name");
+            return apple;
+          })();
+
+    const result = await auth.signInWithPopup(providerInstance);
+    const token = await result.user.getIdToken();
+    if (!token) throw new Error("Could not read a sign-in token.");
+    return token;
+  } catch (error) {
+    throw mapFirebaseAuthError(error, providerLabel);
+  }
 }
 
 export async function signInWithGooglePopup(): Promise<string> {

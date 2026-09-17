@@ -93,8 +93,11 @@ npm run dev:mobile
 
 Project: **gigflow-a5943**
 
+Web social buttons load [`apps/mobile/src/lib/firebase-auth.web.ts`](apps/mobile/src/lib/firebase-auth.web.ts) (not the native `firebase-auth.ts`).
+
 1. **Authentication → Sign-in method:** Google **Enabled**; Apple **Enabled**
-2. **Authentication → Settings → Authorized domains:** include `app.duts.tech` and `localhost`
+2. **Authentication → Settings → Authorized domains:** include `app.duts.tech` and `localhost`  
+   Without `app.duts.tech`, popups fail with `auth/unauthorized-domain`.
 3. **Apple (web):** Services ID / Team ID / Key configured; return URL must be  
    `https://gigflow-a5943.firebaseapp.com/__/auth/handler`
 4. DO `.env.production` already needs `FIREBASE_*` (API) and `EXPO_PUBLIC_FIREBASE_*` (web build args)
