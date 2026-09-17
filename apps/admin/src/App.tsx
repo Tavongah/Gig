@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CommercePilotPanel } from "./CommercePilotPanel";
+import { DutsCatalogPanel } from "./DutsCatalogPanel";
 
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:4000/v1";
 const TOKEN_KEY = "gigflow_admin_token";
@@ -64,6 +65,7 @@ interface AdminGig {
 }
 
 type AdminTab = "overview" | "pending" | "users" | "gigs" | "commerce";
+type CommerceSubTab = "merchants" | "orders" | "catalog";
 
 function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -280,6 +282,7 @@ export function App() {
   const [cancelFeeInput, setCancelFeeInput] = useState("25");
   const [cancelGraceInput, setCancelGraceInput] = useState("5");
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  const [commerceSubTab, setCommerceSubTab] = useState<CommerceSubTab>("merchants");
 
   useEffect(() => {
     async function validateSession(): Promise<void> {
@@ -646,7 +649,28 @@ export function App() {
 
         {activeTab === "commerce" ? (
           <>
-            <CommercePilotPanel apiRequest={apiRequest} />
+            <div className="row-actions" style={{ marginBottom: 16 }}>
+              {(
+                [
+                  ["Merchants", "merchants"],
+                  ["Orders", "orders"],
+                  ["DUTS Catalog", "catalog"]
+                ] as const
+              ).map(([label, id]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={commerceSubTab === id ? undefined : "secondary"}
+                  onClick={() => setCommerceSubTab(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {commerceSubTab === "merchants" ? <CommercePilotPanel apiRequest={apiRequest} /> : null}
+            {commerceSubTab === "catalog" ? <DutsCatalogPanel apiRequest={apiRequest} /> : null}
+            {commerceSubTab === "orders" ? (
             <section className="panel">
               <h2>Commerce orders</h2>
               {commerceOrdersQuery.error ? <p className="notice">{commerceOrdersQuery.error.message}</p> : null}
@@ -686,6 +710,7 @@ export function App() {
                 </tbody>
               </table>
             </section>
+            ) : null}
           </>
         ) : null}
       </section>

@@ -38,6 +38,18 @@ type ProductRow = {
   available: boolean;
   unit: string | null;
   searchAliases: string[];
+  catalogProductId?: string | null;
+  imageUrl?: string | null;
+};
+
+type CatalogHit = {
+  id: string;
+  name: string;
+  brand: string | null;
+  category: string;
+  sizeLabel: string | null;
+  primaryImageUrl: string | null;
+  status: string;
 };
 
 type BulkPreview = {
@@ -73,6 +85,23 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [productForm, setProductForm] = useState({ name: "", price: "", aliases: "" });
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [selectedCatalog, setSelectedCatalog] = useState<CatalogHit | null>(null);
+  const [offerPrice, setOfferPrice] = useState("");
+  const [offerAvailable, setOfferAvailable] = useState(true);
+  const [showNewCatalog, setShowNewCatalog] = useState(false);
+  const [newCatalogForm, setNewCatalogForm] = useState({
+    name: "",
+    brand: "",
+    category: "Drinks",
+    sizeLabel: "",
+    description: "",
+    barcode: "",
+    primaryImageUrl: "",
+    price: "",
+    forceCreate: false
+  });
+  const [similarMatches, setSimilarMatches] = useState<CatalogHit[]>([]);
   const [bulkText, setBulkText] = useState(
     "Bread | 1.20\nEggs 6-pack | 2.50\nMazoe Orange 2L | 3.00\nMilk 1L | 1.50"
   );
@@ -103,6 +132,91 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
     queryFn: () =>
       apiRequest<{ products: ProductRow[] }>(`/admin/commerce/merchants/${selectedId}/products`),
     enabled: Boolean(selectedId)
+  });
+
+  const catalogSearchQuery = useQuery({
+    queryKey: ["merchant-catalog-search", selectedId, catalogSearch],
+    queryFn: () =>
+      apiRequest<{ products: CatalogHit[] }>(
+        `/admin/commerce/merchants/${selectedId}/catalog/search?q=${encodeURIComponent(catalogSearch.trim())}&limit=20`
+      ),
+    enabled: Boolean(selectedId) && catalogSearch.trim().length >= 1
+  });
+
+  const linkCatalogMut = useMutation({
+    mutationFn: () => {
+      if (!selectedId || !selectedCatalog) throw new Error("Select a catalog product");
+      const priceCents = Math.round(Number(offerPrice) * 100);
+      if (!Number.isFinite(priceCents) || priceCents < 1) throw new Error("Enter a valid selling price");
+      return apiRequest(`/admin/commerce/merchants/${selectedId}/catalog/link`, {
+        method: "POST",
+        body: JSON.stringify({
+          catalogProductId: selectedCatalog.id,
+          priceCents,
+          currency: "usd",
+          available: offerAvailable
+        })
+      });
+    },
+    onSuccess: () => {
+      setNotice(`Added ${selectedCatalog?.name} to shop.`);
+      setSelectedCatalog(null);
+      setOfferPrice("");
+      void queryClient.invalidateQueries({ queryKey: ["admin-commerce-products", selectedId] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-commerce-merchant", selectedId] });
+    },
+    onError: (e: Error) => setNotice(e.message)
+  });
+
+  const submitNewCatalogMut = useMutation({
+    mutationFn: () => {
+      if (!selectedId) throw new Error("Select a merchant first");
+      const priceCents = Math.round(Number(newCatalogForm.price) * 100);
+      return apiRequest<{
+        requiresConfirmation: boolean;
+        matches?: CatalogHit[];
+        catalogProduct?: CatalogHit;
+        product?: ProductRow;
+      }>(`/admin/commerce/merchants/${selectedId}/catalog/submit`, {
+        method: "POST",
+        body: JSON.stringify({
+          name: newCatalogForm.name.trim(),
+          brand: newCatalogForm.brand.trim() || null,
+          category: newCatalogForm.category.trim(),
+          sizeLabel: newCatalogForm.sizeLabel.trim() || null,
+          description: newCatalogForm.description.trim() || null,
+          barcode: newCatalogForm.barcode.trim() || null,
+          primaryImageUrl: newCatalogForm.primaryImageUrl.trim(),
+          priceCents,
+          currency: "usd",
+          available: true,
+          forceCreate: newCatalogForm.forceCreate
+        })
+      });
+    },
+    onSuccess: (res) => {
+      if (res.requiresConfirmation && res.matches?.length) {
+        setSimilarMatches(res.matches);
+        setNotice("This may already be in DUTS Catalog — use an existing product or create anyway.");
+        return;
+      }
+      setNotice("New catalog product submitted (PENDING) and added to this shop.");
+      setShowNewCatalog(false);
+      setSimilarMatches([]);
+      setNewCatalogForm({
+        name: "",
+        brand: "",
+        category: "Drinks",
+        sizeLabel: "",
+        description: "",
+        barcode: "",
+        primaryImageUrl: "",
+        price: "",
+        forceCreate: false
+      });
+      void queryClient.invalidateQueries({ queryKey: ["admin-commerce-products", selectedId] });
+    },
+    onError: (e: Error) => setNotice(e.message)
   });
 
   const saveMerchant = useMutation({
@@ -426,33 +540,276 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
       {selectedId ? (
         <>
           <section className="panel">
-            <h2>Catalog</h2>
-            <div className="form-grid">
-              <label>
-                Product name
-                <input
-                  value={productForm.name}
-                  onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                />
-              </label>
-              <label>
-                Price (USD)
-                <input
-                  value={productForm.price}
-                  onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
-                />
-              </label>
-              <label>
-                Aliases (comma)
-                <input
-                  value={productForm.aliases}
-                  onChange={(e) => setProductForm({ ...productForm, aliases: e.target.value })}
-                />
-              </label>
+            <h2>Shop products</h2>
+            <p className="muted">Search DUTS Catalog, then set only price and stock for this merchant.</p>
+
+            <label>
+              Search DUTS Catalog
+              <input
+                value={catalogSearch}
+                onChange={(e) => {
+                  setCatalogSearch(e.target.value);
+                  setShowNewCatalog(false);
+                }}
+                placeholder="Product name, brand, barcode…"
+              />
+            </label>
+
+            {(catalogSearchQuery.data?.products ?? []).length > 0 ? (
+              <ul className="catalog-results" style={{ listStyle: "none", padding: 0 }}>
+                {catalogSearchQuery.data!.products.map((hit) => (
+                  <li
+                    key={hit.id}
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "center",
+                      padding: "8px 0",
+                      borderBottom: "1px solid #eee"
+                    }}
+                  >
+                    {hit.primaryImageUrl ? (
+                      <img src={hit.primaryImageUrl} alt="" width={48} height={48} style={{ objectFit: "cover" }} />
+                    ) : (
+                      <div
+                        style={{
+                          width: 48,
+                          height: 48,
+                          background: "#f0f0f0",
+                          display: "grid",
+                          placeItems: "center",
+                          fontSize: 11
+                        }}
+                      >
+                        No img
+                      </div>
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <strong>{hit.name}</strong>
+                      <div className="muted">
+                        {[hit.brand, hit.category, hit.sizeLabel].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCatalog(hit);
+                        setShowNewCatalog(false);
+                      }}
+                    >
+                      Select
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : catalogSearch.trim() ? (
+              <p className="muted">No approved catalog matches.</p>
+            ) : null}
+
+            <div className="row-actions" style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setShowNewCatalog(true);
+                  setSelectedCatalog(null);
+                  setNewCatalogForm((prev) => ({ ...prev, name: catalogSearch.trim() }));
+                }}
+              >
+                Can&apos;t find the product? Add new product
+              </button>
             </div>
-            <button type="button" onClick={() => addProduct.mutate()} disabled={addProduct.isPending}>
-              Add product
-            </button>
+
+            {selectedCatalog ? (
+              <div className="panel" style={{ marginTop: 16 }}>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  {selectedCatalog.primaryImageUrl ? (
+                    <img
+                      src={selectedCatalog.primaryImageUrl}
+                      alt=""
+                      width={64}
+                      height={64}
+                      style={{ objectFit: "cover" }}
+                    />
+                  ) : null}
+                  <div>
+                    <strong>{selectedCatalog.name}</strong>
+                    <div className="muted">
+                      {[selectedCatalog.brand, selectedCatalog.sizeLabel].filter(Boolean).join(" · ")}
+                    </div>
+                  </div>
+                </div>
+                <div className="form-grid" style={{ marginTop: 12 }}>
+                  <label>
+                    Selling price *
+                    <input value={offerPrice} onChange={(e) => setOfferPrice(e.target.value)} placeholder="2.00" />
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={offerAvailable}
+                      onChange={(e) => setOfferAvailable(e.target.checked)}
+                    />{" "}
+                    In stock
+                  </label>
+                </div>
+                <button type="button" onClick={() => linkCatalogMut.mutate()} disabled={linkCatalogMut.isPending}>
+                  Add to shop
+                </button>
+              </div>
+            ) : null}
+
+            {showNewCatalog ? (
+              <div className="panel" style={{ marginTop: 16 }}>
+                <h3>Add new product</h3>
+                <p className="muted">Creates a PENDING DUTS Catalog entry + this shop&apos;s offer immediately.</p>
+                {similarMatches.length > 0 ? (
+                  <div>
+                    <p>
+                      <strong>This may already be in DUTS Catalog</strong>
+                    </p>
+                    {similarMatches.map((m) => (
+                      <div key={m.id} className="row-actions" style={{ marginBottom: 8 }}>
+                        {m.primaryImageUrl ? (
+                          <img src={m.primaryImageUrl} alt="" width={40} height={40} style={{ objectFit: "cover" }} />
+                        ) : null}
+                        <span>{m.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCatalog(m);
+                            setShowNewCatalog(false);
+                            setSimilarMatches([]);
+                          }}
+                        >
+                          Use this product
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setNewCatalogForm((prev) => ({ ...prev, forceCreate: true }));
+                        submitNewCatalogMut.mutate();
+                      }}
+                    >
+                      Create new anyway
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="form-grid">
+                      <label>
+                        Product photo URL *
+                        <input
+                          value={newCatalogForm.primaryImageUrl}
+                          onChange={(e) =>
+                            setNewCatalogForm({ ...newCatalogForm, primaryImageUrl: e.target.value })
+                          }
+                          placeholder="Upload via DUTS Catalog or paste https URL"
+                        />
+                      </label>
+                      <label>
+                        Product name *
+                        <input
+                          value={newCatalogForm.name}
+                          onChange={(e) => setNewCatalogForm({ ...newCatalogForm, name: e.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Brand
+                        <input
+                          value={newCatalogForm.brand}
+                          onChange={(e) => setNewCatalogForm({ ...newCatalogForm, brand: e.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Category *
+                        <input
+                          value={newCatalogForm.category}
+                          onChange={(e) => setNewCatalogForm({ ...newCatalogForm, category: e.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Size / quantity
+                        <input
+                          value={newCatalogForm.sizeLabel}
+                          onChange={(e) => setNewCatalogForm({ ...newCatalogForm, sizeLabel: e.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Description
+                        <input
+                          value={newCatalogForm.description}
+                          onChange={(e) =>
+                            setNewCatalogForm({ ...newCatalogForm, description: e.target.value })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Barcode / GTIN
+                        <input
+                          value={newCatalogForm.barcode}
+                          onChange={(e) => setNewCatalogForm({ ...newCatalogForm, barcode: e.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Selling price *
+                        <input
+                          value={newCatalogForm.price}
+                          onChange={(e) => setNewCatalogForm({ ...newCatalogForm, price: e.target.value })}
+                        />
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => submitNewCatalogMut.mutate()}
+                      disabled={
+                        submitNewCatalogMut.isPending ||
+                        !newCatalogForm.name.trim() ||
+                        !newCatalogForm.category.trim() ||
+                        !newCatalogForm.primaryImageUrl.trim() ||
+                        !newCatalogForm.price.trim()
+                      }
+                    >
+                      Add product
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : null}
+
+            <details style={{ marginTop: 16 }}>
+              <summary>Advanced — legacy quick add (name + price + aliases)</summary>
+              <div className="form-grid" style={{ marginTop: 12 }}>
+                <label>
+                  Product name
+                  <input
+                    value={productForm.name}
+                    onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Price (USD)
+                  <input
+                    value={productForm.price}
+                    onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Aliases (comma)
+                  <input
+                    value={productForm.aliases}
+                    onChange={(e) => setProductForm({ ...productForm, aliases: e.target.value })}
+                  />
+                </label>
+              </div>
+              <button type="button" onClick={() => addProduct.mutate()} disabled={addProduct.isPending}>
+                Add product (legacy)
+              </button>
+            </details>
+
             <table className="data-table" style={{ marginTop: 16 }}>
               <thead>
                 <tr>
@@ -472,17 +829,11 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
                       <button
                         type="button"
                         className="ghost-btn"
-                        onClick={() =>
-                          toggleProduct.mutate({ id: p.id, available: !p.available })
-                        }
+                        onClick={() => toggleProduct.mutate({ id: p.id, available: !p.available })}
                       >
                         {p.available ? "Mark unavailable" : "Mark available"}
                       </button>
-                      <button
-                        type="button"
-                        className="ghost-btn"
-                        onClick={() => archiveProductMut.mutate(p.id)}
-                      >
+                      <button type="button" className="ghost-btn" onClick={() => archiveProductMut.mutate(p.id)}>
                         Remove
                       </button>
                     </td>

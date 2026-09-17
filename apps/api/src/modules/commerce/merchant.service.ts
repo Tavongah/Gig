@@ -197,7 +197,7 @@ export async function upsertProductForMerchant(
   if (productId) {
     const existing = await prisma.product.findFirst({ where: { id: productId, merchantId } });
     if (!existing) throw new AppError("Product not found.", 404, "PRODUCT_NOT_FOUND");
-    return prisma.product.update({
+    const updated = await prisma.product.update({
       where: { id: productId },
       data: {
         name: parsed.name.trim(),
@@ -213,9 +213,14 @@ export async function upsertProductForMerchant(
         searchAliases: aliases
       }
     });
+    if (!updated.catalogProductId) {
+      const { ensureCatalogLinkForProduct } = await import("./catalog.service.js");
+      await ensureCatalogLinkForProduct(updated.id);
+    }
+    return prisma.product.findUniqueOrThrow({ where: { id: updated.id } });
   }
 
-  return prisma.product.create({
+  const created = await prisma.product.create({
     data: {
       merchantId,
       name: parsed.name.trim(),
@@ -231,6 +236,9 @@ export async function upsertProductForMerchant(
       searchAliases: aliases
     }
   });
+  const { ensureCatalogLinkForProduct } = await import("./catalog.service.js");
+  await ensureCatalogLinkForProduct(created.id);
+  return prisma.product.findUniqueOrThrow({ where: { id: created.id } });
 }
 
 export async function setProductAvailability(merchantId: string, productId: string, available: boolean) {

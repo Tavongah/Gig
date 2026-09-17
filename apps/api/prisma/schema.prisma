@@ -709,38 +709,102 @@ model Merchant {
   /** Pilot area label, e.g. Glen Norah / MSU Senga — not a polygon. */
   pilotArea       String?
   notes           String?
-  products        Product[]
-  orders          CommerceOrder[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  products                 Product[]
+  catalogProductSubmissions CatalogProduct[] @relation("CatalogProductSubmissions")
+  orders                   CommerceOrder[]
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
 
   @@index([isActive, acceptsOrders])
   @@index([latitude, longitude])
   @@index([pilotArea])
 }
 
+/**
+ * Canonical DUTS product information (shared across merchants/channels).
+ * Merchant-specific price/stock lives on Product (merchant offer façade).
+ */
+model CatalogProduct {
+  id               String                 @id @default(uuid())
+  name             String
+  normalizedName   String
+  brand            String?
+  description      String?
+  category         String
+  subcategory      String?
+  sizeLabel        String?
+  unit             String?
+  barcode          String?
+  primaryImageUrl  String?
+  status           CatalogProductStatus   @default(APPROVED)
+  source           CatalogProductSource   @default(DUTS_ADMIN)
+  submittedByMerchantId String?
+  submittedByMerchant   Merchant?         @relation("CatalogProductSubmissions", fields: [submittedByMerchantId], references: [id], onDelete: SetNull)
+  approvedAt       DateTime?
+  approvedByUserId String?
+  images           CatalogProductImage[]
+  merchantOffers   Product[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([normalizedName])
+  @@index([status])
+  @@index([category])
+  @@unique([barcode])
+}
+
+model CatalogProductImage {
+  id               String         @id @default(uuid())
+  catalogProductId String
+  catalogProduct   CatalogProduct @relation(fields: [catalogProductId], references: [id], onDelete: Cascade)
+  url              String
+  sortOrder        Int            @default(0)
+  isPrimary        Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+
+  @@index([catalogProductId, sortOrder])
+}
+
+enum CatalogProductStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum CatalogProductSource {
+  DUTS_ADMIN
+  MERCHANT_SUBMISSION
+  IMPORT
+}
+
+/** Merchant offer / sellable inventory row. Keeps stable IDs for WhatsApp carts & orders. */
 model Product {
-  id              String   @id @default(uuid())
-  merchantId      String
-  merchant        Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  name            String
-  normalizedName  String
-  description     String?
-  category        String?
-  priceCents      Int
-  currency        String   @default("usd")
-  available       Boolean  @default(true)
-  quantityApprox  Int?
-  unit            String?
-  imageUrl        String?
-  searchAliases   String[] @default([])
-  archived        Boolean  @default(false)
-  orderItems      CommerceOrderItem[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String          @id @default(uuid())
+  merchantId       String
+  merchant         Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  catalogProductId String?
+  catalogProduct   CatalogProduct? @relation(fields: [catalogProductId], references: [id], onDelete: SetNull)
+  name             String
+  normalizedName   String
+  description      String?
+  category         String?
+  priceCents       Int
+  currency         String          @default("usd")
+  available        Boolean         @default(true)
+  quantityApprox   Int?
+  unit             String?
+  imageUrl         String?
+  searchAliases    String[]        @default([])
+  archived         Boolean         @default(false)
+  orderItems       CommerceOrderItem[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   @@index([merchantId, archived, available])
   @@index([normalizedName])
+  @@index([catalogProductId])
+  @@unique([merchantId, catalogProductId])
 }
 
 enum CommerceCustomerSource {

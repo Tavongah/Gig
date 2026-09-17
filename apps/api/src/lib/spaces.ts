@@ -12,13 +12,15 @@ export type UploadPurpose =
   | "worker-profile"
   | "customer-photo"
   | "gig-image"
-  | "verification-document";
+  | "verification-document"
+  | "product-image";
 
 const PURPOSE_PREFIX: Record<UploadPurpose, string> = {
   "worker-profile": "profiles/workers",
   "customer-photo": "profiles/customers",
   "gig-image": "gigs",
-  "verification-document": "verification"
+  "verification-document": "verification",
+  "product-image": "products/catalog"
 };
 
 let client: S3Client | null = null;

@@ -297,6 +297,20 @@ export {
   type RequestedShoppingItem
 } from "./commerce.js";
 
+export {
+  catalogProductStatuses,
+  catalogProductSources,
+  normalizeBarcode,
+  createCatalogProductSchema,
+  updateCatalogProductSchema,
+  searchCatalogProductsSchema,
+  linkMerchantOfferSchema,
+  submitMerchantCatalogProductSchema,
+  catalogSearchHaystack,
+  type CatalogProductStatus,
+  type CatalogProductSource
+} from "./catalog.js";
+
 
 export function calculateTieredCommissionRate(totalCents: number): number {
   if (totalCents < 10_000) {

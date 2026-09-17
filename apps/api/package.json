@@ -34,6 +34,9 @@
     "test:merchant-onboarding": "tsx scripts/test-merchant-onboarding-pilot.ts",
     "test:merchant-ready-delivery": "tsx scripts/test-merchant-ready-delivery.ts",
     "test:meriden-test-merchant": "tsx scripts/test-meriden-test-merchant.ts",
+    "test:catalog-helpers": "tsx scripts/test-catalog-helpers.ts",
+    "test:catalog-foundation": "tsx scripts/test-catalog-foundation.ts",
+    "migrate:products-to-catalog": "tsx scripts/migrate-products-to-catalog.ts",
     "seed:pilot-merchant": "tsx scripts/seed-pilot-merchant.ts",
     "seed:meriden-test-merchant": "tsx scripts/seed-meriden-test-merchant.ts"
   },
