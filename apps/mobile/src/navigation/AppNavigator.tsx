@@ -39,6 +39,7 @@ import { TermsOfServiceScreen } from "../screens/support/TermsOfServiceScreen";
 import { ProductSearchScreen } from "../screens/commerce/ProductSearchScreen";
 import { ProductDetailScreen } from "../screens/commerce/ProductDetailScreen";
 import { ShopDetailScreen } from "../screens/commerce/ShopDetailScreen";
+import { ShopLocationScreen } from "../screens/commerce/ShopLocationScreen";
 import { CommerceCheckoutScreen } from "../screens/commerce/CommerceCheckoutScreen";
 import { CommerceOrderDetailScreen } from "../screens/commerce/CommerceOrderDetailScreen";
 import type { RootStackParamList } from "./types";
@@ -106,6 +107,7 @@ export function AppNavigator() {
       <Stack.Screen name="ProductSearch" component={ProductSearchScreen} options={{ title: "Search" }} />
       <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ title: "Product" }} />
       <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{ title: "Shop" }} />
+      <Stack.Screen name="ShopLocation" component={ShopLocationScreen} options={{ title: "Deliver to" }} />
       <Stack.Screen name="CommerceCheckout" component={CommerceCheckoutScreen} options={{ title: "Checkout" }} />
       <Stack.Screen
         name="CommerceOrderDetail"

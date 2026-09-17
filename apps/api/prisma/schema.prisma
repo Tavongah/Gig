@@ -712,6 +712,7 @@ model Merchant {
   products                 Product[]
   catalogProductSubmissions CatalogProduct[] @relation("CatalogProductSubmissions")
   orders                   CommerceOrder[]
+  guestHandoffs            GuestCommerceHandoff[]
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 
@@ -959,4 +960,22 @@ model WhatsAppInboundMessage {
   party              WhatsAppParty?
   processedAt        DateTime @default(now())
   summary            String?
+}
+
+/** Short-lived guest web basket → WhatsApp restore. Token stored hashed only. */
+model GuestCommerceHandoff {
+  id            String    @id @default(uuid())
+  tokenHash     String    @unique
+  merchantId    String
+  merchant      Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  basketJson    Json
+  deliveryLabel String
+  deliveryLat   Decimal   @db.Decimal(9, 6)
+  deliveryLng   Decimal   @db.Decimal(9, 6)
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@index([merchantId])
 }

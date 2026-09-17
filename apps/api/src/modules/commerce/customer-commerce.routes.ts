@@ -15,6 +15,8 @@ import {
   quoteCart,
   quoteTextBasket
 } from "./customer-commerce.service.js";
+import { createGuestHandoff, publicWhatsAppDigits } from "./guest-handoff.service.js";
+import { logDutsFlow } from "../../lib/flow-log.js";
 
 const geoQuery = z.object({
   lat: z.coerce.number().min(-90).max(90),
@@ -22,7 +24,16 @@ const geoQuery = z.object({
 });
 
 export const customerCommerceRouter = Router();
-customerCommerceRouter.use(requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN));
+
+const requireCustomer = [requireAuth, requireRole(UserRole.CLIENT, UserRole.ADMIN)];
+
+customerCommerceRouter.get("/public-config", (_req, res) => {
+  const digits = publicWhatsAppDigits();
+  res.json({
+    whatsappE164: digits ? `+${digits}` : null,
+    whatsappDigits: digits
+  });
+});
 
 customerCommerceRouter.get("/shops/nearby", async (req, res, next) => {
   try {
@@ -39,7 +50,9 @@ customerCommerceRouter.get("/products", async (req, res, next) => {
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
     const category = typeof req.query.category === "string" ? req.query.category : undefined;
     const limit = req.query.limit ? Number(req.query.limit) : 40;
-    res.json(await browseNearbyProducts({ lat: geo.lat, lng: geo.lng, q, category, limit }));
+    const result = await browseNearbyProducts({ lat: geo.lat, lng: geo.lng, q, category, limit });
+    if (!req.header("authorization")) logDutsFlow("GUEST_STOREFRONT_VIEW", { shopsNearby: result.shopsNearby });
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -64,6 +77,7 @@ customerCommerceRouter.get("/products/detail", async (req, res, next) => {
       res.status(400).json({ error: "VALIDATION_ERROR", message: "catalogProductId or productId required" });
       return;
     }
+    if (!req.header("authorization")) logDutsFlow("GUEST_PRODUCT_VIEW", { catalogProductId: catalogProductId ?? null });
     res.json(await getProductDetailNear({ ...geo, catalogProductId, productId }));
   } catch (err) {
     next(err);
@@ -109,13 +123,27 @@ customerCommerceRouter.post("/cart/quote", validateBody(quoteSchema), async (req
   }
 });
 
+const handoffSchema = quoteSchema.extend({
+  deliveryLabel: z.string().min(1).max(200)
+});
+
+customerCommerceRouter.post("/guest/handoff", validateBody(handoffSchema), async (req, res, next) => {
+  try {
+    const result = await createGuestHandoff(req.body);
+    logDutsFlow("GUEST_CHECKOUT_STARTED", { channel: "whatsapp" });
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 const checkoutSchema = quoteSchema.extend({
   deliveryLabel: z.string().min(1).max(200),
   paymentMethod: z.enum(["CASH", "ECOCASH", "ONEMONEY"]).optional(),
   customerPhone: z.string().min(7).max(24).optional()
 });
 
-customerCommerceRouter.post("/cart/checkout", validateBody(checkoutSchema), async (req, res, next) => {
+customerCommerceRouter.post("/cart/checkout", ...requireCustomer, validateBody(checkoutSchema), async (req, res, next) => {
   try {
     res.status(201).json(
       await checkoutCart({
@@ -128,7 +156,7 @@ customerCommerceRouter.post("/cart/checkout", validateBody(checkoutSchema), asyn
   }
 });
 
-customerCommerceRouter.get("/orders", async (req, res, next) => {
+customerCommerceRouter.get("/orders", ...requireCustomer, async (req, res, next) => {
   try {
     res.json(await listCustomerCommerceOrders(req.auth!.userId));
   } catch (err) {
@@ -136,7 +164,7 @@ customerCommerceRouter.get("/orders", async (req, res, next) => {
   }
 });
 
-customerCommerceRouter.get("/orders/:id", async (req, res, next) => {
+customerCommerceRouter.get("/orders/:id", ...requireCustomer, async (req, res, next) => {
   try {
     res.json(await getCustomerCommerceOrder(req.auth!.userId, String(req.params.id)));
   } catch (err) {
@@ -159,7 +187,7 @@ const textBasketSchema = z.object({
   preferredMerchantId: z.string().uuid().optional()
 });
 
-customerCommerceRouter.post("/basket/quote-text", validateBody(textBasketSchema), async (req, res, next) => {
+customerCommerceRouter.post("/basket/quote-text", ...requireCustomer, validateBody(textBasketSchema), async (req, res, next) => {
   try {
     res.json(await quoteTextBasket(req.body));
   } catch (err) {

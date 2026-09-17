@@ -83,11 +83,7 @@ export async function createUploadSignedUrl(input: {
   };
 }
 
-export function publicUrlForObjectKey(objectKey: string): string {
-  if (env.SPACES_CDN_URL) {
-    return `${env.SPACES_CDN_URL.replace(/\/$/, "")}/${objectKey}`;
-  }
-
+function originUrlForObjectKey(objectKey: string): string {
   const bucket = getBucket();
   const endpoint = (env.SPACES_ENDPOINT ?? env.S3_ENDPOINT ?? "").replace(/\/$/, "");
   if (endpoint.includes("digitaloceanspaces.com")) {
@@ -95,6 +91,22 @@ export function publicUrlForObjectKey(objectKey: string): string {
     return `https://${bucket}.${host}/${objectKey}`;
   }
   return `${endpoint}/${bucket}/${objectKey}`;
+}
+
+export function publicUrlForObjectKey(objectKey: string): string {
+  const origin = originUrlForObjectKey(objectKey);
+  const cdnBase = env.SPACES_CDN_URL?.replace(/\/$/, "");
+  if (!cdnBase) return origin;
+  try {
+    const host = new URL(cdnBase).hostname;
+    // Copied production examples use *.cdn.digitaloceanspaces.com even when CDN
+    // was never enabled — that hostname fails DNS and catalog <img> never loads.
+    // Origin virtual-host URLs on the same Space remain browser-reachable.
+    if (host.endsWith(".cdn.digitaloceanspaces.com")) return origin;
+    return `${cdnBase}/${objectKey}`;
+  } catch {
+    return origin;
+  }
 }
 
 export function assertObjectKeyOwnedByUser(objectKey: string, userId: string): void {
@@ -128,17 +140,25 @@ export async function uploadPublicObject(input: {
   const objectKey = buildObjectKey(input.purpose, input.userId, input.fileName);
   const bucket = getBucket();
   const client = getSpacesClient();
+  const base = {
+    Bucket: bucket,
+    Key: objectKey,
+    Body: input.body,
+    ContentType: input.contentType,
+    CacheControl: "public, max-age=31536000, immutable"
+  };
 
-  // Avoid ACL headers — DigitalOcean Spaces commonly rejects them.
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: objectKey,
-      Body: input.body,
-      ContentType: input.contentType,
-      CacheControl: "public, max-age=31536000, immutable"
-    })
-  );
+  try {
+    // Product photos must be anonymously GET-able by Admin/customer browsers.
+    // Presigned PUTs often reject ACL; server-side PutObject usually accepts it.
+    await client.send(new PutObjectCommand({ ...base, ACL: "public-read" }));
+  } catch (err) {
+    const msg = err instanceof Error ? `${err.name} ${err.message}` : String(err);
+    if (!/acl|accesscontrol|canned|notimplemented/i.test(msg)) {
+      throw err;
+    }
+    await client.send(new PutObjectCommand(base));
+  }
 
   return {
     objectKey,

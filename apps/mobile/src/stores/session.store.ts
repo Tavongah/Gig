@@ -62,6 +62,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   setActiveRole: (activeRole) => set({ activeRole }),
   setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
   signOut: async () => {
+    const userId = get().session?.user.id;
+    if (userId) {
+      try {
+        const { saveAccountCartSnapshot } = await import("./commerce-cart.store");
+        await saveAccountCartSnapshot(userId);
+      } catch {
+        // keep sign-out going even if cart snapshot fails
+      }
+    }
     const token = get().session?.token;
     if (token) {
       try {

@@ -6,7 +6,7 @@ import {
   uploadCatalogImage,
   type CatalogStatus
 } from "./commerceAdminUi";
-import { CategorySelect, ProductThumb, StatusBadge } from "./ProductThumb";
+import { CategorySelect, PhotoHero, ProductThumb, StatusBadge } from "./ProductThumb";
 
 type ApiRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -188,6 +188,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
 
   const detail = detailQuery.data?.product;
   const previewSrc = localPreview || form.primaryImageUrl || null;
+  const photoBlocked = uploading || (Boolean(localPreview) && !form.primaryImageUrl.trim());
   const filters: Array<{ id: string; label: string }> = [
     { id: "", label: "All" },
     { id: "APPROVED", label: "Approved" },
@@ -204,13 +205,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
           <h2>{mode === "create" ? "Add product" : "Edit product"}</h2>
           {notice ? <p className="notice">{notice}</p> : null}
 
-          <div className="photo-hero">
-            {previewSrc ? (
-              <img src={previewSrc} alt={form.name || "Product photo"} />
-            ) : (
-              <div className="photo-hero-empty">Product photo</div>
-            )}
-          </div>
+          <PhotoHero src={previewSrc} alt={form.name || "Product photo"} emptyLabel="Product photo" />
           <div className="photo-actions">
             <button type="button" className="btn-secondary" onClick={() => cameraRef.current?.click()} disabled={uploading}>
               Take photo
@@ -289,7 +284,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
             type="button"
             className="btn-primary btn-block"
             onClick={() => saveMut.mutate()}
-            disabled={saveMut.isPending || uploading || !form.name.trim() || !form.category.trim()}
+            disabled={saveMut.isPending || photoBlocked || !form.name.trim() || !form.category.trim()}
           >
             {saveMut.isPending ? "Saving…" : "Save product"}
           </button>
@@ -311,13 +306,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
             <p className="muted">Loading…</p>
           ) : (
             <>
-              <div className="photo-hero">
-                {p.primaryImageUrl ? (
-                  <img src={p.primaryImageUrl} alt={p.name} />
-                ) : (
-                  <div className="photo-hero-empty">{p.name}</div>
-                )}
-              </div>
+              <PhotoHero src={p.primaryImageUrl} alt={p.name} emptyLabel={p.name} />
               <h2 className="product-title">{p.name}</h2>
               <p className="muted">
                 {[p.brand, p.sizeLabel, displayCategory(p.category)].filter(Boolean).join(" · ")}

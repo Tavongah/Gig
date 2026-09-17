@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { Router } from "express";
-import { requireAuth } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
 import {
   geocodeAddressQuery,
@@ -24,7 +23,7 @@ const geocodeBodySchema = z.object({
 
 export const locationRouter = Router();
 
-locationRouter.get("/autocomplete", requireAuth, async (req, res, next) => {
+locationRouter.get("/autocomplete", async (req, res, next) => {
   try {
     const query = typeof req.query.q === "string" ? req.query.q : "";
     const suggestions = await searchAddressSuggestions(query);
@@ -34,7 +33,7 @@ locationRouter.get("/autocomplete", requireAuth, async (req, res, next) => {
   }
 });
 
-locationRouter.post("/geocode", requireAuth, validateBody(geocodeBodySchema), async (req, res, next) => {
+locationRouter.post("/geocode", validateBody(geocodeBodySchema), async (req, res, next) => {
   try {
     const address = await resolveGeocodedLocation(req.body);
     res.json({ address, location: toGeoPointInput(address) });
@@ -43,7 +42,7 @@ locationRouter.post("/geocode", requireAuth, validateBody(geocodeBodySchema), as
   }
 });
 
-locationRouter.post("/reverse-geocode", requireAuth, validateBody(z.object({
+locationRouter.post("/reverse-geocode", validateBody(z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180)
 })), async (req, res, next) => {
@@ -55,7 +54,7 @@ locationRouter.post("/reverse-geocode", requireAuth, validateBody(z.object({
   }
 });
 
-locationRouter.get("/place/:placeId", requireAuth, async (req, res, next) => {
+locationRouter.get("/place/:placeId", async (req, res, next) => {
   try {
     const placeId = String(req.params.placeId);
     const address = await geocodePlaceId(placeId).catch(async () => geocodeAddressQuery(placeId));

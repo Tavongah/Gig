@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { MerchantLocationPicker } from "./MerchantLocationPicker";
 import { hasValidCoordinates, presentationLocationLabel } from "./merchantLocation";
 import { displayCategory, friendlyApiError, uploadCatalogImage } from "./commerceAdminUi";
-import { CategorySelect, ProductThumb } from "./ProductThumb";
+import { CategorySelect, PhotoHero, ProductThumb } from "./ProductThumb";
 
 type ApiRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -841,16 +841,11 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
                       </div>
                     ) : (
                       <>
-                        <div className="photo-hero">
-                          {localPhotoPreview || newCatalogForm.primaryImageUrl ? (
-                            <img
-                              src={localPhotoPreview || newCatalogForm.primaryImageUrl}
-                              alt={newCatalogForm.name || "Product photo"}
-                            />
-                          ) : (
-                            <div className="photo-hero-empty">Product photo *</div>
-                          )}
-                        </div>
+                        <PhotoHero
+                          src={localPhotoPreview || newCatalogForm.primaryImageUrl}
+                          alt={newCatalogForm.name || "Product photo"}
+                          emptyLabel="Product photo *"
+                        />
                         <div className="photo-actions">
                           <button
                             type="button"

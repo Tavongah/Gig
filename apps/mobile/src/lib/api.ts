@@ -744,7 +744,7 @@ export const api = {
     ),
   getWorkerWithdrawOnboardingLink: (token: string) =>
     request<{ url: string; accountId: string }>("/workers/withdraw/onboarding-link", { method: "POST" }, token),
-  autocompleteAddress: (query: string, token: string) =>
+  autocompleteAddress: (query: string, token?: string) =>
     request<{ suggestions: Array<{ placeId: string; label: string; formattedAddress: string }> }>(
       `/location/autocomplete?q=${encodeURIComponent(query)}`,
       {},
@@ -752,9 +752,9 @@ export const api = {
     ),
   geocodeAddress: (
     payload: { query?: string; placeId?: string; latitude?: number; longitude?: number },
-    token: string
+    token?: string
   ) => request<{ location: import("@gigflow/shared").GeoPointInput }>("/location/geocode", { method: "POST", body: JSON.stringify(payload) }, token),
-  reverseGeocode: (latitude: number, longitude: number, token: string) =>
+  reverseGeocode: (latitude: number, longitude: number, token?: string) =>
     request<{ location: import("@gigflow/shared").GeoPointInput }>(
       "/location/reverse-geocode",
       { method: "POST", body: JSON.stringify({ latitude, longitude }) },
@@ -864,7 +864,7 @@ export const api = {
       transportMode: string | null;
     }>("/workers/delivery-eligibility", { method: "POST", body: JSON.stringify(payload) }, token),
 
-  commerceNearbyShops: (lat: number, lng: number, token: string) =>
+  commerceNearbyShops: (lat: number, lng: number, token?: string) =>
     request<{
       shops: Array<{
         id: string;
@@ -879,7 +879,7 @@ export const api = {
 
   commerceNearbyProducts: (
     params: { lat: number; lng: number; q?: string; category?: string; limit?: number },
-    token: string
+    token?: string
   ) => {
     const qs = new URLSearchParams({
       lat: String(params.lat),
@@ -906,7 +906,7 @@ export const api = {
     }>(`/commerce/products?${qs.toString()}`, {}, token);
   },
 
-  commerceCategories: (lat: number, lng: number, token: string) =>
+  commerceCategories: (lat: number, lng: number, token?: string) =>
     request<{ categories: Array<{ name: string; count: number }> }>(
       `/commerce/categories?lat=${lat}&lng=${lng}`,
       {},
@@ -915,7 +915,7 @@ export const api = {
 
   commerceProductDetail: (
     params: { lat: number; lng: number; catalogProductId?: string; productId?: string },
-    token: string
+    token?: string
   ) => {
     const qs = new URLSearchParams({ lat: String(params.lat), lng: String(params.lng) });
     if (params.catalogProductId) qs.set("catalogProductId", params.catalogProductId);
@@ -943,7 +943,7 @@ export const api = {
     }>(`/commerce/products/detail?${qs.toString()}`, {}, token);
   },
 
-  commerceShop: (merchantId: string, lat: number, lng: number, token: string, q?: string) => {
+  commerceShop: (merchantId: string, lat: number, lng: number, token?: string, q?: string) => {
     const qs = new URLSearchParams({ lat: String(lat), lng: String(lng) });
     if (q) qs.set("q", q);
     return request<{
@@ -978,7 +978,7 @@ export const api = {
       lng: number;
       lines: Array<{ productId: string; quantity: number }>;
     },
-    token: string
+    token?: string
   ) =>
     request<{
       merchant: { id: string; name: string; distanceKm: number };
@@ -1062,7 +1062,22 @@ export const api = {
         }>;
         deliveryStatus: string | null;
       };
-    }>(`/commerce/orders/${orderId}`, {}, token)
+    }>(`/commerce/orders/${orderId}`, {}, token),
+
+  commerceGuestHandoff: (payload: {
+    lat: number;
+    lng: number;
+    deliveryLabel: string;
+    lines: Array<{ productId: string; quantity: number }>;
+  }) =>
+    request<{
+      token: string;
+      expiresAt: string;
+      whatsappUrl: string | null;
+      merchantName: string;
+      totalCents: number;
+      currency: string;
+    }>("/commerce/guest/handoff", { method: "POST", body: JSON.stringify(payload) })
 };
 
 export interface DeliveryQuote {

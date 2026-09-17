@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -14,14 +14,23 @@ type Props = NativeStackScreenProps<RootStackParamList, "CommerceCheckout">;
 type PayMethod = "CASH" | "ECOCASH" | "ONEMONEY";
 
 export function CommerceCheckoutScreen({ navigation }: Props) {
-  const token = useSessionStore((s) => s.session!.token);
-  const user = useSessionStore((s) => s.session!.user);
+  const session = useSessionStore((s) => s.session);
+  const token = session?.token;
+  const user = session?.user;
   const location = useShopLocationStore((s) => s.location);
   const lines = useCommerceCartStore((s) => s.lines);
   const merchantName = useCommerceCartStore((s) => s.merchantName);
   const clear = useCommerceCartStore((s) => s.clear);
   const [method, setMethod] = useState<PayMethod>("CASH");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!session) navigation.replace("GuestCheckoutChoice");
+  }, [session, navigation]);
+
+  if (!session || !token || !user) {
+    return null;
+  }
 
   const checkoutMut = useMutation({
     mutationFn: async () => {

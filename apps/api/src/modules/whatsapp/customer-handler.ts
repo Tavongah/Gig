@@ -12,6 +12,7 @@ import {
   quoteBasketTotals
 } from "../commerce/order.service.js";
 import { ensureWhatsAppCommerceCustomer } from "../commerce/commerce-customer.service.js";
+import { applyGuestHandoffToConversation, extractGuestBasketRef } from "../commerce/guest-handoff.service.js";
 import {
   claimInboundMessage,
   getOrCreateConversation,
@@ -91,6 +92,16 @@ export async function handleCustomerWhatsAppMessage(
   let ctx = readContext(conv);
   const text = (msg.text || msg.buttonId || "").trim();
   const customerId = commerceCustomer.id;
+
+  const guestRef = extractGuestBasketRef(text);
+  if (guestRef) {
+    const restored = await applyGuestHandoffToConversation({
+      conversationId: conv.id,
+      token: guestRef
+    });
+    await wa.sendText(phone, restored.message);
+    return { handled: true };
+  }
 
   // Expire stale draft quotes — keep location, drop prices. Always return (no fall-through).
   if (

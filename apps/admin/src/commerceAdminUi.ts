@@ -64,22 +64,45 @@ export function friendlyApiError(err: unknown, fallback: string): string {
 
 type ApiRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
+function normalizeClientImageType(raw: string | null | undefined): string {
+  const t = (raw ?? "").trim().toLowerCase();
+  if (t === "image/jpg" || t === "image/pjpeg") return "image/jpeg";
+  if (t === "image/x-png") return "image/png";
+  return t || "image/jpeg";
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      const comma = result.indexOf(",");
+      if (comma < 0) {
+        reject(new Error("Couldn't read this photo."));
+        return;
+      }
+      resolve(result.slice(comma + 1));
+    };
+    reader.onerror = () => reject(new Error("Couldn't read this photo."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export async function uploadCatalogImage(
   apiRequest: ApiRequest,
   file: File
 ): Promise<string> {
-  const buffer = await file.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]!);
-  const dataBase64 = btoa(binary);
+  const dataBase64 = await readFileAsBase64(file);
   const uploaded = await apiRequest<{ url: string }>("/admin/commerce/catalog/upload-image", {
     method: "POST",
     body: JSON.stringify({
       fileName: file.name || "product.jpg",
-      contentType: file.type || "image/jpeg",
+      contentType: normalizeClientImageType(file.type),
       dataBase64
     })
   });
+  if (!uploaded?.url) {
+    throw new Error("Couldn't upload this photo. Try another photo.");
+  }
   return uploaded.url;
 }

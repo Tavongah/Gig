@@ -2,7 +2,9 @@ import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from "rea
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { api } from "../../lib/api";
+import { logDutsFlow } from "../../lib/flow-log";
 import { DUTS } from "../../lib/theme";
+import { AppButton } from "../../components/AppButton";
 import type { RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 import { useShopLocationStore } from "../../stores/shop-location.store";
@@ -10,8 +12,8 @@ import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProductDetail">;
 
-export function ProductDetailScreen({ route }: Props) {
-  const token = useSessionStore((s) => s.session!.token);
+export function ProductDetailScreen({ route, navigation }: Props) {
+  const token = useSessionStore((s) => s.session?.token);
   const location = useShopLocationStore((s) => s.location);
   const addOffer = useCommerceCartStore((s) => s.addOffer);
 
@@ -39,7 +41,10 @@ export function ProductDetailScreen({ route }: Props) {
   if (!location) {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <Text className="text-center text-muted">Set your delivery location first.</Text>
+        <Text className="text-center text-muted">Set your location to see products available near you.</Text>
+        <View className="mt-4 w-full max-w-sm">
+          <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
+        </View>
       </View>
     );
   }
@@ -63,6 +68,7 @@ export function ProductDetailScreen({ route }: Props) {
             className="h-full w-full"
             resizeMode="contain"
             accessibilityLabel={product.name}
+            {...({ loading: "lazy" } as object)}
           />
         ) : (
           <Text className="text-muted">No photo</Text>
@@ -91,7 +97,8 @@ export function ProductDetailScreen({ route }: Props) {
                 </Text>
               </View>
               <Pressable
-                onPress={() =>
+                onPress={() => {
+                  if (!token) logDutsFlow("GUEST_ADD_TO_CART");
                   addOffer({
                     productId: offer.productId,
                     catalogProductId: product.catalogProductId,
@@ -101,11 +108,11 @@ export function ProductDetailScreen({ route }: Props) {
                     unitPriceCents: offer.priceCents,
                     merchantId: offer.merchantId,
                     merchantName: offer.merchantName
-                  })
-                }
+                  });
+                }}
                 accessibilityRole="button"
                 accessibilityLabel={`Add from ${offer.merchantName}`}
-                className="rounded-full px-4 py-2.5"
+                className="h-11 rounded-full px-4 py-2.5"
                 style={{ backgroundColor: DUTS.purple }}
               >
                 <Text className="font-bold text-white">ADD</Text>

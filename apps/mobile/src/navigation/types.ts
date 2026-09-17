@@ -1,5 +1,5 @@
 export type RootStackParamList = {
-  MainTabs: undefined;
+  MainTabs: { screen?: keyof ClientTabParamList | keyof GuestTabParamList } | undefined;
   PostGig: { serviceCategoryId?: string; preferredWorkerId?: string } | undefined;
   DeliveryRequest: undefined;
   DeliveryPins: {
@@ -42,8 +42,12 @@ export type RootStackParamList = {
   ProductSearch: { q?: string; category?: string } | undefined;
   ProductDetail: { catalogProductId?: string; productId?: string };
   ShopDetail: { merchantId: string };
+  ShopLocation: undefined;
+  GuestCheckoutChoice: undefined;
   CommerceCheckout: undefined;
   CommerceOrderDetail: { orderId: string };
+  ForgotPassword: undefined;
+  ResetPassword: { token?: string } | undefined;
 };
 
 export type ClientTabParamList = {
@@ -53,6 +57,15 @@ export type ClientTabParamList = {
   Cart: undefined;
   Account: undefined;
 };
+
+export type GuestTabParamList = {
+  Home: undefined;
+  Search: undefined;
+  Cart: undefined;
+  SignIn: undefined;
+};
+
+export type GuestStackParamList = RootStackParamList;
 
 export type WorkerTabParamList = {
   Home: undefined;

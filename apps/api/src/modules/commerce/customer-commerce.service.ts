@@ -16,6 +16,7 @@ import {
 import { createConfirmedCommerceOrder, quoteBasketTotals } from "./order.service.js";
 import { ensureAppCommerceCustomer } from "./commerce-customer.service.js";
 import type { CommercePaymentMethod, OrderSource } from "@prisma/client";
+import { browserAccessibleMediaUrl } from "../../lib/catalog-media.js";
 
 const PLACEHOLDER_IMAGE = null;
 
@@ -55,7 +56,7 @@ function presentCatalogCard(input: {
     sizeLabel: input.sizeLabel,
     category: input.category,
     description: input.description,
-    imageUrl: input.imageUrl ?? PLACEHOLDER_IMAGE,
+    imageUrl: browserAccessibleMediaUrl(input.imageUrl) ?? PLACEHOLDER_IMAGE,
     fromPriceCents: input.fromPriceCents,
     currency: input.currency,
     offerCount: input.offerCount
@@ -136,7 +137,7 @@ export async function browseNearbyProducts(input: {
     const sizeLabel = cat?.sizeLabel ?? product.unit ?? null;
     const category = cat?.category ?? product.category ?? null;
     const description = cat?.description ?? product.description ?? null;
-    const imageUrl = cat?.primaryImageUrl ?? product.imageUrl ?? null;
+    const imageUrl = browserAccessibleMediaUrl(cat?.primaryImageUrl ?? product.imageUrl ?? null);
     const key = cat?.id ?? `offer:${product.id}`;
 
     if (categoryFilter && !(category ?? "").toLowerCase().includes(categoryFilter)) {
@@ -286,7 +287,7 @@ export async function getProductDetailNear(input: {
     .sort((a, b) => a.priceCents - b.priceCents || a.distanceKm - b.distanceKm);
 
   const name = catalog?.name ?? seedProduct?.name ?? "Product";
-  const imageUrl = catalog?.primaryImageUrl ?? seedProduct?.imageUrl ?? null;
+  const imageUrl = browserAccessibleMediaUrl(catalog?.primaryImageUrl ?? seedProduct?.imageUrl ?? null);
 
   return {
     product: {
@@ -358,7 +359,7 @@ export async function getShopCatalog(input: {
           sizeLabel,
           category,
           description: cat?.description ?? p.description ?? null,
-          imageUrl: cat?.primaryImageUrl ?? p.imageUrl ?? null,
+          imageUrl: browserAccessibleMediaUrl(cat?.primaryImageUrl ?? p.imageUrl ?? null),
           fromPriceCents: p.priceCents,
           currency: p.currency,
           offerCount: 1
@@ -399,10 +400,12 @@ export async function quoteCart(input: {
 
   const merchantIds = new Set<string>();
   const basketLines: BasketLine[] = [];
+  const unavailable: string[] = [];
   for (const line of input.lines) {
     const product = byId.get(line.productId);
     if (!product || !offerEligible(product)) {
-      throw new AppError("One or more items are unavailable.", 409, "PRODUCT_UNAVAILABLE");
+      unavailable.push(product?.catalogProduct?.name ?? product?.name ?? "An item");
+      continue;
     }
     merchantIds.add(product.merchantId);
     const qty = Math.max(1, Math.min(99, Math.floor(line.quantity)));
@@ -416,6 +419,16 @@ export async function quoteCart(input: {
     });
   }
 
+  if (unavailable.length) {
+    const names = [...new Set(unavailable)];
+    throw new AppError(
+      names.length === 1 ? `${names[0]} is unavailable.` : `${names.join(", ")} are unavailable.`,
+      409,
+      "PRODUCT_UNAVAILABLE",
+      { unavailable: names.join(", ") }
+    );
+  }
+
   if (merchantIds.size > 1) {
     throw new AppError(
       "Your basket has items from more than one shop. Keep one shop per order.",
@@ -425,7 +438,10 @@ export async function quoteCart(input: {
   }
 
   const merchantId = [...merchantIds][0]!;
-  const merchant = products[0]!.merchant;
+  const merchant = products.find((p) => p.merchantId === merchantId)?.merchant;
+  if (!merchant) {
+    throw new AppError("This shop is not available near your delivery location.", 409, "SHOP_NOT_NEARBY");
+  }
   const nearby = await findNearbyMerchants(input.lat, input.lng);
   const dist = nearby.find((n) => n.merchant.id === merchantId);
   if (!dist) {

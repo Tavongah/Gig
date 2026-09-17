@@ -40,6 +40,19 @@ assert.ok(catalog.includes("Choose photo"));
 assert.ok(catalog.includes('capture="environment"'));
 assert.ok(catalog.includes("Product saved."));
 assert.ok(catalog.includes("Edit product"));
+assert.ok(catalog.includes("Change photo"));
+assert.ok(catalog.includes("PhotoHero"));
+assert.ok(!catalog.includes("Product Family"));
+assert.ok(!catalog.includes("flavor selector"));
+
+const thumb = read("ProductThumb.tsx");
+assert.ok(thumb.includes("onError"));
+assert.ok(thumb.includes("product-thumb-placeholder"));
+assert.ok(thumb.includes("PhotoHero"));
+
+const ui = read("commerceAdminUi.ts");
+assert.ok(ui.includes("readAsDataURL"));
+assert.ok(ui.includes("image/jpg"));
 
 const pilot = read("CommercePilotPanel.tsx");
 assert.ok(pilot.includes("Add another product"));

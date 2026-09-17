@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:delivery-ui": "npx tsx scripts/test-delivery-ui.ts",
     "test:customer-ecommerce-ui": "npx tsx scripts/test-customer-ecommerce-ui.ts",
+    "test:guest-storefront-ui": "npx tsx scripts/test-guest-storefront-ui.ts",
     "test:courier-start-trip-ui": "npx tsx scripts/test-courier-start-trip-ui.ts",
     "test:delivery-ux-simplification": "npx tsx scripts/test-delivery-ux-simplification.ts",
     "eas:login": "npx eas-cli login",

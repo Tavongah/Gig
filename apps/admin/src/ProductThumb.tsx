@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   CATALOG_CATEGORIES,
   displayCategory,
@@ -13,12 +14,44 @@ type ThumbProps = {
 };
 
 export function ProductThumb({ src, alt, size = "md", className = "" }: ThumbProps) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+  const show = Boolean(src) && !failed;
+
   return (
-    <div className={`product-thumb product-thumb-${size} ${className}`.trim()} aria-hidden={!src}>
-      {src ? (
-        <img src={src} alt={alt} loading="lazy" decoding="async" />
+    <div className={`product-thumb product-thumb-${size} ${className}`.trim()} aria-hidden={!show}>
+      {show ? (
+        <img src={src!} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} />
       ) : (
         <span className="product-thumb-placeholder">{alt.slice(0, 1).toUpperCase() || "?"}</span>
+      )}
+    </div>
+  );
+}
+
+export function PhotoHero({
+  src,
+  alt,
+  emptyLabel = "Product photo"
+}: {
+  src?: string | null;
+  alt: string;
+  emptyLabel?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+  const show = Boolean(src) && !failed;
+
+  return (
+    <div className="photo-hero">
+      {show ? (
+        <img src={src!} alt={alt} onError={() => setFailed(true)} />
+      ) : (
+        <div className="photo-hero-empty">{emptyLabel}</div>
       )}
     </div>
   );

@@ -13,7 +13,7 @@ import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 type Props = NativeStackScreenProps<RootStackParamList, "ShopDetail">;
 
 export function ShopDetailScreen({ route, navigation }: Props) {
-  const token = useSessionStore((s) => s.session!.token);
+  const token = useSessionStore((s) => s.session?.token);
   const location = useShopLocationStore((s) => s.location);
   const addOffer = useCommerceCartStore((s) => s.addOffer);
   const [q, setQ] = useState("");
@@ -28,7 +28,7 @@ export function ShopDetailScreen({ route, navigation }: Props) {
   if (!location) {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <Text className="text-center text-muted">Set your delivery location first.</Text>
+        <Text className="text-center text-muted">Set your location to see products available near you.</Text>
       </View>
     );
   }

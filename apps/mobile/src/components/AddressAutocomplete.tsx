@@ -8,7 +8,7 @@ import { ErrorMessage } from "./ErrorMessage";
 import { formatLocationSummary } from "../lib/location";
 
 interface AddressAutocompleteProps {
-  token: string;
+  token?: string;
   label?: string;
   value: string;
   onChangeText: (value: string) => void;

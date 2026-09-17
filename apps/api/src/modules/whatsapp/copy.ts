@@ -43,6 +43,7 @@ export function formatCustomerDeliveryLabel(label: string | null | undefined): s
 }
 
 export function formatOrderCartSummary(input: {
+  heading?: string;
   shopName?: string;
   lines: Array<{ quantity: number; productName: string; lineTotalCents: number }>;
   subtotalCents: number;
@@ -58,7 +59,7 @@ export function formatOrderCartSummary(input: {
 }): string {
   const delivery = formatCustomerDeliveryLabel(input.deliveryLabel);
   const parts = [
-    "Your order",
+    input.heading ?? "Your order",
     "",
     formatCartLines(input.lines),
     "",

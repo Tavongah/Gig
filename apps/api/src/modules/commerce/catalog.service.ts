@@ -13,6 +13,7 @@ import {
 import type { CatalogProduct, Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
+import { browserAccessibleMediaUrl } from "../../lib/catalog-media.js";
 
 function presentation(product: CatalogProduct) {
   return {
@@ -25,7 +26,7 @@ function presentation(product: CatalogProduct) {
     sizeLabel: product.sizeLabel,
     unit: product.unit,
     barcode: product.barcode,
-    primaryImageUrl: product.primaryImageUrl,
+    primaryImageUrl: browserAccessibleMediaUrl(product.primaryImageUrl),
     status: product.status,
     source: product.source,
     submittedByMerchantId: product.submittedByMerchantId,
@@ -64,7 +65,7 @@ export async function createCatalogProduct(
       sizeLabel: parsed.sizeLabel?.trim() || null,
       unit: parsed.unit?.trim() || null,
       barcode,
-      primaryImageUrl: parsed.primaryImageUrl || null,
+      primaryImageUrl: browserAccessibleMediaUrl(parsed.primaryImageUrl) || null,
       status,
       source,
       submittedByMerchantId: opts?.submittedByMerchantId ?? null,
@@ -74,7 +75,7 @@ export async function createCatalogProduct(
         ? {
             images: {
               create: {
-                url: parsed.primaryImageUrl,
+                url: browserAccessibleMediaUrl(parsed.primaryImageUrl) || parsed.primaryImageUrl,
                 sortOrder: 0,
                 isPrimary: true
               }
@@ -124,7 +125,9 @@ export async function updateCatalogProduct(
       ...(parsed.sizeLabel !== undefined ? { sizeLabel: parsed.sizeLabel?.trim() || null } : {}),
       ...(parsed.unit !== undefined ? { unit: parsed.unit?.trim() || null } : {}),
       ...(barcode !== undefined ? { barcode } : {}),
-      ...(parsed.primaryImageUrl !== undefined ? { primaryImageUrl: parsed.primaryImageUrl || null } : {}),
+      ...(parsed.primaryImageUrl !== undefined
+        ? { primaryImageUrl: browserAccessibleMediaUrl(parsed.primaryImageUrl) || null }
+        : {}),
       ...(parsed.status !== undefined ? { status: parsed.status } : {}),
       ...(parsed.status === "APPROVED" && existing.status !== "APPROVED"
         ? { approvedAt: new Date(), approvedByUserId: opts?.actorUserId ?? null }
@@ -141,7 +144,7 @@ export async function updateCatalogProduct(
     await prisma.catalogProductImage.create({
       data: {
         catalogProductId: id,
-        url: parsed.primaryImageUrl,
+        url: browserAccessibleMediaUrl(parsed.primaryImageUrl) || parsed.primaryImageUrl,
         sortOrder: 0,
         isPrimary: true
       }
@@ -307,7 +310,7 @@ export async function linkCatalogProductToMerchant(merchantId: string, input: un
         description: catalog.description,
         category: catalog.category,
         unit: catalog.unit ?? catalog.sizeLabel,
-        imageUrl: catalog.primaryImageUrl
+        imageUrl: browserAccessibleMediaUrl(catalog.primaryImageUrl)
       }
     });
   }
@@ -325,7 +328,7 @@ export async function linkCatalogProductToMerchant(merchantId: string, input: un
       currency: parsed.currency,
       available: parsed.available,
       unit: catalog.unit ?? catalog.sizeLabel,
-      imageUrl: catalog.primaryImageUrl,
+      imageUrl: browserAccessibleMediaUrl(catalog.primaryImageUrl),
       searchAliases: aliases
     }
   });
@@ -377,13 +380,13 @@ export async function submitMerchantNewCatalogProduct(merchantId: string, input:
         sizeLabel: parsed.sizeLabel?.trim() || null,
         unit: parsed.unit?.trim() || null,
         barcode,
-        primaryImageUrl: parsed.primaryImageUrl,
+        primaryImageUrl: browserAccessibleMediaUrl(parsed.primaryImageUrl),
         status: "PENDING",
         source: "MERCHANT_SUBMISSION",
         submittedByMerchantId: merchantId,
         images: {
           create: {
-            url: parsed.primaryImageUrl,
+            url: browserAccessibleMediaUrl(parsed.primaryImageUrl) || parsed.primaryImageUrl,
             sortOrder: 0,
             isPrimary: true
           }
@@ -404,7 +407,7 @@ export async function submitMerchantNewCatalogProduct(merchantId: string, input:
         currency: parsed.currency,
         available: parsed.available,
         unit: catalog.unit ?? catalog.sizeLabel,
-        imageUrl: catalog.primaryImageUrl,
+        imageUrl: browserAccessibleMediaUrl(catalog.primaryImageUrl),
         searchAliases: aliases
       }
     });

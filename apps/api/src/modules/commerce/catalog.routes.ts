@@ -12,6 +12,13 @@ import { validateBody } from "../../middleware/validate.js";
 import { isSpacesConfigured, uploadPublicObject } from "../../lib/spaces.js";
 import { AppError } from "../../lib/errors.js";
 import {
+  ALLOWED_CATALOG_IMAGE_TYPES,
+  detectImageContentType,
+  isHeicLike,
+  MAX_CATALOG_IMAGE_BYTES,
+  normalizeImageContentType
+} from "../../lib/catalog-media.js";
+import {
   createCatalogProduct,
   getCatalogProduct,
   linkCatalogProductToMerchant,
@@ -22,9 +29,6 @@ import {
   updateCatalogProduct,
   findSimilarCatalogProducts
 } from "./catalog.service.js";
-
-const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export const catalogAdminRouter = Router();
 catalogAdminRouter.use(requireAuth, requireRole(UserRole.ADMIN));
@@ -135,26 +139,31 @@ catalogAdminRouter.post("/catalog/upload-image", async (req, res, next) => {
       contentType?: string;
       dataBase64?: string;
     };
-    if (!fileName || !contentType || !dataBase64) {
+    if (!fileName || !dataBase64) {
       throw new AppError("fileName, contentType, and dataBase64 are required.", 400, "VALIDATION_ERROR");
     }
-    if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
-      throw new AppError("Only JPEG, PNG, WebP, or GIF images are allowed.", 400, "INVALID_IMAGE_TYPE");
-    }
     const buffer = Buffer.from(dataBase64, "base64");
-    if (buffer.length === 0 || buffer.length > MAX_IMAGE_BYTES) {
+    if (buffer.length === 0 || buffer.length > MAX_CATALOG_IMAGE_BYTES) {
       throw new AppError("Image must be between 1 byte and 5MB.", 400, "INVALID_IMAGE_SIZE");
     }
-    const head = buffer.subarray(0, 16).toString("utf8").toLowerCase();
-    if (head.includes("<script") || head.includes("<?php") || head.includes("<html")) {
-      throw new AppError("File content is not a valid image.", 400, "INVALID_IMAGE_CONTENT");
+    if (isHeicLike(buffer)) {
+      throw new AppError("Please use a JPEG or PNG photo.", 400, "INVALID_IMAGE_TYPE");
+    }
+    const detected = detectImageContentType(buffer);
+    const normalized = normalizeImageContentType(contentType);
+    const finalType =
+      detected && ALLOWED_CATALOG_IMAGE_TYPES.has(detected)
+        ? detected
+        : normalized;
+    if (!ALLOWED_CATALOG_IMAGE_TYPES.has(finalType)) {
+      throw new AppError("Only JPEG, PNG, WebP, or GIF images are allowed.", 400, "INVALID_IMAGE_TYPE");
     }
 
     const uploaded = await uploadPublicObject({
       purpose: "product-image",
       userId: req.auth!.userId,
       fileName: fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80),
-      contentType,
+      contentType: finalType,
       body: buffer
     });
     res.status(201).json({ url: uploaded.publicUrl, objectKey: uploaded.objectKey });
