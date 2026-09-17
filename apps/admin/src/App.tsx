@@ -65,7 +65,7 @@ interface AdminGig {
 }
 
 type AdminTab = "overview" | "pending" | "users" | "gigs" | "commerce";
-type CommerceSubTab = "merchants" | "orders" | "catalog";
+type CommerceSubTab = "merchants" | "orders" | "catalog" | "deliveries";
 
 function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -480,10 +480,15 @@ export function App() {
       <section className="content">
         <header>
           <div>
-            <p className="eyebrow">Operations dashboard</p>
-            <h1>Marketplace command center</h1>
+            <p className="eyebrow">{activeTab === "commerce" ? "DUTS" : "Operations dashboard"}</p>
+            <h1>{activeTab === "commerce" ? "Commerce" : "Marketplace command center"}</h1>
+            {activeTab === "commerce" ? (
+              <p className="muted commerce-subhead">Manage shops, products and orders.</p>
+            ) : null}
           </div>
-          <div className="commission">{Math.round(overview.commissionRate * 100)}% commission</div>
+          {activeTab !== "commerce" ? (
+            <div className="commission">{Math.round(overview.commissionRate * 100)}% commission</div>
+          ) : null}
         </header>
 
         {overviewQuery.error ? <p className="notice">{overviewQuery.error.message}</p> : null}
@@ -649,67 +654,65 @@ export function App() {
 
         {activeTab === "commerce" ? (
           <>
-            <div className="row-actions" style={{ marginBottom: 16 }}>
+            <div className="commerce-home-grid">
               {(
                 [
-                  ["Merchants", "merchants"],
-                  ["Orders", "orders"],
-                  ["DUTS Catalog", "catalog"]
+                  ["Merchants", "merchants", "Shops and product catalogs"],
+                  ["Orders", "orders", "Customer shop orders"],
+                  ["DUTS Catalog", "catalog", "Shared product photos & details"],
+                  ["Deliveries", "deliveries", "Courier-linked shop orders"]
                 ] as const
-              ).map(([label, id]) => (
+              ).map(([label, id, hint]) => (
                 <button
                   key={id}
                   type="button"
-                  className={commerceSubTab === id ? undefined : "secondary"}
+                  className={commerceSubTab === id ? "commerce-home-card active" : "commerce-home-card"}
                   onClick={() => setCommerceSubTab(id)}
                 >
-                  {label}
+                  <strong>{label}</strong>
+                  <span>{hint}</span>
                 </button>
               ))}
             </div>
 
             {commerceSubTab === "merchants" ? <CommercePilotPanel apiRequest={apiRequest} /> : null}
             {commerceSubTab === "catalog" ? <DutsCatalogPanel apiRequest={apiRequest} /> : null}
-            {commerceSubTab === "orders" ? (
-            <section className="panel">
-              <h2>Commerce orders</h2>
-              {commerceOrdersQuery.error ? <p className="notice">{commerceOrdersQuery.error.message}</p> : null}
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Shop</th>
-                    <th>Customer</th>
-                    <th>Source</th>
-                    <th>Status</th>
-                    <th>Payment</th>
-                    <th>Total</th>
-                    <th>Delivery</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(commerceOrdersQuery.data?.orders ?? []).map((o) => (
-                    <tr key={o.id}>
-                      <td>{o.orderNumber}</td>
-                      <td>{o.merchant?.name ?? "—"}</td>
-                      <td>
-                        {o.customer?.fullName ?? "—"}
-                        {o.customer?.phoneNumber ? ` (${o.customer.phoneNumber})` : ""}
-                      </td>
-                      <td>{o.orderSource}</td>
-                      <td>{o.status}</td>
-                      <td>{o.paymentStatus}</td>
-                      <td>${(o.totalCents / 100).toFixed(2)}</td>
-                      <td>
-                        {o.linkedDeliveryGig
-                          ? `${o.linkedDeliveryGig.status}`
-                          : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
+            {commerceSubTab === "orders" || commerceSubTab === "deliveries" ? (
+              <section className="panel commerce-panel">
+                <h2>{commerceSubTab === "deliveries" ? "Deliveries" : "Orders"}</h2>
+                {commerceOrdersQuery.error ? <p className="notice">{commerceOrdersQuery.error.message}</p> : null}
+                <div className="order-card-list">
+                  {(commerceOrdersQuery.data?.orders ?? [])
+                    .filter((o) =>
+                      commerceSubTab === "deliveries" ? Boolean(o.linkedDeliveryGig) : true
+                    )
+                    .map((o) => (
+                      <article key={o.id} className="order-card">
+                        <div className="order-card-top">
+                          <strong>Order #{o.orderNumber}</strong>
+                          <span>${(o.totalCents / 100).toFixed(2)}</span>
+                        </div>
+                        <p className="muted">{o.merchant?.name ?? "Shop"}</p>
+                        <p className="muted">
+                          {o.customer?.fullName ?? "Customer"}
+                          {o.customer?.phoneNumber ? ` · ${o.customer.phoneNumber}` : ""}
+                        </p>
+                        <p>
+                          <span className="status-badge tone-muted">{String(o.status).replace(/_/g, " ")}</span>
+                        </p>
+                        {o.linkedDeliveryGig ? (
+                          <p className="muted">Delivery: {o.linkedDeliveryGig.status}</p>
+                        ) : commerceSubTab === "orders" ? (
+                          <p className="muted">No courier linked yet</p>
+                        ) : null}
+                      </article>
+                    ))}
+                </div>
+                {commerceSubTab === "deliveries" &&
+                !(commerceOrdersQuery.data?.orders ?? []).some((o) => o.linkedDeliveryGig) ? (
+                  <p className="muted">No deliveries linked yet.</p>
+                ) : null}
+              </section>
             ) : null}
           </>
         ) : null}

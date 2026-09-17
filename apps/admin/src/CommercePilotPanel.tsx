@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { MerchantLocationPicker } from "./MerchantLocationPicker";
 import { hasValidCoordinates, presentationLocationLabel } from "./merchantLocation";
+import { displayCategory, friendlyApiError, uploadCatalogImage } from "./commerceAdminUi";
+import { CategorySelect, ProductThumb } from "./ProductThumb";
 
 type ApiRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -112,6 +114,15 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
   const [testResult, setTestResult] = useState<string>("");
   const [notice, setNotice] = useState<string>("");
   const [locationConfirmed, setLocationConfirmed] = useState(false);
+  const [shopView, setShopView] = useState<"products" | "add" | "success" | "edit-offer">("products");
+  const [productFilter, setProductFilter] = useState("");
+  const [editingOffer, setEditingOffer] = useState<ProductRow | null>(null);
+  const [editPrice, setEditPrice] = useState("");
+  const [editAvailable, setEditAvailable] = useState(true);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [localPhotoPreview, setLocalPhotoPreview] = useState<string | null>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   const merchantsQuery = useQuery({
     queryKey: ["admin-commerce-merchants"],
@@ -159,17 +170,19 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
       });
     },
     onSuccess: () => {
-      setNotice(`Added ${selectedCatalog?.name} to shop.`);
+      setNotice(`✓ Added to shop`);
       setSelectedCatalog(null);
       setOfferPrice("");
+      setShopView("success");
       void queryClient.invalidateQueries({ queryKey: ["admin-commerce-products", selectedId] });
       void queryClient.invalidateQueries({ queryKey: ["admin-commerce-merchant", selectedId] });
     },
-    onError: (e: Error) => setNotice(e.message)
+    onError: (e: unknown) =>
+      setNotice(friendlyApiError(e, "Product wasn't saved. Check your connection and try again."))
   });
 
   const submitNewCatalogMut = useMutation({
-    mutationFn: () => {
+    mutationFn: (opts?: { forceCreate?: boolean }) => {
       if (!selectedId) throw new Error("Select a merchant first");
       const priceCents = Math.round(Number(newCatalogForm.price) * 100);
       return apiRequest<{
@@ -190,19 +203,20 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
           priceCents,
           currency: "usd",
           available: true,
-          forceCreate: newCatalogForm.forceCreate
+          forceCreate: Boolean(opts?.forceCreate || newCatalogForm.forceCreate)
         })
       });
     },
     onSuccess: (res) => {
       if (res.requiresConfirmation && res.matches?.length) {
         setSimilarMatches(res.matches);
-        setNotice("This may already be in DUTS Catalog — use an existing product or create anyway.");
+        setNotice("Possible match — is this the product?");
         return;
       }
-      setNotice("New catalog product submitted (PENDING) and added to this shop.");
+      setNotice("✓ Added to shop");
       setShowNewCatalog(false);
       setSimilarMatches([]);
+      setLocalPhotoPreview(null);
       setNewCatalogForm({
         name: "",
         brand: "",
@@ -214,9 +228,11 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
         price: "",
         forceCreate: false
       });
+      setShopView("success");
       void queryClient.invalidateQueries({ queryKey: ["admin-commerce-products", selectedId] });
     },
-    onError: (e: Error) => setNotice(e.message)
+    onError: (e: unknown) =>
+      setNotice(friendlyApiError(e, "Product wasn't saved. Check your connection and try again."))
   });
 
   const saveMerchant = useMutation({
@@ -290,18 +306,6 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
     onError: (e: Error) => setNotice(e.message)
   });
 
-  const toggleProduct = useMutation({
-    mutationFn: ({ id, available }: { id: string; available: boolean }) =>
-      apiRequest(`/admin/commerce/merchants/${selectedId}/products/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ available })
-      }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["admin-commerce-products", selectedId] });
-      void queryClient.invalidateQueries({ queryKey: ["admin-commerce-merchant", selectedId] });
-    }
-  });
-
   const archiveProductMut = useMutation({
     mutationFn: (id: string) =>
       apiRequest(`/admin/commerce/merchants/${selectedId}/products/${id}`, {
@@ -309,10 +313,66 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
         body: JSON.stringify({ archived: true })
       }),
     onSuccess: () => {
+      setNotice("Product removed from shop.");
+      setShopView("products");
+      setEditingOffer(null);
       void queryClient.invalidateQueries({ queryKey: ["admin-commerce-products", selectedId] });
       void queryClient.invalidateQueries({ queryKey: ["admin-commerce-merchants"] });
     }
   });
+
+  const saveOfferMut = useMutation({
+    mutationFn: () => {
+      if (!editingOffer) throw new Error("No product selected");
+      const priceCents = Math.round(Number(editPrice) * 100);
+      if (!Number.isFinite(priceCents) || priceCents < 1) throw new Error("Enter a valid selling price");
+      return apiRequest(`/admin/commerce/merchants/${selectedId}/products/${editingOffer.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: editingOffer.name,
+          priceCents,
+          available: editAvailable,
+          currency: "usd",
+          searchAliases: editingOffer.searchAliases ?? []
+        })
+      });
+    },
+    onSuccess: () => {
+      setNotice("Product saved.");
+      setShopView("products");
+      setEditingOffer(null);
+      void queryClient.invalidateQueries({ queryKey: ["admin-commerce-products", selectedId] });
+    },
+    onError: (e: unknown) =>
+      setNotice(friendlyApiError(e, "Product wasn't saved. Check your connection and try again."))
+  });
+
+  async function onPickMerchantPhoto(file: File | null) {
+    if (!file) return;
+    if (localPhotoPreview) URL.revokeObjectURL(localPhotoPreview);
+    setLocalPhotoPreview(URL.createObjectURL(file));
+    setPhotoUploading(true);
+    setNotice("");
+    try {
+      const url = await uploadCatalogImage(apiRequest, file);
+      setNewCatalogForm((prev) => ({ ...prev, primaryImageUrl: url }));
+      setNotice("Photo updated.");
+    } catch (e) {
+      setNotice(friendlyApiError(e, "Couldn't upload this photo. Try another photo."));
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
+  function openAddFlow() {
+    setShopView("add");
+    setCatalogSearch("");
+    setSelectedCatalog(null);
+    setShowNewCatalog(false);
+    setOfferPrice("");
+    setSimilarMatches([]);
+    setNotice("");
+  }
 
   const previewBulk = useMutation({
     mutationFn: () =>
@@ -413,7 +473,7 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
           </button>
         </div>
         {notice ? <p className="notice">{notice}</p> : null}
-        <table className="data-table">
+        <table className="data-table merchant-table-desktop">
           <thead>
             <tr>
               <th>Name</th>
@@ -434,13 +494,30 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
                 <td>{m.availableProductCount ?? m._count.products}</td>
                 <td>
                   <button type="button" className="ghost-btn" onClick={() => loadMerchant(m)}>
-                    Edit
+                    Open
                   </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        <div className="merchant-card-list">
+          {(merchantsQuery.data?.merchants ?? []).map((m) => (
+            <button key={m.id} type="button" className="product-card" onClick={() => loadMerchant(m)}>
+              <div className="product-card-body">
+                <strong>{m.name}</strong>
+                <span className="muted">{m.pilotArea || m.locationLabel}</span>
+                <span className="muted">
+                  {m.availableProductCount ?? m._count.products} products
+                  {m.acceptsOrders && m.isActive ? " · Open" : " · Closed"}
+                </span>
+              </div>
+              <span className="chevron" aria-hidden>
+                ›
+              </span>
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="panel">
@@ -527,7 +604,12 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
             Accepts DUTS orders
           </label>
         </div>
-        <button type="button" onClick={() => saveMerchant.mutate()} disabled={saveMerchant.isPending}>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => saveMerchant.mutate()}
+          disabled={saveMerchant.isPending}
+        >
           {selectedId ? "Save merchant" : "Create merchant"}
         </button>
         {readiness ? (
@@ -539,249 +621,475 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
 
       {selectedId ? (
         <>
-          <section className="panel">
-            <h2>Shop products</h2>
-            <p className="muted">Search DUTS Catalog, then set only price and stock for this merchant.</p>
-
-            <label>
-              Search DUTS Catalog
-              <input
-                value={catalogSearch}
-                onChange={(e) => {
-                  setCatalogSearch(e.target.value);
-                  setShowNewCatalog(false);
-                }}
-                placeholder="Product name, brand, barcode…"
-              />
-            </label>
-
-            {(catalogSearchQuery.data?.products ?? []).length > 0 ? (
-              <ul className="catalog-results" style={{ listStyle: "none", padding: 0 }}>
-                {catalogSearchQuery.data!.products.map((hit) => (
-                  <li
-                    key={hit.id}
-                    style={{
-                      display: "flex",
-                      gap: 12,
-                      alignItems: "center",
-                      padding: "8px 0",
-                      borderBottom: "1px solid #eee"
-                    }}
-                  >
-                    {hit.primaryImageUrl ? (
-                      <img src={hit.primaryImageUrl} alt="" width={48} height={48} style={{ objectFit: "cover" }} />
-                    ) : (
-                      <div
-                        style={{
-                          width: 48,
-                          height: 48,
-                          background: "#f0f0f0",
-                          display: "grid",
-                          placeItems: "center",
-                          fontSize: 11
-                        }}
-                      >
-                        No img
-                      </div>
-                    )}
-                    <div style={{ flex: 1 }}>
-                      <strong>{hit.name}</strong>
-                      <div className="muted">
-                        {[hit.brand, hit.category, hit.sizeLabel].filter(Boolean).join(" · ")}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedCatalog(hit);
-                        setShowNewCatalog(false);
-                      }}
-                    >
-                      Select
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : catalogSearch.trim() ? (
-              <p className="muted">No approved catalog matches.</p>
-            ) : null}
-
-            <div className="row-actions" style={{ marginTop: 12 }}>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  setShowNewCatalog(true);
-                  setSelectedCatalog(null);
-                  setNewCatalogForm((prev) => ({ ...prev, name: catalogSearch.trim() }));
-                }}
-              >
-                Can&apos;t find the product? Add new product
-              </button>
-            </div>
-
-            {selectedCatalog ? (
-              <div className="panel" style={{ marginTop: 16 }}>
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  {selectedCatalog.primaryImageUrl ? (
-                    <img
-                      src={selectedCatalog.primaryImageUrl}
-                      alt=""
-                      width={64}
-                      height={64}
-                      style={{ objectFit: "cover" }}
-                    />
-                  ) : null}
-                  <div>
-                    <strong>{selectedCatalog.name}</strong>
-                    <div className="muted">
-                      {[selectedCatalog.brand, selectedCatalog.sizeLabel].filter(Boolean).join(" · ")}
-                    </div>
-                  </div>
-                </div>
-                <div className="form-grid" style={{ marginTop: 12 }}>
-                  <label>
-                    Selling price *
-                    <input value={offerPrice} onChange={(e) => setOfferPrice(e.target.value)} placeholder="2.00" />
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={offerAvailable}
-                      onChange={(e) => setOfferAvailable(e.target.checked)}
-                    />{" "}
-                    In stock
-                  </label>
-                </div>
-                <button type="button" onClick={() => linkCatalogMut.mutate()} disabled={linkCatalogMut.isPending}>
-                  Add to shop
+          <section className="panel commerce-panel">
+            {shopView === "success" ? (
+              <div className="success-panel">
+                <h2>✓ Added to shop</h2>
+                <p className="muted">Ready for the next product.</p>
+                <button
+                  type="button"
+                  className="btn-primary btn-block"
+                  onClick={() => {
+                    setNotice("");
+                    openAddFlow();
+                  }}
+                >
+                  Add another product
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary btn-block"
+                  onClick={() => {
+                    setShopView("products");
+                    setNotice("");
+                  }}
+                >
+                  Done
                 </button>
               </div>
             ) : null}
 
-            {showNewCatalog ? (
-              <div className="panel" style={{ marginTop: 16 }}>
-                <h3>Add new product</h3>
-                <p className="muted">Creates a PENDING DUTS Catalog entry + this shop&apos;s offer immediately.</p>
-                {similarMatches.length > 0 ? (
-                  <div>
-                    <p>
-                      <strong>This may already be in DUTS Catalog</strong>
-                    </p>
-                    {similarMatches.map((m) => (
-                      <div key={m.id} className="row-actions" style={{ marginBottom: 8 }}>
-                        {m.primaryImageUrl ? (
-                          <img src={m.primaryImageUrl} alt="" width={40} height={40} style={{ objectFit: "cover" }} />
-                        ) : null}
-                        <span>{m.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedCatalog(m);
-                            setShowNewCatalog(false);
-                            setSimilarMatches([]);
-                          }}
-                        >
-                          Use this product
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => {
-                        setNewCatalogForm((prev) => ({ ...prev, forceCreate: true }));
-                        submitNewCatalogMut.mutate();
-                      }}
-                    >
-                      Create new anyway
-                    </button>
-                  </div>
-                ) : (
+            {shopView === "edit-offer" && editingOffer ? (
+              <>
+                <button type="button" className="text-back" onClick={() => setShopView("products")}>
+                  ← Products
+                </button>
+                <h2>{editingOffer.name}</h2>
+                {editingOffer.unit ? <p className="muted">{editingOffer.unit}</p> : null}
+                {notice ? <p className="notice">{notice}</p> : null}
+                <div className="commerce-form">
+                  <label>
+                    Selling price
+                    <input
+                      value={editPrice}
+                      onChange={(e) => setEditPrice(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="2.50"
+                    />
+                  </label>
+                  <label className="toggle-row">
+                    <span>In stock</span>
+                    <input
+                      type="checkbox"
+                      checked={editAvailable}
+                      onChange={(e) => setEditAvailable(e.target.checked)}
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  className="btn-primary btn-block"
+                  onClick={() => saveOfferMut.mutate()}
+                  disabled={saveOfferMut.isPending}
+                >
+                  {saveOfferMut.isPending ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary btn-block"
+                  onClick={() => archiveProductMut.mutate(editingOffer.id)}
+                >
+                  Remove from shop
+                </button>
+              </>
+            ) : null}
+
+            {shopView === "add" ? (
+              <>
+                <button type="button" className="text-back" onClick={() => setShopView("products")}>
+                  ← Products
+                </button>
+                <h2>Add product to {selectedLabel}</h2>
+                {notice ? <p className="notice">{notice}</p> : null}
+
+                {!showNewCatalog && !selectedCatalog ? (
                   <>
-                    <div className="form-grid">
-                      <label>
-                        Product photo URL *
-                        <input
-                          value={newCatalogForm.primaryImageUrl}
-                          onChange={(e) =>
-                            setNewCatalogForm({ ...newCatalogForm, primaryImageUrl: e.target.value })
-                          }
-                          placeholder="Upload via DUTS Catalog or paste https URL"
-                        />
-                      </label>
-                      <label>
-                        Product name *
-                        <input
-                          value={newCatalogForm.name}
-                          onChange={(e) => setNewCatalogForm({ ...newCatalogForm, name: e.target.value })}
-                        />
-                      </label>
-                      <label>
-                        Brand
-                        <input
-                          value={newCatalogForm.brand}
-                          onChange={(e) => setNewCatalogForm({ ...newCatalogForm, brand: e.target.value })}
-                        />
-                      </label>
-                      <label>
-                        Category *
-                        <input
-                          value={newCatalogForm.category}
-                          onChange={(e) => setNewCatalogForm({ ...newCatalogForm, category: e.target.value })}
-                        />
-                      </label>
-                      <label>
-                        Size / quantity
-                        <input
-                          value={newCatalogForm.sizeLabel}
-                          onChange={(e) => setNewCatalogForm({ ...newCatalogForm, sizeLabel: e.target.value })}
-                        />
-                      </label>
-                      <label>
-                        Description
-                        <input
-                          value={newCatalogForm.description}
-                          onChange={(e) =>
-                            setNewCatalogForm({ ...newCatalogForm, description: e.target.value })
-                          }
-                        />
-                      </label>
-                      <label>
-                        Barcode / GTIN
-                        <input
-                          value={newCatalogForm.barcode}
-                          onChange={(e) => setNewCatalogForm({ ...newCatalogForm, barcode: e.target.value })}
-                        />
-                      </label>
+                    <label className="search-field">
+                      <span className="sr-only">Search DUTS Catalog</span>
+                      <input
+                        value={catalogSearch}
+                        onChange={(e) => setCatalogSearch(e.target.value)}
+                        placeholder="Search DUTS Catalog…"
+                        enterKeyHint="search"
+                      />
+                    </label>
+
+                    <div className="product-card-list">
+                      {(catalogSearchQuery.data?.products ?? []).map((hit) => (
+                        <div key={hit.id} className="product-card static">
+                          <ProductThumb src={hit.primaryImageUrl} alt={hit.name} size="md" />
+                          <div className="product-card-body">
+                            <strong>{hit.name}</strong>
+                            <span className="muted">
+                              {[hit.brand, hit.sizeLabel].filter(Boolean).join(" · ") ||
+                                displayCategory(hit.category)}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => {
+                              setSelectedCatalog(hit);
+                              setShowNewCatalog(false);
+                            }}
+                          >
+                            Select
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    {catalogSearch.trim() && !catalogSearchQuery.isFetching && (catalogSearchQuery.data?.products ?? []).length === 0 ? (
+                      <p className="muted">No matching products.</p>
+                    ) : null}
+
+                    <div className="cant-find">
+                      <p className="muted">Can&apos;t find it?</p>
+                      <button
+                        type="button"
+                        className="btn-primary btn-block"
+                        onClick={() => {
+                          setShowNewCatalog(true);
+                          setSelectedCatalog(null);
+                          setNewCatalogForm((prev) => ({ ...prev, name: catalogSearch.trim() }));
+                        }}
+                      >
+                        + Add new product
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+
+                {selectedCatalog ? (
+                  <div className="offer-panel">
+                    <ProductThumb src={selectedCatalog.primaryImageUrl} alt={selectedCatalog.name} size="lg" />
+                    <h3>{selectedCatalog.name}</h3>
+                    <p className="muted">
+                      {[selectedCatalog.brand, selectedCatalog.sizeLabel].filter(Boolean).join(" · ")}
+                    </p>
+                    <div className="commerce-form">
                       <label>
                         Selling price *
                         <input
-                          value={newCatalogForm.price}
-                          onChange={(e) => setNewCatalogForm({ ...newCatalogForm, price: e.target.value })}
+                          value={offerPrice}
+                          onChange={(e) => setOfferPrice(e.target.value)}
+                          placeholder="2.00"
+                          inputMode="decimal"
+                        />
+                      </label>
+                      <label className="toggle-row">
+                        <span>In stock</span>
+                        <input
+                          type="checkbox"
+                          checked={offerAvailable}
+                          onChange={(e) => setOfferAvailable(e.target.checked)}
                         />
                       </label>
                     </div>
                     <button
                       type="button"
-                      onClick={() => submitNewCatalogMut.mutate()}
-                      disabled={
-                        submitNewCatalogMut.isPending ||
-                        !newCatalogForm.name.trim() ||
-                        !newCatalogForm.category.trim() ||
-                        !newCatalogForm.primaryImageUrl.trim() ||
-                        !newCatalogForm.price.trim()
-                      }
+                      className="btn-primary btn-block"
+                      onClick={() => linkCatalogMut.mutate()}
+                      disabled={linkCatalogMut.isPending}
                     >
-                      Add product
+                      {linkCatalogMut.isPending ? "Saving…" : "Add to shop"}
                     </button>
-                  </>
-                )}
-              </div>
+                    <button
+                      type="button"
+                      className="btn-secondary btn-block"
+                      onClick={() => setSelectedCatalog(null)}
+                    >
+                      Back to search
+                    </button>
+                  </div>
+                ) : null}
+
+                {showNewCatalog ? (
+                  <div className="offer-panel">
+                    <h3>Add new product</h3>
+                    {similarMatches.length > 0 ? (
+                      <div className="similar-box">
+                        <p>
+                          <strong>Possible match</strong>
+                        </p>
+                        {similarMatches.map((m) => (
+                          <div key={m.id} className="product-card static">
+                            <ProductThumb src={m.primaryImageUrl} alt={m.name} size="sm" />
+                            <div className="product-card-body">
+                              <strong>{m.name}</strong>
+                              <span className="muted">{m.sizeLabel ?? displayCategory(m.category)}</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={() => {
+                                setSelectedCatalog(m);
+                                setShowNewCatalog(false);
+                                setSimilarMatches([]);
+                              }}
+                            >
+                              Use this product
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="btn-primary btn-block"
+                          onClick={() => submitNewCatalogMut.mutate({ forceCreate: true })}
+                        >
+                          Create new product
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="photo-hero">
+                          {localPhotoPreview || newCatalogForm.primaryImageUrl ? (
+                            <img
+                              src={localPhotoPreview || newCatalogForm.primaryImageUrl}
+                              alt={newCatalogForm.name || "Product photo"}
+                            />
+                          ) : (
+                            <div className="photo-hero-empty">Product photo *</div>
+                          )}
+                        </div>
+                        <div className="photo-actions">
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => cameraRef.current?.click()}
+                            disabled={photoUploading}
+                          >
+                            Take photo
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => galleryRef.current?.click()}
+                            disabled={photoUploading}
+                          >
+                            Choose photo
+                          </button>
+                        </div>
+                        {photoUploading ? <p className="muted">Uploading photo…</p> : null}
+                        <input
+                          ref={cameraRef}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="sr-only"
+                          onChange={(e) => {
+                            void onPickMerchantPhoto(e.target.files?.[0] ?? null);
+                            e.target.value = "";
+                          }}
+                        />
+                        <input
+                          ref={galleryRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="sr-only"
+                          onChange={(e) => {
+                            void onPickMerchantPhoto(e.target.files?.[0] ?? null);
+                            e.target.value = "";
+                          }}
+                        />
+
+                        <div className="commerce-form">
+                          <label>
+                            Product name *
+                            <input
+                              value={newCatalogForm.name}
+                              onChange={(e) => setNewCatalogForm({ ...newCatalogForm, name: e.target.value })}
+                            />
+                          </label>
+                          <label>
+                            Brand
+                            <input
+                              value={newCatalogForm.brand}
+                              onChange={(e) => setNewCatalogForm({ ...newCatalogForm, brand: e.target.value })}
+                            />
+                          </label>
+                          <label>
+                            Category *
+                            <CategorySelect
+                              value={newCatalogForm.category}
+                              onChange={(category) => setNewCatalogForm({ ...newCatalogForm, category })}
+                            />
+                          </label>
+                          <label>
+                            Size / quantity
+                            <input
+                              value={newCatalogForm.sizeLabel}
+                              onChange={(e) =>
+                                setNewCatalogForm({ ...newCatalogForm, sizeLabel: e.target.value })
+                              }
+                            />
+                          </label>
+                          <label>
+                            Short product description
+                            <textarea
+                              rows={3}
+                              value={newCatalogForm.description}
+                              onChange={(e) =>
+                                setNewCatalogForm({ ...newCatalogForm, description: e.target.value })
+                              }
+                            />
+                          </label>
+                          <label>
+                            Barcode / GTIN
+                            <input
+                              value={newCatalogForm.barcode}
+                              onChange={(e) => setNewCatalogForm({ ...newCatalogForm, barcode: e.target.value })}
+                              inputMode="numeric"
+                            />
+                          </label>
+                          <label>
+                            Selling price *
+                            <input
+                              value={newCatalogForm.price}
+                              onChange={(e) => setNewCatalogForm({ ...newCatalogForm, price: e.target.value })}
+                              inputMode="decimal"
+                            />
+                          </label>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-primary btn-block"
+                          onClick={() => submitNewCatalogMut.mutate({})}
+                          disabled={
+                            submitNewCatalogMut.isPending ||
+                            photoUploading ||
+                            !newCatalogForm.name.trim() ||
+                            !newCatalogForm.category.trim() ||
+                            !newCatalogForm.primaryImageUrl.trim() ||
+                            !newCatalogForm.price.trim()
+                          }
+                        >
+                          {submitNewCatalogMut.isPending ? "Saving…" : "Add product"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-block"
+                          onClick={() => setShowNewCatalog(false)}
+                        >
+                          Back to search
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : null}
+              </>
             ) : null}
 
+            {shopView === "products" ? (
+              <>
+                <div className="panel-header-row">
+                  <h2>Products ({productsQuery.data?.products?.length ?? 0})</h2>
+                </div>
+                {notice ? <p className="notice">{notice}</p> : null}
+                <label className="search-field">
+                  <span className="sr-only">Search products</span>
+                  <input
+                    value={productFilter}
+                    onChange={(e) => setProductFilter(e.target.value)}
+                    placeholder="Search products"
+                  />
+                </label>
+                <button type="button" className="btn-primary btn-block" onClick={openAddFlow}>
+                  + Add product
+                </button>
+                <div className="product-card-list">
+                  {(productsQuery.data?.products ?? [])
+                    .filter((p) =>
+                      !productFilter.trim()
+                        ? true
+                        : p.name.toLowerCase().includes(productFilter.trim().toLowerCase())
+                    )
+                    .map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="product-card"
+                        onClick={() => {
+                          setEditingOffer(p);
+                          setEditPrice((p.priceCents / 100).toFixed(2));
+                          setEditAvailable(p.available);
+                          setShopView("edit-offer");
+                          setNotice("");
+                        }}
+                      >
+                        <ProductThumb src={p.imageUrl} alt={p.name} size="md" />
+                        <div className="product-card-body">
+                          <strong>{p.name}</strong>
+                          {p.unit ? <span className="muted">{p.unit}</span> : null}
+                          <span className="price-line">${(p.priceCents / 100).toFixed(2)}</span>
+                          <span className={p.available ? "stock-ok" : "stock-out"}>
+                            {p.available ? "In stock" : "Out of stock"}
+                          </span>
+                        </div>
+                        <span className="chevron" aria-hidden>
+                          ›
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </>
+            ) : null}
+          </section>
+
+          <details className="panel advanced-box">
+            <summary>Advanced — bulk import &amp; test tools</summary>
+            <div className="commerce-form" style={{ marginTop: 12 }}>
+              <label>
+                Bulk catalog import
+                <textarea rows={6} value={bulkText} onChange={(e) => setBulkText(e.target.value)} />
+              </label>
+            </div>
+            <div className="row-actions">
+              <button type="button" className="btn-secondary" onClick={() => previewBulk.mutate()}>
+                Preview
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => importBulk.mutate()}
+                disabled={!bulkPreview || bulkPreview.valid.length === 0}
+              >
+                Confirm import ({bulkPreview?.valid.length ?? 0})
+              </button>
+            </div>
+            {bulkPreview ? (
+              <ul className="muted">
+                {bulkPreview.lines.slice(0, 12).map((l, i) => (
+                  <li key={`${l.line}-${i}`}>
+                    {l.name
+                      ? `${l.name} · $${((l.priceCents ?? 0) / 100).toFixed(2)} · ${l.status}`
+                      : `${l.line} · ${l.status}`}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            <h3 style={{ marginTop: 20 }}>Test basket</h3>
+            <div className="form-grid">
+              <label>
+                Customer lat
+                <input value={testLat} onChange={(e) => setTestLat(e.target.value)} />
+              </label>
+              <label>
+                Customer lng
+                <input value={testLng} onChange={(e) => setTestLng(e.target.value)} />
+              </label>
+            </div>
+            <label>
+              Items (one per line)
+              <textarea rows={4} value={testItems} onChange={(e) => setTestItems(e.target.value)} />
+            </label>
+            <button type="button" className="btn-secondary" onClick={() => runTestBasket.mutate()}>
+              Run test basket
+            </button>
+            {testResult ? <pre className="readiness-box">{testResult}</pre> : null}
+
             <details style={{ marginTop: 16 }}>
-              <summary>Advanced — legacy quick add (name + price + aliases)</summary>
+              <summary>Legacy quick add</summary>
               <div className="form-grid" style={{ marginTop: 12 }}>
                 <label>
                   Product name
@@ -805,115 +1113,11 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
                   />
                 </label>
               </div>
-              <button type="button" onClick={() => addProduct.mutate()} disabled={addProduct.isPending}>
+              <button type="button" className="btn-secondary" onClick={() => addProduct.mutate()} disabled={addProduct.isPending}>
                 Add product (legacy)
               </button>
             </details>
-
-            <table className="data-table" style={{ marginTop: 16 }}>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Price</th>
-                  <th>Available</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(productsQuery.data?.products ?? []).map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.name}</td>
-                    <td>${(p.priceCents / 100).toFixed(2)}</td>
-                    <td>{p.available ? "Yes" : "No"}</td>
-                    <td className="row-actions">
-                      <button
-                        type="button"
-                        className="ghost-btn"
-                        onClick={() => toggleProduct.mutate({ id: p.id, available: !p.available })}
-                      >
-                        {p.available ? "Mark unavailable" : "Mark available"}
-                      </button>
-                      <button type="button" className="ghost-btn" onClick={() => archiveProductMut.mutate(p.id)}>
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-
-          <section className="panel">
-            <h2>Bulk catalog import</h2>
-            <p className="muted">One product per line: Name | price — preview before save.</p>
-            <textarea
-              rows={8}
-              value={bulkText}
-              onChange={(e) => setBulkText(e.target.value)}
-              style={{ width: "100%" }}
-            />
-            <div className="row-actions">
-              <button type="button" onClick={() => previewBulk.mutate()}>
-                Preview
-              </button>
-              <button
-                type="button"
-                onClick={() => importBulk.mutate()}
-                disabled={!bulkPreview || bulkPreview.valid.length === 0}
-              >
-                Confirm import ({bulkPreview?.valid.length ?? 0})
-              </button>
-            </div>
-            {bulkPreview ? (
-              <table className="data-table" style={{ marginTop: 12 }}>
-                <thead>
-                  <tr>
-                    <th>Line</th>
-                    <th>Parsed</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bulkPreview.lines.map((l, i) => (
-                    <tr key={`${l.line}-${i}`}>
-                      <td>{l.line}</td>
-                      <td>
-                        {l.name
-                          ? `${l.name} · $${((l.priceCents ?? 0) / 100).toFixed(2)}`
-                          : "—"}
-                      </td>
-                      <td>
-                        {l.status}
-                        {l.warning ? ` — ${l.warning}` : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : null}
-          </section>
-
-          <section className="panel">
-            <h2>Test basket (live matching)</h2>
-            <div className="form-grid">
-              <label>
-                Customer lat
-                <input value={testLat} onChange={(e) => setTestLat(e.target.value)} />
-              </label>
-              <label>
-                Customer lng
-                <input value={testLng} onChange={(e) => setTestLng(e.target.value)} />
-              </label>
-            </div>
-            <label>
-              Items (one per line)
-              <textarea rows={4} value={testItems} onChange={(e) => setTestItems(e.target.value)} />
-            </label>
-            <button type="button" onClick={() => runTestBasket.mutate()}>
-              Run test basket
-            </button>
-            {testResult ? <pre className="readiness-box">{testResult}</pre> : null}
-          </section>
+          </details>
         </>
       ) : null}
     </>

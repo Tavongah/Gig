@@ -8,6 +8,7 @@
     "build": "npx tsc -p tsconfig.json --noEmit && npx vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:merchant-location": "npx tsx scripts/test-merchant-location-picker.ts",
+    "test:commerce-admin-mobile-ux": "npx tsx scripts/test-commerce-admin-mobile-ux.ts",
     "preview": "vite preview"
   },
   "dependencies": {
