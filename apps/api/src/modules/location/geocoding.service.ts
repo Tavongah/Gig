@@ -13,7 +13,9 @@ interface NominatimAddress {
   town?: string;
   village?: string;
   hamlet?: string;
+  suburb?: string;
   state?: string;
+  county?: string;
   postcode?: string;
   country_code?: string;
 }
@@ -83,7 +85,8 @@ function mapGoogleComponents(
   formattedAddress: string,
   latitude: number,
   longitude: number,
-  components: Array<{ long_name: string; short_name: string; types: string[] }>
+  components: Array<{ long_name: string; short_name: string; types: string[] }>,
+  options?: { allowIncomplete?: boolean }
 ): GeocodedAddress {
   const city =
     pickComponent(components, "locality") ||
@@ -97,9 +100,22 @@ function mapGoogleComponents(
   const addressLine1 = buildAddressLine1(components);
 
   if (!addressLine1 || !city || !region || !postalCode) {
-    throw new AppError("INVALID_ADDRESS", 422, "INVALID_ADDRESS", {
-      location: "Address must include street, city, state, and postal code."
-    });
+    if (!options?.allowIncomplete) {
+      throw new AppError("INVALID_ADDRESS", 422, "INVALID_ADDRESS", {
+        location: "Address must include street, city, state, and postal code."
+      });
+    }
+    // Merchant / place flows: GPS + label matter more than a full postal address (e.g. Zimbabwe tuck shops).
+    return {
+      addressLine1: addressLine1 || formattedAddress || "Shop",
+      city: city || "Unknown",
+      region: region || "Unknown",
+      postalCode: postalCode || "0000",
+      country: country.length === 2 ? country : "ZW",
+      formattedAddress: formattedAddress || "Shop location",
+      latitude,
+      longitude
+    };
   }
 
   return {
@@ -114,18 +130,30 @@ function mapGoogleComponents(
   };
 }
 
-function mapNominatimResult(result: NominatimResult): GeocodedAddress {
+function mapNominatimResult(result: NominatimResult, options?: { allowIncomplete?: boolean }): GeocodedAddress {
   const address = result.address ?? {};
   const addressLine1 = [address.house_number, address.road].filter(Boolean).join(" ").trim();
-  const city = address.city ?? address.town ?? address.village ?? address.hamlet ?? "";
-  const region = address.state ?? "";
+  const city = address.city ?? address.town ?? address.village ?? address.hamlet ?? address.suburb ?? "";
+  const region = address.state ?? address.county ?? "";
   const postalCode = address.postcode ?? "";
   const country = (address.country_code ?? "us").toUpperCase();
 
   if (!addressLine1 || !city || !region || !postalCode) {
-    throw new AppError("INVALID_ADDRESS", 422, "INVALID_ADDRESS", {
-      location: "Address must include street, city, state, and postal code."
-    });
+    if (!options?.allowIncomplete) {
+      throw new AppError("INVALID_ADDRESS", 422, "INVALID_ADDRESS", {
+        location: "Address must include street, city, state, and postal code."
+      });
+    }
+    return {
+      addressLine1: addressLine1 || result.display_name || "Shop",
+      city: city || "Unknown",
+      region: region || "Unknown",
+      postalCode: postalCode || "0000",
+      country: country.length === 2 ? country : "ZW",
+      formattedAddress: result.display_name || "Shop location",
+      latitude: Number(result.lat),
+      longitude: Number(result.lon)
+    };
   }
 
   return {
@@ -155,11 +183,12 @@ function hasGoogleMapsKey(): boolean {
   return Boolean(env.GOOGLE_MAPS_API_KEY?.trim());
 }
 
-async function geocodeWithGoogle(query: string): Promise<GeocodedAddress> {
+async function geocodeWithGoogle(query: string, options?: { allowIncomplete?: boolean }): Promise<GeocodedAddress> {
   const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
   url.searchParams.set("address", query);
   url.searchParams.set("key", env.GOOGLE_MAPS_API_KEY!);
-  url.searchParams.set("components", "country:US");
+  // Zimbabwe tuck shops + Meriden US pilot.
+  url.searchParams.set("components", "country:ZW|country:US");
 
   const data = await fetchJson<GoogleGeocodeResult>(url.toString());
   if (data.status !== "OK" || data.results.length === 0) {
@@ -173,17 +202,18 @@ async function geocodeWithGoogle(query: string): Promise<GeocodedAddress> {
     top.formatted_address,
     top.geometry.location.lat,
     top.geometry.location.lng,
-    top.address_components
+    top.address_components,
+    options
   );
 }
 
-async function geocodeWithNominatim(query: string): Promise<GeocodedAddress> {
+async function geocodeWithNominatim(query: string, options?: { allowIncomplete?: boolean }): Promise<GeocodedAddress> {
   const url = new URL(`${NOMINATIM_BASE}/search`);
   url.searchParams.set("q", query);
   url.searchParams.set("format", "json");
   url.searchParams.set("addressdetails", "1");
   url.searchParams.set("limit", "1");
-  url.searchParams.set("countrycodes", "us");
+  url.searchParams.set("countrycodes", "zw,us");
 
   const results = await fetchJson<NominatimResult[]>(url.toString(), { "User-Agent": USER_AGENT });
   if (!Array.isArray(results) || results.length === 0) {
@@ -192,7 +222,7 @@ async function geocodeWithNominatim(query: string): Promise<GeocodedAddress> {
     });
   }
 
-  return mapNominatimResult(results[0]!);
+  return mapNominatimResult(results[0]!, options);
 }
 
 async function reverseGeocodeWithGoogle(latitude: number, longitude: number): Promise<GeocodedAddress> {
@@ -212,7 +242,8 @@ async function reverseGeocodeWithGoogle(latitude: number, longitude: number): Pr
     top.formatted_address,
     top.geometry.location.lat,
     top.geometry.location.lng,
-    top.address_components
+    top.address_components,
+    { allowIncomplete: true }
   );
 }
 
@@ -230,18 +261,24 @@ async function reverseGeocodeWithNominatim(latitude: number, longitude: number):
     });
   }
 
-  return mapNominatimResult(result);
+  return mapNominatimResult(result, { allowIncomplete: true });
 }
 
-export async function geocodeAddressQuery(query: string): Promise<GeocodedAddress> {
+export async function geocodeAddressQuery(
+  query: string,
+  options?: { allowIncomplete?: boolean }
+): Promise<GeocodedAddress> {
   const trimmed = query.trim();
-  if (trimmed.length < 8) {
+  const minLen = options?.allowIncomplete ? 3 : 8;
+  if (trimmed.length < minLen) {
     throw new AppError("INVALID_ADDRESS", 422, "INVALID_ADDRESS", {
       location: "Enter a complete street address."
     });
   }
 
-  return hasGoogleMapsKey() ? geocodeWithGoogle(trimmed) : geocodeWithNominatim(trimmed);
+  return hasGoogleMapsKey()
+    ? geocodeWithGoogle(trimmed, options)
+    : geocodeWithNominatim(trimmed, options);
 }
 
 export async function reverseGeocodeCoordinates(latitude: number, longitude: number): Promise<GeocodedAddress> {
@@ -273,7 +310,8 @@ export async function geocodePlaceId(placeId: string): Promise<GeocodedAddress> 
     data.result.formatted_address,
     data.result.geometry.location.lat,
     data.result.geometry.location.lng,
-    data.result.address_components
+    data.result.address_components,
+    { allowIncomplete: true }
   );
 }
 
@@ -328,17 +366,19 @@ export async function resolveGeocodedLocation(input: {
   region?: string;
   postalCode?: string;
   country?: string;
+  allowIncomplete?: boolean;
 }): Promise<GeocodedAddress> {
   let resolved: GeocodedAddress;
+  const incomplete = { allowIncomplete: Boolean(input.allowIncomplete) };
 
   if (input.placeId) {
     if (hasGoogleMapsKey()) {
       resolved = await geocodePlaceId(input.placeId);
     } else {
-      resolved = await geocodeAddressQuery(input.formattedAddress ?? input.query ?? "");
+      resolved = await geocodeAddressQuery(input.formattedAddress ?? input.query ?? "", incomplete);
     }
   } else if (input.query) {
-    resolved = await geocodeAddressQuery(input.query);
+    resolved = await geocodeAddressQuery(input.query, incomplete);
   } else if (input.latitude !== undefined && input.longitude !== undefined) {
     resolved = await reverseGeocodeCoordinates(input.latitude, input.longitude);
   } else if (
@@ -359,7 +399,7 @@ export async function resolveGeocodedLocation(input: {
       latitude: input.latitude,
       longitude: input.longitude
     };
-    resolved = await geocodeAddressQuery(resolved.formattedAddress);
+    resolved = await geocodeAddressQuery(resolved.formattedAddress, incomplete);
   } else {
     throw new AppError("INVALID_ADDRESS", 422, "INVALID_ADDRESS", {
       location: "A valid address is required."

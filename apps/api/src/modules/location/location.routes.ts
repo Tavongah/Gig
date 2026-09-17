@@ -15,7 +15,8 @@ const geocodeBodySchema = z.object({
   query: z.string().trim().min(3).max(240).optional(),
   placeId: z.string().trim().min(3).max(200).optional(),
   latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional()
+  longitude: z.number().min(-180).max(180).optional(),
+  allowIncomplete: z.boolean().optional()
 }).refine(
   (value) => Boolean(value.query || value.placeId || (value.latitude !== undefined && value.longitude !== undefined)),
   { message: "Provide a query, placeId, or coordinates." }

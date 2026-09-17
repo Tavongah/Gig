@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   coordsEqual,
+  defaultShopLocationLabel,
   formatAccuracyMessage,
   geolocationErrorMessage,
   hasValidCoordinates,
@@ -10,6 +11,7 @@ import {
   isValidLatitude,
   isValidLongitude,
   parseCoordinate,
+  presentationLocationLabel,
   roundCoord,
   type LocationSuggestion,
   type MerchantLocationValue
@@ -153,7 +155,7 @@ export function MerchantLocationPicker({
 
   async function useCurrentLocation(): Promise<void> {
     if (!navigator.geolocation) {
-      setStatusMsg("Couldn't get your location. Search for the shop or place the pin manually.");
+      setStatusMsg(geolocationErrorMessage(undefined));
       setStatusTone("err");
       return;
     }
@@ -168,6 +170,7 @@ export function MerchantLocationPicker({
         setStatusTone(isPoorGpsAccuracy(accuracy) ? "warn" : "ok");
         setGpsBusy(false);
         mapRef.current?.invalidateSize();
+        void tryFillLabelFromCoords(latitude, longitude);
       },
       (err) => {
         setStatusMsg(geolocationErrorMessage(err.code));
@@ -176,6 +179,25 @@ export function MerchantLocationPicker({
       },
       { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 }
     );
+  }
+
+  async function tryFillLabelFromCoords(lat: number, lng: number): Promise<void> {
+    try {
+      const geo = await apiRequest<{
+        address?: { formattedAddress?: string };
+        location?: { formattedAddress?: string };
+      }>("/location/reverse-geocode", {
+        method: "POST",
+        body: JSON.stringify({ latitude: lat, longitude: lng })
+      });
+      const label =
+        geo.address?.formattedAddress || geo.location?.formattedAddress || "";
+      if (label.trim().length >= 2) {
+        applyCoords(lat, lng, label.trim());
+      }
+    } catch {
+      /* GPS pin still works without a label */
+    }
   }
 
   async function runSearch(): Promise<void> {
@@ -237,7 +259,10 @@ export function MerchantLocationPicker({
           address?: { formattedAddress?: string; latitude: number; longitude: number };
         }>("/location/geocode", {
           method: "POST",
-          body: JSON.stringify({ query: s.formattedAddress || s.label })
+          body: JSON.stringify({
+            query: s.formattedAddress || s.label,
+            allowIncomplete: true
+          })
         });
         lat = geo.location?.latitude ?? geo.address?.latitude ?? null;
         lng = geo.location?.longitude ?? geo.address?.longitude ?? null;
@@ -286,7 +311,7 @@ export function MerchantLocationPicker({
     <div className="merchant-location">
       <h3 className="merchant-location-title">Shop location</h3>
       <p className="muted merchant-location-help">
-        Stand at the shop when possible. Coordinates are authoritative — address search is optional.
+        Stand at the shop when possible. Use GPS, search, or move the pin — then confirm.
       </p>
 
       <button
@@ -295,7 +320,7 @@ export function MerchantLocationPicker({
         onClick={() => void useCurrentLocation()}
         disabled={gpsBusy}
       >
-        {gpsBusy ? "Getting location…" : "Use current location"}
+        {gpsBusy ? "Getting location…" : "Use my current location"}
       </button>
 
       <div className="merchant-location-search">
@@ -346,8 +371,8 @@ export function MerchantLocationPicker({
 
       {ready && confirmed ? (
         <div className="merchant-location-confirmed">
-          <strong>📍 Location confirmed</strong>
-          <p>{value.locationLabel || `${value.latitude}, ${value.longitude}`}</p>
+          <strong>✓ Shop location confirmed</strong>
+          {value.locationLabel.trim() ? <p>{value.locationLabel}</p> : null}
           <button type="button" className="secondary" onClick={() => onConfirmedChange(false)}>
             Change location
           </button>
@@ -359,8 +384,14 @@ export function MerchantLocationPicker({
           disabled={!ready}
           onClick={() => {
             if (!ready) return;
+            if (!value.locationLabel.trim()) {
+              onChange({
+                ...value,
+                locationLabel: defaultShopLocationLabel()
+              });
+            }
             onConfirmedChange(true);
-            setStatusMsg("📍 Location confirmed");
+            setStatusMsg("✓ Shop location confirmed");
             setStatusTone("ok");
           }}
         >
@@ -373,7 +404,7 @@ export function MerchantLocationPicker({
         open={advancedOpen}
         onToggle={(e) => setAdvancedOpen((e.target as HTMLDetailsElement).open)}
       >
-        <summary>Advanced — Enter coordinates manually</summary>
+        <summary>Advanced location settings — Enter coordinates manually</summary>
         <div className="form-grid" style={{ marginTop: 12 }}>
           <label>
             Latitude

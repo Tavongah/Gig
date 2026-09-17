@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { MerchantLocationPicker } from "./MerchantLocationPicker";
-import { hasValidCoordinates } from "./merchantLocation";
+import { hasValidCoordinates, presentationLocationLabel } from "./merchantLocation";
 
 type ApiRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -113,15 +113,12 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
       if (!locationConfirmed) {
         throw new Error("Confirm the shop location pin before saving.");
       }
-      if (!form.locationLabel.trim()) {
-        throw new Error("Add a short location label (e.g. Glen Norah B, Harare).");
-      }
       const body = {
         name: form.name.trim(),
         contactName: form.contactName.trim() || undefined,
         whatsappPhone: form.whatsappPhone.trim(),
         phone: form.phone.trim() || undefined,
-        locationLabel: form.locationLabel.trim(),
+        locationLabel: presentationLocationLabel(form.locationLabel),
         latitude: Number(form.latitude),
         longitude: Number(form.longitude),
         openingHours: form.openingHours.trim() || undefined,

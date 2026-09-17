@@ -40,23 +40,28 @@ export function isPoorGpsAccuracy(accuracyMeters: number | null | undefined): bo
 
 export function formatAccuracyMessage(accuracyMeters: number | null | undefined): string {
   if (accuracyMeters == null || !Number.isFinite(accuracyMeters)) {
-    return "✓ Location found";
+    return "Shop location set — confirm the pin.";
   }
   if (isPoorGpsAccuracy(accuracyMeters)) {
-    return "Location accuracy is low. Check the pin before saving.";
+    return "Location accuracy is low. Check the pin before confirming.";
   }
-  return `✓ Location found (±${Math.round(accuracyMeters)} m)`;
+  return `Shop location set (±${Math.round(accuracyMeters)} m) — confirm the pin.`;
 }
 
 export function geolocationErrorMessage(code: number | undefined): string {
   // 1 PERMISSION_DENIED, 2 POSITION_UNAVAILABLE, 3 TIMEOUT
-  if (code === 1) {
-    return "Couldn't get your location. Search for the shop or place the pin manually.";
-  }
-  if (code === 2 || code === 3) {
-    return "Couldn't get your location. Search for the shop or place the pin manually.";
-  }
-  return "Couldn't get your location. Search for the shop or place the pin manually.";
+  void code;
+  return "Couldn't access your location. Search for the shop or choose it on the map.";
+}
+
+/** Presentation label when no formal address exists (GPS-only tuck shop). */
+export function defaultShopLocationLabel(): string {
+  return "Shop location";
+}
+
+export function presentationLocationLabel(label: string | null | undefined): string {
+  const trimmed = String(label ?? "").trim();
+  return trimmed.length >= 2 ? trimmed : defaultShopLocationLabel();
 }
 
 export function roundCoord(n: number, digits = 6): string {
