@@ -208,7 +208,11 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
           <h2>{mode === "create" ? "Add product" : "Edit product"}</h2>
           {notice ? <p className="notice">{notice}</p> : null}
 
-          <PhotoHero src={previewSrc} alt={form.name || "Product photo"} emptyLabel="Product photo" />
+          <PhotoHero
+            src={previewSrc}
+            alt={form.name || "Product photo"}
+            emptyLabel={localPreview ? "Photo selected ✓" : "Product photo"}
+          />
           <div className="photo-actions">
             <button type="button" className="btn-secondary" onClick={() => cameraRef.current?.click()} disabled={uploading}>
               Take photo
@@ -241,7 +245,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
           <input
             ref={galleryRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept="image/*"
             className="sr-only"
             onChange={(e) => {
               void onPickImage(e.target.files?.[0] ?? null);

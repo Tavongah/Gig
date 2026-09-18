@@ -22,7 +22,8 @@ RUN npm run build --workspace @gigflow/api
 
 FROM base AS runner
 ENV NODE_ENV=production
-RUN apk add --no-cache wget
+ENV CATALOG_MEDIA_DIR=/data/catalog-media
+RUN apk add --no-cache wget && mkdir -p /data/catalog-media
 WORKDIR /app
 
 COPY --from=build /app/node_modules ./node_modules

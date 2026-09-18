@@ -846,7 +846,7 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
                         <PhotoHero
                           src={localPhotoPreview || newCatalogForm.primaryImageUrl}
                           alt={newCatalogForm.name || "Product photo"}
-                          emptyLabel="Product photo *"
+                          emptyLabel={localPhotoPreview ? "Photo selected ✓" : "Product photo *"}
                         />
                         <div className="photo-actions">
                           <button
@@ -890,7 +890,7 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
                         <input
                           ref={galleryRef}
                           type="file"
-                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          accept="image/*"
                           className="sr-only"
                           onChange={(e) => {
                             void onPickMerchantPhoto(e.target.files?.[0] ?? null);

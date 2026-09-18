@@ -19,6 +19,7 @@ import { locationRouter } from "./modules/location/location.routes.js";
 import { pushRouter } from "./modules/notifications/push.routes.js";
 import { createWhatsAppRouter, commerceAdminRouter } from "./modules/whatsapp/whatsapp.routes.js";
 import { catalogAdminRouter } from "./modules/commerce/catalog.routes.js";
+import { catalogMediaRouter } from "./modules/commerce/catalog-media.routes.js";
 import { customerCommerceRouter } from "./modules/commerce/customer-commerce.routes.js";
 import { createCommercePaymentsRouter } from "./modules/commerce/payments/payments.routes.js";
 import { raw } from "express";
@@ -48,7 +49,7 @@ export function createApp(io: Server) {
   app.use("/v1/commerce/payments/paynow/callback", express.urlencoded({ extended: false }));
   app.use("/v1/commerce/payments/webhook/paynow", express.urlencoded({ extended: false }));
 
-  app.use(express.json({ limit: "15mb" }));
+  app.use(express.json({ limit: "30mb" }));
 
   // Register before rate limiting so Render health checks pass while Redis is still connecting.
   app.get("/health", (_req, res) => {
@@ -73,6 +74,8 @@ export function createApp(io: Server) {
     }
     res.json({ ready: true, checks: health.checks });
   });
+
+  app.use("/v1/media", catalogMediaRouter);
 
   app.use(
     rateLimit({

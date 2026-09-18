@@ -31,9 +31,8 @@ assert.ok(
   )
 );
 assert.ok(
-  friendlyApiError(new Error("Spaces upload failed"), "Photo couldn't be uploaded. Please try again.").includes(
-    "Photo couldn't be uploaded"
-  )
+  friendlyApiError(new Error("Please choose a photo."), "Photo couldn't be uploaded. Please try again.") ===
+    "Please choose a photo."
 );
 
 const catalog = read("DutsCatalogPanel.tsx");
@@ -44,7 +43,10 @@ assert.ok(catalog.includes("Try again"));
 assert.ok(catalog.includes("Photo couldn't be uploaded. Please try again."));
 assert.ok(catalog.includes("pendingPhotoRef"));
 assert.ok(catalog.includes("Choose photo"));
+assert.ok(catalog.includes('accept="image/*"'));
 assert.ok(catalog.includes('capture="environment"'));
+assert.ok(catalog.includes("Photo selected ✓"));
+assert.ok(!catalog.includes("image/jpeg,image/png,image/webp,image/gif"));
 assert.ok(catalog.includes("Product saved."));
 assert.ok(catalog.includes("Edit product"));
 assert.ok(catalog.includes("Change photo"));

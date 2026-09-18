@@ -56,6 +56,15 @@ export function friendlyApiError(err: unknown, fallback: string): string {
   const msg = err instanceof Error ? err.message : String(err ?? "");
   if (!msg.trim()) return fallback;
   if (
+    msg === "Please choose a photo." ||
+    msg === "This photo is too large. Please choose a smaller photo." ||
+    msg === "We couldn't process this photo. Try another one." ||
+    msg === "Photo couldn't be uploaded. Please try again." ||
+    msg === "Product wasn't saved. Please try again."
+  ) {
+    return msg;
+  }
+  if (
     /spaces|s3|storage|bucket|NoSuchBucket|specified bucket|ECONN|network|fetch|timeout|500|502|503|access key/i.test(
       msg
     )

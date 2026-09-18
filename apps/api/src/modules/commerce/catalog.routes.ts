@@ -9,15 +9,9 @@ import { Router } from "express";
 import { UserRole } from "@prisma/client";
 import { requireAuth, requireRole } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
-import { isSpacesConfigured, uploadPublicObject } from "../../lib/spaces.js";
-import { AppError, PHOTO_UPLOAD_FAILED } from "../../lib/errors.js";
-import {
-  ALLOWED_CATALOG_IMAGE_TYPES,
-  detectImageContentType,
-  isHeicLike,
-  MAX_CATALOG_IMAGE_BYTES,
-  normalizeImageContentType
-} from "../../lib/catalog-media.js";
+import { uploadPublicObject } from "../../lib/spaces.js";
+import { AppError, PHOTO_INVALID, PHOTO_TOO_LARGE } from "../../lib/errors.js";
+import { MAX_CATALOG_IMAGE_BYTES, normalizeCatalogPhoto } from "../../lib/catalog-media.js";
 import {
   createCatalogProduct,
   getCatalogProduct,
@@ -131,40 +125,34 @@ catalogAdminRouter.post("/catalog/migrate-existing", async (_req, res, next) => 
 
 catalogAdminRouter.post("/catalog/upload-image", async (req, res, next) => {
   try {
-    if (!isSpacesConfigured()) {
-      throw new AppError(PHOTO_UPLOAD_FAILED, 503, "STORAGE_NOT_CONFIGURED");
-    }
     const { fileName, contentType, dataBase64 } = req.body as {
       fileName?: string;
       contentType?: string;
       dataBase64?: string;
     };
     if (!fileName || !dataBase64) {
-      throw new AppError("fileName, contentType, and dataBase64 are required.", 400, "VALIDATION_ERROR");
+      throw new AppError(PHOTO_INVALID, 400, "VALIDATION_ERROR");
     }
-    const buffer = Buffer.from(dataBase64, "base64");
-    if (buffer.length === 0 || buffer.length > MAX_CATALOG_IMAGE_BYTES) {
-      throw new AppError("Image must be between 1 byte and 5MB.", 400, "INVALID_IMAGE_SIZE");
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(dataBase64, "base64");
+    } catch {
+      throw new AppError(PHOTO_INVALID, 400, "INVALID_IMAGE_TYPE");
     }
-    if (isHeicLike(buffer)) {
-      throw new AppError("Please use a JPEG or PNG photo.", 400, "INVALID_IMAGE_TYPE");
+    if (buffer.length === 0) {
+      throw new AppError(PHOTO_INVALID, 400, "INVALID_IMAGE_TYPE");
     }
-    const detected = detectImageContentType(buffer);
-    const normalized = normalizeImageContentType(contentType);
-    const finalType =
-      detected && ALLOWED_CATALOG_IMAGE_TYPES.has(detected)
-        ? detected
-        : normalized;
-    if (!ALLOWED_CATALOG_IMAGE_TYPES.has(finalType)) {
-      throw new AppError("Only JPEG, PNG, WebP, or GIF images are allowed.", 400, "INVALID_IMAGE_TYPE");
+    if (buffer.length > MAX_CATALOG_IMAGE_BYTES) {
+      throw new AppError(PHOTO_TOO_LARGE, 413, "INVALID_IMAGE_SIZE");
     }
 
+    const normalized = await normalizeCatalogPhoto(buffer);
     const uploaded = await uploadPublicObject({
       purpose: "product-image",
       userId: req.auth!.userId,
-      fileName: fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80),
-      contentType: finalType,
-      body: buffer
+      fileName: "product.jpg",
+      contentType: normalized.contentType,
+      body: normalized.body
     });
     res.status(201).json({ url: uploaded.publicUrl, objectKey: uploaded.objectKey });
   } catch (err) {

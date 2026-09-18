@@ -1,5 +1,10 @@
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import {
+  CreateBucketCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
   type S3ClientConfig
@@ -20,7 +25,7 @@ const PURPOSE_PREFIX: Record<UploadPurpose, string> = {
   "customer-photo": "profiles/customers",
   "gig-image": "gigs",
   "verification-document": "verification",
-  "product-image": "products/catalog"
+  "product-image": "product-image"
 };
 
 let client: S3Client | null = null;
@@ -51,7 +56,13 @@ function getBucket(): string {
   return (env.SPACES_BUCKET ?? env.S3_BUCKET ?? "").trim();
 }
 
+export const PRODUCT_IMAGE_KEY_RE =
+  /^product-image\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.jpg$/i;
+
 export function buildObjectKey(purpose: UploadPurpose, userId: string, fileName: string): string {
+  if (purpose === "product-image") {
+    return `product-image/${randomUUID()}.jpg`;
+  }
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
   return `${PURPOSE_PREFIX[purpose]}/${userId}/${Date.now()}-${safeName}`;
 }
@@ -108,7 +119,90 @@ export function publicUrlForObjectKey(objectKey: string): string {
   }
 }
 
+function catalogMediaRoot(): string {
+  const configured = env.CATALOG_MEDIA_DIR?.trim();
+  if (configured) return configured;
+  return path.join(process.cwd(), ".data", "catalog-media");
+}
+
+export function localMediaAbsolutePath(objectKey: string): string {
+  const root = path.resolve(catalogMediaRoot());
+  const dest = path.resolve(root, objectKey);
+  if (!dest.startsWith(root + path.sep) && dest !== root) {
+    throw new AppError(PHOTO_UPLOAD_FAILED, 400, "INVALID_OBJECT_KEY");
+  }
+  return dest;
+}
+
+function localPublicUrl(objectKey: string): string {
+  const base = (env.API_PUBLIC_URL ?? "").replace(/\/$/, "");
+  if (!base) {
+    console.error("[spaces] local_media_missing_api_public_url");
+    throw new AppError(PHOTO_UPLOAD_FAILED, 503, "STORAGE_NOT_CONFIGURED");
+  }
+  return `${base}/v1/media/${objectKey}`;
+}
+
+async function uploadLocalPublicObject(input: {
+  objectKey: string;
+  contentType: string;
+  body: Buffer;
+}): Promise<{ objectKey: string; publicUrl: string }> {
+  const dest = localMediaAbsolutePath(input.objectKey);
+  await mkdir(path.dirname(dest), { recursive: true });
+  await writeFile(dest, input.body);
+  console.info("[spaces] local_put_ok", { prefix: input.objectKey.split("/")[0] });
+  return { objectKey: input.objectKey, publicUrl: localPublicUrl(input.objectKey) };
+}
+
+function isNoSuchBucket(err: unknown): boolean {
+  const aws = err as { name?: string; Code?: string; code?: string; message?: string };
+  const hay = [aws.name, aws.Code, aws.code, aws.message].filter(Boolean).join(" ");
+  return /NoSuchBucket|specified bucket does not exist/i.test(hay);
+}
+
+async function putPublicObject(objectKey: string, contentType: string, body: Buffer): Promise<void> {
+  const bucket = getBucket();
+  const client = getSpacesClient();
+  const base = {
+    Bucket: bucket,
+    Key: objectKey,
+    Body: body,
+    ContentType: contentType,
+    CacheControl: "public, max-age=31536000, immutable"
+  };
+
+  const sendPut = async () => {
+    try {
+      await client.send(new PutObjectCommand({ ...base, ACL: "public-read" }));
+    } catch (err) {
+      const msg = err instanceof Error ? `${err.name} ${err.message}` : String(err);
+      if (!/acl|accesscontrol|canned|notimplemented/i.test(msg)) throw err;
+      await client.send(new PutObjectCommand(base));
+    }
+  };
+
+  try {
+    await sendPut();
+  } catch (err) {
+    if (!isNoSuchBucket(err)) throw err;
+    console.error("[spaces] no_such_bucket_creating", { bucket });
+    try {
+      await client.send(new CreateBucketCommand({ Bucket: bucket }));
+      await sendPut();
+    } catch (createErr) {
+      console.error("[spaces] create_bucket_failed", {
+        name: (createErr as Error).name
+      });
+      throw err;
+    }
+  }
+
+  await client.send(new HeadObjectCommand({ Bucket: bucket, Key: objectKey }));
+}
+
 export function assertObjectKeyOwnedByUser(objectKey: string, userId: string): void {
+  if (PRODUCT_IMAGE_KEY_RE.test(objectKey)) return;
   const allowed = Object.values(PURPOSE_PREFIX).some((prefix) =>
     objectKey.startsWith(`${prefix}/${userId}/`)
   );
@@ -137,28 +231,17 @@ export async function uploadPublicObject(input: {
   body: Buffer;
 }): Promise<{ objectKey: string; publicUrl: string }> {
   const objectKey = buildObjectKey(input.purpose, input.userId, input.fileName);
-  const bucket = getBucket();
-  const client = getSpacesClient();
-  const base = {
-    Bucket: bucket,
-    Key: objectKey,
-    Body: input.body,
-    ContentType: input.contentType,
-    CacheControl: "public, max-age=31536000, immutable"
-  };
+
+  if (!isSpacesConfigured()) {
+    return uploadLocalPublicObject({
+      objectKey,
+      contentType: input.contentType,
+      body: input.body
+    });
+  }
 
   try {
-    try {
-      // Product photos must be anonymously GET-able by Admin/customer browsers.
-      // Presigned PUTs often reject ACL; server-side PutObject usually accepts it.
-      await client.send(new PutObjectCommand({ ...base, ACL: "public-read" }));
-    } catch (err) {
-      const msg = err instanceof Error ? `${err.name} ${err.message}` : String(err);
-      if (!/acl|accesscontrol|canned|notimplemented/i.test(msg)) {
-        throw err;
-      }
-      await client.send(new PutObjectCommand(base));
-    }
+    await putPublicObject(objectKey, input.contentType, input.body);
   } catch (err) {
     const aws = err as { name?: string; Code?: string; code?: string };
     console.error("[spaces] put_object_failed", {
@@ -166,6 +249,14 @@ export async function uploadPublicObject(input: {
       code: aws.Code ?? aws.code,
       prefix: objectKey.split("/").slice(0, 2).join("/")
     });
+    if (input.purpose === "product-image") {
+      console.error("[spaces] falling_back_local_product_image");
+      return uploadLocalPublicObject({
+        objectKey,
+        contentType: input.contentType,
+        body: input.body
+      });
+    }
     throw new AppError(PHOTO_UPLOAD_FAILED, 503, "STORAGE_UPLOAD_FAILED");
   }
 

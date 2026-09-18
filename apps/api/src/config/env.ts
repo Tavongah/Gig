@@ -51,6 +51,8 @@ const envSchema = z.object({
   SPACES_ACCESS_KEY_ID: optionalString,
   SPACES_SECRET_ACCESS_KEY: optionalString,
   SPACES_CDN_URL: optionalUrl,
+  /** Local durable catalog photos when Spaces is not configured. */
+  CATALOG_MEDIA_DIR: optionalString,
   /** Preferred free email provider: https://resend.com (100 emails/day free). */
   RESEND_API_KEY: optionalString,
   /** Optional legacy provider. Used only if RESEND_API_KEY is unset. */

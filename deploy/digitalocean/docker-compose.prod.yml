@@ -60,8 +60,11 @@ services:
     environment:
       NODE_ENV: production
       TRUST_PROXY: "true"
+      CATALOG_MEDIA_DIR: /data/catalog-media
       DATABASE_URL: postgresql://${POSTGRES_USER:-gigflow}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gigflow}?schema=public
       REDIS_URL: redis://redis:6379
+    volumes:
+      - catalog_media:/data/catalog-media
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,6 +143,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  catalog_media:
   certbot_conf:
   certbot_www:
 

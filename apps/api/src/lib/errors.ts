@@ -11,6 +11,9 @@ export class AppError extends Error {
 }
 
 export const PHOTO_UPLOAD_FAILED = "Photo couldn't be uploaded. Please try again.";
+export const PHOTO_INVALID = "Please choose a photo.";
+export const PHOTO_TOO_LARGE = "This photo is too large. Please choose a smaller photo.";
+export const PHOTO_PROCESS_FAILED = "We couldn't process this photo. Try another one.";
 export const PRODUCT_SAVE_FAILED = "Product wasn't saved. Please try again.";
 
 /** S3/Spaces/network failures — never send infrastructure text to Admin. */
@@ -70,6 +73,10 @@ export function mapErrorToResponse(error: unknown): {
       INVALID_TRANSPORT_MODE: 400,
       WORKER_PROFILE_REQUIRED: 400
     };
+
+    if (/entity too large|PayloadTooLargeError/i.test(`${error.name} ${error.message}`)) {
+      return { status: 413, body: { error: PHOTO_TOO_LARGE, code: "INVALID_IMAGE_SIZE" } };
+    }
 
     if (isStorageInfraError(error)) {
       console.error("[spaces] storage_error", {
