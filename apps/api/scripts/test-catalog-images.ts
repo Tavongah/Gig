@@ -11,7 +11,7 @@ import {
   normalizeImageContentType
 } from "../src/lib/catalog-media.js";
 
-import { mapErrorToResponse } from "../src/lib/errors.js";
+import { AppError, mapErrorToResponse, PHOTO_UPLOAD_FAILED } from "../src/lib/errors.js";
 
 const cdn =
   "https://gigflow-uploads.nyc3.cdn.digitaloceanspaces.com/products/catalog/u/1-mazoe.jpg";
@@ -58,6 +58,14 @@ assert.equal(raspberry.name, "Mazoe Raspberry");
   assert.equal(mapped.status, 503);
   assert.equal(mapped.body.error, "Photo couldn't be uploaded. Please try again.");
   assert.doesNotMatch(mapped.body.error, /bucket/i);
+}
+
+{
+  const mapped = mapErrorToResponse(new AppError(PHOTO_UPLOAD_FAILED, 503, "STORAGE_NOT_CONFIGURED"));
+  assert.equal(mapped.body.error, "Photo couldn't be uploaded. Please try again.");
+  const notFound = mapErrorToResponse(new Error("NOT_FOUND"));
+  assert.equal(notFound.status, 404);
+  assert.equal(notFound.body.error, "NOT_FOUND");
 }
 
 console.log(JSON.stringify({ ok: true }, null, 2));

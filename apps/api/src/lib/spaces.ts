@@ -27,9 +27,8 @@ let client: S3Client | null = null;
 
 function getSpacesClient(): S3Client {
   if (!isSpacesConfigured()) {
-    throw new AppError("STORAGE_NOT_CONFIGURED", 503, "STORAGE_NOT_CONFIGURED", {
-      storage: "DigitalOcean Spaces is not configured."
-    });
+    console.error("[spaces] not_configured");
+    throw new AppError(PHOTO_UPLOAD_FAILED, 503, "STORAGE_NOT_CONFIGURED");
   }
 
   if (!client) {

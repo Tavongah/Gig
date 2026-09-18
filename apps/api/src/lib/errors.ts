@@ -17,7 +17,7 @@ export const PRODUCT_SAVE_FAILED = "Product wasn't saved. Please try again.";
 export function isStorageInfraError(error: unknown): boolean {
   const err = error as { name?: string; Code?: string; code?: string; message?: string };
   const hay = [err?.name, err?.Code, err?.code, err?.message].filter(Boolean).join(" ");
-  return /NoSuchBucket|InvalidAccessKeyId|SignatureDoesNotMatch|AccessDenied|NotFound|NetworkingError|TimeoutError|ECONN|ENOTFOUND|specified bucket|spaces|s3\b|storage/i.test(
+  return /NoSuchBucket|InvalidAccessKeyId|SignatureDoesNotMatch|NetworkingError|TimeoutError|ECONNREFUSED|ECONNRESET|ENOTFOUND|specified bucket|digitaloceanspaces|STORAGE_NOT_CONFIGURED|STORAGE_UPLOAD_FAILED|S3Exception|S3ServiceException/i.test(
     hay
   );
 }
@@ -27,11 +27,16 @@ export function mapErrorToResponse(error: unknown): {
   body: { success?: boolean; error: string; code?: string; errors?: Record<string, string> };
 } {
   if (error instanceof AppError) {
+    const storageish =
+      error.code === "STORAGE_NOT_CONFIGURED" ||
+      error.code === "STORAGE_UPLOAD_FAILED" ||
+      isStorageInfraError(error);
+    const message = storageish ? PHOTO_UPLOAD_FAILED : error.message;
     return {
       status: error.statusCode,
       body: {
         ...(error.errors ? { success: false, errors: error.errors } : {}),
-        error: error.message,
+        error: message,
         ...(error.code ? { code: error.code } : {})
       }
     };
