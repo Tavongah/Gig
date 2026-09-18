@@ -1,0 +1,765 @@
+{
+  "checked": 67,
+  "urlReachable": 67,
+  "brokenUrl": 0,
+  "uniqueUrls": 67,
+  "duplicateUrls": 0,
+  "good": 59,
+  "questionable": 8,
+  "wrongProduct": 1,
+  "rows": [
+    {
+      "catalogProductId": "0b10d7e2-6d16-4851-b7b3-db3563e36ec6",
+      "name": "7up",
+      "brand": null,
+      "sizeLabel": "1L",
+      "category": "Soft Drinks",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/6470cb3b-22e5-4989-84bd-cc62eb913534.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "22b771d0-3dc4-424c-b860-f7bdc09a141b",
+      "name": "All Purpose Flour",
+      "brand": "Gloria",
+      "sizeLabel": "2kg",
+      "category": "Staples",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/c5a708de-59a6-4105-a7b8-c46c0794cd02.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "9b86fcd9-ebfd-4c74-8048-cc3317f82bf3",
+      "name": "Beef",
+      "brand": "Texas",
+      "sizeLabel": "1kg",
+      "category": "Beef",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/bb329305-d192-4113-a847-88ad973a7a62.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "fcc4bbae-540e-499e-aecb-a75069ddce40",
+      "name": "Beef tripe (maguru )",
+      "brand": "Irvine\u2019s",
+      "sizeLabel": "1kg",
+      "category": "Groceries",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/6ba362f8-0108-4611-a0c2-7ff9eb02f452.jpg",
+      "classification": "QUESTIONABLE",
+      "urlReachable": true,
+      "flags": [
+        "STALE_CATEGORY"
+      ]
+    },
+    {
+      "catalogProductId": "e2b64b27-2a02-4562-bf09-b415533a5ab1",
+      "name": "Body Lotion",
+      "brand": "Nivea",
+      "sizeLabel": "400ml",
+      "category": "Personal Care",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/05ca2cfe-9ec5-4f63-b452-000db384bf66.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "82cc387e-61c3-40dc-9d51-889c03ee78d9",
+      "name": "Broiler chicken",
+      "brand": "Irvine\u2019s",
+      "sizeLabel": "1.5kg",
+      "category": "Groceries",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/dc6474c2-13a2-45f3-a371-f3fea2fc3295.jpg",
+      "classification": "QUESTIONABLE",
+      "urlReachable": true,
+      "flags": [
+        "STALE_CATEGORY"
+      ]
+    },
+    {
+      "catalogProductId": "d5f2784a-1159-4ee4-a898-01d72be97e8e",
+      "name": "Brothers",
+      "brand": "Bigtree Beverages",
+      "sizeLabel": "500ml",
+      "category": "Energy Drinks",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/ffb01cbe-ece8-4be3-b323-d2e794ba12cc.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "8d204b9c-cafe-4fe0-ac30-45e5b68e2288",
+      "name": "Brown Bread",
+      "brand": "Proton",
+      "sizeLabel": "700g",
+      "category": "Bread & Bakery",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/66fee3b7-661d-4a90-b5e3-1f35187921ed.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "92adf8b0-b9cb-4a82-a2f6-feeeb4042dd7",
+      "name": "Cake Flour",
+      "brand": "Gloria",
+      "sizeLabel": "2kg",
+      "category": "Staples",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/dc3caf98-60a3-41b5-8d55-e81273bd65f6.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "6b754670-786a-44d1-a8b2-8a872433e670",
+      "name": "Cascade Baobab",
+      "brand": "Dairibord",
+      "sizeLabel": "400ml",
+      "category": "Juices",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/25385cd8-e74f-4c92-8df5-765edf51fe1e.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "8c70d38b-44a1-4334-ae89-c3ae772f4d7c",
+      "name": "Cascade Orange",
+      "brand": "Dairibord",
+      "sizeLabel": "1L",
+      "category": "Juices",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/bb66c531-8112-4543-9473-969cf5d62102.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "71e4288d-bcfc-47b4-88e0-dffcfb2b09da",
+      "name": "Cascade Orange",
+      "brand": "Dairibord",
+      "sizeLabel": "400ml",
+      "category": "Juices",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/8db935ad-d31a-4d26-9890-9d55e2839aff.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "5ab68321-0498-4553-b46d-7ce83f224f3e",
+      "name": "Cascade Tropical Punch",
+      "brand": "Dairibord",
+      "sizeLabel": "1L",
+      "category": "Juices",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/f63cf584-24c6-4352-a8c2-135d5136e30b.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "60425d82-7d6c-4412-9e34-698e0facb6bb",
+      "name": "Cerevita",
+      "brand": "Nestle",
+      "sizeLabel": "500g",
+      "category": "Breakfast",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/9688570c-1dea-481b-861a-43cc5f6250c5.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "266e8357-a596-4a67-b7f9-20ba63dcba11",
+      "name": "Chicken Cuts",
+      "brand": null,
+      "sizeLabel": "1kg",
+      "category": "Chicken",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/fdc172e7-2c74-489e-852e-7ff4b31fb61e.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "3d4596f0-9f92-4ced-a557-7cf8602d17b1",
+      "name": "Chicken feet\u2019s n heads",
+      "brand": "Irvine\u2019s",
+      "sizeLabel": "1kg",
+      "category": "Groceries",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/b6039d4c-02cf-4539-b71d-ebdea3399f91.jpg",
+      "classification": "QUESTIONABLE",
+      "urlReachable": true,
+      "flags": [
+        "STALE_CATEGORY"
+      ]
+    },
+    {
+      "catalogProductId": "794fa161-6f4a-45d2-bb86-904aed452b25",
+      "name": "Citro",
+      "brand": "Dairibord",
+      "sizeLabel": "1L",
+      "category": "Juices",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/d9b3574d-c17a-48cd-bc22-3e603d8af1d0.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "0d4cee94-a5c7-4f85-a37e-88ec40cdab85",
+      "name": "Colgate",
+      "brand": "Colgate",
+      "sizeLabel": "100ml",
+      "category": "Personal Care",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/088860b8-51b0-4f3d-b533-470ee3005ebf.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "82bf7c6e-af50-47a5-8487-02a1604b722d",
+      "name": "Cooking Oil",
+      "brand": "Zimgold",
+      "sizeLabel": "2L",
+      "category": "Cooking Ingredients",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/51d47e8b-763e-43bb-b9d8-26577f19bc03.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "4dfea044-31ff-4dd8-9eea-38f5728c2742",
+      "name": "Corn Flakes",
+      "brand": "Willards",
+      "sizeLabel": "750g",
+      "category": "Breakfast",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/e9507f7c-0fe3-4b4f-b506-9e0f21ed414c.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "9db1620f-dc4f-4411-b6ad-7a1af972c7ad",
+      "name": "Cremora",
+      "brand": "Dairibord",
+      "sizeLabel": "1kg",
+      "category": "Dairy & Eggs",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/28979435-d94c-4ef7-83b4-22a9817da1df.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "ac8104d5-e102-48ef-a212-a9150f939261",
+      "name": "Eggs",
+      "brand": null,
+      "sizeLabel": "Crate",
+      "category": "Dairy & Eggs",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/f43ece97-cd1f-4b73-80c5-4c5d28abd32f.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "77ca8c2d-7fe3-48fb-8b9b-80d583c579f8",
+      "name": "Fish",
+      "brand": "Lake Harvest",
+      "sizeLabel": "5kg",
+      "category": "Fish & Protein",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/7f15ee02-06f9-45e8-9221-33f09c576cf2.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "c1fd76c3-0e80-4fbb-9c52-c8b694b64cc5",
+      "name": "Fizzi",
+      "brand": "Probottles",
+      "sizeLabel": "1L",
+      "category": "Soft Drinks",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/b510a8bc-b651-42d8-9bfb-4e2ffd3e3060.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "604e7b9e-e1f1-4599-ac5b-e3a46de6e96b",
+      "name": "Fun n Fresh",
+      "brand": "Dairibord",
+      "sizeLabel": "1L",
+      "category": "Juices",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/10eaf2d4-2c9e-41c6-83dd-41df84e2a9b4.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "2a8d1c76-b59b-417f-9c55-7129ed752c39",
+      "name": "Gizzards",
+      "brand": "Irvine\u2019s",
+      "sizeLabel": "500g",
+      "category": "Groceries",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/511535ba-7112-4c68-94bd-cd90879f29ee.jpg",
+      "classification": "QUESTIONABLE",
+      "urlReachable": true,
+      "flags": [
+        "STALE_CATEGORY"
+      ]
+    },
+    {
+      "catalogProductId": "871b6cfc-d2df-4502-b43b-8b4e370afc2c",
+      "name": "Instant Noodles",
+      "brand": "Kelloggs",
+      "sizeLabel": "70g",
+      "category": "Convenience Foods",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/8b12746f-a767-4ef2-9b0d-f4760643d99c.jpg",
+      "classification": "QUESTIONABLE",
+      "urlReachable": true,
+      "flags": [
+        "WRONG_PRODUCT_OR_BRAND"
+      ]
+    },
+    {
+      "catalogProductId": "42c35948-8c5e-4824-856a-07284c3aaf2f",
+      "name": "Kapenta",
+      "brand": null,
+      "sizeLabel": "100g",
+      "category": "Fish & Protein",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/8482653f-e11f-4083-842a-83fdbbf26827.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "e6606109-6c96-4469-b88a-affdcf74acc5",
+      "name": "Lifebuoy Soap",
+      "brand": "Lifebuoy",
+      "sizeLabel": "90g",
+      "category": "Personal Care",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/89e791da-c077-473d-a67c-2c33fcfc6853.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "4ee29b84-0a2a-42d2-a42f-b062993ebf7a",
+      "name": "Liver",
+      "brand": "Irvine's",
+      "sizeLabel": "1kg",
+      "category": "Chicken",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/d86e2625-be55-4880-9f21-640236d7cd52.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "d1044ff0-7c05-4ee5-b370-7d5a4e33aa12",
+      "name": "Macaroni",
+      "brand": "Ekono",
+      "sizeLabel": "500g",
+      "category": "Staples",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/be3fa405-3e04-41c9-bde0-cbbd61949e04.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "07619128-9128-40dd-99f0-e7fe41eadb83",
+      "name": "Madora / Mopane Worm",
+      "brand": null,
+      "sizeLabel": "250g",
+      "category": "Fish & Protein",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/7f2534e8-0a57-4cb9-8f6c-0c342723bd4b.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "c101c7e9-6045-44d8-9ea9-193a35bef40c",
+      "name": "Margarine",
+      "brand": "Stock",
+      "sizeLabel": "1kg",
+      "category": "Breakfast",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/15cd0321-a84b-4b3c-b586-16c15fcbbb44.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "67658a95-d44d-465b-afe3-a25c80f7e175",
+      "name": "Mayonnaise",
+      "brand": "Tang May",
+      "sizeLabel": "750g",
+      "category": "Cooking Ingredients",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/674eca54-3267-4c6c-ae7b-bcbbb90650de.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "d56254f0-d4c7-47af-a20d-a1e5995ee2e6",
+      "name": "Mazoe Blackberry",
+      "brand": "Mazoe",
+      "sizeLabel": "2L",
+      "category": "Juices",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/3eff64c8-1bc8-4c24-a158-61867f67c0d6.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "2326e24b-2f17-4d49-92e5-cb9662253881",
+      "name": "Mazoe Orange Crush",
+      "brand": "Mazoe",
+      "sizeLabel": "2L",
+      "category": "Juices",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/87a9e41a-efe7-4d5d-af0e-205d90f9d88e.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "cde8184e-e01e-4f11-a7ad-1a71be5ced4c",
+      "name": "Mazondo",
+      "brand": "Irvine\u2019s",
+      "sizeLabel": "1kg",
+      "category": "Groceries",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/169b1db6-2318-4448-9d5a-51e744167f58.jpg",
+      "classification": "QUESTIONABLE",
+      "urlReachable": true,
+      "flags": [
+        "STALE_CATEGORY"
+      ]
+    },
+    {
+      "catalogProductId": "b72dcf92-bfa2-4549-8843-7ad3aefffaac",
+      "name": "Mealie Meal",
+      "brand": "Upfu",
+      "sizeLabel": "10kg",
+      "category": "Staples",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/85268088-127c-4cca-9365-e70494d7a8e3.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "ce2a1163-6598-4fcc-841f-81b5a2abf358",
+      "name": "Milk",
+      "brand": "Dairibord",
+      "sizeLabel": "1L",
+      "category": "Dairy & Eggs",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/a39e7479-737a-456d-9700-f0dcce083161.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "b1af5bad-9f67-4471-8834-d47b393b1377",
+      "name": "Minestrone",
+      "brand": "Knorr",
+      "sizeLabel": "45g",
+      "category": "Cooking Ingredients",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/e0a2f932-7bbc-4a84-b57a-fd6906756975.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "7dadda14-5c44-423e-beaf-b0d3b1723a6a",
+      "name": "Mirinda",
+      "brand": "Pepsi",
+      "sizeLabel": "1L",
+      "category": "Soft Drinks",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/2ca7e92f-1636-4f44-a0ab-47cc3bfb700f.jpg",
+      "classification": "QUESTIONABLE",
+      "urlReachable": true,
+      "flags": [
+        "IMAGE_IDENTITY_REVIEW"
+      ]
+    },
+    {
+      "catalogProductId": "1bf06234-7496-4744-a453-9f5212691e65",
+      "name": "Mountain Dew",
+      "brand": "Mtn Dew",
+      "sizeLabel": "500ml",
+      "category": "Soft Drinks",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/6190a104-fbc5-4791-84f3-5c7c1d297ea9.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "b86a24ae-9e85-4c54-a302-aed57cad1a67",
+      "name": "Natural Joy",
+      "brand": "Dairibord",
+      "sizeLabel": "1L",
+      "category": "Juices",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/68ec3f13-d63f-4b3f-8292-5893297fa583.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "9ad50381-f416-4923-a8d2-73545cb423de",
+      "name": "Palenta Upfu",
+      "brand": "Red Seal",
+      "sizeLabel": "10kg",
+      "category": "Staples",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/1735234a-fdd1-4dd0-9fb2-e1fc4d58b0fa.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "f5a678f6-b8c1-4da5-a9d1-aaf1f0847a44",
+      "name": "Peanut Butter",
+      "brand": "Yum Yum",
+      "sizeLabel": "1kg",
+      "category": "Breakfast",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/abfd0628-5693-4691-bbe5-c18105ec0b21.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "ce7da30e-bb29-4e48-875d-3b9944909c1c",
+      "name": "Pfuko Maheu",
+      "brand": "Dairibord",
+      "sizeLabel": "500g",
+      "category": "Mahewu",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/70303322-7596-4567-b801-09d496d2d639.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "877abc79-4711-4797-a0c8-69ac851781b0",
+      "name": "Pfuko Maheu Traditional",
+      "brand": "Dairibord",
+      "sizeLabel": "400ml",
+      "category": "Mahewu",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/300dc05a-0abb-4732-aa1a-49f8153b2e0f.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "e2c99a83-cc37-4e0a-9ef1-7b701b62face",
+      "name": "Popcorn",
+      "brand": "Probrands",
+      "sizeLabel": "500g",
+      "category": "Snacks",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/c53a1b81-2138-4443-8169-35be5052d2c9.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "1e5b2bab-0a64-4194-8b1a-f2917796bbbb",
+      "name": "Pork",
+      "brand": "Colcom",
+      "sizeLabel": "5kg",
+      "category": "Pork",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/baad9f78-b0cc-41f6-ac20-d324d90c8b4c.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "cb38edbd-a90e-4361-997f-fa3dfdf76787",
+      "name": "Salt",
+      "brand": "Probrands",
+      "sizeLabel": "2kg",
+      "category": "Staples",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/a04a3227-abe1-4ac8-ad9b-3a222c66b791.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "02b8ec5a-0f76-440a-99ed-5929f0dfe1e3",
+      "name": "Sanitary Pads",
+      "brand": "Softcare",
+      "sizeLabel": "290mm",
+      "category": "Feminine Hygiene",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/b2ef19fc-d653-41ff-90e0-6da62a31532e.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "a4851ee7-98dc-46f0-8072-62a95af352aa",
+      "name": "Sausage",
+      "brand": "Colcom",
+      "sizeLabel": "1kg",
+      "category": "Pork",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/a1533311-587f-480f-835a-462a5dea11b1.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "17282635-e2f0-4b65-9f8e-31e864e38dcb",
+      "name": "Spaghetti",
+      "brand": "Mega",
+      "sizeLabel": "400g",
+      "category": "Staples",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/bf19c8f3-bdca-4cf5-a280-5d3dacb7d516.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "2ce87858-71a0-4b46-a8ca-71fa3f8cf649",
+      "name": "Sta-Soft",
+      "brand": "Trade King",
+      "sizeLabel": "2L",
+      "category": "Laundry",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/f3a62e1e-b651-4f42-a26a-cabd02c923f8.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "9f70db16-c267-4bb8-93ba-239ae0ecac2d",
+      "name": "Sting Energy Drink",
+      "brand": "PepsiCo",
+      "sizeLabel": "250ml",
+      "category": "Energy Drinks",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/8972644e-d774-43c0-88fe-aa8f993f75c1.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "5504e905-f56c-4a8b-9370-ad35e68656fc",
+      "name": "Sugar",
+      "brand": "Huletts",
+      "sizeLabel": "2kg",
+      "category": "Staples",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/3969de93-fbbc-43d8-b895-b4fb95f64a8a.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "72c43884-b44c-444a-9785-6f98c9411742",
+      "name": "Sunlight",
+      "brand": "Trade King",
+      "sizeLabel": "750ml",
+      "category": "Household Cleaning",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/935f1f9d-2e06-4fdd-822f-258934d0e946.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "627070c9-1e31-4134-92a5-ede75a9555d4",
+      "name": "Surf",
+      "brand": "Surf",
+      "sizeLabel": "2kg",
+      "category": "Laundry",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/ab280323-2310-4850-a620-95623611dfb7.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "b65ba866-6abd-4429-8b0b-24adfdc3c9d3",
+      "name": "Switch",
+      "brand": "Bigtree",
+      "sizeLabel": "500ml",
+      "category": "Energy Drinks",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/911c7f84-1aad-49a1-b028-06269db646ba.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "a7516998-5a61-43ce-a3a3-bbd1307f9f6b",
+      "name": "Tomato Sauce",
+      "brand": "Rabroy",
+      "sizeLabel": "700ml",
+      "category": "Cooking Ingredients",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/6356c936-7dae-415a-bfe2-11b1b6c3ced9.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "69a9cae4-04ac-499a-bf66-cb9b3e86097f",
+      "name": "Vaseline",
+      "brand": "Blueseal",
+      "sizeLabel": "450ml",
+      "category": "Personal Care",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/acf20304-0077-467e-8abf-84445a6b44c0.jpg",
+      "classification": "QUESTIONABLE",
+      "urlReachable": true,
+      "flags": [
+        "IMAGE_IDENTITY_REVIEW"
+      ]
+    },
+    {
+      "catalogProductId": "62976ee2-146a-41de-aa5c-bcaec35eb91f",
+      "name": "Water",
+      "brand": "Jojo Zimbabwe",
+      "sizeLabel": "500ml",
+      "category": "Water",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/0e795f0c-b914-4bcb-96b5-ad2404f0f2f7.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "0e17920a-2dc6-4fe1-85bf-3af546ad7f12",
+      "name": "White Bread",
+      "brand": "Proton",
+      "sizeLabel": "700g",
+      "category": "Bread & Bakery",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/8826f150-2a94-4ca1-ae81-92f2767ef938.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "add9876b-c4de-40bc-a59a-e528754e0f6b",
+      "name": "White Bread",
+      "brand": "Bakers Inn",
+      "sizeLabel": "700g",
+      "category": "Bread & Bakery",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/3dabd045-2690-4cd8-a64b-1dce44c10513.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "1cc893fc-b018-481e-9c9f-7c1b30cc0f40",
+      "name": "White bread",
+      "brand": "Lobels",
+      "sizeLabel": "700g",
+      "category": "Bread & Bakery",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/fd7b0e78-3e72-4ed7-8ece-a4077b905b10.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "179ded7d-2501-456f-b26e-2eece0d16e9e",
+      "name": "Whole Wheat Bread",
+      "brand": "Lobels",
+      "sizeLabel": "700g",
+      "category": "Bread & Bakery",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/60d0de3e-f6d8-4698-bd05-f124fb670404.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    },
+    {
+      "catalogProductId": "c9c4a25b-6cb7-4d02-abd1-c755eb02a4b8",
+      "name": "Wildcat",
+      "brand": "Bigtree Brands",
+      "sizeLabel": "500ml",
+      "category": "Energy Drinks",
+      "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/13ac97fa-f841-4e3b-af6f-a6984f1117c5.jpg",
+      "classification": "GOOD",
+      "urlReachable": true,
+      "flags": []
+    }
+  ]
+}
