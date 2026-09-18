@@ -3,42 +3,51 @@ import { ActivityIndicator, ScrollView, Text, TextInput, View } from "react-nati
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ProductCard } from "../../components/ProductCard";
+import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
+import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import type { RootStackParamList } from "../../navigation/types";
-import { useSessionStore } from "../../stores/session.store";
-import { useShopLocationStore } from "../../stores/shop-location.store";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProductSearch">;
 
 export function ProductSearchScreen({ route, navigation }: Props) {
-  const token = useSessionStore((s) => s.session?.token);
-  const location = useShopLocationStore((s) => s.location);
+  const browse = useShopBrowse();
   const addOffer = useCommerceCartStore((s) => s.addOffer);
   const [q, setQ] = useState(route.params?.q ?? "");
   const category = route.params?.category;
 
   const query = useQuery({
-    queryKey: ["commerce-search", location?.latitude, location?.longitude, q, category],
+    queryKey: ["commerce-search", ...browse.queryKey, q, category],
     queryFn: () =>
       api.commerceNearbyProducts(
         {
-          lat: location!.latitude,
-          lng: location!.longitude,
+          ...browse.geo!,
           q: q.trim() || undefined,
           category,
           limit: 40
         },
-        token
+        browse.token
       ),
-    enabled: Boolean(location)
+    enabled: Boolean(browse.geo)
   });
 
-  if (!location) {
+  if (!browse.geo) {
     return (
       <View className="flex-1 items-center justify-center bg-background px-6">
-        <Text className="text-center text-base text-muted">Set your location to see products available near you.</Text>
+        {browse.isGuest ? (
+          <Text className="text-center text-base text-muted">Loading products near you…</Text>
+        ) : (
+          <>
+            <Text className="text-center text-base text-muted">
+              Set your location to see products available near you.
+            </Text>
+            <View className="mt-4 w-full max-w-sm">
+              <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
+            </View>
+          </>
+        )}
       </View>
     );
   }
@@ -75,12 +84,11 @@ export function ProductSearchScreen({ route, navigation }: Props) {
                 void api
                   .commerceProductDetail(
                     {
-                      lat: location.latitude,
-                      lng: location.longitude,
+                      ...browse.geo!,
                       catalogProductId: p.catalogProductId ?? undefined,
                       productId: p.productId
                     },
-                    token
+                    browse.token
                   )
                   .then((detail) => {
                     const offer = detail.offers[0];

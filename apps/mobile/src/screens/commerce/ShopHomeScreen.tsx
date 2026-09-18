@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { CompositeNavigationProp } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
@@ -10,10 +10,10 @@ import { ProductCard } from "../../components/ProductCard";
 import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
 import { logDutsFlow } from "../../lib/flow-log";
+import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import type { ClientTabParamList, RootStackParamList } from "../../navigation/types";
-import { useSessionStore } from "../../stores/session.store";
-import { useShopLocationStore } from "../../stores/shop-location.store";
+import { useShopAreaStore, timezoneAreaHint } from "../../stores/shop-area.store";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 
 type Nav = CompositeNavigationProp<
@@ -22,51 +22,59 @@ type Nav = CompositeNavigationProp<
 >;
 
 const GUEST_CATEGORIES = ["Drinks", "Groceries", "Snacks", "Household"];
+const FALLBACK_AREAS = [
+  { id: "harare", name: "Harare", shopCount: 0 },
+  { id: "bulawayo", name: "Bulawayo", shopCount: 0 },
+  { id: "gweru", name: "Gweru", shopCount: 0 }
+];
 
 export function ShopHomeScreen() {
   const navigation = useNavigation<Nav>();
-  const session = useSessionStore((s) => s.session);
-  const token = session?.token;
-  const userId = session?.user.id;
-  const location = useShopLocationStore((s) => s.location);
-  const hydrated = useShopLocationStore((s) => s.hydrated);
-  const hydrate = useShopLocationStore((s) => s.hydrate);
-  const useDeviceLocation = useShopLocationStore((s) => s.useDeviceLocation);
-  const useSavedAddress = useShopLocationStore((s) => s.useSavedAddress);
+  const browse = useShopBrowse();
+  const setArea = useShopAreaStore((s) => s.setArea);
   const addOffer = useCommerceCartStore((s) => s.addOffer);
   const pendingCheckout = useCommerceCartStore((s) => s.pendingCheckout);
   const setPendingCheckout = useCommerceCartStore((s) => s.setPendingCheckout);
   const lines = useCommerceCartStore((s) => s.lines);
-  const [locBusy, setLocBusy] = useState(false);
-  const [locError, setLocError] = useState("");
+  const [areaOpen, setAreaOpen] = useState(false);
 
   useEffect(() => {
-    void hydrate(userId);
-  }, [hydrate, userId]);
-
-  useEffect(() => {
-    if (session && pendingCheckout && lines.length) {
+    if (!browse.isGuest && pendingCheckout && lines.length && browse.ready) {
       setPendingCheckout(false);
-      navigation.navigate("CommerceCheckout");
+      navigation.navigate(browse.exact ? "CommerceCheckout" : "ShopLocation");
     }
-  }, [session, pendingCheckout, lines.length, navigation, setPendingCheckout]);
+  }, [browse.isGuest, browse.ready, browse.exact, pendingCheckout, lines.length, navigation, setPendingCheckout]);
 
-  const geo = location;
+  const areasQuery = useQuery({
+    queryKey: ["commerce-shopping-areas"],
+    queryFn: () => api.commerceShoppingAreas(),
+    enabled: browse.isGuest
+  });
+
+  useEffect(() => {
+    if (!browse.isGuest || !browse.ready) return;
+    if (areasQuery.isLoading && !areasQuery.data && !areasQuery.isError) return;
+    const areas = areasQuery.data?.areas.length ? areasQuery.data.areas : FALLBACK_AREAS;
+    if (browse.area && areas.some((a) => a.id === browse.area?.id)) return;
+    const hinted = timezoneAreaHint();
+    const pick = areas.find((a) => a.id === hinted) ?? areas[0];
+    if (pick) void setArea({ id: pick.id, name: pick.name });
+  }, [browse.isGuest, browse.ready, browse.area, areasQuery.data, areasQuery.isLoading, areasQuery.isError, setArea]);
+
   const productsQuery = useQuery({
-    queryKey: ["commerce-products", geo?.latitude, geo?.longitude],
-    queryFn: () =>
-      api.commerceNearbyProducts({ lat: geo!.latitude, lng: geo!.longitude, limit: 24 }, token),
-    enabled: Boolean(geo)
+    queryKey: ["commerce-products", ...browse.queryKey],
+    queryFn: () => api.commerceNearbyProducts({ ...browse.geo!, limit: 24 }, browse.token),
+    enabled: Boolean(browse.geo)
   });
   const categoriesQuery = useQuery({
-    queryKey: ["commerce-categories", geo?.latitude, geo?.longitude],
-    queryFn: () => api.commerceCategories(geo!.latitude, geo!.longitude, token),
-    enabled: Boolean(geo)
+    queryKey: ["commerce-categories", ...browse.queryKey],
+    queryFn: () => api.commerceCategories(browse.geo!, browse.token),
+    enabled: Boolean(browse.geo)
   });
   const shopsQuery = useQuery({
-    queryKey: ["commerce-shops", geo?.latitude, geo?.longitude],
-    queryFn: () => api.commerceNearbyShops(geo!.latitude, geo!.longitude, token),
-    enabled: Boolean(geo)
+    queryKey: ["commerce-shops", ...browse.queryKey],
+    queryFn: () => api.commerceNearbyShops(browse.geo!, browse.token),
+    enabled: Boolean(browse.geo)
   });
 
   const categories = useMemo(() => {
@@ -74,22 +82,6 @@ export function ShopHomeScreen() {
     if (fromApi.length) return fromApi.slice(0, 8);
     return GUEST_CATEGORIES;
   }, [categoriesQuery.data]);
-
-  async function enableLocation() {
-    setLocBusy(true);
-    setLocError("");
-    try {
-      if (userId) {
-        const fromSaved = await useSavedAddress(userId);
-        if (fromSaved) return;
-      }
-      await useDeviceLocation();
-    } catch {
-      setLocError("We couldn't get your location. Check permissions and try again.");
-    } finally {
-      setLocBusy(false);
-    }
-  }
 
   function openSignIn() {
     navigation.navigate("MainTabs", { screen: "SignIn" });
@@ -99,17 +91,16 @@ export function ShopHomeScreen() {
     catalogProductId: string | null;
     productId: string;
   }) {
-    if (!location) return;
-    if (!token) logDutsFlow("GUEST_ADD_TO_CART");
+    if (!browse.geo) return;
+    if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
     void api
       .commerceProductDetail(
         {
-          lat: location.latitude,
-          lng: location.longitude,
+          ...browse.geo,
           catalogProductId: p.catalogProductId ?? undefined,
           productId: p.productId
         },
-        token
+        browse.token
       )
       .then((detail) => {
         const offer = detail.offers[0];
@@ -127,12 +118,15 @@ export function ShopHomeScreen() {
       });
   }
 
+  const canBrowse = Boolean(browse.geo);
+  const areaName = browse.area?.name ?? "your area";
+
   return (
     <TabScreen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 28 }}>
         <View className="flex-row items-center justify-between">
           <Text className="text-2xl font-black text-ink">DUTS</Text>
-          {!session ? (
+          {browse.isGuest ? (
             <Pressable onPress={openSignIn} accessibilityRole="button" accessibilityLabel="Sign in">
               <Text className="text-base font-bold" style={{ color: DUTS.purple }}>
                 Sign in
@@ -142,18 +136,29 @@ export function ShopHomeScreen() {
         </View>
         <Text className="mt-1 text-sm text-muted">Shop nearby · delivered to you</Text>
 
-        <Pressable
-          onPress={() => navigation.navigate("ShopLocation")}
-          className="mt-4 rounded-2xl border border-border bg-surface px-4 py-3"
-          accessibilityRole="button"
-          accessibilityLabel="Set delivery location"
-        >
-          <Text className="text-xs font-semibold uppercase text-muted">Deliver to</Text>
-          <Text className="mt-1 text-base font-bold text-ink">
-            {location?.label ?? "Set your location"}
-          </Text>
-        </Pressable>
-        {locError ? <Text className="mt-2 text-sm text-danger">{locError}</Text> : null}
+        {browse.isGuest ? (
+          <Pressable
+            onPress={() => setAreaOpen(true)}
+            className="mt-4 rounded-2xl border border-border bg-surface px-4 py-3"
+            accessibilityRole="button"
+            accessibilityLabel="Change shopping area"
+          >
+            <Text className="text-xs font-semibold uppercase text-muted">Shopping near</Text>
+            <Text className="mt-1 text-base font-bold text-ink">{areaName} ▼</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => navigation.navigate("ShopLocation")}
+            className="mt-4 rounded-2xl border border-border bg-surface px-4 py-3"
+            accessibilityRole="button"
+            accessibilityLabel="Set delivery location"
+          >
+            <Text className="text-xs font-semibold uppercase text-muted">Deliver to</Text>
+            <Text className="mt-1 text-base font-bold text-ink">
+              {browse.exact?.label ?? "Set your location"}
+            </Text>
+          </Pressable>
+        )}
 
         <Pressable
           onPress={() => navigation.navigate("Search")}
@@ -171,7 +176,7 @@ export function ShopHomeScreen() {
               <Pressable
                 key={name}
                 onPress={() => {
-                  if (!location) {
+                  if (!browse.isGuest && !browse.geo) {
                     navigation.navigate("ShopLocation");
                     return;
                   }
@@ -187,15 +192,14 @@ export function ShopHomeScreen() {
           </ScrollView>
         </View>
 
-        {!hydrated || locBusy ? (
+        {!browse.ready || (browse.isGuest && areasQuery.isLoading && !browse.geo) ? (
           <ActivityIndicator className="mt-8" color={DUTS.purple} />
-        ) : !location ? (
+        ) : !canBrowse && !browse.isGuest ? (
           <View className="mt-8 gap-3">
             <Text className="text-base text-muted">
               Set your location to see products available near you.
             </Text>
             <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
-            <AppButton label="Use my location" variant="secondary" onPress={() => void enableLocation()} />
           </View>
         ) : (
           <>
@@ -235,17 +239,19 @@ export function ShopHomeScreen() {
                   onPress={() => navigation.navigate("ShopDetail", { merchantId: shop.id })}
                   className="mb-3 rounded-2xl border border-border bg-card px-4 py-4"
                   accessibilityRole="button"
-                  accessibilityLabel={`${shop.name}, ${shop.distanceKm} kilometers`}
+                  accessibilityLabel={
+                    browse.isGuest ? shop.name : `${shop.name}, ${shop.distanceKm} kilometers`
+                  }
                 >
                   <Text className="text-base font-bold text-ink">{shop.name}</Text>
                   <Text className="mt-1 text-sm text-muted">
-                    {shop.distanceKm} km · {shop.locationLabel}
+                    {browse.isGuest ? shop.locationLabel : `${shop.distanceKm} km · ${shop.locationLabel}`}
                   </Text>
                 </Pressable>
               ))}
             </View>
 
-            {session ? (
+            {!browse.isGuest ? (
               <View className="mt-8 gap-2 border-t border-border pt-6">
                 <Text className="text-sm font-semibold text-muted">Also on DUTS</Text>
                 <AppButton
@@ -263,6 +269,32 @@ export function ShopHomeScreen() {
           </>
         )}
       </ScrollView>
+
+      <Modal visible={areaOpen} transparent animationType="fade" onRequestClose={() => setAreaOpen(false)}>
+        <Pressable
+          className="flex-1 justify-end"
+          style={{ backgroundColor: "rgba(0,0,0,0.35)" }}
+          onPress={() => setAreaOpen(false)}
+        >
+          <Pressable className="rounded-t-3xl bg-background px-5 pb-10 pt-5" onPress={(e) => e.stopPropagation?.()}>
+            <Text className="text-lg font-extrabold text-ink">Change area</Text>
+            {(areasQuery.data?.areas.length ? areasQuery.data.areas : FALLBACK_AREAS).map((item) => (
+              <Pressable
+                key={item.id}
+                onPress={() => {
+                  void setArea({ id: item.id, name: item.name });
+                  setAreaOpen(false);
+                }}
+                className="mt-3 rounded-2xl border border-border bg-card px-4 py-3.5"
+                accessibilityRole="button"
+                accessibilityLabel={item.name}
+              >
+                <Text className="text-base font-bold text-ink">{item.name}</Text>
+              </Pressable>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </TabScreen>
   );
 }
@@ -270,8 +302,16 @@ export function ShopHomeScreen() {
 /** Lightweight search tab entry — navigates to ProductSearch with query. */
 export function ShopSearchTabScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const location = useShopLocationStore((s) => s.location);
+  const browse = useShopBrowse();
   const [q, setQ] = useState("");
+
+  function runSearch() {
+    if (!browse.isGuest && !browse.geo) {
+      navigation.navigate("ShopLocation");
+      return;
+    }
+    if (q.trim()) navigation.navigate("ProductSearch", { q: q.trim() });
+  }
 
   return (
     <TabScreen>
@@ -283,26 +323,11 @@ export function ShopSearchTabScreen() {
         placeholderTextColor={DUTS.placeholder}
         className="mt-4 rounded-2xl border border-border bg-card px-4 py-3.5 text-base text-ink"
         returnKeyType="search"
-        onSubmitEditing={() => {
-          if (!location) {
-            navigation.navigate("ShopLocation");
-            return;
-          }
-          if (q.trim()) navigation.navigate("ProductSearch", { q: q.trim() });
-        }}
+        onSubmitEditing={runSearch}
         accessibilityLabel="Search products"
       />
       <View className="mt-3">
-        <AppButton
-          label="Search"
-          onPress={() => {
-            if (!location) {
-              navigation.navigate("ShopLocation");
-              return;
-            }
-            if (q.trim()) navigation.navigate("ProductSearch", { q: q.trim() });
-          }}
-        />
+        <AppButton label="Search" onPress={runSearch} />
       </View>
     </TabScreen>
   );

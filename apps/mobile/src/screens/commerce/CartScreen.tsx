@@ -6,17 +6,14 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { TabScreen } from "../../components/TabScreen";
 import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
+import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import type { RootStackParamList } from "../../navigation/types";
-import { useSessionStore } from "../../stores/session.store";
-import { useShopLocationStore } from "../../stores/shop-location.store";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 
 export function CartScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const session = useSessionStore((s) => s.session);
-  const token = session?.token;
-  const location = useShopLocationStore((s) => s.location);
+  const browse = useShopBrowse();
   const lines = useCommerceCartStore((s) => s.lines);
   const merchantName = useCommerceCartStore((s) => s.merchantName);
   const setQuantity = useCommerceCartStore((s) => s.setQuantity);
@@ -25,14 +22,20 @@ export function CartScreen() {
 
   const quoteMut = useMutation({
     mutationFn: () => {
-      if (!location) throw new Error("Set delivery location first.");
+      if (browse.isGuest) {
+        return api.commerceCartQuote({
+          deferDelivery: true,
+          lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
+        });
+      }
+      if (!browse.exact) throw new Error("Set delivery location first.");
       return api.commerceCartQuote(
         {
-          lat: location.latitude,
-          lng: location.longitude,
+          lat: browse.exact.latitude,
+          lng: browse.exact.longitude,
           lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
         },
-        token
+        browse.token
       );
     },
     onError: (e: Error) => setQuoteError(e.message)
@@ -40,11 +43,10 @@ export function CartScreen() {
 
   useEffect(() => {
     setQuoteError("");
-    if (lines.length && location) {
-      quoteMut.mutate();
-    }
+    if (!lines.length) return;
+    if (browse.isGuest || browse.exact) quoteMut.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lines, location?.latitude, location?.longitude]);
+  }, [lines, browse.isGuest, browse.exact?.latitude, browse.exact?.longitude]);
 
   if (!lines.length) {
     return (
@@ -58,7 +60,7 @@ export function CartScreen() {
     );
   }
 
-  if (!location) {
+  if (!browse.isGuest && !browse.exact) {
     return (
       <TabScreen>
         <Text className="text-2xl font-black text-ink">Your cart</Text>
@@ -72,6 +74,7 @@ export function CartScreen() {
 
   const quote = quoteMut.data;
   const quotedLine = (productId: string) => quote?.lines.find((l) => l.productId === productId);
+  const deferred = browse.isGuest || quote?.deliveryQuoteStatus === "deferred";
 
   return (
     <TabScreen>
@@ -127,14 +130,18 @@ export function CartScreen() {
 
         {quote ? (
           <View className="mt-6 gap-1 rounded-2xl border border-border bg-surface p-4">
-            <Text className="text-sm text-muted">Items       ${(quote.subtotalCents / 100).toFixed(2)}</Text>
-            <Text className="text-sm text-muted">Delivery    ${(quote.deliveryFeeCents / 100).toFixed(2)}</Text>
-            {quote.serviceFeeCents > 0 ? (
-              <Text className="text-sm text-muted">Service     ${(quote.serviceFeeCents / 100).toFixed(2)}</Text>
-            ) : null}
-            <Text className="mt-2 text-lg font-black text-ink">
-              Total       ${(quote.totalCents / 100).toFixed(2)}
+            <Text className="text-sm text-muted">Items          ${(quote.subtotalCents / 100).toFixed(2)}</Text>
+            <Text className="text-sm text-muted">
+              Delivery       {deferred ? "Calculated when you order" : `$${(quote.deliveryFeeCents / 100).toFixed(2)}`}
             </Text>
+            {!deferred && quote.serviceFeeCents > 0 ? (
+              <Text className="text-sm text-muted">Service        ${(quote.serviceFeeCents / 100).toFixed(2)}</Text>
+            ) : null}
+            {!deferred ? (
+              <Text className="mt-2 text-lg font-black text-ink">
+                Total          ${(quote.totalCents / 100).toFixed(2)}
+              </Text>
+            ) : null}
           </View>
         ) : null}
 
@@ -142,7 +149,7 @@ export function CartScreen() {
           <AppButton
             label="Continue to order"
             onPress={() =>
-              session ? navigation.navigate("CommerceCheckout") : navigation.navigate("GuestCheckoutChoice")
+              browse.isGuest ? navigation.navigate("GuestCheckoutChoice") : navigation.navigate("CommerceCheckout")
             }
             disabled={!quote || quoteMut.isPending}
           />

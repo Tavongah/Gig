@@ -964,17 +964,20 @@ model WhatsAppInboundMessage {
 
 /** Short-lived guest web basket → WhatsApp restore. Token stored hashed only. */
 model GuestCommerceHandoff {
-  id            String    @id @default(uuid())
-  tokenHash     String    @unique
-  merchantId    String
-  merchant      Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  basketJson    Json
-  deliveryLabel String
-  deliveryLat   Decimal   @db.Decimal(9, 6)
-  deliveryLng   Decimal   @db.Decimal(9, 6)
-  expiresAt     DateTime
-  consumedAt    DateTime?
-  createdAt     DateTime  @default(now())
+  id                    String    @id @default(uuid())
+  tokenHash             String    @unique
+  merchantId            String
+  merchant              Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  basketJson            Json
+  /** Coarse shopping area id for discovery only — not a delivery address. */
+  shoppingAreaId        String?
+  deliveryLabel         String?
+  deliveryLat           Decimal?  @db.Decimal(9, 6)
+  deliveryLng           Decimal?  @db.Decimal(9, 6)
+  locationIsApproximate Boolean   @default(true)
+  expiresAt             DateTime
+  consumedAt            DateTime?
+  createdAt             DateTime  @default(now())
 
   @@index([expiresAt])
   @@index([merchantId])

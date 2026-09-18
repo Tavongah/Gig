@@ -22,6 +22,7 @@ function pass(name: string) {
 {
   const routes = readFileSync(resolve(here, "../src/modules/commerce/customer-commerce.routes.ts"), "utf8");
   assert.ok(!routes.includes("customerCommerceRouter.use(requireAuth"), "commerce router is not globally authenticated");
+  assert.ok(routes.includes('customerCommerceRouter.get("/shopping-areas"'), "shopping areas public");
   assert.ok(routes.includes('customerCommerceRouter.get("/shops/nearby"'), "nearby shops public");
   assert.ok(routes.includes('customerCommerceRouter.get("/products"'), "products public");
   assert.ok(routes.includes('customerCommerceRouter.get("/categories"'), "categories public");
@@ -47,6 +48,30 @@ function pass(name: string) {
   assert.ok(handler.includes("applyGuestHandoffToConversation"), "WhatsApp restores guest basket");
   assert.ok(handler.includes("ensureWhatsAppCommerceCustomer"), "CommerceCustomer still used");
   pass("WhatsApp import wiring");
+}
+
+{
+  const copy = readFileSync(resolve(here, "../src/modules/whatsapp/copy.ts"), "utf8");
+  assert.ok(copy.includes("formatGuestHandoffAwaitingLocation"), "guest restore asks for WhatsApp location");
+  assert.ok(copy.includes("Please send your location using WhatsApp."), "native location request copy");
+  assert.ok(copy.includes("Delivery: Calculated when you send your location"), "no authoritative delivery fee on restore");
+  pass("WhatsApp location copy after handoff");
+}
+
+{
+  const areas = readFileSync(resolve(here, "../src/modules/commerce/shopping-areas.ts"), "utf8");
+  assert.ok(areas.includes("listShoppingAreas"), "areas derived from merchants");
+  assert.ok(areas.includes("SHOPPING_AREA_MATCH_KM"), "coarse city clustering");
+  pass("shopping area module");
+}
+
+{
+  const handoff = readFileSync(resolve(here, "../src/modules/commerce/guest-handoff.service.ts"), "utf8");
+  assert.ok(handoff.includes("deferDelivery: true"), "handoff quotes items without delivery");
+  assert.ok(handoff.includes("locationIsApproximate: true"), "stored location is not exact");
+  assert.ok(handoff.includes("AWAITING_LOCATION"), "restore waits for WhatsApp location");
+  assert.ok(!handoff.includes("AWAITING_ORDER_CONFIRMATION"), "must not confirm before exact location");
+  pass("handoff defers delivery until WhatsApp location");
 }
 
 const {
@@ -80,6 +105,51 @@ const {
   if (prev === undefined) delete process.env.TWILIO_WHATSAPP_FROM;
   else process.env.TWILIO_WHATSAPP_FROM = prev;
   pass("WhatsApp deep link has ref not prices");
+}
+
+{
+  const { formatGuestHandoffAwaitingLocation } = await import("../src/modules/whatsapp/copy.js");
+  const message = formatGuestHandoffAwaitingLocation({
+    shopName: "Corner Shop",
+    lines: [{ quantity: 1, productName: "Mazoe Orange Crush 2L", lineTotalCents: 250 }],
+    subtotalCents: 250
+  });
+  assert.match(message, /Items: \$2\.50/);
+  assert.match(message, /Where should we deliver\?/);
+  assert.match(message, /Please send your location using WhatsApp/);
+  assert.doesNotMatch(message, /Delivery:\s*\$/);
+  assert.doesNotMatch(message, /Confirm order/);
+  pass("handoff restore copy has no delivery fee");
+}
+
+{
+  const { shoppingAreaForMerchant } = await import("../src/modules/commerce/shopping-areas.js");
+  const harare = shoppingAreaForMerchant({
+    id: "m1",
+    locationLabel: "Borrowdale",
+    pilotArea: "Harare",
+    latitude: -17.78,
+    longitude: 31.1
+  });
+  assert.equal(harare.id, "harare");
+  assert.equal(harare.name, "Harare");
+  const nearbyHarare = shoppingAreaForMerchant({
+    id: "m2",
+    locationLabel: "Glen Norah",
+    pilotArea: null,
+    latitude: -17.908,
+    longitude: 30.98
+  });
+  assert.equal(nearbyHarare.id, "harare");
+  const gweru = shoppingAreaForMerchant({
+    id: "m3",
+    locationLabel: "Mkoba",
+    pilotArea: "Gweru",
+    latitude: -19.45,
+    longitude: 29.82
+  });
+  assert.equal(gweru.id, "gweru");
+  pass("merchant clustering maps to coarse areas");
 }
 
 async function dbSuite() {

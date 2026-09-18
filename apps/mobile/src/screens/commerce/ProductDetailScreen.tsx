@@ -3,48 +3,50 @@ import { useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { api } from "../../lib/api";
 import { logDutsFlow } from "../../lib/flow-log";
+import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import { AppButton } from "../../components/AppButton";
 import type { RootStackParamList } from "../../navigation/types";
-import { useSessionStore } from "../../stores/session.store";
-import { useShopLocationStore } from "../../stores/shop-location.store";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProductDetail">;
 
 export function ProductDetailScreen({ route, navigation }: Props) {
-  const token = useSessionStore((s) => s.session?.token);
-  const location = useShopLocationStore((s) => s.location);
+  const browse = useShopBrowse();
   const addOffer = useCommerceCartStore((s) => s.addOffer);
 
   const detailQuery = useQuery({
     queryKey: [
       "commerce-detail",
-      location?.latitude,
-      location?.longitude,
+      ...browse.queryKey,
       route.params.catalogProductId,
       route.params.productId
     ],
     queryFn: () =>
       api.commerceProductDetail(
         {
-          lat: location!.latitude,
-          lng: location!.longitude,
+          ...browse.geo!,
           catalogProductId: route.params.catalogProductId,
           productId: route.params.productId
         },
-        token
+        browse.token
       ),
-    enabled: Boolean(location)
+    enabled: Boolean(browse.geo)
   });
 
-  if (!location) {
+  if (!browse.geo) {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <Text className="text-center text-muted">Set your location to see products available near you.</Text>
-        <View className="mt-4 w-full max-w-sm">
-          <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
-        </View>
+        {browse.isGuest ? (
+          <Text className="text-center text-muted">Loading products near you…</Text>
+        ) : (
+          <>
+            <Text className="text-center text-muted">Set your location to see products available near you.</Text>
+            <View className="mt-4 w-full max-w-sm">
+              <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
+            </View>
+          </>
+        )}
       </View>
     );
   }
@@ -91,14 +93,14 @@ export function ProductDetailScreen({ route, navigation }: Props) {
             >
               <View className="flex-1 pr-3">
                 <Text className="text-base font-bold text-ink">{offer.merchantName}</Text>
-                <Text className="text-sm text-muted">{offer.distanceKm} km</Text>
+                {!browse.isGuest ? <Text className="text-sm text-muted">{offer.distanceKm} km</Text> : null}
                 <Text className="mt-1 text-base font-extrabold text-ink">
                   ${(offer.priceCents / 100).toFixed(2)}
                 </Text>
               </View>
               <Pressable
                 onPress={() => {
-                  if (!token) logDutsFlow("GUEST_ADD_TO_CART");
+                  if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
                   addOffer({
                     productId: offer.productId,
                     catalogProductId: product.catalogProductId,

@@ -28,12 +28,9 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
     if (!session) navigation.replace("GuestCheckoutChoice");
   }, [session, navigation]);
 
-  if (!session || !token || !user) {
-    return null;
-  }
-
   const checkoutMut = useMutation({
     mutationFn: async () => {
+      if (!token || !user) throw new Error("Sign in to check out.");
       if (!location) throw new Error("Set delivery location first.");
       if (!lines.length) throw new Error("Your cart is empty.");
       return api.commerceCheckout(
@@ -54,6 +51,24 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
     },
     onError: (e: Error) => setError(e.message)
   });
+
+  if (!session || !token || !user) {
+    return null;
+  }
+
+  if (!location) {
+    return (
+      <ScrollView className="flex-1 bg-background px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>
+        <Text className="text-2xl font-black text-ink">Checkout</Text>
+        <Text className="mt-4 text-base text-muted">
+          Choose a delivery address so we can confirm the shop and delivery fee.
+        </Text>
+        <View className="mt-6">
+          <AppButton label="Choose delivery location" onPress={() => navigation.navigate("ShopLocation")} />
+        </View>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView className="flex-1 bg-background px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>

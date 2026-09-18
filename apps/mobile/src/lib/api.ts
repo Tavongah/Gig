@@ -864,7 +864,10 @@ export const api = {
       transportMode: string | null;
     }>("/workers/delivery-eligibility", { method: "POST", body: JSON.stringify(payload) }, token),
 
-  commerceNearbyShops: (lat: number, lng: number, token?: string) =>
+  commerceShoppingAreas: () =>
+    request<{ areas: Array<{ id: string; name: string; shopCount: number }> }>("/commerce/shopping-areas"),
+
+  commerceNearbyShops: (geo: CommerceBrowseGeo, token?: string) =>
     request<{
       shops: Array<{
         id: string;
@@ -875,19 +878,17 @@ export const api = {
         logoUrl: string | null;
         openingHours: string | null;
       }>;
-    }>(`/commerce/shops/nearby?lat=${lat}&lng=${lng}`, {}, token),
+    }>(`/commerce/shops/nearby?${commerceGeoQs(geo).toString()}`, {}, token),
 
   commerceNearbyProducts: (
-    params: { lat: number; lng: number; q?: string; category?: string; limit?: number },
+    params: CommerceBrowseGeo & { q?: string; category?: string; limit?: number },
     token?: string
   ) => {
-    const qs = new URLSearchParams({
-      lat: String(params.lat),
-      lng: String(params.lng),
-      limit: String(params.limit ?? 40)
+    const qs = commerceGeoQs(params, {
+      limit: String(params.limit ?? 40),
+      q: params.q,
+      category: params.category
     });
-    if (params.q) qs.set("q", params.q);
-    if (params.category) qs.set("category", params.category);
     return request<{
       products: Array<{
         catalogProductId: string | null;
@@ -906,20 +907,21 @@ export const api = {
     }>(`/commerce/products?${qs.toString()}`, {}, token);
   },
 
-  commerceCategories: (lat: number, lng: number, token?: string) =>
+  commerceCategories: (geo: CommerceBrowseGeo, token?: string) =>
     request<{ categories: Array<{ name: string; count: number }> }>(
-      `/commerce/categories?lat=${lat}&lng=${lng}`,
+      `/commerce/categories?${commerceGeoQs(geo).toString()}`,
       {},
       token
     ),
 
   commerceProductDetail: (
-    params: { lat: number; lng: number; catalogProductId?: string; productId?: string },
+    params: CommerceBrowseGeo & { catalogProductId?: string; productId?: string },
     token?: string
   ) => {
-    const qs = new URLSearchParams({ lat: String(params.lat), lng: String(params.lng) });
-    if (params.catalogProductId) qs.set("catalogProductId", params.catalogProductId);
-    if (params.productId) qs.set("productId", params.productId);
+    const qs = commerceGeoQs(params, {
+      catalogProductId: params.catalogProductId,
+      productId: params.productId
+    });
     return request<{
       product: {
         catalogProductId: string | null;
@@ -943,9 +945,8 @@ export const api = {
     }>(`/commerce/products/detail?${qs.toString()}`, {}, token);
   },
 
-  commerceShop: (merchantId: string, lat: number, lng: number, token?: string, q?: string) => {
-    const qs = new URLSearchParams({ lat: String(lat), lng: String(lng) });
-    if (q) qs.set("q", q);
+  commerceShop: (merchantId: string, geo: CommerceBrowseGeo, token?: string, q?: string) => {
+    const qs = commerceGeoQs(geo, { q });
     return request<{
       shop: {
         id: string;
@@ -974,14 +975,15 @@ export const api = {
 
   commerceCartQuote: (
     payload: {
-      lat: number;
-      lng: number;
+      lat?: number;
+      lng?: number;
+      deferDelivery?: boolean;
       lines: Array<{ productId: string; quantity: number }>;
     },
     token?: string
   ) =>
     request<{
-      merchant: { id: string; name: string; distanceKm: number };
+      merchant: { id: string; name: string; distanceKm: number | null };
       lines: Array<{
         productId: string;
         productName: string;
@@ -995,6 +997,7 @@ export const api = {
       serviceFeeCents: number;
       totalCents: number;
       currency: string;
+      deliveryQuoteStatus: "final" | "deferred";
     }>("/commerce/cart/quote", { method: "POST", body: JSON.stringify(payload) }, token),
 
   commerceCheckout: (
@@ -1065,9 +1068,7 @@ export const api = {
     }>(`/commerce/orders/${orderId}`, {}, token),
 
   commerceGuestHandoff: (payload: {
-    lat: number;
-    lng: number;
-    deliveryLabel: string;
+    shoppingAreaId?: string;
     lines: Array<{ productId: string; quantity: number }>;
   }) =>
     request<{
@@ -1075,10 +1076,25 @@ export const api = {
       expiresAt: string;
       whatsappUrl: string | null;
       merchantName: string;
-      totalCents: number;
+      subtotalCents: number;
       currency: string;
     }>("/commerce/guest/handoff", { method: "POST", body: JSON.stringify(payload) })
 };
+
+export type CommerceBrowseGeo = { areaId: string } | { lat: number; lng: number };
+
+function commerceGeoQs(geo: CommerceBrowseGeo, extra?: Record<string, string | undefined>) {
+  const qs = new URLSearchParams();
+  if ("areaId" in geo) qs.set("areaId", geo.areaId);
+  else {
+    qs.set("lat", String(geo.lat));
+    qs.set("lng", String(geo.lng));
+  }
+  for (const [key, value] of Object.entries(extra ?? {})) {
+    if (value) qs.set(key, value);
+  }
+  return qs;
+}
 
 export interface DeliveryQuote {
   currency: string;

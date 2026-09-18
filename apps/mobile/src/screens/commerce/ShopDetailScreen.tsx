@@ -3,32 +3,40 @@ import { ActivityIndicator, ScrollView, Text, TextInput, View } from "react-nati
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ProductCard } from "../../components/ProductCard";
+import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
+import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import type { RootStackParamList } from "../../navigation/types";
-import { useSessionStore } from "../../stores/session.store";
-import { useShopLocationStore } from "../../stores/shop-location.store";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ShopDetail">;
 
 export function ShopDetailScreen({ route, navigation }: Props) {
-  const token = useSessionStore((s) => s.session?.token);
-  const location = useShopLocationStore((s) => s.location);
+  const browse = useShopBrowse();
   const addOffer = useCommerceCartStore((s) => s.addOffer);
   const [q, setQ] = useState("");
 
   const shopQuery = useQuery({
-    queryKey: ["commerce-shop", route.params.merchantId, location?.latitude, location?.longitude, q],
+    queryKey: ["commerce-shop", route.params.merchantId, ...browse.queryKey, q],
     queryFn: () =>
-      api.commerceShop(route.params.merchantId, location!.latitude, location!.longitude, token, q.trim() || undefined),
-    enabled: Boolean(location)
+      api.commerceShop(route.params.merchantId, browse.geo!, browse.token, q.trim() || undefined),
+    enabled: Boolean(browse.geo)
   });
 
-  if (!location) {
+  if (!browse.geo) {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <Text className="text-center text-muted">Set your location to see products available near you.</Text>
+        {browse.isGuest ? (
+          <Text className="text-center text-muted">Loading shops near you…</Text>
+        ) : (
+          <>
+            <Text className="text-center text-muted">Set your location to see products available near you.</Text>
+            <View className="mt-4 w-full max-w-sm">
+              <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
+            </View>
+          </>
+        )}
       </View>
     );
   }
@@ -47,7 +55,7 @@ export function ShopDetailScreen({ route, navigation }: Props) {
     <ScrollView className="flex-1 bg-background px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 8 }}>
       <Text className="text-2xl font-black text-ink">{shop.name}</Text>
       <Text className="mt-1 text-sm text-muted">
-        {shop.distanceKm} km · {shop.locationLabel}
+        {browse.isGuest ? shop.locationLabel : `${shop.distanceKm} km · ${shop.locationLabel}`}
       </Text>
       {shop.openingHours ? <Text className="mt-1 text-sm text-muted">{shop.openingHours}</Text> : null}
 

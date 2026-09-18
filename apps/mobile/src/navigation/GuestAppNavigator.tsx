@@ -4,7 +4,6 @@ import { GuestTabs } from "./GuestTabs";
 import { ProductSearchScreen } from "../screens/commerce/ProductSearchScreen";
 import { ProductDetailScreen } from "../screens/commerce/ProductDetailScreen";
 import { ShopDetailScreen } from "../screens/commerce/ShopDetailScreen";
-import { ShopLocationScreen } from "../screens/commerce/ShopLocationScreen";
 import { GuestCheckoutChoiceScreen } from "../screens/commerce/GuestCheckoutChoiceScreen";
 import { ForgotPasswordScreen } from "../screens/auth/ForgotPasswordScreen";
 import { ResetPasswordScreen } from "../screens/auth/ResetPasswordScreen";
@@ -30,7 +29,6 @@ export function GuestAppNavigator() {
       <Stack.Screen name="ProductSearch" component={ProductSearchScreen} options={{ title: "Search" }} />
       <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ title: "Product" }} />
       <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{ title: "Shop" }} />
-      <Stack.Screen name="ShopLocation" component={ShopLocationScreen} options={{ title: "Deliver to" }} />
       <Stack.Screen
         name="GuestCheckoutChoice"
         component={GuestCheckoutChoiceScreen}

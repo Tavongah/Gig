@@ -7,25 +7,22 @@ import { api } from "../../lib/api";
 import { logDutsFlow } from "../../lib/flow-log";
 import { DUTS } from "../../lib/theme";
 import type { GuestStackParamList } from "../../navigation/types";
-import { useShopLocationStore } from "../../stores/shop-location.store";
+import { useShopAreaStore } from "../../stores/shop-area.store";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 
 type Props = NativeStackScreenProps<GuestStackParamList, "GuestCheckoutChoice">;
 
 export function GuestCheckoutChoiceScreen({ navigation }: Props) {
-  const location = useShopLocationStore((s) => s.location);
+  const area = useShopAreaStore((s) => s.area);
   const lines = useCommerceCartStore((s) => s.lines);
   const setPendingCheckout = useCommerceCartStore((s) => s.setPendingCheckout);
   const [error, setError] = useState("");
 
   const handoffMut = useMutation({
     mutationFn: async () => {
-      if (!location) throw new Error("Set your delivery location first.");
       if (!lines.length) throw new Error("Your cart is empty.");
       return api.commerceGuestHandoff({
-        lat: location.latitude,
-        lng: location.longitude,
-        deliveryLabel: location.label,
+        shoppingAreaId: area?.id,
         lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
       });
     },

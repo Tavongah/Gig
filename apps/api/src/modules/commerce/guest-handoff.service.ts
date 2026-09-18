@@ -4,7 +4,7 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { logDutsFlow } from "../../lib/flow-log.js";
 import { getCartTtlMs } from "../whatsapp/cart-mutations.js";
-import { formatOrderCartSummary } from "../whatsapp/copy.js";
+import { formatGuestHandoffAwaitingLocation } from "../whatsapp/copy.js";
 import { updateConversation, type ConversationContext } from "../whatsapp/conversation.service.js";
 import { quoteCart } from "./customer-commerce.service.js";
 
@@ -42,21 +42,17 @@ export function buildWhatsAppHandoffUrl(token: string): string | null {
 }
 
 export async function createGuestHandoff(input: {
-  lat: number;
-  lng: number;
-  deliveryLabel: string;
+  shoppingAreaId?: string;
   lines: Array<{ productId: string; quantity: number }>;
 }) {
   const quote = await quoteCart({
-    lat: input.lat,
-    lng: input.lng,
+    deferDelivery: true,
     lines: input.lines
   });
 
   const token = generateHandoffToken();
   const tokenHash = hashHandoffToken(token);
   const expiresAt = new Date(Date.now() + getCartTtlMs());
-  const label = input.deliveryLabel.trim() || "Delivery location";
 
   await prisma.guestCommerceHandoff.create({
     data: {
@@ -65,9 +61,11 @@ export async function createGuestHandoff(input: {
       basketJson: {
         lines: input.lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
       },
-      deliveryLabel: label.slice(0, 200),
-      deliveryLat: input.lat,
-      deliveryLng: input.lng,
+      shoppingAreaId: input.shoppingAreaId?.trim() || null,
+      deliveryLabel: null,
+      deliveryLat: null,
+      deliveryLng: null,
+      locationIsApproximate: true,
       expiresAt
     }
   });
@@ -82,7 +80,7 @@ export async function createGuestHandoff(input: {
     expiresAt: expiresAt.toISOString(),
     whatsappUrl: buildWhatsAppHandoffUrl(token),
     merchantName: quote.merchant.name,
-    totalCents: quote.totalCents,
+    subtotalCents: quote.subtotalCents,
     currency: quote.currency
   };
 }
@@ -121,8 +119,7 @@ export async function applyGuestHandoffToConversation(input: {
   let quote: Awaited<ReturnType<typeof quoteCart>>;
   try {
     quote = await quoteCart({
-      lat: Number(row.deliveryLat),
-      lng: Number(row.deliveryLng),
+      deferDelivery: true,
       lines
     });
   } catch (err) {
@@ -134,18 +131,13 @@ export async function applyGuestHandoffToConversation(input: {
   }
 
   const ctx: ConversationContext = {
-    deliveryLat: Number(row.deliveryLat),
-    deliveryLng: Number(row.deliveryLng),
-    deliveryLabel: row.deliveryLabel,
     merchantId: quote.merchant.id,
     previousMerchantId: quote.merchant.id,
-    draftLines: quote.lines,
-    requestedItems: quote.lines.map((l) => ({ query: l.productName, quantity: l.quantity })),
-    draftQuotedAt: new Date().toISOString()
+    requestedItems: quote.lines.map((l) => ({ query: l.productName, quantity: l.quantity }))
   };
 
   await updateConversation(input.conversationId, {
-    state: WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION,
+    state: WhatsAppConversationState.AWAITING_LOCATION,
     context: ctx,
     merchantId: quote.merchant.id
   });
@@ -155,20 +147,14 @@ export async function applyGuestHandoffToConversation(input: {
     data: { consumedAt: new Date() }
   });
 
-  const message = formatOrderCartSummary({
-    heading: "Your DUTS cart",
+  const message = formatGuestHandoffAwaitingLocation({
     shopName: quote.merchant.name,
     lines: quote.lines.map((l) => ({
       quantity: l.quantity,
       productName: l.productName,
       lineTotalCents: l.lineTotalCents
     })),
-    subtotalCents: quote.subtotalCents,
-    deliveryFeeCents: quote.deliveryFeeCents,
-    serviceFeeCents: quote.serviceFeeCents,
-    totalCents: quote.totalCents,
-    deliveryLabel: row.deliveryLabel,
-    includeConfirmChoices: true
+    subtotalCents: quote.subtotalCents
   });
 
   return { ok: true, message };

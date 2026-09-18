@@ -18,6 +18,10 @@ function read(rel: string) {
 const app = readFileSync(join(root, "App.tsx"), "utf8");
 assert.ok(app.includes("GuestAppNavigator"), "logged-out root uses GuestAppNavigator");
 assert.ok(app.includes("guestLinking"), "guest linking present");
+{
+  const guestBlock = app.slice(app.indexOf("const guestLinking"), app.indexOf("const appLinking"));
+  assert.ok(!guestBlock.includes("ShopLocation"), "guest deep links must not open exact location");
+}
 assert.ok(!app.includes("<AuthNavigator />"), "root must not force AuthNavigator");
 assert.ok(app.includes("hydrateCommerceCart"), "cart hydrates for refresh persistence");
 assert.ok(app.includes("claimCartAfterLogin"), "guest cart claimed after login");
@@ -29,20 +33,34 @@ for (const name of ["Home", "Search", "Cart", "SignIn"]) {
 assert.ok(!guestTabs.includes('name="Orders"'), "guest nav must not expose Orders");
 assert.ok(!guestTabs.includes('name="Account"'), "guest nav must not expose Account");
 
+const guestNav = read("navigation/GuestAppNavigator.tsx");
+assert.ok(!guestNav.includes("ShopLocation"), "guest stack must not open exact-location screen");
+
 const home = read("screens/commerce/ShopHomeScreen.tsx");
-assert.ok(home.includes("Set your location to see products available near you."), "location gate copy");
-assert.ok(home.includes("session?.token"), "home works without auth token");
+assert.ok(home.includes("Shopping near"), "approximate area label");
+assert.ok(home.includes("Change area"), "manual area change");
+assert.ok(!home.includes("Use my location"), "guest home must not request GPS");
+assert.ok(!home.includes("Set your location to see products available near you.") || home.includes("browse.isGuest"), "location gate is signed-in only");
+assert.ok(home.includes("session") || home.includes("isGuest"), "home works without auth token");
 assert.ok(!home.includes("session!.token"), "home must not require session");
+
+const areaStore = read("stores/shop-area.store.ts");
+assert.ok(areaStore.includes("duts.shop.area"), "persists coarse area only");
+assert.ok(areaStore.includes("duts.shop.deliveryLocation"), "clears leftover exact GPS for guests");
+assert.ok(areaStore.includes("Africa/Harare"), "timezone hint for default area");
+assert.ok(!areaStore.includes("getCurrentCoordinates"), "area store must not request GPS");
 
 const cart = read("screens/commerce/CartScreen.tsx");
 assert.ok(cart.includes("GuestCheckoutChoice"), "guest checkout decision");
 assert.ok(cart.includes("Continue to order"), "continue CTA");
-assert.ok(cart.includes("quote.totalCents"), "backend quote totals");
+assert.ok(cart.includes("Calculated when you order"), "deferred delivery copy");
+assert.ok(cart.includes("deferDelivery"), "guest quote defers delivery");
 
 const choice = read("screens/commerce/GuestCheckoutChoiceScreen.tsx");
 assert.ok(choice.includes("Continue on WhatsApp"), "WhatsApp CTA");
 assert.ok(choice.includes("Sign in / Create account"), "account path");
 assert.ok(choice.includes("commerceGuestHandoff"), "creates guest handoff");
+assert.ok(!choice.includes("latitude"), "handoff must not send exact coordinates");
 assert.ok(!choice.includes("Create an account to track orders") || choice.includes("Create an account to track orders and save your details."), "short account copy");
 
 const store = read("stores/commerce-cart.store.ts");
@@ -53,9 +71,10 @@ assert.ok(store.includes("Which basket should we keep"), "conflicting account ca
 const api = read("lib/api.ts");
 assert.ok(api.includes("commerceGuestHandoff"), "handoff API");
 assert.ok(api.includes("/commerce/guest/handoff"), "handoff path");
+assert.ok(api.includes("/commerce/shopping-areas"), "shopping areas API");
+assert.ok(api.includes("deferDelivery"), "deferred quote payload");
 
-const loc = read("screens/commerce/ShopLocationScreen.tsx");
-assert.ok(loc.includes("Use my location"), "GPS without account");
-assert.ok(loc.includes("Enter location"), "manual location");
+const checkout = read("screens/commerce/CommerceCheckoutScreen.tsx");
+assert.ok(checkout.includes("Choose delivery location"), "account path collects exact address");
 
 console.log(JSON.stringify({ ok: true }, null, 2));

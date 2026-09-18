@@ -66,7 +66,6 @@ const guestLinking = {
       ProductSearch: "products",
       ProductDetail: "product",
       ShopDetail: "shop/:merchantId",
-      ShopLocation: "deliver-to",
       GuestCheckoutChoice: "order",
       ForgotPassword: "forgot-password",
       ResetPassword: resetPasswordLink

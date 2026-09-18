@@ -35,6 +35,29 @@ export function formatCartLines(
   return lines.map((l) => `${l.quantity} × ${l.productName} — ${money(l.lineTotalCents)}`).join("\n");
 }
 
+/** Guest web basket restored — ask for WhatsApp location before any delivery quote. */
+export function formatGuestHandoffAwaitingLocation(input: {
+  shopName?: string;
+  lines: Array<{ quantity: number; productName: string; lineTotalCents: number }>;
+  subtotalCents: number;
+}): string {
+  return [
+    "Your DUTS cart",
+    "",
+    formatCartLines(input.lines),
+    "",
+    input.shopName ? `Shop: ${input.shopName}` : null,
+    `Items: ${money(input.subtotalCents)}`,
+    "Delivery: Calculated when you send your location",
+    "",
+    "Where should we deliver?",
+    "",
+    "Please send your location using WhatsApp."
+  ]
+    .filter((p) => p != null)
+    .join("\n");
+}
+
 /** Prefer human-readable delivery labels; keep coordinate strings as safe fallback. */
 export function formatCustomerDeliveryLabel(label: string | null | undefined): string | null {
   const trimmed = String(label ?? "").trim();

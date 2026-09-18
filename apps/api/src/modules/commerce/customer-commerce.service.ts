@@ -13,10 +13,20 @@ import {
   listMerchantProducts,
   type BasketLine
 } from "./merchant.service.js";
+import { findMerchantsInShoppingArea } from "./shopping-areas.js";
 import { createConfirmedCommerceOrder, quoteBasketTotals } from "./order.service.js";
 import { ensureAppCommerceCustomer } from "./commerce-customer.service.js";
 import type { CommercePaymentMethod, OrderSource } from "@prisma/client";
 import { browserAccessibleMediaUrl } from "../../lib/catalog-media.js";
+
+export type BrowseGeo = { areaId: string } | { lat: number; lng: number };
+
+async function merchantsForBrowse(geo: BrowseGeo) {
+  if ("areaId" in geo) {
+    return findMerchantsInShoppingArea(geo.areaId);
+  }
+  return findNearbyMerchants(geo.lat, geo.lng);
+}
 
 const PLACEHOLDER_IMAGE = null;
 
@@ -63,8 +73,8 @@ function presentCatalogCard(input: {
   };
 }
 
-export async function browseNearbyShops(lat: number, lng: number) {
-  const nearby = await findNearbyMerchants(lat, lng);
+export async function browseNearbyShops(geo: BrowseGeo) {
+  const nearby = await merchantsForBrowse(geo);
   return {
     shops: nearby.map(({ merchant, distanceKm }) => ({
       id: merchant.id,
@@ -78,15 +88,13 @@ export async function browseNearbyShops(lat: number, lng: number) {
   };
 }
 
-export async function browseNearbyProducts(input: {
-  lat: number;
-  lng: number;
+export async function browseNearbyProducts(input: BrowseGeo & {
   q?: string;
   category?: string;
   limit?: number;
 }) {
   const limit = Math.min(input.limit ?? 40, 80);
-  const nearby = await findNearbyMerchants(input.lat, input.lng);
+  const nearby = await merchantsForBrowse(input);
   if (nearby.length === 0) {
     return { products: [] as ReturnType<typeof presentCatalogCard>[], shopsNearby: 0 };
   }
@@ -212,8 +220,8 @@ export async function browseNearbyProducts(input: {
   return { products: productsOut, shopsNearby: nearby.length };
 }
 
-export async function listBrowseCategories(lat: number, lng: number) {
-  const { products } = await browseNearbyProducts({ lat, lng, limit: 200 });
+export async function listBrowseCategories(geo: BrowseGeo) {
+  const { products } = await browseNearbyProducts({ ...geo, limit: 200 });
   const counts = new Map<string, number>();
   for (const p of products) {
     const cat = (p.category || "Other").trim() || "Other";
@@ -225,13 +233,11 @@ export async function listBrowseCategories(lat: number, lng: number) {
   return { categories };
 }
 
-export async function getProductDetailNear(input: {
-  lat: number;
-  lng: number;
+export async function getProductDetailNear(input: BrowseGeo & {
   catalogProductId?: string;
   productId?: string;
 }) {
-  const nearby = await findNearbyMerchants(input.lat, input.lng);
+  const nearby = await merchantsForBrowse(input);
   const merchantById = new Map(nearby.map((n) => [n.merchant.id, n]));
 
   let catalogId = input.catalogProductId ?? null;
@@ -304,13 +310,11 @@ export async function getProductDetailNear(input: {
   };
 }
 
-export async function getShopCatalog(input: {
+export async function getShopCatalog(input: BrowseGeo & {
   merchantId: string;
-  lat: number;
-  lng: number;
   q?: string;
 }) {
-  const nearby = await findNearbyMerchants(input.lat, input.lng);
+  const nearby = await merchantsForBrowse(input);
   const hit = nearby.find((n) => n.merchant.id === input.merchantId);
   if (!hit) {
     throw new AppError("This shop is not available near your location.", 404, "SHOP_NOT_NEARBY");
@@ -385,8 +389,9 @@ export async function getShopCatalog(input: {
 }
 
 export async function quoteCart(input: {
-  lat: number;
-  lng: number;
+  lat?: number;
+  lng?: number;
+  deferDelivery?: boolean;
   lines: Array<{ productId: string; quantity: number }>;
   preferredMerchantId?: string;
 }) {
@@ -439,9 +444,32 @@ export async function quoteCart(input: {
 
   const merchantId = [...merchantIds][0]!;
   const merchant = products.find((p) => p.merchantId === merchantId)?.merchant;
-  if (!merchant) {
-    throw new AppError("This shop is not available near your delivery location.", 409, "SHOP_NOT_NEARBY");
+  if (!merchant || !merchant.isActive || !merchant.acceptsOrders) {
+    throw new AppError("This shop is not accepting orders right now.", 409, "MERCHANT_CLOSED");
   }
+
+  if (input.deferDelivery) {
+    const subtotalCents = basketLines.reduce((sum, line) => sum + line.lineTotalCents, 0);
+    return {
+      merchant: {
+        id: merchant.id,
+        name: merchant.name,
+        distanceKm: null as number | null
+      },
+      lines: basketLines,
+      subtotalCents,
+      deliveryFeeCents: 0,
+      serviceFeeCents: 0,
+      totalCents: subtotalCents,
+      currency: "usd" as const,
+      deliveryQuoteStatus: "deferred" as const
+    };
+  }
+
+  if (input.lat == null || input.lng == null) {
+    throw new AppError("Delivery location is required to calculate delivery.", 400, "LOCATION_REQUIRED");
+  }
+
   const nearby = await findNearbyMerchants(input.lat, input.lng);
   const dist = nearby.find((n) => n.merchant.id === merchantId);
   if (!dist) {
@@ -463,7 +491,8 @@ export async function quoteCart(input: {
       distanceKm: Math.round(dist.distanceKm * 10) / 10
     },
     lines: basketLines,
-    ...totals
+    ...totals,
+    deliveryQuoteStatus: "final" as const
   };
 }
 
