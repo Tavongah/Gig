@@ -11,6 +11,8 @@ import {
   normalizeImageContentType
 } from "../src/lib/catalog-media.js";
 
+import { mapErrorToResponse } from "../src/lib/errors.js";
+
 const cdn =
   "https://gigflow-uploads.nyc3.cdn.digitaloceanspaces.com/products/catalog/u/1-mazoe.jpg";
 const origin =
@@ -50,5 +52,12 @@ const raspberry = createCatalogProductSchema.parse({
   primaryImageUrl: origin
 });
 assert.equal(raspberry.name, "Mazoe Raspberry");
+
+{
+  const mapped = mapErrorToResponse(Object.assign(new Error("The specified bucket does not exist"), { name: "NoSuchBucket", Code: "NoSuchBucket" }));
+  assert.equal(mapped.status, 503);
+  assert.equal(mapped.body.error, "Photo couldn't be uploaded. Please try again.");
+  assert.doesNotMatch(mapped.body.error, /bucket/i);
+}
 
 console.log(JSON.stringify({ ok: true }, null, 2));

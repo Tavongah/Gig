@@ -48,6 +48,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  const pendingPhotoRef = useRef<File | null>(null);
 
   const listQuery = useQuery({
     queryKey: ["duts-catalog", q, statusFilter],
@@ -116,7 +117,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
       void queryClient.invalidateQueries({ queryKey: ["duts-catalog-detail"] });
     },
     onError: (e: unknown) =>
-      setNotice(friendlyApiError(e, "Product wasn't saved. Check your connection and try again."))
+      setNotice(friendlyApiError(e, "Product wasn't saved. Please try again."))
   });
 
   const statusMut = useMutation({
@@ -155,6 +156,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
 
   async function onPickImage(file: File | null) {
     if (!file) return;
+    pendingPhotoRef.current = file;
     if (localPreview) URL.revokeObjectURL(localPreview);
     const previewUrl = URL.createObjectURL(file);
     setLocalPreview(previewUrl);
@@ -165,7 +167,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
       setForm((prev) => ({ ...prev, primaryImageUrl: url }));
       setNotice("Photo updated.");
     } catch (e) {
-      setNotice(friendlyApiError(e, "Couldn't upload this photo. Try another photo."));
+      setNotice(friendlyApiError(e, "Photo couldn't be uploaded. Please try again."));
     } finally {
       setUploading(false);
     }
@@ -175,6 +177,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
     setSelectedId(null);
     setForm(emptyForm);
     setLocalPreview(null);
+    pendingPhotoRef.current = null;
     setNotice("");
     setMode("create");
   }
@@ -215,6 +218,15 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
             </button>
           </div>
           {uploading ? <p className="muted">Uploading photo…</p> : null}
+          {!uploading && localPreview && !form.primaryImageUrl.trim() ? (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => void onPickImage(pendingPhotoRef.current)}
+            >
+              Try again
+            </button>
+          ) : null}
           <input
             ref={cameraRef}
             type="file"

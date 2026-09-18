@@ -10,6 +10,18 @@ export class AppError extends Error {
   }
 }
 
+export const PHOTO_UPLOAD_FAILED = "Photo couldn't be uploaded. Please try again.";
+export const PRODUCT_SAVE_FAILED = "Product wasn't saved. Please try again.";
+
+/** S3/Spaces/network failures — never send infrastructure text to Admin. */
+export function isStorageInfraError(error: unknown): boolean {
+  const err = error as { name?: string; Code?: string; code?: string; message?: string };
+  const hay = [err?.name, err?.Code, err?.code, err?.message].filter(Boolean).join(" ");
+  return /NoSuchBucket|InvalidAccessKeyId|SignatureDoesNotMatch|AccessDenied|NotFound|NetworkingError|TimeoutError|ECONN|ENOTFOUND|specified bucket|spaces|s3\b|storage/i.test(
+    hay
+  );
+}
+
 export function mapErrorToResponse(error: unknown): {
   status: number;
   body: { success?: boolean; error: string; code?: string; errors?: Record<string, string> };
@@ -53,6 +65,17 @@ export function mapErrorToResponse(error: unknown): {
       INVALID_TRANSPORT_MODE: 400,
       WORKER_PROFILE_REQUIRED: 400
     };
+
+    if (isStorageInfraError(error)) {
+      console.error("[spaces] storage_error", {
+        name: error.name,
+        code: (error as Error & { Code?: string; code?: string }).Code ?? (error as Error & { code?: string }).code
+      });
+      return {
+        status: 503,
+        body: { error: PHOTO_UPLOAD_FAILED, code: "STORAGE_UPLOAD_FAILED" }
+      };
+    }
 
     const status = known[error.message] ?? known[(error as Error & { code?: string }).code ?? ""] ?? 500;
     const fieldErrors = (error as Error & { errors?: Record<string, string> }).errors;

@@ -6,7 +6,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env, isSpacesConfigured } from "../config/env.js";
-import { AppError } from "./errors.js";
+import { AppError, PHOTO_UPLOAD_FAILED } from "./errors.js";
 
 export type UploadPurpose =
   | "worker-profile"
@@ -49,7 +49,7 @@ function getSpacesClient(): S3Client {
 }
 
 function getBucket(): string {
-  return env.SPACES_BUCKET ?? env.S3_BUCKET ?? "";
+  return (env.SPACES_BUCKET ?? env.S3_BUCKET ?? "").trim();
 }
 
 export function buildObjectKey(purpose: UploadPurpose, userId: string, fileName: string): string {
@@ -149,15 +149,25 @@ export async function uploadPublicObject(input: {
   };
 
   try {
-    // Product photos must be anonymously GET-able by Admin/customer browsers.
-    // Presigned PUTs often reject ACL; server-side PutObject usually accepts it.
-    await client.send(new PutObjectCommand({ ...base, ACL: "public-read" }));
-  } catch (err) {
-    const msg = err instanceof Error ? `${err.name} ${err.message}` : String(err);
-    if (!/acl|accesscontrol|canned|notimplemented/i.test(msg)) {
-      throw err;
+    try {
+      // Product photos must be anonymously GET-able by Admin/customer browsers.
+      // Presigned PUTs often reject ACL; server-side PutObject usually accepts it.
+      await client.send(new PutObjectCommand({ ...base, ACL: "public-read" }));
+    } catch (err) {
+      const msg = err instanceof Error ? `${err.name} ${err.message}` : String(err);
+      if (!/acl|accesscontrol|canned|notimplemented/i.test(msg)) {
+        throw err;
+      }
+      await client.send(new PutObjectCommand(base));
     }
-    await client.send(new PutObjectCommand(base));
+  } catch (err) {
+    const aws = err as { name?: string; Code?: string; code?: string };
+    console.error("[spaces] put_object_failed", {
+      name: aws.name,
+      code: aws.Code ?? aws.code,
+      prefix: objectKey.split("/").slice(0, 2).join("/")
+    });
+    throw new AppError(PHOTO_UPLOAD_FAILED, 503, "STORAGE_UPLOAD_FAILED");
   }
 
   return {

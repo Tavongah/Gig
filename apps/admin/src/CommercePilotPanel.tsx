@@ -123,6 +123,7 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
   const [localPhotoPreview, setLocalPhotoPreview] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const pendingPhotoRef = useRef<File | null>(null);
 
   const merchantsQuery = useQuery({
     queryKey: ["admin-commerce-merchants"],
@@ -178,7 +179,7 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
       void queryClient.invalidateQueries({ queryKey: ["admin-commerce-merchant", selectedId] });
     },
     onError: (e: unknown) =>
-      setNotice(friendlyApiError(e, "Product wasn't saved. Check your connection and try again."))
+      setNotice(friendlyApiError(e, "Product wasn't saved. Please try again."))
   });
 
   const submitNewCatalogMut = useMutation({
@@ -232,7 +233,7 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
       void queryClient.invalidateQueries({ queryKey: ["admin-commerce-products", selectedId] });
     },
     onError: (e: unknown) =>
-      setNotice(friendlyApiError(e, "Product wasn't saved. Check your connection and try again."))
+      setNotice(friendlyApiError(e, "Product wasn't saved. Please try again."))
   });
 
   const saveMerchant = useMutation({
@@ -344,11 +345,12 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
       void queryClient.invalidateQueries({ queryKey: ["admin-commerce-products", selectedId] });
     },
     onError: (e: unknown) =>
-      setNotice(friendlyApiError(e, "Product wasn't saved. Check your connection and try again."))
+      setNotice(friendlyApiError(e, "Product wasn't saved. Please try again."))
   });
 
   async function onPickMerchantPhoto(file: File | null) {
     if (!file) return;
+    pendingPhotoRef.current = file;
     if (localPhotoPreview) URL.revokeObjectURL(localPhotoPreview);
     setLocalPhotoPreview(URL.createObjectURL(file));
     setPhotoUploading(true);
@@ -358,7 +360,7 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
       setNewCatalogForm((prev) => ({ ...prev, primaryImageUrl: url }));
       setNotice("Photo updated.");
     } catch (e) {
-      setNotice(friendlyApiError(e, "Couldn't upload this photo. Try another photo."));
+      setNotice(friendlyApiError(e, "Photo couldn't be uploaded. Please try again."));
     } finally {
       setPhotoUploading(false);
     }
@@ -865,6 +867,15 @@ export function CommercePilotPanel({ apiRequest }: { apiRequest: ApiRequest }) {
                           </button>
                         </div>
                         {photoUploading ? <p className="muted">Uploading photo…</p> : null}
+                        {!photoUploading && localPhotoPreview && !newCatalogForm.primaryImageUrl.trim() ? (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => void onPickMerchantPhoto(pendingPhotoRef.current)}
+                          >
+                            Try again
+                          </button>
+                        ) : null}
                         <input
                           ref={cameraRef}
                           type="file"

@@ -26,8 +26,13 @@ assert.equal(friendlyCatalogStatus("PENDING"), "Pending review");
 assert.equal(displayCategory("baking"), "Baking");
 assert.equal(displayCategory("Drinks"), "Drinks");
 assert.ok(
-  friendlyApiError(new Error("Spaces upload failed"), "Couldn't upload this photo. Try another photo.").includes(
-    "Couldn't upload"
+  friendlyApiError(new Error("The specified bucket does not exist"), "Photo couldn't be uploaded. Please try again.").includes(
+    "Photo couldn't be uploaded"
+  )
+);
+assert.ok(
+  friendlyApiError(new Error("Spaces upload failed"), "Photo couldn't be uploaded. Please try again.").includes(
+    "Photo couldn't be uploaded"
   )
 );
 
@@ -35,7 +40,9 @@ const catalog = read("DutsCatalogPanel.tsx");
 assert.ok(catalog.includes("Manage products available across DUTS"));
 assert.ok(!catalog.includes("Canonical product information"));
 assert.ok(catalog.includes("Advanced"));
-assert.ok(catalog.includes("Take photo"));
+assert.ok(catalog.includes("Try again"));
+assert.ok(catalog.includes("Photo couldn't be uploaded. Please try again."));
+assert.ok(catalog.includes("pendingPhotoRef"));
 assert.ok(catalog.includes("Choose photo"));
 assert.ok(catalog.includes('capture="environment"'));
 assert.ok(catalog.includes("Product saved."));
@@ -60,6 +67,8 @@ assert.ok(pilot.includes("Search DUTS Catalog"));
 assert.ok(pilot.includes("Add to shop"));
 assert.ok(pilot.includes("In stock"));
 assert.ok(pilot.includes("uploadCatalogImage"));
+assert.ok(pilot.includes("Try again"));
+assert.ok(pilot.includes("Photo couldn't be uploaded. Please try again."));
 assert.ok(pilot.includes("Possible match"));
 
 const app = read("App.tsx");

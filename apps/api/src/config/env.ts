@@ -74,12 +74,20 @@ const envSchema = z.object({
 
 export const env = envSchema.parse(process.env);
 
+function looksLikePlaceholderSecret(value: string): boolean {
+  const v = value.trim();
+  if (!v) return true;
+  return /replace|changeme|your-|xxx|example|placeholder|dummy/i.test(v);
+}
+
 export function isSpacesConfigured(): boolean {
-  const bucket = env.SPACES_BUCKET ?? env.S3_BUCKET;
-  const key = env.SPACES_ACCESS_KEY_ID ?? env.AWS_ACCESS_KEY_ID;
-  const secret = env.SPACES_SECRET_ACCESS_KEY ?? env.AWS_SECRET_ACCESS_KEY;
-  const endpoint = env.SPACES_ENDPOINT ?? env.S3_ENDPOINT;
-  return Boolean(bucket && key && secret && endpoint);
+  const bucket = (env.SPACES_BUCKET ?? env.S3_BUCKET ?? "").trim();
+  const key = (env.SPACES_ACCESS_KEY_ID ?? env.AWS_ACCESS_KEY_ID ?? "").trim();
+  const secret = (env.SPACES_SECRET_ACCESS_KEY ?? env.AWS_SECRET_ACCESS_KEY ?? "").trim();
+  const endpoint = (env.SPACES_ENDPOINT ?? env.S3_ENDPOINT ?? "").trim();
+  if (!bucket || !key || !secret || !endpoint) return false;
+  if (looksLikePlaceholderSecret(key) || looksLikePlaceholderSecret(secret)) return false;
+  return true;
 }
 
 export function getCorsOrigins(): string[] | true {

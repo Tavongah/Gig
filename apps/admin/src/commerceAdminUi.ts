@@ -55,7 +55,11 @@ export function displayCategory(category: string | null | undefined): string {
 export function friendlyApiError(err: unknown, fallback: string): string {
   const msg = err instanceof Error ? err.message : String(err ?? "");
   if (!msg.trim()) return fallback;
-  if (/spaces|s3|storage|ECONN|network|fetch|timeout|500|502|503/i.test(msg)) {
+  if (
+    /spaces|s3|storage|bucket|NoSuchBucket|specified bucket|ECONN|network|fetch|timeout|500|502|503|access key/i.test(
+      msg
+    )
+  ) {
     return fallback;
   }
   if (msg.length > 160) return fallback;
@@ -102,7 +106,7 @@ export async function uploadCatalogImage(
     })
   });
   if (!uploaded?.url) {
-    throw new Error("Couldn't upload this photo. Try another photo.");
+    throw new Error("Photo couldn't be uploaded. Please try again.");
   }
   return uploaded.url;
 }

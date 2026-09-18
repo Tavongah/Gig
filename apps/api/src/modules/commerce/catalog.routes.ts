@@ -10,7 +10,7 @@ import { UserRole } from "@prisma/client";
 import { requireAuth, requireRole } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
 import { isSpacesConfigured, uploadPublicObject } from "../../lib/spaces.js";
-import { AppError } from "../../lib/errors.js";
+import { AppError, PHOTO_UPLOAD_FAILED } from "../../lib/errors.js";
 import {
   ALLOWED_CATALOG_IMAGE_TYPES,
   detectImageContentType,
@@ -132,7 +132,7 @@ catalogAdminRouter.post("/catalog/migrate-existing", async (_req, res, next) => 
 catalogAdminRouter.post("/catalog/upload-image", async (req, res, next) => {
   try {
     if (!isSpacesConfigured()) {
-      throw new AppError("Image storage is not configured.", 503, "STORAGE_NOT_CONFIGURED");
+      throw new AppError(PHOTO_UPLOAD_FAILED, 503, "STORAGE_NOT_CONFIGURED");
     }
     const { fileName, contentType, dataBase64 } = req.body as {
       fileName?: string;
