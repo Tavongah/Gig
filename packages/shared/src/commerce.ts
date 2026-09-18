@@ -179,6 +179,8 @@ export const PRODUCT_ALIAS_MAP: Record<string, string[]> = {
   sugar: ["sugar", "suger", "sugr"],
   oil: ["cooking oil", "oil", "cookin oil"],
   rice: ["rice"],
+  kapenta: ["kapenta", "matemba"],
+  matemba: ["matemba", "kapenta"],
   pepsi: ["pepsi"],
   soap: ["soap", "barra"],
   water: ["water", "bottled water"],

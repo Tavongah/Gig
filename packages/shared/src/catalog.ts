@@ -7,6 +7,35 @@ export type CatalogProductStatus = (typeof catalogProductStatuses)[number];
 export const catalogProductSources = ["DUTS_ADMIN", "MERCHANT_SUBMISSION", "IMPORT"] as const;
 export type CatalogProductSource = (typeof catalogProductSources)[number];
 
+/**
+ * Admin/catalog search scans at most this many CatalogProduct rows, then scores/slices.
+ * Independent of WhatsApp reply caps (those stay at 5 / 12 nearby merchant offers).
+ */
+export const CATALOG_PRODUCT_SCAN_LIMIT = 1000;
+
+/** Max rows an ADMIN master-catalog request may return. Must stay ≤ scan limit. */
+export const ADMIN_CATALOG_LIST_LIMIT = 1000;
+
+/** Max rows merchant catalog-search / non-admin callers may return. */
+export const MERCHANT_CATALOG_SEARCH_LIMIT_MAX = 100;
+
+/**
+ * Legacy APPROVED rows kept after the canonical rebuild. Visible to admin,
+ * never counted as canonical, never mutated by the visibility fix.
+ * Dragon / Starbucks / 500ml and Pepsi zero sugar / Coca-Cola / 400ml.
+ */
+export const UNRESOLVED_LEGACY_CATALOG_PRODUCT_IDS = [
+  "cd5ff8f9-14ea-4193-88a2-85d97114ea26",
+  "4eb36208-3c3d-4fbc-b856-c62767a7093e"
+] as const;
+
+export function isUnresolvedLegacyCatalogProduct(id: string): boolean {
+  return (UNRESOLVED_LEGACY_CATALOG_PRODUCT_IDS as readonly string[]).includes(id);
+}
+
+export const adminCatalogViews = ["canonical", "archived", "unresolved", "all"] as const;
+export type AdminCatalogView = (typeof adminCatalogViews)[number];
+
 export function normalizeBarcode(barcode: string | null | undefined): string | null {
   if (!barcode) return null;
   const digits = barcode.replace(/\D/g, "");
@@ -31,14 +60,26 @@ export const updateCatalogProductSchema = createCatalogProductSchema.partial().e
   status: z.enum(catalogProductStatuses).optional()
 });
 
-export const searchCatalogProductsSchema = z.object({
-  q: z.string().max(160).optional().default(""),
-  status: z.enum(catalogProductStatuses).optional(),
-  /** When true (admin list), return all statuses unless `status` is set. */
-  adminList: z.boolean().optional().default(false),
-  includePendingForMerchantId: z.string().uuid().optional(),
-  limit: z.number().int().min(1).max(100).optional().default(30)
-});
+export const searchCatalogProductsSchema = z
+  .object({
+    q: z.string().max(160).optional().default(""),
+    status: z.enum(catalogProductStatuses).optional(),
+    /** When true (admin list), return all statuses unless `status`/`view` is set. */
+    adminList: z.boolean().optional().default(false),
+    includePendingForMerchantId: z.string().uuid().optional(),
+    category: z.string().max(80).optional(),
+    view: z.enum(adminCatalogViews).optional(),
+    limit: z.number().int().min(1).max(ADMIN_CATALOG_LIST_LIMIT).optional().default(30)
+  })
+  .superRefine((data, ctx) => {
+    if (!data.adminList && (data.limit ?? 30) > MERCHANT_CATALOG_SEARCH_LIMIT_MAX) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["limit"],
+        message: `Non-admin catalog search limit cannot exceed ${MERCHANT_CATALOG_SEARCH_LIMIT_MAX}`
+      });
+    }
+  });
 
 export const linkMerchantOfferSchema = z.object({
   catalogProductId: z.string().uuid(),

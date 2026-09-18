@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   displayCategory,
   friendlyApiError,
@@ -21,9 +21,37 @@ type CatalogProduct = {
   primaryImageUrl: string | null;
   status: CatalogStatus;
   source: string;
+  unresolved?: boolean;
+};
+
+type CatalogView = "canonical" | "archived" | "unresolved" | "all";
+
+type CatalogListResponse = {
+  products: CatalogProduct[];
+  total?: number;
+  approved?: number;
+  archived?: number;
+  canonical?: number;
+  unresolved?: number;
+  categories?: string[];
 };
 
 type Mode = "list" | "detail" | "edit" | "create";
+
+function catalogRowMatchesQuery(product: CatalogProduct, raw: string): boolean {
+  const q = raw.trim().toLowerCase();
+  if (!q) return true;
+  const hay = [product.name, product.brand, product.sizeLabel, product.category]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (hay.includes(q)) return true;
+  if (q.includes("matemba") && hay.includes("kapenta")) return true;
+  if ((q === "coke" || q.includes("coca-cola") || q.includes("coca cola")) && hay.includes("coca")) {
+    return true;
+  }
+  return false;
+}
 
 const emptyForm = {
   name: "",
@@ -38,7 +66,8 @@ const emptyForm = {
 export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [view, setView] = useState<CatalogView>("canonical");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [mode, setMode] = useState<Mode>("list");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -51,15 +80,12 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
   const pendingPhotoRef = useRef<File | null>(null);
 
   const listQuery = useQuery({
-    queryKey: ["duts-catalog", q, statusFilter],
+    queryKey: ["duts-catalog", view],
     queryFn: () => {
       const params = new URLSearchParams();
-      if (q.trim()) params.set("q", q.trim());
-      if (statusFilter) params.set("status", statusFilter);
-      params.set("limit", "50");
-      return apiRequest<{ products: CatalogProduct[] }>(
-        `/admin/commerce/catalog/products?${params.toString()}`
-      );
+      params.set("view", view);
+      params.set("limit", "1000");
+      return apiRequest<CatalogListResponse>(`/admin/commerce/catalog/products?${params.toString()}`);
     }
   });
 
@@ -192,11 +218,26 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
   const detail = detailQuery.data?.product;
   const previewSrc = localPreview || form.primaryImageUrl || null;
   const photoBlocked = uploading || (Boolean(localPreview) && !form.primaryImageUrl.trim());
-  const filters: Array<{ id: string; label: string }> = [
-    { id: "", label: "All" },
-    { id: "APPROVED", label: "Approved" },
-    { id: "PENDING", label: "Pending" }
+  const viewFilters: Array<{ id: CatalogView; label: string }> = [
+    { id: "canonical", label: "Canonical" },
+    { id: "unresolved", label: "Unresolved" },
+    { id: "archived", label: "Archived" },
+    { id: "all", label: "All" }
   ];
+  const canonicalCount = listQuery.data?.canonical ?? 0;
+  const archivedCount = listQuery.data?.archived ?? 0;
+  const unresolvedCount = listQuery.data?.unresolved ?? 0;
+  const categoryOptions = useMemo(() => {
+    const fromApi = listQuery.data?.categories ?? [];
+    const fromRows = (listQuery.data?.products ?? []).map((p) => p.category);
+    return [...new Set([...fromApi, ...fromRows])].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [listQuery.data?.categories, listQuery.data?.products]);
+  const visibleProducts = useMemo(() => {
+    return (listQuery.data?.products ?? []).filter((p) => {
+      if (categoryFilter && p.category !== categoryFilter) return false;
+      return catalogRowMatchesQuery(p, q);
+    });
+  }, [listQuery.data?.products, categoryFilter, q]);
 
   if (mode === "create" || mode === "edit") {
     return (
@@ -329,7 +370,9 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
               </p>
               <div style={{ margin: "12px 0" }}>
                 <StatusBadge status={p.status} />
+                {p.unresolved ? <span className="catalog-unresolved-badge">Unresolved</span> : null}
               </div>
+              {!p.primaryImageUrl ? <p className="catalog-missing-image">No image</p> : null}
               {p.description ? <p className="product-desc">{p.description}</p> : null}
 
               <button type="button" className="btn-primary btn-block" onClick={() => setMode("edit")}>
@@ -361,6 +404,14 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
     <div className="commerce-stack">
       <section className="panel commerce-panel">
         <h2>DUTS Catalog</h2>
+        <p className="catalog-count-line">
+          <strong>{canonicalCount}</strong> canonical products
+        </p>
+        <p className="catalog-stat-row">
+          <span>Canonical {canonicalCount}</span>
+          <span>Unresolved {unresolvedCount}</span>
+          <span>Archived {archivedCount}</span>
+        </p>
         <p className="muted">Manage products available across DUTS.</p>
         {notice ? <p className="notice">{notice}</p> : null}
 
@@ -374,20 +425,41 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
           />
         </label>
 
-        <div className="chip-row" role="tablist" aria-label="Status filter">
-          {filters.map((f) => (
+        <div className="chip-row" role="tablist" aria-label="Catalog view">
+          {viewFilters.map((f) => (
             <button
-              key={f.id || "all"}
+              key={f.id}
               type="button"
               role="tab"
-              aria-selected={statusFilter === f.id}
-              className={statusFilter === f.id ? "chip chip-active" : "chip"}
-              onClick={() => setStatusFilter(f.id)}
+              aria-selected={view === f.id}
+              className={view === f.id ? "chip chip-active" : "chip"}
+              onClick={() => setView(f.id)}
             >
               {f.label}
             </button>
           ))}
         </div>
+
+        <label className="catalog-category-filter">
+          <span className="sr-only">Category</span>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            aria-label="Filter by category"
+          >
+            <option value="">All Categories</option>
+            {categoryOptions.map((c) => (
+              <option key={c} value={c}>
+                {displayCategory(c)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <p className="muted tiny catalog-showing">
+          Showing {visibleProducts.length}
+          {listQuery.data?.products ? ` of ${listQuery.data.products.length}` : ""}
+        </p>
 
         <button type="button" className="btn-primary btn-block" onClick={openCreate}>
           + Add product
@@ -399,7 +471,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
         ) : null}
 
         <div className="product-card-list">
-          {(listQuery.data?.products ?? []).map((p) => (
+          {visibleProducts.map((p) => (
             <button key={p.id} type="button" className="product-card" onClick={() => openDetail(p)}>
               <ProductThumb src={p.primaryImageUrl} alt={p.name} size="md" />
               <div className="product-card-body">
@@ -408,7 +480,11 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
                   {[p.brand, p.sizeLabel].filter(Boolean).join(" · ") || displayCategory(p.category)}
                 </span>
                 <span className="muted">{displayCategory(p.category)}</span>
-                <StatusBadge status={p.status} />
+                <span className="catalog-card-flags">
+                  <StatusBadge status={p.status} />
+                  {p.unresolved ? <span className="catalog-unresolved-badge">Unresolved</span> : null}
+                  {!p.primaryImageUrl ? <span className="catalog-missing-image">No image</span> : null}
+                </span>
               </div>
               <span className="chevron" aria-hidden>
                 ›
@@ -417,7 +493,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
           ))}
         </div>
 
-        {!listQuery.isLoading && (listQuery.data?.products ?? []).length === 0 ? (
+        {!listQuery.isLoading && visibleProducts.length === 0 ? (
           <p className="muted">No products match this search.</p>
         ) : null}
 

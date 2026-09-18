@@ -1,4 +1,6 @@
 import {
+  ADMIN_CATALOG_LIST_LIMIT,
+  MERCHANT_CATALOG_SEARCH_LIMIT_MAX,
   createCatalogProductSchema,
   linkMerchantOfferSchema,
   searchCatalogProductsSchema,
@@ -29,11 +31,15 @@ catalogAdminRouter.use(requireAuth, requireRole(UserRole.ADMIN));
 
 catalogAdminRouter.get("/catalog/products", async (req, res, next) => {
   try {
+    const status = typeof req.query.status === "string" ? req.query.status : undefined;
+    const view = typeof req.query.view === "string" ? req.query.view : undefined;
     const result = await searchCatalogProducts({
       q: typeof req.query.q === "string" ? req.query.q : "",
-      status: typeof req.query.status === "string" ? req.query.status : undefined,
-      adminList: !req.query.status,
-      limit: req.query.limit ? Number(req.query.limit) : 50
+      status,
+      category: typeof req.query.category === "string" ? req.query.category : undefined,
+      view: view ?? (status ? undefined : "canonical"),
+      adminList: true,
+      limit: req.query.limit ? Number(req.query.limit) : ADMIN_CATALOG_LIST_LIMIT
     });
     res.json(result);
   } catch (err) {
@@ -162,10 +168,11 @@ catalogAdminRouter.post("/catalog/upload-image", async (req, res, next) => {
 
 catalogAdminRouter.get("/merchants/:id/catalog/search", async (req, res, next) => {
   try {
+    const rawLimit = req.query.limit ? Number(req.query.limit) : 30;
     const parsed = searchCatalogProductsSchema.parse({
       q: typeof req.query.q === "string" ? req.query.q : "",
       includePendingForMerchantId: String(req.params.id),
-      limit: req.query.limit ? Number(req.query.limit) : 30
+      limit: Math.min(Number.isFinite(rawLimit) ? rawLimit : 30, MERCHANT_CATALOG_SEARCH_LIMIT_MAX)
     });
     const result = await searchCatalogProducts(parsed);
     res.json(result);

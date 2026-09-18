@@ -37,6 +37,11 @@ assert.ok(
 
 const catalog = read("DutsCatalogPanel.tsx");
 assert.ok(catalog.includes("Manage products available across DUTS"));
+assert.ok(catalog.includes('params.set("limit", "1000")'));
+assert.ok(!catalog.includes('params.set("limit", "50")'));
+assert.ok(catalog.includes("canonical products"));
+assert.ok(catalog.includes("All Categories"));
+assert.ok(catalog.includes("No image"));
 assert.ok(!catalog.includes("Canonical product information"));
 assert.ok(catalog.includes("Advanced"));
 assert.ok(catalog.includes("Try again"));

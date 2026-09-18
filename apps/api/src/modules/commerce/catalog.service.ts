@@ -1,7 +1,12 @@
 import {
+  ADMIN_CATALOG_LIST_LIMIT,
+  CATALOG_PRODUCT_SCAN_LIMIT,
+  MERCHANT_CATALOG_SEARCH_LIMIT_MAX,
+  UNRESOLVED_LEGACY_CATALOG_PRODUCT_IDS,
   catalogSearchHaystack,
   createCatalogProductSchema,
   expandSearchTerms,
+  isUnresolvedLegacyCatalogProduct,
   linkMerchantOfferSchema,
   normalizeBarcode,
   normalizeProductSearchName,
@@ -15,7 +20,12 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { browserAccessibleMediaUrl } from "../../lib/catalog-media.js";
 
+export { CATALOG_PRODUCT_SCAN_LIMIT, ADMIN_CATALOG_LIST_LIMIT };
+
+const unresolvedLegacyIds = [...UNRESOLVED_LEGACY_CATALOG_PRODUCT_IDS];
+
 function presentation(product: CatalogProduct) {
+  const unresolved = isUnresolvedLegacyCatalogProduct(product.id);
   return {
     id: product.id,
     name: product.name,
@@ -29,10 +39,80 @@ function presentation(product: CatalogProduct) {
     primaryImageUrl: browserAccessibleMediaUrl(product.primaryImageUrl),
     status: product.status,
     source: product.source,
+    unresolved,
     submittedByMerchantId: product.submittedByMerchantId,
     approvedAt: product.approvedAt,
     createdAt: product.createdAt,
     updatedAt: product.updatedAt
+  };
+}
+
+type CatalogSearchSummary = {
+  total: number;
+  approved: number;
+  archived: number;
+  pending: number;
+  rejected: number;
+  canonical: number;
+  unresolved: number;
+  categories: string[];
+};
+
+async function loadCatalogSummary(): Promise<CatalogSearchSummary> {
+  const [statusGroups, unresolvedApproved, categoryRows] = await Promise.all([
+    prisma.catalogProduct.groupBy({ by: ["status"], _count: { _all: true } }),
+    prisma.catalogProduct.count({
+      where: { id: { in: unresolvedLegacyIds }, status: "APPROVED" }
+    }),
+    prisma.catalogProduct.findMany({
+      where: { status: "APPROVED", id: { notIn: unresolvedLegacyIds } },
+      distinct: ["category"],
+      select: { category: true },
+      orderBy: { category: "asc" }
+    })
+  ]);
+  const countOf = (status: CatalogProductStatus) =>
+    statusGroups.find((row) => row.status === status)?._count._all ?? 0;
+  const approved = countOf("APPROVED");
+  return {
+    total: statusGroups.reduce((sum, row) => sum + row._count._all, 0),
+    approved,
+    archived: countOf("ARCHIVED"),
+    pending: countOf("PENDING"),
+    rejected: countOf("REJECTED"),
+    canonical: Math.max(0, approved - unresolvedApproved),
+    unresolved: unresolvedApproved,
+    categories: categoryRows.map((row) => row.category)
+  };
+}
+
+function emptyCatalogSummary(): CatalogSearchSummary {
+  return {
+    total: 0,
+    approved: 0,
+    archived: 0,
+    pending: 0,
+    rejected: 0,
+    canonical: 0,
+    unresolved: 0,
+    categories: []
+  };
+}
+
+function packCatalogSearch(
+  products: ReturnType<typeof presentation>[],
+  summary: CatalogSearchSummary
+) {
+  return {
+    products,
+    total: summary.total,
+    approved: summary.approved,
+    archived: summary.archived,
+    canonical: summary.canonical,
+    unresolved: summary.unresolved,
+    pending: summary.pending,
+    rejected: summary.rejected,
+    categories: summary.categories
   };
 }
 
@@ -218,38 +298,52 @@ export async function searchCatalogProducts(input: unknown) {
   const parsed = searchCatalogProductsSchema.parse(input);
   const q = normalizeProductSearchName(parsed.q ?? "");
   const barcode = normalizeBarcode(parsed.q ?? "");
+  const maxLimit = parsed.adminList ? ADMIN_CATALOG_LIST_LIMIT : MERCHANT_CATALOG_SEARCH_LIMIT_MAX;
+  const limit = Math.min(parsed.limit, maxLimit);
 
   const statusFilter: Prisma.CatalogProductWhereInput = parsed.status
     ? { status: parsed.status }
-    : parsed.adminList
-      ? {}
-      : parsed.includePendingForMerchantId
-        ? {
-            OR: [
-              { status: "APPROVED" },
-              {
-                status: "PENDING",
-                submittedByMerchantId: parsed.includePendingForMerchantId
-              }
-            ]
-          }
-        : { status: "APPROVED" };
+    : parsed.view === "canonical" || (parsed.adminList && !parsed.view)
+      ? { status: "APPROVED", id: { notIn: unresolvedLegacyIds } }
+      : parsed.view === "archived"
+        ? { status: "ARCHIVED" }
+        : parsed.view === "unresolved"
+          ? { id: { in: unresolvedLegacyIds } }
+          : parsed.view === "all" || parsed.adminList
+            ? {}
+            : parsed.includePendingForMerchantId
+              ? {
+                  OR: [
+                    { status: "APPROVED" },
+                    {
+                      status: "PENDING",
+                      submittedByMerchantId: parsed.includePendingForMerchantId
+                    }
+                  ]
+                }
+              : { status: "APPROVED" };
+
+  if (parsed.category?.trim()) {
+    statusFilter.category = parsed.category.trim();
+  }
+
+  const summary = parsed.adminList ? await loadCatalogSummary() : emptyCatalogSummary();
 
   if (barcode) {
     const byBarcode = await prisma.catalogProduct.findFirst({
       where: { ...statusFilter, barcode }
     });
-    if (byBarcode) return { products: [presentation(byBarcode)] };
+    if (byBarcode) return packCatalogSearch([presentation(byBarcode)], summary);
   }
 
   const rows = await prisma.catalogProduct.findMany({
     where: statusFilter,
     orderBy: [{ name: "asc" }],
-    take: 300
+    take: CATALOG_PRODUCT_SCAN_LIMIT
   });
 
   if (!q) {
-    return { products: rows.slice(0, parsed.limit).map(presentation) };
+    return packCatalogSearch(rows.slice(0, limit).map(presentation), summary);
   }
 
   const terms = expandSearchTerms(q);
@@ -266,10 +360,10 @@ export async function searchCatalogProducts(input: unknown) {
     })
     .filter((row) => row.score > 0)
     .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))
-    .slice(0, parsed.limit)
+    .slice(0, limit)
     .map((row) => presentation(row.p));
 
-  return { products: scored };
+  return packCatalogSearch(scored, summary);
 }
 
 export async function getCatalogProduct(id: string) {

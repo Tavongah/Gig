@@ -6,8 +6,11 @@ import assert from "node:assert/strict";
 import {
   catalogSearchHaystack,
   createCatalogProductSchema,
+  expandSearchTerms,
   normalizeBarcode,
-  submitMerchantCatalogProductSchema
+  searchCatalogProductsSchema,
+  submitMerchantCatalogProductSchema,
+  ADMIN_CATALOG_LIST_LIMIT
 } from "@gigflow/shared";
 
 assert.equal(normalizeBarcode(null), null);
@@ -46,5 +49,10 @@ const withImage = submitMerchantCatalogProductSchema.parse({
   priceCents: 100
 });
 assert.equal(withImage.forceCreate, false);
+
+assert.equal(ADMIN_CATALOG_LIST_LIMIT, 1000);
+assert.equal(searchCatalogProductsSchema.parse({ adminList: true, limit: 1000 }).limit, 1000);
+assert.equal(searchCatalogProductsSchema.safeParse({ limit: 1000 }).success, false);
+assert.ok(expandSearchTerms("matemba").includes("kapenta"));
 
 console.log(JSON.stringify({ ok: true }, null, 2));

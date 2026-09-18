@@ -301,6 +301,12 @@ export {
 export {
   catalogProductStatuses,
   catalogProductSources,
+  CATALOG_PRODUCT_SCAN_LIMIT,
+  ADMIN_CATALOG_LIST_LIMIT,
+  MERCHANT_CATALOG_SEARCH_LIMIT_MAX,
+  UNRESOLVED_LEGACY_CATALOG_PRODUCT_IDS,
+  isUnresolvedLegacyCatalogProduct,
+  adminCatalogViews,
   normalizeBarcode,
   createCatalogProductSchema,
   updateCatalogProductSchema,
@@ -309,7 +315,8 @@ export {
   submitMerchantCatalogProductSchema,
   catalogSearchHaystack,
   type CatalogProductStatus,
-  type CatalogProductSource
+  type CatalogProductSource,
+  type AdminCatalogView
 } from "./catalog.js";
 
 
