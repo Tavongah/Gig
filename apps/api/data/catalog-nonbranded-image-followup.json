@@ -1,0 +1,76 @@
+{
+  "phase": "H3.14",
+  "mode": "FOLLOW_UP_QUEUE_ONLY",
+  "doNotMixWithBrandedAcquisition": true,
+  "doNotImplementNow": true,
+  "HUMAN_REVIEW": [
+    {
+      "catalogProductId": "e421c4f1-fa18-4d32-a318-46c6ef4ab3d9",
+      "name": "Chocolate Bar",
+      "sizeLabel": "each",
+      "queue": "HUMAN_REVIEW",
+      "recommendation": "Do not generate a Cadbury/Nestl\u00e9/generic branded bar. Either capture the exact bar a participating merchant sells (then set brand later in a metadata phase) or keep imageless until the SKU is brand-identified.",
+      "doNotImplementNow": true
+    },
+    {
+      "catalogProductId": "d1da0504-ad41-4ab2-b38e-a32903c3b516",
+      "name": "Infant Formula",
+      "sizeLabel": "400g",
+      "queue": "HUMAN_REVIEW",
+      "recommendation": "Infant formula is high-risk. Only an official manufacturer asset or a merchant photo of the exact tin sold. Never generate or approximate NAN/SMA/Lactogen packaging.",
+      "doNotImplementNow": true
+    }
+  ],
+  "GENERATION_DIFFICULTY": [
+    {
+      "catalogProductId": "4fcf8dd0-f018-41e4-b451-aaf5ba7e5ec4",
+      "name": "AA Batteries",
+      "sizeLabel": "4",
+      "queue": "GENERATION_DIFFICULTY",
+      "recommendation": "Photograph a real 4-count AA pack or four AA cells with count visible. Previous generated image failed identity (cells did not read as AA). Count must MATCH 4.",
+      "doNotImplementNow": true
+    },
+    {
+      "catalogProductId": "82e4b413-f188-447b-a5b3-34f02fb57a4a",
+      "name": "Baby Cereal",
+      "sizeLabel": "250g",
+      "queue": "GENERATION_DIFFICULTY",
+      "recommendation": "Photograph the actual Zimbabwe baby cereal sold (e.g. Nestl\u00e9 Cereals/Nestum if that is the SKU) or a clearly infant-cereal pack. Previous generated image looked like TVP. If branded, treat as branded acquisition later.",
+      "doNotImplementNow": true
+    },
+    {
+      "catalogProductId": "4c467bb3-ee51-498e-811f-80274816f8c3",
+      "name": "Exercise Book",
+      "sizeLabel": "each",
+      "queue": "GENERATION_DIFFICULTY",
+      "recommendation": "Photograph a real unbranded or locally printed school exercise book. Do not generate covers with fake school crests or publisher logos.",
+      "doNotImplementNow": true
+    }
+  ],
+  "COUNT_OR_SIZE_SENSITIVE": [
+    {
+      "catalogProductId": "31fd3097-96a8-4e5d-8231-3529c8d24a37",
+      "name": "Bottled Water",
+      "sizeLabel": "10L",
+      "queue": "COUNT_OR_SIZE_SENSITIVE",
+      "recommendation": "Photograph an actual 10L container sold in Zimbabwe (often a rectangular 10L bottle, not a 5L jug or 18.9L cooler). Size mark must be visible. Generation previously collapsed to 5L/cooler.",
+      "doNotImplementNow": true
+    },
+    {
+      "catalogProductId": "4a926905-38f3-4ce1-97ed-a1ae73006748",
+      "name": "Pine Gel",
+      "sizeLabel": "5L",
+      "queue": "COUNT_OR_SIZE_SENSITIVE",
+      "recommendation": "Photograph a real 5L pine gel jerry. Do not generate a branded cleaning bottle. Size 5L must be readable or package geometry must unambiguously be 5L class.",
+      "doNotImplementNow": true
+    },
+    {
+      "catalogProductId": "a7e1b3cf-24d4-4cf6-8f33-97d332e82e66",
+      "name": "Stock Cubes Chicken",
+      "sizeLabel": "12",
+      "queue": "COUNT_OR_SIZE_SENSITIVE",
+      "recommendation": "Photograph a real 12-count chicken stock cube pack. Previous H2.4 image showed 9 cubes and was reverted. Visible count must be 12, not 8/9/24. If branded (Knorr/Royco), treat as branded later.",
+      "doNotImplementNow": true
+    }
+  ]
+}

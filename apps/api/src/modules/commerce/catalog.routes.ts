@@ -1,8 +1,11 @@
 import {
   ADMIN_CATALOG_LIST_LIMIT,
   MERCHANT_CATALOG_SEARCH_LIMIT_MAX,
+  assignCatalogImageAcquisitionSchema,
   createCatalogProductSchema,
   linkMerchantOfferSchema,
+  listCatalogImageQueueSchema,
+  rejectCatalogImageAcquisitionSchema,
   searchCatalogProductsSchema,
   submitMerchantCatalogProductSchema,
   updateCatalogProductSchema
@@ -11,9 +14,13 @@ import { Router } from "express";
 import { UserRole } from "@prisma/client";
 import { requireAuth, requireRole } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
-import { uploadPublicObject } from "../../lib/spaces.js";
-import { AppError, PHOTO_INVALID, PHOTO_TOO_LARGE } from "../../lib/errors.js";
-import { MAX_CATALOG_IMAGE_BYTES, normalizeCatalogPhoto } from "../../lib/catalog-media.js";
+import { persistNormalizedCatalogPhoto } from "../../lib/catalog-photo-upload.js";
+import {
+  assignValidatedAcquisition,
+  listImageQueue,
+  rejectAcquisitionPhoto,
+  uploadAcquisitionCandidate
+} from "./catalog-image-acquisition.service.js";
 import {
   createCatalogProduct,
   getCatalogProduct,
@@ -131,40 +138,78 @@ catalogAdminRouter.post("/catalog/migrate-existing", async (_req, res, next) => 
 
 catalogAdminRouter.post("/catalog/upload-image", async (req, res, next) => {
   try {
-    const { fileName, contentType, dataBase64 } = req.body as {
+    const { fileName, dataBase64 } = req.body as {
       fileName?: string;
-      contentType?: string;
       dataBase64?: string;
     };
-    if (!fileName || !dataBase64) {
-      throw new AppError(PHOTO_INVALID, 400, "VALIDATION_ERROR");
-    }
-    let buffer: Buffer;
-    try {
-      buffer = Buffer.from(dataBase64, "base64");
-    } catch {
-      throw new AppError(PHOTO_INVALID, 400, "INVALID_IMAGE_TYPE");
-    }
-    if (buffer.length === 0) {
-      throw new AppError(PHOTO_INVALID, 400, "INVALID_IMAGE_TYPE");
-    }
-    if (buffer.length > MAX_CATALOG_IMAGE_BYTES) {
-      throw new AppError(PHOTO_TOO_LARGE, 413, "INVALID_IMAGE_SIZE");
-    }
-
-    const normalized = await normalizeCatalogPhoto(buffer);
-    const uploaded = await uploadPublicObject({
-      purpose: "product-image",
+    const uploaded = await persistNormalizedCatalogPhoto({
       userId: req.auth!.userId,
-      fileName: "product.jpg",
-      contentType: normalized.contentType,
-      body: normalized.body
+      fileName,
+      dataBase64: dataBase64 ?? ""
     });
-    res.status(201).json({ url: uploaded.publicUrl, objectKey: uploaded.objectKey });
+    res.status(201).json({ url: uploaded.url, objectKey: uploaded.objectKey });
   } catch (err) {
     next(err);
   }
 });
+
+catalogAdminRouter.get("/catalog/image-queue", async (req, res, next) => {
+  try {
+    const parsed = listCatalogImageQueueSchema.parse({
+      tab: typeof req.query.tab === "string" ? req.query.tab : undefined,
+      pack: typeof req.query.pack === "string" ? req.query.pack : undefined,
+      priority: typeof req.query.priority === "string" ? req.query.priority : undefined,
+      q: typeof req.query.q === "string" ? req.query.q : ""
+    });
+    const result = await listImageQueue(parsed);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+catalogAdminRouter.post("/catalog/image-queue/:id/candidate", async (req, res, next) => {
+  try {
+    const { fileName, dataBase64 } = req.body as {
+      fileName?: string;
+      dataBase64?: string;
+    };
+    const item = await uploadAcquisitionCandidate(String(req.params.id), {
+      userId: req.auth!.userId,
+      fileName,
+      dataBase64: dataBase64 ?? ""
+    });
+    res.status(201).json({ item });
+  } catch (err) {
+    next(err);
+  }
+});
+
+catalogAdminRouter.post(
+  "/catalog/image-queue/:id/reject",
+  validateBody(rejectCatalogImageAcquisitionSchema),
+  async (req, res, next) => {
+    try {
+      const item = await rejectAcquisitionPhoto(String(req.params.id), req.body);
+      res.json({ item });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+catalogAdminRouter.post(
+  "/catalog/image-queue/:id/assign",
+  validateBody(assignCatalogImageAcquisitionSchema),
+  async (req, res, next) => {
+    try {
+      const item = await assignValidatedAcquisition(String(req.params.id), req.body);
+      res.json({ item });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 catalogAdminRouter.get("/merchants/:id/catalog/search", async (req, res, next) => {
   try {

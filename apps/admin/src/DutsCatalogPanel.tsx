@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CatalogImageQueuePanel } from "./CatalogImageQueuePanel";
 import {
   displayCategory,
   friendlyApiError,
@@ -67,6 +68,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [view, setView] = useState<CatalogView>("canonical");
+  const [section, setSection] = useState<"products" | "image-queue">("products");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [mode, setMode] = useState<Mode>("list");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -404,6 +406,27 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
     <div className="commerce-stack">
       <section className="panel commerce-panel">
         <h2>DUTS Catalog</h2>
+        <div className="chip-row" role="tablist" aria-label="Catalog section">
+          <button
+            type="button"
+            role="tab"
+            className={section === "products" ? "chip chip-active" : "chip"}
+            onClick={() => setSection("products")}
+          >
+            Products
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className={section === "image-queue" ? "chip chip-active" : "chip"}
+            onClick={() => setSection("image-queue")}
+          >
+            Image Queue
+          </button>
+        </div>
+        {section === "image-queue" ? <CatalogImageQueuePanel apiRequest={apiRequest} /> : null}
+        {section === "products" ? (
+          <>
         <p className="catalog-count-line">
           <strong>{canonicalCount}</strong> canonical products
         </p>
@@ -509,6 +532,8 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
             {migrateMut.isPending ? "Migrating…" : "Migrate existing merchant products"}
           </button>
         </details>
+          </>
+        ) : null}
       </section>
     </div>
   );

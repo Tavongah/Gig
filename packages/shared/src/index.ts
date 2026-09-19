@@ -314,9 +314,27 @@ export {
   linkMerchantOfferSchema,
   submitMerchantCatalogProductSchema,
   catalogSearchHaystack,
+  catalogImageAcquisitionStatuses,
+  catalogImageQueueKinds,
+  catalogImageQueueTabs,
+  catalogImageAcquisitionPacks,
+  catalogImageAcquisitionPriorities,
+  catalogImageSourceTypes,
+  catalogImageRejectionReasons,
+  catalogImageValidationChecksSchema,
+  assignCatalogImageAcquisitionSchema,
+  rejectCatalogImageAcquisitionSchema,
+  listCatalogImageQueueSchema,
   type CatalogProductStatus,
   type CatalogProductSource,
-  type AdminCatalogView
+  type AdminCatalogView,
+  type CatalogImageAcquisitionStatus,
+  type CatalogImageQueueKind,
+  type CatalogImageQueueTab,
+  type CatalogImageAcquisitionPack,
+  type CatalogImageAcquisitionPriority,
+  type CatalogImageSourceType,
+  type CatalogImageRejectionReason
 } from "./catalog.js";
 
 

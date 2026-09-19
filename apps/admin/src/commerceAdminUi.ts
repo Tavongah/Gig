@@ -119,3 +119,19 @@ export async function uploadCatalogImage(
   }
   return uploaded.url;
 }
+
+export async function uploadImageQueueCandidate(
+  apiRequest: ApiRequest,
+  acquisitionId: string,
+  file: File
+): Promise<{ item: Record<string, unknown> }> {
+  const dataBase64 = await readFileAsBase64(file);
+  return apiRequest(`/admin/commerce/catalog/image-queue/${acquisitionId}/candidate`, {
+    method: "POST",
+    body: JSON.stringify({
+      fileName: file.name || "product.jpg",
+      contentType: normalizeClientImageType(file.type),
+      dataBase64
+    })
+  });
+}

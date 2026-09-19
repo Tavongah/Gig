@@ -114,3 +114,91 @@ export function catalogSearchHaystack(input: {
     [input.name, input.brand, input.sizeLabel, input.barcode, input.category].filter(Boolean).join(" ")
   );
 }
+
+export const catalogImageAcquisitionStatuses = [
+  "NEEDS_IMAGE_ACQUISITION",
+  "PHOTO_RECEIVED",
+  "VALIDATION_REQUIRED",
+  "VALIDATED",
+  "REJECTED",
+  "UPLOADED"
+] as const;
+export type CatalogImageAcquisitionStatus = (typeof catalogImageAcquisitionStatuses)[number];
+
+export const catalogImageQueueKinds = ["BRANDED", "GENERIC_EXCEPTION", "LEGACY_REVIEW"] as const;
+export type CatalogImageQueueKind = (typeof catalogImageQueueKinds)[number];
+
+export const catalogImageQueueTabs = [
+  "all-missing",
+  "branded",
+  "exceptions",
+  "human-review",
+  "completed",
+  "legacy"
+] as const;
+export type CatalogImageQueueTab = (typeof catalogImageQueueTabs)[number];
+
+export const catalogImageAcquisitionPacks = [
+  "PACK_A_BEVERAGES",
+  "PACK_B_HOUSEHOLD",
+  "PACK_C_SNACKS",
+  "PACK_D_BREAKFAST",
+  "PACK_E_PERSONAL_CARE"
+] as const;
+export type CatalogImageAcquisitionPack = (typeof catalogImageAcquisitionPacks)[number];
+
+export const catalogImageAcquisitionPriorities = [
+  "BRANDED_PRIORITY_A",
+  "BRANDED_PRIORITY_B",
+  "BRANDED_PRIORITY_C"
+] as const;
+export type CatalogImageAcquisitionPriority = (typeof catalogImageAcquisitionPriorities)[number];
+
+export const catalogImageSourceTypes = ["MERCHANT_SUPPLIED_PHOTO", "DUTS_OWN_PHOTO"] as const;
+export type CatalogImageSourceType = (typeof catalogImageSourceTypes)[number];
+
+export const catalogImageRejectionReasons = [
+  "WRONG_BRAND",
+  "WRONG_PRODUCT",
+  "WRONG_SIZE",
+  "WRONG_VARIANT",
+  "BLURRY",
+  "GLARE",
+  "PACKAGE_OBSTRUCTED",
+  "WATERMARK",
+  "REGIONAL_PACKAGE_MISMATCH",
+  "OTHER"
+] as const;
+export type CatalogImageRejectionReason = (typeof catalogImageRejectionReasons)[number];
+
+export const catalogImageValidationChecksSchema = z.object({
+  brandMatches: z.literal(true),
+  productMatches: z.literal(true),
+  sizeMatches: z.literal(true),
+  flavorMatches: z.literal(true),
+  packageTypeMatches: z.literal(true),
+  imageClear: z.literal(true),
+  noWatermark: z.literal(true),
+  noPriceOverlay: z.literal(true),
+  regionalPackageConfirmed: z.boolean().optional()
+});
+
+export const assignCatalogImageAcquisitionSchema = z.object({
+  catalogProductId: z.string().uuid(),
+  sourceType: z.enum(catalogImageSourceTypes),
+  capturedByLabel: z.string().trim().max(80).optional().nullable(),
+  checks: catalogImageValidationChecksSchema
+});
+
+export const rejectCatalogImageAcquisitionSchema = z.object({
+  reason: z.enum(catalogImageRejectionReasons),
+  notes: z.string().trim().max(500).optional().nullable()
+});
+
+export const listCatalogImageQueueSchema = z.object({
+  tab: z.enum(catalogImageQueueTabs).optional().default("branded"),
+  pack: z.enum(catalogImageAcquisitionPacks).optional(),
+  priority: z.enum(catalogImageAcquisitionPriorities).optional(),
+  q: z.string().max(160).optional().default("")
+});
+

@@ -1,0 +1,2904 @@
+{
+  "phase": "H3",
+  "mode": "READ_ONLY_PLANNING",
+  "productionWrites": 0,
+  "completedAt": "2026-09-19T02:20:00Z",
+  "canonicalProducts": 281,
+  "withImages": 225,
+  "withoutImages": 56,
+  "brandedMissingConfirmed": 48,
+  "commerceProtection": {
+    "CatalogProduct": 285,
+    "Product": 2,
+    "Orders": 2,
+    "OrderItems": 2
+  },
+  "sourceHierarchy": [
+    "MERCHANT_SUPPLIED_PHOTO",
+    "DUTS_OWN_PHOTO",
+    "OFFICIAL_MANUFACTURER_ASSET",
+    "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+    "MANUAL_REVIEW_REQUIRED"
+  ],
+  "photoSpecification": {
+    "title": "DUTS branded product photography \u2014 ambassador / merchant spec",
+    "goal": "Accurate, recognizable marketplace imagery of the actual Zimbabwe-sold package. Not professional studio photography.",
+    "required": [
+      "One product per photo",
+      "Front-facing package",
+      "Brand clearly visible",
+      "Product name visible",
+      "Size visible where practical",
+      "Entire package inside the frame",
+      "No hand covering the product",
+      "No price sticker covering identity",
+      "No severe glare",
+      "No blur",
+      "No watermark",
+      "Neutral/simple background where practical",
+      "Good lighting",
+      "High enough resolution for marketplace crop",
+      "Original photograph (not a screenshot, not a Google result, not a generated image)"
+    ],
+    "preferredFraming": "Square or portrait with enough margin for a square crop",
+    "doNot": [
+      "Do not AI-generate branded packaging",
+      "Do not create fake logos",
+      "Do not approximate real packaging",
+      "Do not upload arbitrary image-search results",
+      "Do not photograph only one size when several visibly different packages are required",
+      "Do not cover barcodes if they help identity, but barcode is optional"
+    ],
+    "permission": "Photograph in a shop with permission from the merchant. Do not remove stock from shelves without asking."
+  },
+  "validationChecklist": [
+    "BRAND_MATCH",
+    "PRODUCT_MATCH",
+    "FLAVOR_VARIANT_MATCH",
+    "SIZE_MATCH",
+    "PACKAGE_TYPE_MATCH",
+    "REGIONAL_PACKAGE_REASONABLE",
+    "IMAGE_CLEAR",
+    "NO_WATERMARK",
+    "NO_PRICE_OVERLAY",
+    "NO_UNRELATED_PRODUCT",
+    "NO_OBVIOUS_IMAGE_MANIPULATION"
+  ],
+  "brandFamilies": [
+    {
+      "family": "7up",
+      "productsPerFamily": 2,
+      "sizeVariants": [
+        "2L",
+        "500ml"
+      ],
+      "products": [
+        "7up 2L",
+        "7up 500ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Aromat",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "75g"
+      ],
+      "products": [
+        "Aromat 75g"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Ceres",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "1L"
+      ],
+      "products": [
+        "Ceres Apple 1L"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH"
+    },
+    {
+      "family": "Cerevita",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "1kg"
+      ],
+      "products": [
+        "Cerevita 1kg"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH"
+    },
+    {
+      "family": "Coca-Cola",
+      "productsPerFamily": 4,
+      "sizeVariants": [
+        "1L",
+        "2L",
+        "330ml",
+        "500ml"
+      ],
+      "products": [
+        "Coca-Cola 1L",
+        "Coca-Cola 2L",
+        "Coca-Cola 330ml",
+        "Coca-Cola 500ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH"
+    },
+    {
+      "family": "Coca-Cola Zero",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "500ml"
+      ],
+      "products": [
+        "Coca-Cola Zero 500ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH"
+    },
+    {
+      "family": "Colgate",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "50ml"
+      ],
+      "products": [
+        "Colgate Toothpaste 50ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Comfort",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "2L"
+      ],
+      "products": [
+        "Comfort Fabric Softener 2L"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Cup-a-Soup",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "pack"
+      ],
+      "products": [
+        "Cup-a-Soup pack"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Dairibord",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "1L"
+      ],
+      "products": [
+        "Dairibord Maheu 1L"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "LOW"
+    },
+    {
+      "family": "Eet-Sum-Mor",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "200g"
+      ],
+      "products": [
+        "Eet-Sum-Mor 200g"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Fanta",
+      "productsPerFamily": 2,
+      "sizeVariants": [
+        "2L",
+        "500ml"
+      ],
+      "products": [
+        "Fanta Orange 2L",
+        "Fanta Orange 500ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH"
+    },
+    {
+      "family": "Fizzi",
+      "productsPerFamily": 2,
+      "sizeVariants": [
+        "2L",
+        "500ml"
+      ],
+      "products": [
+        "Fizzi 2L",
+        "Fizzi 500ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "LOW"
+    },
+    {
+      "family": "Geisha",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "90g"
+      ],
+      "products": [
+        "Geisha Soap 90g"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Halls",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "pack"
+      ],
+      "products": [
+        "Halls pack"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Handy Andy",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "750ml"
+      ],
+      "products": [
+        "Handy Andy 750ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Jelly Tots",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "100g"
+      ],
+      "products": [
+        "Jelly Tots 100g"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Jik",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "750ml"
+      ],
+      "products": [
+        "Jik Bleach 750ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "LOW"
+    },
+    {
+      "family": "Mazoe",
+      "productsPerFamily": 3,
+      "sizeVariants": [
+        "1L",
+        "2L",
+        "5L"
+      ],
+      "products": [
+        "Mazoe Orange Crush 1L",
+        "Mazoe Raspberry 2L",
+        "Mazoe Orange Crush 5L"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "LOW"
+    },
+    {
+      "family": "Mirinda",
+      "productsPerFamily": 2,
+      "sizeVariants": [
+        "2L",
+        "500ml"
+      ],
+      "products": [
+        "Mirinda Orange 2L",
+        "Mirinda Orange 500ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "NikNaks",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "55g"
+      ],
+      "products": [
+        "NikNaks 55g"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Omo",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "2kg"
+      ],
+      "products": [
+        "Omo Washing Powder 2kg"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Pepsi",
+      "productsPerFamily": 2,
+      "sizeVariants": [
+        "2L",
+        "500ml"
+      ],
+      "products": [
+        "Pepsi 2L",
+        "Pepsi 500ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH"
+    },
+    {
+      "family": "Ricoffy",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "100g"
+      ],
+      "products": [
+        "Ricoffy 100g"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Romany Creams",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "200g"
+      ],
+      "products": [
+        "Romany Creams 200g"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Schweppes",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "330ml"
+      ],
+      "products": [
+        "Schweppes Ginger Ale 330ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH"
+    },
+    {
+      "family": "Simba",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "125g"
+      ],
+      "products": [
+        "Simba Chips 125g"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Sparletta",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "2L"
+      ],
+      "products": [
+        "Sparletta Cream Soda 2L"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Sprite",
+      "productsPerFamily": 2,
+      "sizeVariants": [
+        "2L",
+        "500ml"
+      ],
+      "products": [
+        "Sprite 2L",
+        "Sprite 500ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH"
+    },
+    {
+      "family": "Sting",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "500ml"
+      ],
+      "products": [
+        "Sting Energy Drink 500ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH"
+    },
+    {
+      "family": "Sunlight",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "400ml"
+      ],
+      "products": [
+        "Sunlight Liquid 400ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH"
+    },
+    {
+      "family": "Surf",
+      "productsPerFamily": 2,
+      "sizeVariants": [
+        "1kg",
+        "500g"
+      ],
+      "products": [
+        "Surf Washing Powder 1kg",
+        "Surf Washing Powder 500g"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Tennis Biscuits",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "200g"
+      ],
+      "products": [
+        "Tennis Biscuits 200g"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Vaseline",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "250ml"
+      ],
+      "products": [
+        "Vaseline Petroleum Jelly 250ml"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH"
+    },
+    {
+      "family": "Vim",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "500g"
+      ],
+      "products": [
+        "Vim Scouring Powder 500g"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM"
+    },
+    {
+      "family": "Weet-Bix",
+      "productsPerFamily": 1,
+      "sizeVariants": [
+        "450g"
+      ],
+      "products": [
+        "Weet-Bix 450g"
+      ],
+      "separateImageRequired": "YES",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH"
+    }
+  ],
+  "products": [
+    {
+      "catalogProductId": "22cfda60-bc89-456d-9989-4654436d6b96",
+      "name": "7up",
+      "brand": "7up",
+      "sizeLabel": "2L",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "7up",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "PepsiCo PET geometry/label can differ by market. Photograph Zimbabwe shop stock.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "7up",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/6470cb3b-22e5-4989-84bd-cc62eb913534.jpg",
+          "existingProduct": "7up 1L (0b10d7e2-6d16-4851-b7b3-db3563e36ec6)",
+          "recommended": "NO",
+          "sizeVariantConflict": "500ml PET, 1L PET, and 2L PET are visibly different bottle sizes."
+        }
+      ],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "500ml vs 2L separately. Do not reuse existing 1L."
+    },
+    {
+      "catalogProductId": "d8ac79e7-ba40-4f9f-b685-d2cf45ded3bb",
+      "name": "7up",
+      "brand": "7up",
+      "sizeLabel": "500ml",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "7up",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "PepsiCo PET geometry/label can differ by market. Photograph Zimbabwe shop stock.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "7up",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/6470cb3b-22e5-4989-84bd-cc62eb913534.jpg",
+          "existingProduct": "7up 1L (0b10d7e2-6d16-4851-b7b3-db3563e36ec6)",
+          "recommended": "NO",
+          "sizeVariantConflict": "500ml PET, 1L PET, and 2L PET are visibly different bottle sizes."
+        }
+      ],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "500ml vs 2L separately. Do not reuse existing 1L."
+    },
+    {
+      "catalogProductId": "0124f94e-4f05-40d3-8c34-194bf3e15ede",
+      "name": "Coca-Cola",
+      "brand": "Coca-Cola",
+      "sizeLabel": "1L",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Coca-Cola",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Contour glass vs local PET, label language, and bottle shape vary. Use Zimbabwe-sold bottles for each size.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Coca-Cola",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Do not use Coca-Cola Zero for regular Coca-Cola. Photograph 330ml, 500ml, 1L, and 2L separately."
+    },
+    {
+      "catalogProductId": "4d9979f1-b0ef-4954-b0f3-a806165765e6",
+      "name": "Coca-Cola",
+      "brand": "Coca-Cola",
+      "sizeLabel": "2L",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Coca-Cola",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Contour glass vs local PET, label language, and bottle shape vary. Use Zimbabwe-sold bottles for each size.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Coca-Cola",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Do not use Coca-Cola Zero for regular Coca-Cola. Photograph 330ml, 500ml, 1L, and 2L separately."
+    },
+    {
+      "catalogProductId": "705942f1-b491-4943-9a79-97cd2c589ff0",
+      "name": "Coca-Cola",
+      "brand": "Coca-Cola",
+      "sizeLabel": "330ml",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Coca-Cola",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Contour glass vs local PET, label language, and bottle shape vary. Use Zimbabwe-sold bottles for each size.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Coca-Cola",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Do not use Coca-Cola Zero for regular Coca-Cola. Photograph 330ml, 500ml, 1L, and 2L separately."
+    },
+    {
+      "catalogProductId": "fc15354a-ec7f-4449-9e2b-b54ed032c4fb",
+      "name": "Coca-Cola",
+      "brand": "Coca-Cola",
+      "sizeLabel": "500ml",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Coca-Cola",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Contour glass vs local PET, label language, and bottle shape vary. Use Zimbabwe-sold bottles for each size.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Coca-Cola",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Do not use Coca-Cola Zero for regular Coca-Cola. Photograph 330ml, 500ml, 1L, and 2L separately."
+    },
+    {
+      "catalogProductId": "baf50e0f-2589-403a-957a-f78b95374878",
+      "name": "Coca-Cola Zero",
+      "brand": "Coca-Cola",
+      "sizeLabel": "500ml",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Coca-Cola Zero",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Zero / Zero Sugar branding differs by country. Must match Zimbabwe-sold 500ml Zero, not US Coke Zero Sugar.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Coca-Cola",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Must be Zero, not regular Coca-Cola. Zimbabwe Zero branding, not US Coke Zero Sugar if they differ."
+    },
+    {
+      "catalogProductId": "c6945c26-8bf2-42e6-9dde-7e8b7ea42779",
+      "name": "Fanta Orange",
+      "brand": "Fanta",
+      "sizeLabel": "2L",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Fanta",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Fanta Orange bottle/label (script vs block) differs widely. Use Zimbabwe PET for 500ml and 2L separately.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Fanta",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Must be Fanta Orange, not grape/pineapple. 500ml and 2L separately."
+    },
+    {
+      "catalogProductId": "a112ae11-bc0c-4c82-9a68-b0f14097b9f6",
+      "name": "Fanta Orange",
+      "brand": "Fanta",
+      "sizeLabel": "500ml",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Fanta",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Fanta Orange bottle/label (script vs block) differs widely. Use Zimbabwe PET for 500ml and 2L separately.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Fanta",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Must be Fanta Orange, not grape/pineapple. 500ml and 2L separately."
+    },
+    {
+      "catalogProductId": "ca052455-a6de-468f-a583-10581dc80f8a",
+      "name": "Mazoe Orange Crush",
+      "brand": "Mazoe",
+      "sizeLabel": "1L",
+      "category": "Juices",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Mazoe",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "LOW",
+      "regionalNotes": "Mazoe is a Zimbabwe Schweppes Zimbabwe squash. Photograph local bottles; 1L vs 5L vs Raspberry are different packs.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Mazoe",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "REVIEW",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/87a9e41a-efe7-4d5d-af0e-205d90f9d88e.jpg",
+          "existingProduct": "Mazoe Orange Crush 2L (2326e24b-2f17-4d49-92e5-cb9662253881)",
+          "recommended": "REVIEW",
+          "sizeVariantConflict": "1L vs 2L bottles; size usually visible on Mazoe labels."
+        }
+      ],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Orange Crush \u2260 Raspberry. 1L \u2260 5L. Do not reuse Mazoe Blackberry."
+    },
+    {
+      "catalogProductId": "825bd247-9efa-47bd-90c0-7d9ca6c126d1",
+      "name": "Mazoe Raspberry",
+      "brand": "Mazoe",
+      "sizeLabel": "2L",
+      "category": "Juices",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Mazoe",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "LOW",
+      "regionalNotes": "Mazoe is a Zimbabwe Schweppes Zimbabwe squash. Photograph local bottles; 1L vs 5L vs Raspberry are different packs.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Mazoe",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/3eff64c8-1bc8-4c24-a158-61867f67c0d6.jpg",
+          "existingProduct": "Mazoe Blackberry 2L (d56254f0-d4c7-47af-a20d-a1e5995ee2e6)",
+          "recommended": "NO",
+          "sizeVariantConflict": "Flavor conflict: Blackberry \u2260 Raspberry."
+        }
+      ],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Orange Crush \u2260 Raspberry. 1L \u2260 5L. Do not reuse Mazoe Blackberry."
+    },
+    {
+      "catalogProductId": "1ac6f981-6b19-432c-befe-0fa9d36bbb3e",
+      "name": "Mazoe Orange Crush",
+      "brand": "Mazoe",
+      "sizeLabel": "5L",
+      "category": "Juices",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Mazoe",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "LOW",
+      "regionalNotes": "Mazoe is a Zimbabwe Schweppes Zimbabwe squash. Photograph local bottles; 1L vs 5L vs Raspberry are different packs.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Mazoe",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/87a9e41a-efe7-4d5d-af0e-205d90f9d88e.jpg",
+          "existingProduct": "Mazoe Orange Crush 2L (2326e24b-2f17-4d49-92e5-cb9662253881)",
+          "recommended": "NO",
+          "sizeVariantConflict": "2L bottle vs 5L jerry/large bottle \u2014 package type differs."
+        }
+      ],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Orange Crush \u2260 Raspberry. 1L \u2260 5L. Do not reuse Mazoe Blackberry."
+    },
+    {
+      "catalogProductId": "315a8851-86a8-4e23-b3e2-9cf85ebc2054",
+      "name": "Pepsi",
+      "brand": "Pepsi",
+      "sizeLabel": "2L",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Pepsi",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Pepsi globe/label refreshes by market. Photograph Zimbabwe 500ml and 2L PET separately.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Pepsi",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "500ml vs 2L separately. Not Pepsi Zero (excluded SKU)."
+    },
+    {
+      "catalogProductId": "0bba2cd9-e9c5-487b-81dc-1b41f586f9f8",
+      "name": "Pepsi",
+      "brand": "Pepsi",
+      "sizeLabel": "500ml",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Pepsi",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Pepsi globe/label refreshes by market. Photograph Zimbabwe 500ml and 2L PET separately.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Pepsi",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "500ml vs 2L separately. Not Pepsi Zero (excluded SKU)."
+    },
+    {
+      "catalogProductId": "79373171-8713-4180-b902-31d1ae3ae7a6",
+      "name": "Sprite",
+      "brand": "Sprite",
+      "sizeLabel": "2L",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Sprite",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Sprite PET labels differ (green vs silver). Photograph Zimbabwe 500ml and 2L separately.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Sprite",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "500ml vs 2L separately."
+    },
+    {
+      "catalogProductId": "c039ea2b-e38e-42f8-afa3-95fb38a62d17",
+      "name": "Sprite",
+      "brand": "Sprite",
+      "sizeLabel": "500ml",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Sprite",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Sprite PET labels differ (green vs silver). Photograph Zimbabwe 500ml and 2L separately.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Sprite",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "500ml vs 2L separately."
+    },
+    {
+      "catalogProductId": "9ad7d0b3-87f8-4b8b-b2f3-442f07c2645f",
+      "name": "Fizzi",
+      "brand": "Fizzi",
+      "sizeLabel": "2L",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Fizzi",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "LOW",
+      "regionalNotes": "Local Zimbabwe soft drink. Prefer shop photo of actual Fizzi PET. Existing 1L image is branded Probottles \u2014 do not assume reuse.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Fizzi",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/b510a8bc-b651-42d8-9bfb-4e2ffd3e3060.jpg",
+          "existingProduct": "Fizzi 1L brand=Probottles (c1fd76c3-0e80-4fbb-9c52-c8b694b64cc5)",
+          "recommended": "NO",
+          "sizeVariantConflict": "1L vs 500ml vs 2L; existing brand column is Probottles not Fizzi."
+        }
+      ],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "500ml vs 2L separately. Do not reuse Probottles 1L."
+    },
+    {
+      "catalogProductId": "ca95347d-8841-4e89-897d-894f58d390dc",
+      "name": "Fizzi",
+      "brand": "Fizzi",
+      "sizeLabel": "500ml",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Fizzi",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "LOW",
+      "regionalNotes": "Local Zimbabwe soft drink. Prefer shop photo of actual Fizzi PET. Existing 1L image is branded Probottles \u2014 do not assume reuse.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Fizzi",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/b510a8bc-b651-42d8-9bfb-4e2ffd3e3060.jpg",
+          "existingProduct": "Fizzi 1L brand=Probottles (c1fd76c3-0e80-4fbb-9c52-c8b694b64cc5)",
+          "recommended": "NO",
+          "sizeVariantConflict": "1L vs 500ml vs 2L; existing brand column is Probottles not Fizzi."
+        }
+      ],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "500ml vs 2L separately. Do not reuse Probottles 1L."
+    },
+    {
+      "catalogProductId": "fb489c29-16b6-4f78-a23b-e15e9c6fe557",
+      "name": "Mirinda Orange",
+      "brand": "Mirinda",
+      "sizeLabel": "2L",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Mirinda",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "PepsiCo Mirinda PET labels differ. Existing catalog 1L is labeled brand Pepsi. Photograph 500ml and 2L Orange separately.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Mirinda",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/2ca7e92f-1636-4f44-a0ab-47cc3bfb700f.jpg",
+          "existingProduct": "Mirinda 1L brand=Pepsi (7dadda14-5c44-423e-beaf-b0d3b1723a6a)",
+          "recommended": "NO",
+          "sizeVariantConflict": "1L vs 500ml vs 2L; confirm Orange flavor on existing image before any review."
+        }
+      ],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Must be Orange. 500ml vs 2L separately."
+    },
+    {
+      "catalogProductId": "8bba6346-9c14-4dd5-b443-ce20e543f92c",
+      "name": "Mirinda Orange",
+      "brand": "Mirinda",
+      "sizeLabel": "500ml",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Mirinda",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "PepsiCo Mirinda PET labels differ. Existing catalog 1L is labeled brand Pepsi. Photograph 500ml and 2L Orange separately.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Mirinda",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/2ca7e92f-1636-4f44-a0ab-47cc3bfb700f.jpg",
+          "existingProduct": "Mirinda 1L brand=Pepsi (7dadda14-5c44-423e-beaf-b0d3b1723a6a)",
+          "recommended": "NO",
+          "sizeVariantConflict": "1L vs 500ml vs 2L; confirm Orange flavor on existing image before any review."
+        }
+      ],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Must be Orange. 500ml vs 2L separately."
+    },
+    {
+      "catalogProductId": "103407c0-f3aa-4fdc-8e79-0f1cdf684c0f",
+      "name": "Sparletta Cream Soda",
+      "brand": "Sparletta",
+      "sizeLabel": "2L",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Sparletta",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Sparletta Cream Soda is Coca-Cola Africa. Photograph Zimbabwe 2L Cream Soda, not other Sparletta flavors.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Sparletta",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Cream Soda 2L only."
+    },
+    {
+      "catalogProductId": "eab2767e-d7ce-4f97-a7f7-6e40368b2eb5",
+      "name": "Sting Energy Drink",
+      "brand": "Sting",
+      "sizeLabel": "500ml",
+      "category": "Energy Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Sting",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Sting energy packaging differs (PH vs Africa; 250ml can vs 500ml). Existing 250ml PepsiCo image must not be reused for 500ml.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Sting",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/8972644e-d774-43c0-88fe-aa8f993f75c1.jpg",
+          "existingProduct": "Sting Energy Drink 250ml brand=PepsiCo (9f70db16-c267-4bb8-93ba-239ae0ecac2d)",
+          "recommended": "NO",
+          "sizeVariantConflict": "250ml vs 500ml; can vs bottle likely differs."
+        }
+      ],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "500ml, not the existing 250ml."
+    },
+    {
+      "catalogProductId": "a8658bb3-a0e4-4cef-a96d-bc5adae3495d",
+      "name": "Schweppes Ginger Ale",
+      "brand": "Schweppes",
+      "sizeLabel": "330ml",
+      "category": "Soft Drinks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_C",
+      "brandFamily": "Schweppes",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Schweppes Ginger Ale cans/bottles differ globally. Photograph Zimbabwe 330ml Ginger Ale, not tonic or US ginger ale.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Schweppes",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_A_BEVERAGES",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Ginger Ale 330ml only, not tonic or soda water."
+    },
+    {
+      "catalogProductId": "8ad2dba7-74c6-4c60-99e8-fcd272c440b6",
+      "name": "Jik Bleach",
+      "brand": "Jik",
+      "sizeLabel": "750ml",
+      "category": "Household Cleaning",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Jik",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "LOW",
+      "regionalNotes": "Jik bleach is a common Southern African Reckitt SKU. Photograph local 750ml.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Jik",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_B_HOUSEHOLD",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": ""
+    },
+    {
+      "catalogProductId": "5b932a7c-267f-4499-9fe8-c029f0288679",
+      "name": "Omo Washing Powder",
+      "brand": "Omo",
+      "sizeLabel": "2kg",
+      "category": "Laundry",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Omo",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Unilever Omo packs differ (handwash vs machine). Photograph Zimbabwe 2kg.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Omo",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_B_HOUSEHOLD",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": ""
+    },
+    {
+      "catalogProductId": "406406a8-8cb1-4402-b494-6bd3ba48e826",
+      "name": "Sunlight Liquid",
+      "brand": "Sunlight",
+      "sizeLabel": "400ml",
+      "category": "Household Cleaning",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Sunlight",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Sunlight dishwashing vs laundry vs Trade King confusion. Existing 750ml image is Trade King branded \u2014 do not reuse for Unilever Sunlight Liquid 400ml.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Sunlight",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/935f1f9d-2e06-4fdd-822f-258934d0e946.jpg",
+          "existingProduct": "Sunlight 750ml brand=Trade King (72c43884-b44c-444a-9785-6f98c9411742)",
+          "recommended": "NO",
+          "sizeVariantConflict": "Different manufacturer identity (Trade King vs typical Unilever Sunlight Liquid) and 750ml vs 400ml."
+        }
+      ],
+      "acquisitionPack": "PACK_B_HOUSEHOLD",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Sunlight Liquid 400ml, not Trade King 750ml."
+    },
+    {
+      "catalogProductId": "d4b236f9-f312-420c-ab00-52f1d8840ea5",
+      "name": "Surf Washing Powder",
+      "brand": "Surf",
+      "sizeLabel": "1kg",
+      "category": "Laundry",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Surf",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Unilever Surf bags differ by weight. Existing 2kg image must not be assumed for 500g/1kg.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Surf",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/ab280323-2310-4850-a620-95623611dfb7.jpg",
+          "existingProduct": "Surf 2kg (627070c9-1e31-4134-92a5-ede75a9555d4)",
+          "recommended": "NO",
+          "sizeVariantConflict": "2kg bag vs 500g vs 1kg; weight usually printed large on Surf packs."
+        }
+      ],
+      "acquisitionPack": "PACK_B_HOUSEHOLD",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "500g vs 1kg separately. Do not reuse existing 2kg."
+    },
+    {
+      "catalogProductId": "99dea805-5a2c-4a41-8366-178530acc9c9",
+      "name": "Surf Washing Powder",
+      "brand": "Surf",
+      "sizeLabel": "500g",
+      "category": "Laundry",
+      "currentPrimaryImageUrl": null,
+      "strategy": "SAME_PRODUCT_DIFFERENT_SIZE",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Surf",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Unilever Surf bags differ by weight. Existing 2kg image must not be assumed for 500g/1kg.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Surf",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/ab280323-2310-4850-a620-95623611dfb7.jpg",
+          "existingProduct": "Surf 2kg (627070c9-1e31-4134-92a5-ede75a9555d4)",
+          "recommended": "NO",
+          "sizeVariantConflict": "2kg bag vs 500g vs 1kg; weight usually printed large on Surf packs."
+        }
+      ],
+      "acquisitionPack": "PACK_B_HOUSEHOLD",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "500g vs 1kg separately. Do not reuse existing 2kg."
+    },
+    {
+      "catalogProductId": "35adc00a-ab71-4103-b598-c88bc8855c67",
+      "name": "Comfort Fabric Softener",
+      "brand": "Comfort",
+      "sizeLabel": "2L",
+      "category": "Laundry",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Comfort",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Unilever Comfort bottles differ (blue vs concentrated). Photograph Zimbabwe 2L.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Comfort",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_B_HOUSEHOLD",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": ""
+    },
+    {
+      "catalogProductId": "085e2293-90b4-454b-a4a4-0a4c897c73cc",
+      "name": "Handy Andy",
+      "brand": "Handy Andy",
+      "sizeLabel": "750ml",
+      "category": "Household Cleaning",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Handy Andy",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Unilever Handy Andy bottles are SA/Africa specific. Prefer Zimbabwe 750ml.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Handy Andy",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_B_HOUSEHOLD",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": ""
+    },
+    {
+      "catalogProductId": "18f73c8a-06a0-4dbd-8baf-a8158b3d315d",
+      "name": "Vim Scouring Powder",
+      "brand": "Vim",
+      "sizeLabel": "500g",
+      "category": "Household Cleaning",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_C",
+      "brandFamily": "Vim",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Vim powder vs cream and regional packs differ. Photograph 500g scouring powder.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Vim",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_B_HOUSEHOLD",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": ""
+    },
+    {
+      "catalogProductId": "7bab7021-3e68-480e-8fac-96fa53f98109",
+      "name": "NikNaks",
+      "brand": "NikNaks",
+      "sizeLabel": "55g",
+      "category": "Snacks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "NikNaks",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Simba/PepsiCo NikNaks bags differ by flavor/weight. Photograph 55g Zimbabwe bag.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "NikNaks",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_C_SNACKS",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": ""
+    },
+    {
+      "catalogProductId": "572907aa-fb67-4f0f-9606-15a28343cce2",
+      "name": "Simba Chips",
+      "brand": "Simba",
+      "sizeLabel": "125g",
+      "category": "Snacks",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Simba",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Simba chip bags are Southern African; flavor/weight must match 125g.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Simba",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_C_SNACKS",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": ""
+    },
+    {
+      "catalogProductId": "b6e31dd5-dc2d-47f3-b2a9-60d64fd5ba22",
+      "name": "Eet-Sum-Mor",
+      "brand": null,
+      "sizeLabel": "200g",
+      "category": "Biscuits",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_C",
+      "brandFamily": "Eet-Sum-Mor",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Bakers packs are common in Southern Africa; confirm Zimbabwe-sold 200g pack.",
+      "brandMetadataReview": "YES",
+      "likelyBrandForAcquisitionOnly": "Bakers",
+      "likelyManufacturerForAcquisitionOnly": "Premier FMCG / Bakers",
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_C_SNACKS",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Eet-Sum-Mor is a Bakers biscuit. Catalog brand is empty."
+    },
+    {
+      "catalogProductId": "acf691e9-391d-494b-a67c-8c97b0c1b96f",
+      "name": "Halls",
+      "brand": "Halls",
+      "sizeLabel": "pack",
+      "category": "Sweets",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_C",
+      "brandFamily": "Halls",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Halls stick packs differ by flavor/region. Photograph Zimbabwe pack; flavor must match if visible.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Halls",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_C_SNACKS",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": ""
+    },
+    {
+      "catalogProductId": "ae1feee1-f50d-44f1-8f0f-aaab9d5f5798",
+      "name": "Jelly Tots",
+      "brand": null,
+      "sizeLabel": "100g",
+      "category": "Sweets",
+      "currentPrimaryImageUrl": null,
+      "strategy": "GENERIC_PACKAGED",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_C",
+      "brandFamily": "Jelly Tots",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Nestl\u00e9 Jelly Tots bags differ by weight/art. Photograph 100g Zimbabwe pack.",
+      "brandMetadataReview": "YES",
+      "likelyBrandForAcquisitionOnly": "Nestl\u00e9",
+      "likelyManufacturerForAcquisitionOnly": "Nestl\u00e9",
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_C_SNACKS",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Jelly Tots is a Nestl\u00e9 sweet. Catalog brand is empty."
+    },
+    {
+      "catalogProductId": "42ab1134-d0cd-4767-a4b6-3f9edb7c4dc7",
+      "name": "Romany Creams",
+      "brand": null,
+      "sizeLabel": "200g",
+      "category": "Biscuits",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_C",
+      "brandFamily": "Romany Creams",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Bakers Romany Creams packs differ by weight. Photograph 200g.",
+      "brandMetadataReview": "YES",
+      "likelyBrandForAcquisitionOnly": "Bakers",
+      "likelyManufacturerForAcquisitionOnly": "Premier FMCG / Bakers",
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_C_SNACKS",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Romany Creams is a Bakers biscuit. Catalog brand is empty."
+    },
+    {
+      "catalogProductId": "799d9bf9-2850-457f-b09a-f4dbf2539a86",
+      "name": "Tennis Biscuits",
+      "brand": null,
+      "sizeLabel": "200g",
+      "category": "Biscuits",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_C",
+      "brandFamily": "Tennis Biscuits",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Bakers Tennis packs differ by weight. Photograph 200g.",
+      "brandMetadataReview": "YES",
+      "likelyBrandForAcquisitionOnly": "Bakers",
+      "likelyManufacturerForAcquisitionOnly": "Premier FMCG / Bakers",
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_C_SNACKS",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Tennis Biscuits is a Bakers product. Catalog brand is empty."
+    },
+    {
+      "catalogProductId": "864cee97-fc95-42ea-90bd-fad6ea347c39",
+      "name": "Dairibord Maheu",
+      "brand": "Dairibord",
+      "sizeLabel": "1L",
+      "category": "Mahewu",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Dairibord",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "LOW",
+      "regionalNotes": "Dairibord is a Zimbabwe manufacturer. Local Maheu pack is the correct source.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Dairibord",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/25385cd8-e74f-4c92-8df5-765edf51fe1e.jpg",
+          "existingProduct": "Cascade Baobab 400ml brand=Dairibord",
+          "recommended": "NO",
+          "sizeVariantConflict": "Different product (Cascade juice \u2260 Maheu). Also Pfuko Maheu images exist and are still a different SKU."
+        }
+      ],
+      "acquisitionPack": "PACK_D_BREAKFAST",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Dairibord Maheu 1L, not Pfuko Maheu and not Cascade juice."
+    },
+    {
+      "catalogProductId": "0186b42c-08f5-485d-8feb-bdfaae4e7931",
+      "name": "Aromat",
+      "brand": "Aromat",
+      "sizeLabel": "75g",
+      "category": "Cooking Ingredients",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Aromat",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Unilever Aromat tins differ by region (SA vs Zim). Prefer local tin.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Aromat",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_D_BREAKFAST",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": ""
+    },
+    {
+      "catalogProductId": "837717fd-c136-4ee0-a943-16e37a8e0bb9",
+      "name": "Ceres Apple",
+      "brand": "Ceres",
+      "sizeLabel": "1L",
+      "category": "Juices",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Ceres",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Ceres juice cartons are strongly South African; Zimbabwe retail packs may differ. Do not use a US/EU carton.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Ceres",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_D_BREAKFAST",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": ""
+    },
+    {
+      "catalogProductId": "00b44112-3a04-46f3-837b-c156c5d641f1",
+      "name": "Cerevita",
+      "brand": null,
+      "sizeLabel": "1kg",
+      "category": "Breakfast",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Cerevita",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Nestl\u00e9 Cerevita is an Africa SKU. Do not use unrelated Nestl\u00e9 cereal boxes from other regions.",
+      "brandMetadataReview": "YES",
+      "likelyBrandForAcquisitionOnly": "Nestl\u00e9",
+      "likelyManufacturerForAcquisitionOnly": "Nestl\u00e9",
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_D_BREAKFAST",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Cerevita is a Nestl\u00e9 instant cereal sold in Zimbabwe/Africa. Catalog brand is empty. Brand metadata empty \u2014 photograph Nestl\u00e9 Cerevita 1kg if that is the local product."
+    },
+    {
+      "catalogProductId": "0e4e8c41-e7d7-44ea-865a-e13b7ff5f644",
+      "name": "Cup-a-Soup",
+      "brand": null,
+      "sizeLabel": "pack",
+      "category": "Convenience Foods",
+      "currentPrimaryImageUrl": null,
+      "strategy": "GENERIC_PACKAGED",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Cup-a-Soup",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Knorr Cup-a-Soup sachets differ by market/flavor. Photograph the exact pack sold.",
+      "brandMetadataReview": "YES",
+      "likelyBrandForAcquisitionOnly": "Knorr",
+      "likelyManufacturerForAcquisitionOnly": "Unilever",
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_D_BREAKFAST",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "Cup-a-Soup is typically Knorr/Unilever. Confirm local SKU before photography. Brand metadata empty \u2014 photograph the exact sachet sold; flavor must match if printed."
+    },
+    {
+      "catalogProductId": "f2a97cbe-2947-4653-b4ba-a3d2bd355099",
+      "name": "Ricoffy",
+      "brand": "Ricoffy",
+      "sizeLabel": "100g",
+      "category": "Breakfast",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Ricoffy",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Ricoffy tins/jars differ (Nestl\u00e9 SA). Photograph 100g Zimbabwe pack.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Ricoffy",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_D_BREAKFAST",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": ""
+    },
+    {
+      "catalogProductId": "cbfe5297-6e1d-4337-8d51-4c90f7f6dcf9",
+      "name": "Weet-Bix",
+      "brand": "Weet-Bix",
+      "sizeLabel": "450g",
+      "category": "Breakfast",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 3,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Weet-Bix",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "Weet-Bix boxes differ AU vs Africa (Bokomo/Tiger Brands). Photograph Zimbabwe 450g box.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Weet-Bix",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_D_BREAKFAST",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "450g Zimbabwe/Africa box, not Australian Weet-Bix."
+    },
+    {
+      "catalogProductId": "ffac2168-9b46-4377-9150-ab72d3f3dda8",
+      "name": "Colgate Toothpaste",
+      "brand": "Colgate",
+      "sizeLabel": "50ml",
+      "category": "Personal Care",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 1,
+      "priority": "BRANDED_PRIORITY_A",
+      "brandFamily": "Colgate",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Tube artwork and size bands differ. Existing catalog already has a 100ml Colgate image \u2014 do not reuse for 50ml without size check.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Colgate",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NO",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/088860b8-51b0-4f3d-b533-470ee3005ebf.jpg",
+          "existingProduct": "Colgate 100ml (0d4cee94-a5c7-4f85-a37e-88ec40cdab85)",
+          "recommended": "NO",
+          "sizeVariantConflict": "100ml vs 50ml tubes; size is usually printed on the tube."
+        }
+      ],
+      "acquisitionPack": "PACK_E_PERSONAL_CARE",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "50ml tube, not existing 100ml."
+    },
+    {
+      "catalogProductId": "7abc683d-5604-40fd-83da-bd2d5b8def5b",
+      "name": "Geisha Soap",
+      "brand": "Geisha",
+      "sizeLabel": "90g",
+      "category": "Personal Care",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Geisha",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "MEDIUM",
+      "regionalNotes": "Geisha soap wrappers differ by market. Photograph local 90g bar.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Geisha",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "NONE",
+      "existingReuseDetails": [],
+      "acquisitionPack": "PACK_E_PERSONAL_CARE",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": ""
+    },
+    {
+      "catalogProductId": "87419e05-0ec2-48c1-aa2a-d35100951398",
+      "name": "Vaseline Petroleum Jelly",
+      "brand": "Vaseline",
+      "sizeLabel": "250ml",
+      "category": "Personal Care",
+      "currentPrimaryImageUrl": null,
+      "strategy": "BRANDED_EXACT",
+      "catalogPriority": 2,
+      "priority": "BRANDED_PRIORITY_B",
+      "brandFamily": "Vaseline",
+      "preferredSource": "MERCHANT_SUPPLIED_PHOTO",
+      "sourceHierarchy": [
+        "MERCHANT_SUPPLIED_PHOTO",
+        "DUTS_OWN_PHOTO",
+        "OFFICIAL_MANUFACTURER_ASSET",
+        "AUTHORIZED_RETAILER_OR_DISTRIBUTOR_ASSET",
+        "MANUAL_REVIEW_REQUIRED"
+      ],
+      "separateImageRequired": "SEPARATE_IMAGE_REQUIRED",
+      "sharedImagePossible": "NO",
+      "zimbabwePackagePreferred": "YES",
+      "regionalPackageRisk": "HIGH",
+      "regionalNotes": "African retail is often Vaseline Blueseal; catalog SKU is Petroleum Jelly 250ml. Existing Blueseal 450ml is a different size/variant.",
+      "brandMetadataReview": "NO",
+      "likelyBrandForAcquisitionOnly": "Vaseline",
+      "likelyManufacturerForAcquisitionOnly": null,
+      "existingReuseCandidate": "REVIEW",
+      "existingReuseDetails": [
+        {
+          "existingImageUrl": "https://api.duts.tech/v1/media/product-image/acf20304-0077-467e-8abf-84445a6b44c0.jpg",
+          "existingProduct": "Vaseline Blueseal 450ml (69a9cae4-04ac-499a-bf66-cb9b3e86097f)",
+          "recommended": "REVIEW",
+          "sizeVariantConflict": "450ml Blueseal vs 250ml petroleum jelly; variant name may not match catalog SKU."
+        }
+      ],
+      "acquisitionPack": "PACK_E_PERSONAL_CARE",
+      "status": "NEEDS_IMAGE_ACQUISITION",
+      "notes": "250ml petroleum jelly; Blueseal 450ml is REVIEW only."
+    }
+  ],
+  "acquisitionPacks": [
+    {
+      "id": "PACK_A_BEVERAGES",
+      "products": [
+        "7up 2L",
+        "7up 500ml",
+        "Coca-Cola 1L",
+        "Coca-Cola 2L",
+        "Coca-Cola 330ml",
+        "Coca-Cola 500ml",
+        "Coca-Cola Zero 500ml",
+        "Fanta Orange 2L",
+        "Fanta Orange 500ml",
+        "Mazoe Orange Crush 1L",
+        "Mazoe Raspberry 2L",
+        "Mazoe Orange Crush 5L",
+        "Pepsi 2L",
+        "Pepsi 500ml",
+        "Sprite 2L",
+        "Sprite 500ml",
+        "Fizzi 2L",
+        "Fizzi 500ml",
+        "Mirinda Orange 2L",
+        "Mirinda Orange 500ml",
+        "Sparletta Cream Soda 2L",
+        "Sting Energy Drink 500ml",
+        "Schweppes Ginger Ale 330ml"
+      ],
+      "sizes": [
+        "2L",
+        "500ml",
+        "1L",
+        "2L",
+        "330ml",
+        "500ml",
+        "500ml",
+        "2L",
+        "500ml",
+        "1L",
+        "2L",
+        "5L",
+        "2L",
+        "500ml",
+        "2L",
+        "500ml",
+        "2L",
+        "500ml",
+        "2L",
+        "500ml",
+        "2L",
+        "500ml",
+        "330ml"
+      ],
+      "catalogProductIds": [
+        "22cfda60-bc89-456d-9989-4654436d6b96",
+        "d8ac79e7-ba40-4f9f-b685-d2cf45ded3bb",
+        "0124f94e-4f05-40d3-8c34-194bf3e15ede",
+        "4d9979f1-b0ef-4954-b0f3-a806165765e6",
+        "705942f1-b491-4943-9a79-97cd2c589ff0",
+        "fc15354a-ec7f-4449-9e2b-b54ed032c4fb",
+        "baf50e0f-2589-403a-957a-f78b95374878",
+        "c6945c26-8bf2-42e6-9dde-7e8b7ea42779",
+        "a112ae11-bc0c-4c82-9a68-b0f14097b9f6",
+        "ca052455-a6de-468f-a583-10581dc80f8a",
+        "825bd247-9efa-47bd-90c0-7d9ca6c126d1",
+        "1ac6f981-6b19-432c-befe-0fa9d36bbb3e",
+        "315a8851-86a8-4e23-b3e2-9cf85ebc2054",
+        "0bba2cd9-e9c5-487b-81dc-1b41f586f9f8",
+        "79373171-8713-4180-b902-31d1ae3ae7a6",
+        "c039ea2b-e38e-42f8-afa3-95fb38a62d17",
+        "9ad7d0b3-87f8-4b8b-b2f3-442f07c2645f",
+        "ca95347d-8841-4e89-897d-894f58d390dc",
+        "fb489c29-16b6-4f78-a23b-e15e9c6fe557",
+        "8bba6346-9c14-4dd5-b443-ce20e543f92c",
+        "103407c0-f3aa-4fdc-8e79-0f1cdf684c0f",
+        "eab2767e-d7ce-4f97-a7f7-6e40368b2eb5",
+        "a8658bb3-a0e4-4cef-a96d-bc5adae3495d"
+      ],
+      "requiredPhotographs": 23,
+      "warnings": [
+        "500ml vs 2L separately.",
+        "500ml vs 2L separately. Do not reuse Probottles 1L.",
+        "500ml vs 2L separately. Do not reuse existing 1L.",
+        "500ml vs 2L separately. Not Pepsi Zero (excluded SKU).",
+        "500ml, not the existing 250ml.",
+        "Cream Soda 2L only.",
+        "Do not use Coca-Cola Zero for regular Coca-Cola. Photograph 330ml, 500ml, 1L, and 2L separately.",
+        "Ginger Ale 330ml only, not tonic or soda water.",
+        "Must be Fanta Orange, not grape/pineapple. 500ml and 2L separately.",
+        "Must be Orange. 500ml vs 2L separately.",
+        "Must be Zero, not regular Coca-Cola. Zimbabwe Zero branding, not US Coke Zero Sugar if they differ.",
+        "Orange Crush \u2260 Raspberry. 1L \u2260 5L. Do not reuse Mazoe Blackberry."
+      ],
+      "instruction": "Walk the aisle and photograph each listed package separately. Do not skip a size because another size of the same brand was already photographed."
+    },
+    {
+      "id": "PACK_B_HOUSEHOLD",
+      "products": [
+        "Jik Bleach 750ml",
+        "Omo Washing Powder 2kg",
+        "Sunlight Liquid 400ml",
+        "Surf Washing Powder 1kg",
+        "Surf Washing Powder 500g",
+        "Comfort Fabric Softener 2L",
+        "Handy Andy 750ml",
+        "Vim Scouring Powder 500g"
+      ],
+      "sizes": [
+        "750ml",
+        "2kg",
+        "400ml",
+        "1kg",
+        "500g",
+        "2L",
+        "750ml",
+        "500g"
+      ],
+      "catalogProductIds": [
+        "8ad2dba7-74c6-4c60-99e8-fcd272c440b6",
+        "5b932a7c-267f-4499-9fe8-c029f0288679",
+        "406406a8-8cb1-4402-b494-6bd3ba48e826",
+        "d4b236f9-f312-420c-ab00-52f1d8840ea5",
+        "99dea805-5a2c-4a41-8366-178530acc9c9",
+        "35adc00a-ab71-4103-b598-c88bc8855c67",
+        "085e2293-90b4-454b-a4a4-0a4c897c73cc",
+        "18f73c8a-06a0-4dbd-8baf-a8158b3d315d"
+      ],
+      "requiredPhotographs": 8,
+      "warnings": [
+        "500g vs 1kg separately. Do not reuse existing 2kg.",
+        "Sunlight Liquid 400ml, not Trade King 750ml."
+      ],
+      "instruction": "Walk the aisle and photograph each listed package separately. Do not skip a size because another size of the same brand was already photographed."
+    },
+    {
+      "id": "PACK_C_SNACKS",
+      "products": [
+        "NikNaks 55g",
+        "Simba Chips 125g",
+        "Eet-Sum-Mor 200g",
+        "Halls pack",
+        "Jelly Tots 100g",
+        "Romany Creams 200g",
+        "Tennis Biscuits 200g"
+      ],
+      "sizes": [
+        "55g",
+        "125g",
+        "200g",
+        "pack",
+        "100g",
+        "200g",
+        "200g"
+      ],
+      "catalogProductIds": [
+        "7bab7021-3e68-480e-8fac-96fa53f98109",
+        "572907aa-fb67-4f0f-9606-15a28343cce2",
+        "b6e31dd5-dc2d-47f3-b2a9-60d64fd5ba22",
+        "acf691e9-391d-494b-a67c-8c97b0c1b96f",
+        "ae1feee1-f50d-44f1-8f0f-aaab9d5f5798",
+        "42ab1134-d0cd-4767-a4b6-3f9edb7c4dc7",
+        "799d9bf9-2850-457f-b09a-f4dbf2539a86"
+      ],
+      "requiredPhotographs": 7,
+      "warnings": [],
+      "instruction": "Walk the aisle and photograph each listed package separately. Do not skip a size because another size of the same brand was already photographed."
+    },
+    {
+      "id": "PACK_D_BREAKFAST",
+      "products": [
+        "Dairibord Maheu 1L",
+        "Aromat 75g",
+        "Ceres Apple 1L",
+        "Cerevita 1kg",
+        "Cup-a-Soup pack",
+        "Ricoffy 100g",
+        "Weet-Bix 450g"
+      ],
+      "sizes": [
+        "1L",
+        "75g",
+        "1L",
+        "1kg",
+        "pack",
+        "100g",
+        "450g"
+      ],
+      "catalogProductIds": [
+        "864cee97-fc95-42ea-90bd-fad6ea347c39",
+        "0186b42c-08f5-485d-8feb-bdfaae4e7931",
+        "837717fd-c136-4ee0-a943-16e37a8e0bb9",
+        "00b44112-3a04-46f3-837b-c156c5d641f1",
+        "0e4e8c41-e7d7-44ea-865a-e13b7ff5f644",
+        "f2a97cbe-2947-4653-b4ba-a3d2bd355099",
+        "cbfe5297-6e1d-4337-8d51-4c90f7f6dcf9"
+      ],
+      "requiredPhotographs": 7,
+      "warnings": [
+        "450g Zimbabwe/Africa box, not Australian Weet-Bix.",
+        "Brand metadata empty \u2014 photograph Nestl\u00e9 Cerevita 1kg if that is the local product.",
+        "Brand metadata empty \u2014 photograph the exact sachet sold; flavor must match if printed.",
+        "Dairibord Maheu 1L, not Pfuko Maheu and not Cascade juice."
+      ],
+      "instruction": "Walk the aisle and photograph each listed package separately. Do not skip a size because another size of the same brand was already photographed."
+    },
+    {
+      "id": "PACK_E_PERSONAL_CARE",
+      "products": [
+        "Colgate Toothpaste 50ml",
+        "Geisha Soap 90g",
+        "Vaseline Petroleum Jelly 250ml"
+      ],
+      "sizes": [
+        "50ml",
+        "90g",
+        "250ml"
+      ],
+      "catalogProductIds": [
+        "ffac2168-9b46-4377-9150-ab72d3f3dda8",
+        "7abc683d-5604-40fd-83da-bd2d5b8def5b",
+        "87419e05-0ec2-48c1-aa2a-d35100951398"
+      ],
+      "requiredPhotographs": 3,
+      "warnings": [
+        "250ml petroleum jelly; Blueseal 450ml is REVIEW only.",
+        "50ml tube, not existing 100ml."
+      ],
+      "instruction": "Walk the aisle and photograph each listed package separately. Do not skip a size because another size of the same brand was already photographed."
+    }
+  ],
+  "existingImageReuseCandidates": [
+    {
+      "existingImageUrl": "https://api.duts.tech/v1/media/product-image/6470cb3b-22e5-4989-84bd-cc62eb913534.jpg",
+      "existingProduct": "7up 1L (0b10d7e2-6d16-4851-b7b3-db3563e36ec6)",
+      "missingProduct": "7up 500ml / 7up 2L",
+      "whyReuseMightBePossible": "Same brand family; legacy 1L image is classified GOOD in the 67-image audit.",
+      "sizeVariantConflict": "500ml PET, 1L PET, and 2L PET are visibly different bottle sizes.",
+      "recommended": "NO",
+      "missingIds": [
+        "d8ac79e7-ba40-4f9f-b685-d2cf45ded3bb",
+        "22cfda60-bc89-456d-9989-4654436d6b96"
+      ]
+    },
+    {
+      "existingImageUrl": "https://api.duts.tech/v1/media/product-image/088860b8-51b0-4f3d-b533-470ee3005ebf.jpg",
+      "existingProduct": "Colgate 100ml (0d4cee94-a5c7-4f85-a37e-88ec40cdab85)",
+      "missingProduct": "Colgate Toothpaste 50ml",
+      "whyReuseMightBePossible": "Same Colgate toothpaste brand/product type already in catalog.",
+      "sizeVariantConflict": "100ml vs 50ml tubes; size is usually printed on the tube.",
+      "recommended": "NO",
+      "missingIds": [
+        "ffac2168-9b46-4377-9150-ab72d3f3dda8"
+      ]
+    },
+    {
+      "existingImageUrl": "https://api.duts.tech/v1/media/product-image/b510a8bc-b651-42d8-9bfb-4e2ffd3e3060.jpg",
+      "existingProduct": "Fizzi 1L brand=Probottles (c1fd76c3-0e80-4fbb-9c52-c8b694b64cc5)",
+      "missingProduct": "Fizzi 500ml / Fizzi 2L",
+      "whyReuseMightBePossible": "Same Fizzi name family already photographed.",
+      "sizeVariantConflict": "1L vs 500ml vs 2L; existing brand column is Probottles not Fizzi.",
+      "recommended": "NO",
+      "missingIds": [
+        "ca95347d-8841-4e89-897d-894f58d390dc",
+        "9ad7d0b3-87f8-4b8b-b2f3-442f07c2645f"
+      ]
+    },
+    {
+      "existingImageUrl": "https://api.duts.tech/v1/media/product-image/87a9e41a-efe7-4d5d-af0e-205d90f9d88e.jpg",
+      "existingProduct": "Mazoe Orange Crush 2L (2326e24b-2f17-4d49-92e5-cb9662253881)",
+      "missingProduct": "Mazoe Orange Crush 1L",
+      "whyReuseMightBePossible": "Same Mazoe Orange Crush flavor; 2L already has a catalog image.",
+      "sizeVariantConflict": "1L vs 2L bottles; size usually visible on Mazoe labels.",
+      "recommended": "REVIEW",
+      "missingIds": [
+        "ca052455-a6de-468f-a583-10581dc80f8a"
+      ]
+    },
+    {
+      "existingImageUrl": "https://api.duts.tech/v1/media/product-image/87a9e41a-efe7-4d5d-af0e-205d90f9d88e.jpg",
+      "existingProduct": "Mazoe Orange Crush 2L (2326e24b-2f17-4d49-92e5-cb9662253881)",
+      "missingProduct": "Mazoe Orange Crush 5L",
+      "whyReuseMightBePossible": "Same flavor family.",
+      "sizeVariantConflict": "2L bottle vs 5L jerry/large bottle \u2014 package type differs.",
+      "recommended": "NO",
+      "missingIds": [
+        "1ac6f981-6b19-432c-befe-0fa9d36bbb3e"
+      ]
+    },
+    {
+      "existingImageUrl": "https://api.duts.tech/v1/media/product-image/3eff64c8-1bc8-4c24-a158-61867f67c0d6.jpg",
+      "existingProduct": "Mazoe Blackberry 2L (d56254f0-d4c7-47af-a20d-a1e5995ee2e6)",
+      "missingProduct": "Mazoe Raspberry 2L",
+      "whyReuseMightBePossible": "Same Mazoe squash brand and 2L format.",
+      "sizeVariantConflict": "Flavor conflict: Blackberry \u2260 Raspberry.",
+      "recommended": "NO",
+      "missingIds": [
+        "825bd247-9efa-47bd-90c0-7d9ca6c126d1"
+      ]
+    },
+    {
+      "existingImageUrl": "https://api.duts.tech/v1/media/product-image/2ca7e92f-1636-4f44-a0ab-47cc3bfb700f.jpg",
+      "existingProduct": "Mirinda 1L brand=Pepsi (7dadda14-5c44-423e-beaf-b0d3b1723a6a)",
+      "missingProduct": "Mirinda Orange 500ml / Mirinda Orange 2L",
+      "whyReuseMightBePossible": "Same Mirinda family already photographed.",
+      "sizeVariantConflict": "1L vs 500ml vs 2L; confirm Orange flavor on existing image before any review.",
+      "recommended": "NO",
+      "missingIds": [
+        "8bba6346-9c14-4dd5-b443-ce20e543f92c",
+        "fb489c29-16b6-4f78-a23b-e15e9c6fe557"
+      ]
+    },
+    {
+      "existingImageUrl": "https://api.duts.tech/v1/media/product-image/8972644e-d774-43c0-88fe-aa8f993f75c1.jpg",
+      "existingProduct": "Sting Energy Drink 250ml brand=PepsiCo (9f70db16-c267-4bb8-93ba-239ae0ecac2d)",
+      "missingProduct": "Sting Energy Drink 500ml",
+      "whyReuseMightBePossible": "Same Sting energy drink family.",
+      "sizeVariantConflict": "250ml vs 500ml; can vs bottle likely differs.",
+      "recommended": "NO",
+      "missingIds": [
+        "eab2767e-d7ce-4f97-a7f7-6e40368b2eb5"
+      ]
+    },
+    {
+      "existingImageUrl": "https://api.duts.tech/v1/media/product-image/935f1f9d-2e06-4fdd-822f-258934d0e946.jpg",
+      "existingProduct": "Sunlight 750ml brand=Trade King (72c43884-b44c-444a-9785-6f98c9411742)",
+      "missingProduct": "Sunlight Liquid 400ml",
+      "whyReuseMightBePossible": "Sunlight name overlap in catalog.",
+      "sizeVariantConflict": "Different manufacturer identity (Trade King vs typical Unilever Sunlight Liquid) and 750ml vs 400ml.",
+      "recommended": "NO",
+      "missingIds": [
+        "406406a8-8cb1-4402-b494-6bd3ba48e826"
+      ]
+    },
+    {
+      "existingImageUrl": "https://api.duts.tech/v1/media/product-image/ab280323-2310-4850-a620-95623611dfb7.jpg",
+      "existingProduct": "Surf 2kg (627070c9-1e31-4134-92a5-ede75a9555d4)",
+      "missingProduct": "Surf Washing Powder 500g / 1kg",
+      "whyReuseMightBePossible": "Same Surf washing powder brand already photographed at 2kg.",
+      "sizeVariantConflict": "2kg bag vs 500g vs 1kg; weight usually printed large on Surf packs.",
+      "recommended": "NO",
+      "missingIds": [
+        "99dea805-5a2c-4a41-8366-178530acc9c9",
+        "d4b236f9-f312-420c-ab00-52f1d8840ea5"
+      ]
+    },
+    {
+      "existingImageUrl": "https://api.duts.tech/v1/media/product-image/acf20304-0077-467e-8abf-84445a6b44c0.jpg",
+      "existingProduct": "Vaseline Blueseal 450ml (69a9cae4-04ac-499a-bf66-cb9b3e86097f)",
+      "missingProduct": "Vaseline Petroleum Jelly 250ml",
+      "whyReuseMightBePossible": "Same Vaseline family; Blueseal is common Zimbabwe petroleum jelly.",
+      "sizeVariantConflict": "450ml Blueseal vs 250ml petroleum jelly; variant name may not match catalog SKU.",
+      "recommended": "REVIEW",
+      "missingIds": [
+        "87419e05-0ec2-48c1-aa2a-d35100951398"
+      ]
+    },
+    {
+      "existingImageUrl": "https://api.duts.tech/v1/media/product-image/25385cd8-e74f-4c92-8df5-765edf51fe1e.jpg",
+      "existingProduct": "Cascade Baobab 400ml brand=Dairibord",
+      "missingProduct": "Dairibord Maheu 1L",
+      "whyReuseMightBePossible": "Same manufacturer Dairibord.",
+      "sizeVariantConflict": "Different product (Cascade juice \u2260 Maheu). Also Pfuko Maheu images exist and are still a different SKU.",
+      "recommended": "NO",
+      "missingIds": [
+        "864cee97-fc95-42ea-90bd-fad6ea347c39"
+      ]
+    }
+  ],
+  "nonBrandedFollowUpQueue": [
+    {
+      "catalogProductId": "e421c4f1-fa18-4d32-a318-46c6ef4ab3d9",
+      "name": "Chocolate Bar",
+      "sizeLabel": "each",
+      "queue": "HUMAN_REVIEW",
+      "recommendation": "Do not generate a Cadbury/Nestl\u00e9/generic branded bar. Either capture the exact bar a participating merchant sells (then set brand later in a metadata phase) or keep imageless until the SKU is brand-identified.",
+      "doNotImplementNow": true
+    },
+    {
+      "catalogProductId": "d1da0504-ad41-4ab2-b38e-a32903c3b516",
+      "name": "Infant Formula",
+      "sizeLabel": "400g",
+      "queue": "HUMAN_REVIEW",
+      "recommendation": "Infant formula is high-risk. Only an official manufacturer asset or a merchant photo of the exact tin sold. Never generate or approximate NAN/SMA/Lactogen packaging.",
+      "doNotImplementNow": true
+    },
+    {
+      "catalogProductId": "4fcf8dd0-f018-41e4-b451-aaf5ba7e5ec4",
+      "name": "AA Batteries",
+      "sizeLabel": "4",
+      "queue": "GENERATION_DIFFICULTY",
+      "recommendation": "Photograph a real 4-count AA pack or four AA cells with count visible. Previous generated image failed identity (cells did not read as AA). Count must MATCH 4.",
+      "doNotImplementNow": true
+    },
+    {
+      "catalogProductId": "82e4b413-f188-447b-a5b3-34f02fb57a4a",
+      "name": "Baby Cereal",
+      "sizeLabel": "250g",
+      "queue": "GENERATION_DIFFICULTY",
+      "recommendation": "Photograph the actual Zimbabwe baby cereal sold (e.g. Nestl\u00e9 Cereals/Nestum if that is the SKU) or a clearly infant-cereal pack. Previous generated image looked like TVP. If branded, treat as branded acquisition later.",
+      "doNotImplementNow": true
+    },
+    {
+      "catalogProductId": "4c467bb3-ee51-498e-811f-80274816f8c3",
+      "name": "Exercise Book",
+      "sizeLabel": "each",
+      "queue": "GENERATION_DIFFICULTY",
+      "recommendation": "Photograph a real unbranded or locally printed school exercise book. Do not generate covers with fake school crests or publisher logos.",
+      "doNotImplementNow": true
+    },
+    {
+      "catalogProductId": "31fd3097-96a8-4e5d-8231-3529c8d24a37",
+      "name": "Bottled Water",
+      "sizeLabel": "10L",
+      "queue": "COUNT_OR_SIZE_SENSITIVE",
+      "recommendation": "Photograph an actual 10L container sold in Zimbabwe (often a rectangular 10L bottle, not a 5L jug or 18.9L cooler). Size mark must be visible. Generation previously collapsed to 5L/cooler.",
+      "doNotImplementNow": true
+    },
+    {
+      "catalogProductId": "4a926905-38f3-4ce1-97ed-a1ae73006748",
+      "name": "Pine Gel",
+      "sizeLabel": "5L",
+      "queue": "COUNT_OR_SIZE_SENSITIVE",
+      "recommendation": "Photograph a real 5L pine gel jerry. Do not generate a branded cleaning bottle. Size 5L must be readable or package geometry must unambiguously be 5L class.",
+      "doNotImplementNow": true
+    },
+    {
+      "catalogProductId": "a7e1b3cf-24d4-4cf6-8f33-97d332e82e66",
+      "name": "Stock Cubes Chicken",
+      "sizeLabel": "12",
+      "queue": "COUNT_OR_SIZE_SENSITIVE",
+      "recommendation": "Photograph a real 12-count chicken stock cube pack. Previous H2.4 image showed 9 cubes and was reverted. Visible count must be 12, not 8/9/24. If branded (Knorr/Royco), treat as branded later.",
+      "doNotImplementNow": true
+    }
+  ],
+  "orphanedMedia": [
+    "https://api.duts.tech/v1/media/product-image/ff59cc3d-0d1d-42e9-b1e8-fd6cba2fde97.jpg",
+    "https://api.duts.tech/v1/media/product-image/39c39471-dc68-4140-a160-0b2ec2d23b32.jpg",
+    "https://api.duts.tech/v1/media/product-image/e5d18022-f027-4a5b-935d-191aedb20d51.jpg",
+    "https://api.duts.tech/v1/media/product-image/a6d2a350-e403-4bb1-a9d8-59912d8521df.jpg",
+    "https://api.duts.tech/v1/media/product-image/d0de03e7-b2ee-40ed-ae7d-bc2bd9e113b8.jpg",
+    "https://api.duts.tech/v1/media/product-image/f47779b2-bae2-4c06-9ac9-7f9a30a456cc.jpg"
+  ],
+  "legacyImageRepairDeferred": {
+    "deferred": true,
+    "instantNoodlesKelloggs": [
+      {
+        "catalogProductId": "871b6cfc-d2df-4502-b43b-8b4e370afc2c",
+        "name": "Instant Noodles",
+        "brand": "Kelloggs",
+        "sizeLabel": "70g",
+        "category": "Convenience Foods",
+        "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/8b12746f-a767-4ef2-9b0d-f4760643d99c.jpg",
+        "classification": "QUESTIONABLE",
+        "urlReachable": true,
+        "flags": [
+          "WRONG_PRODUCT_OR_BRAND"
+        ]
+      }
+    ],
+    "questionableExistingImages": [
+      {
+        "catalogProductId": "fcc4bbae-540e-499e-aecb-a75069ddce40",
+        "name": "Beef tripe (maguru )",
+        "brand": "Irvine\u2019s",
+        "sizeLabel": "1kg",
+        "category": "Groceries",
+        "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/6ba362f8-0108-4611-a0c2-7ff9eb02f452.jpg",
+        "classification": "QUESTIONABLE",
+        "urlReachable": true,
+        "flags": [
+          "STALE_CATEGORY"
+        ]
+      },
+      {
+        "catalogProductId": "82cc387e-61c3-40dc-9d51-889c03ee78d9",
+        "name": "Broiler chicken",
+        "brand": "Irvine\u2019s",
+        "sizeLabel": "1.5kg",
+        "category": "Groceries",
+        "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/dc6474c2-13a2-45f3-a371-f3fea2fc3295.jpg",
+        "classification": "QUESTIONABLE",
+        "urlReachable": true,
+        "flags": [
+          "STALE_CATEGORY"
+        ]
+      },
+      {
+        "catalogProductId": "3d4596f0-9f92-4ced-a557-7cf8602d17b1",
+        "name": "Chicken feet\u2019s n heads",
+        "brand": "Irvine\u2019s",
+        "sizeLabel": "1kg",
+        "category": "Groceries",
+        "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/b6039d4c-02cf-4539-b71d-ebdea3399f91.jpg",
+        "classification": "QUESTIONABLE",
+        "urlReachable": true,
+        "flags": [
+          "STALE_CATEGORY"
+        ]
+      },
+      {
+        "catalogProductId": "2a8d1c76-b59b-417f-9c55-7129ed752c39",
+        "name": "Gizzards",
+        "brand": "Irvine\u2019s",
+        "sizeLabel": "500g",
+        "category": "Groceries",
+        "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/511535ba-7112-4c68-94bd-cd90879f29ee.jpg",
+        "classification": "QUESTIONABLE",
+        "urlReachable": true,
+        "flags": [
+          "STALE_CATEGORY"
+        ]
+      },
+      {
+        "catalogProductId": "871b6cfc-d2df-4502-b43b-8b4e370afc2c",
+        "name": "Instant Noodles",
+        "brand": "Kelloggs",
+        "sizeLabel": "70g",
+        "category": "Convenience Foods",
+        "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/8b12746f-a767-4ef2-9b0d-f4760643d99c.jpg",
+        "classification": "QUESTIONABLE",
+        "urlReachable": true,
+        "flags": [
+          "WRONG_PRODUCT_OR_BRAND"
+        ]
+      },
+      {
+        "catalogProductId": "cde8184e-e01e-4f11-a7ad-1a71be5ced4c",
+        "name": "Mazondo",
+        "brand": "Irvine\u2019s",
+        "sizeLabel": "1kg",
+        "category": "Groceries",
+        "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/169b1db6-2318-4448-9d5a-51e744167f58.jpg",
+        "classification": "QUESTIONABLE",
+        "urlReachable": true,
+        "flags": [
+          "STALE_CATEGORY"
+        ]
+      },
+      {
+        "catalogProductId": "7dadda14-5c44-423e-beaf-b0d3b1723a6a",
+        "name": "Mirinda",
+        "brand": "Pepsi",
+        "sizeLabel": "1L",
+        "category": "Soft Drinks",
+        "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/2ca7e92f-1636-4f44-a0ab-47cc3bfb700f.jpg",
+        "classification": "QUESTIONABLE",
+        "urlReachable": true,
+        "flags": [
+          "IMAGE_IDENTITY_REVIEW"
+        ]
+      },
+      {
+        "catalogProductId": "69a9cae4-04ac-499a-bf66-cb9b3e86097f",
+        "name": "Vaseline",
+        "brand": "Blueseal",
+        "sizeLabel": "450ml",
+        "category": "Personal Care",
+        "primaryImageUrl": "https://api.duts.tech/v1/media/product-image/acf20304-0077-467e-8abf-84445a6b44c0.jpg",
+        "classification": "QUESTIONABLE",
+        "urlReachable": true,
+        "flags": [
+          "IMAGE_IDENTITY_REVIEW"
+        ]
+      }
+    ],
+    "notes": "Do not repair during H3. Instant Noodles / Kelloggs remains WRONG_PRODUCT_OR_BRAND. Questionable rows remain in catalog-image-existing-audit.json."
+  },
+  "summary": {
+    "PHASE_H3_COMPLETE": "YES",
+    "PRODUCTION_WRITES": 0,
+    "BRANDED_MISSING_CONFIRMED": 48,
+    "BRAND_FAMILIES": 36,
+    "SEPARATE_IMAGES_REQUIRED": 48,
+    "SHARED_IMAGE_POSSIBLE": 0,
+    "BRAND_METADATA_REVIEW_COUNT": 6,
+    "ZIMBABWE_PACKAGE_HIGH_RISK": [
+      "Ceres",
+      "Cerevita",
+      "Coca-Cola",
+      "Coca-Cola Zero",
+      "Fanta",
+      "Pepsi",
+      "Schweppes",
+      "Sprite",
+      "Sting",
+      "Sunlight",
+      "Vaseline",
+      "Weet-Bix"
+    ],
+    "EXISTING_IMAGE_REUSE_CANDIDATES": 12,
+    "BRANDED_PRIORITY_A": 25,
+    "BRANDED_PRIORITY_B": 16,
+    "BRANDED_PRIORITY_C": 7,
+    "ACQUISITION_PACKS": 5,
+    "ESTIMATED_NEW_BRANDED_PHOTOS_REQUIRED": 48,
+    "HUMAN_REVIEW_QUEUE": 2,
+    "GENERATION_DIFFICULTY_QUEUE": 3,
+    "COUNT_SIZE_QUEUE": 3,
+    "ORPHANED_MEDIA_COUNT": 6,
+    "LEGACY_IMAGE_REPAIR_DEFERRED": "YES",
+    "SAFE_TO_BEGIN_BRANDED_ACQUISITION": "YES"
+  },
+  "constraints": {
+    "doNotDownloadBrandedImages": true,
+    "doNotUploadBrandedImages": true,
+    "doNotChangeProductData": true,
+    "doNotStartLegacyImageRepair": true,
+    "doNotAiGenerateBrandedPackaging": true
+  }
+}

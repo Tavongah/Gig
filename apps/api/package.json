@@ -38,6 +38,8 @@
     "test:catalog-foundation": "tsx scripts/test-catalog-foundation.ts",
     "test:admin-catalog-visibility": "tsx scripts/test-admin-catalog-visibility.ts",
     "test:catalog-image-manifest": "tsx scripts/test-catalog-image-manifest.ts",
+    "test:catalog-image-acquisition": "tsx scripts/test-catalog-image-acquisition.ts",
+    "test:catalog-image-acquisition-db": "tsx scripts/test-catalog-image-acquisition-db.ts",
     "test:customer-ecommerce": "tsx scripts/test-customer-ecommerce-phase2.ts",
     "test:guest-handoff": "tsx scripts/test-guest-handoff.ts",
     "migrate:products-to-catalog": "tsx scripts/migrate-products-to-catalog.ts",

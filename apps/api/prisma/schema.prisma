@@ -745,6 +745,7 @@ model CatalogProduct {
   approvedByUserId String?
   images           CatalogProductImage[]
   merchantOffers   Product[]
+  imageAcquisition CatalogImageAcquisition?
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
@@ -777,6 +778,82 @@ enum CatalogProductSource {
   DUTS_ADMIN
   MERCHANT_SUBMISSION
   IMPORT
+}
+
+enum CatalogImageAcquisitionStatus {
+  NEEDS_IMAGE_ACQUISITION
+  PHOTO_RECEIVED
+  VALIDATION_REQUIRED
+  VALIDATED
+  REJECTED
+  UPLOADED
+}
+
+enum CatalogImageQueueKind {
+  BRANDED
+  GENERIC_EXCEPTION
+  LEGACY_REVIEW
+}
+
+enum CatalogImageAssetRole {
+  CANDIDATE
+  REJECTED
+  ASSIGNED
+}
+
+/**
+ * Operational photo-acquisition state. Independent of CatalogProduct.status.
+ * Does not change APPROVED / merchant Product IDs / orders.
+ */
+model CatalogImageAcquisition {
+  id                       String                         @id @default(uuid())
+  catalogProductId         String                         @unique
+  catalogProduct           CatalogProduct                 @relation(fields: [catalogProductId], references: [id], onDelete: Cascade)
+  queueKind                CatalogImageQueueKind
+  exceptionQueue           String?
+  status                   CatalogImageAcquisitionStatus  @default(NEEDS_IMAGE_ACQUISITION)
+  sourceType               String?
+  capturedByLabel          String?
+  plannedName              String
+  plannedBrand             String?
+  plannedSizeLabel         String?
+  plannedCategory          String
+  brandFamily              String?
+  acquisitionPack          String?
+  acquisitionPriority      String?
+  regionalPackageRisk      String?
+  brandMetadataReview      Boolean                        @default(false)
+  likelyBrand              String?
+  referenceImageUrl        String?
+  candidateImageUrl        String?
+  candidateObjectKey       String?
+  assignedImageUrl         String?
+  rejectionReason          String?
+  rejectionNotes           String?
+  regionalPackageConfirmed Boolean                        @default(false)
+  validationChecks         Json?
+  validatedAt              DateTime?
+  uploadedAt               DateTime?
+  notes                    String?
+  assets                   CatalogImageAcquisitionAsset[]
+  createdAt                DateTime                       @default(now())
+  updatedAt                DateTime                       @updatedAt
+
+  @@index([queueKind, status])
+  @@index([acquisitionPack])
+  @@index([acquisitionPriority])
+}
+
+model CatalogImageAcquisitionAsset {
+  id            String                    @id @default(uuid())
+  acquisitionId String
+  acquisition   CatalogImageAcquisition   @relation(fields: [acquisitionId], references: [id], onDelete: Cascade)
+  url           String
+  objectKey     String?
+  role          CatalogImageAssetRole
+  createdAt     DateTime                  @default(now())
+
+  @@index([acquisitionId, role])
 }
 
 /** Merchant offer / sellable inventory row. Keeps stable IDs for WhatsApp carts & orders. */

@@ -1007,6 +1007,111 @@ li {
 }
 
 .catalog-unresolved-badge {
+  display: inline-block;
+  margin-left: 6px;
+  color: #8a5a00;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.iq-packs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.iq-pack {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.iq-pack.active {
+  border-color: #111;
+}
+
+.iq-pack span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.iq-card-meta {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.iq-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.iq-flag,
+.iq-mini-flag {
+  display: block;
+  margin: 0 0 8px;
+  color: #8a5a00;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.iq-compare {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+}
+
+.iq-compare h3,
+.iq-instructions + .photo-actions {
+  margin-top: 8px;
+}
+
+.iq-instructions {
+  margin: 0 0 10px;
+}
+
+.iq-instructions p {
+  margin: 0 0 4px;
+}
+
+.iq-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.iq-check input {
+  margin-top: 3px;
+}
+
+.iq-reference {
+  margin: 0 0 16px;
+}
+
+@media (min-width: 721px) {
+  .iq-packs {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .iq-compare {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
