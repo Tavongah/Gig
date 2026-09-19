@@ -1006,14 +1006,6 @@ li {
   color: var(--muted);
 }
 
-.catalog-unresolved-badge {
-  display: inline-block;
-  margin-left: 6px;
-  color: #8a5a00;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
 .iq-packs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1112,6 +1104,8 @@ li {
     align-items: start;
   }
 }
+
+.catalog-unresolved-badge {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
