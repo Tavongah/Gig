@@ -1,10 +1,12 @@
 import {
   STOREFRONT_CATALOG_PAGE_SIZE,
   STOREFRONT_CATALOG_PAGE_SIZE_MAX,
+  canPurchaseStorefrontCategory,
   catalogSearchHaystack,
   expandSearchTerms,
   isPublicStorefrontCatalogProduct,
   normalizeProductSearchName,
+  parseAlcoholCommerceEnabled,
   type StorefrontProductCard
 } from "@gigflow/shared";
 import { browserAccessibleMediaUrl } from "../../lib/catalog-media.js";
@@ -83,8 +85,16 @@ export function compareStorefrontRows(a: StorefrontAcc, b: StorefrontAcc) {
 }
 
 export function presentStorefrontCard(input: StorefrontAcc): StorefrontProductCard {
+  const alcoholOk = canPurchaseStorefrontCategory(
+    input.category,
+    parseAlcoholCommerceEnabled(process.env.ALCOHOL_COMMERCE_ENABLED)
+  );
   const purchasable =
-    input.purchasable && Boolean(input.productId) && input.fromPriceCents != null && input.merchantOfferCount > 0;
+    alcoholOk &&
+    input.purchasable &&
+    Boolean(input.productId) &&
+    input.fromPriceCents != null &&
+    input.merchantOfferCount > 0;
   return {
     catalogProductId: input.catalogProductId,
     productId: purchasable ? input.productId : null,

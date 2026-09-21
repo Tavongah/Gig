@@ -15,6 +15,7 @@
     "test:guest-storefront-ui": "npx tsx scripts/test-guest-storefront-ui.ts",
     "test:storefront-catalog-ui": "npx tsx scripts/test-storefront-catalog-ui.ts",
     "test:storefront-visual": "npx tsx scripts/test-storefront-visual.ts",
+    "test:storefront-categories": "npx tsx scripts/test-storefront-categories.ts",
     "test:courier-start-trip-ui": "npx tsx scripts/test-courier-start-trip-ui.ts",
     "test:delivery-ux-simplification": "npx tsx scripts/test-delivery-ux-simplification.ts",
     "eas:login": "npx eas-cli login",

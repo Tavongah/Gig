@@ -71,6 +71,11 @@ const envSchema = z.object({
   LOG_VERIFICATION_TO_CONSOLE: z
     .string()
     .optional()
+    .transform((value) => value === "true" || value === "1"),
+  /** Alcohol purchasing stays off until compliance work is explicitly enabled. */
+  ALCOHOL_COMMERCE_ENABLED: z
+    .string()
+    .optional()
     .transform((value) => value === "true" || value === "1")
 });
 

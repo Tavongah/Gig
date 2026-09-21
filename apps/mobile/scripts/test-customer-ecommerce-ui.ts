@@ -21,6 +21,8 @@ const files = [
   "navigation/types.ts",
   "screens/commerce/ShopHomeScreen.tsx",
   "screens/commerce/ProductSearchScreen.tsx",
+  "screens/commerce/MarketplaceCategoryScreen.tsx",
+  "screens/commerce/AllCategoriesScreen.tsx",
   "screens/commerce/ProductDetailScreen.tsx",
   "screens/commerce/ShopDetailScreen.tsx",
   "screens/commerce/CartScreen.tsx",

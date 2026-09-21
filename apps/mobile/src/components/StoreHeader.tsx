@@ -7,6 +7,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { DUTS } from "../lib/theme";
 import { STOREFRONT_MAX_WIDTH, categoryIcon, useStorefrontLayout } from "../lib/storefront-ui";
+import { headerChipCategories } from "../lib/storefront-categories";
+import { openStorefrontCategory } from "../lib/storefront-nav";
 import { useShopBrowse } from "../lib/shop-browse";
 import { useCommerceCartStore } from "../stores/commerce-cart.store";
 import { useShopAreaStore } from "../stores/shop-area.store";
@@ -137,26 +139,37 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
     </Pressable>
   );
 
+  const chips = headerChipCategories(categories, isDesktopNav);
+
   const categoryRow =
-    showCategories && categories.length > 0 ? (
+    showCategories && (chips.length > 0 || categories.length > 0) ? (
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         className={isDesktopNav ? "mt-3" : "mt-4"}
         contentContainerStyle={{ gap: 8, paddingRight: 8 }}
       >
-        {categories.slice(0, isDesktopNav ? 8 : 12).map((name) => (
+        {chips.map((cat) => (
           <Pressable
-            key={name}
-            onPress={() => navigation.navigate("ProductSearch", { category: name, q: undefined })}
+            key={cat.slug}
+            onPress={() => openStorefrontCategory(navigation, cat, categories)}
             accessibilityRole="button"
-            accessibilityLabel={`Category ${name}`}
+            accessibilityLabel={`Category ${cat.label}`}
             className="flex-row items-center rounded-full border border-border bg-card px-3 py-2"
           >
-            <Ionicons name={categoryIcon(name)} size={16} color={DUTS.purple} />
-            <Text className="ml-1.5 text-sm font-semibold text-ink">{name}</Text>
+            <Ionicons name={categoryIcon(cat.label)} size={16} color={DUTS.purple} />
+            <Text className="ml-1.5 text-sm font-semibold text-ink">{cat.label}</Text>
           </Pressable>
         ))}
+        <Pressable
+          onPress={() => navigation.navigate("AllCategories")}
+          accessibilityRole="button"
+          accessibilityLabel="All categories"
+          className="flex-row items-center rounded-full border border-border bg-card px-3 py-2"
+        >
+          <Ionicons name="grid-outline" size={16} color={DUTS.purple} />
+          <Text className="ml-1.5 text-sm font-semibold text-ink">All categories</Text>
+        </Pressable>
       </ScrollView>
     ) : null;
 

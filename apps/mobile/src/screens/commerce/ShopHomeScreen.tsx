@@ -11,7 +11,9 @@ import { api } from "../../lib/api";
 import { addStorefrontProduct } from "../../lib/storefront-cart";
 import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
-import { categoryIcon } from "../../lib/storefront-ui";
+import { moreOnDutsCategories, shopByCategories } from "../../lib/storefront-categories";
+import { openStorefrontCategory } from "../../lib/storefront-nav";
+import { StorefrontCategoryCard } from "../../components/StorefrontCategoryCard";
 import type { RootStackParamList } from "../../navigation/types";
 import { useShopAreaStore, timezoneAreaHint } from "../../stores/shop-area.store";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
@@ -73,11 +75,14 @@ export function ShopHomeScreen() {
     enabled: Boolean(browse.geo)
   });
 
-  const categories = useMemo(() => {
+  const catalogNames = useMemo(() => {
     const fromApi = (categoriesQuery.data?.categories ?? []).map((c) => c.name);
-    if (fromApi.length) return fromApi.slice(0, 8);
+    if (fromApi.length) return fromApi;
     return GUEST_CATEGORIES;
   }, [categoriesQuery.data]);
+
+  const shopBy = shopByCategories(catalogNames);
+  const moreOnDuts = moreOnDutsCategories(catalogNames);
 
   const sectionCategories = (categoriesQuery.data?.categories ?? [])
     .filter((c) => c.count >= 6)
@@ -110,33 +115,21 @@ export function ShopHomeScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <StoreHeader categories={categories} />
+      <StoreHeader categories={catalogNames} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
         <StorePage>
           <Text className="mt-4 text-sm text-muted">Need it? DUTS it. Shop local. Get it delivered.</Text>
 
-          {categories.length > 0 ? (
+          {shopBy.length > 0 ? (
             <View className="mt-5">
               <Text className="mb-3 text-lg font-extrabold text-ink">Shop by category</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 8 }}>
-                {categories.map((name) => (
-                  <Pressable
-                    key={name}
-                    onPress={() => navigation.navigate("ProductSearch", { category: name, q: undefined })}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Shop ${name}`}
-                    className="w-[108px] items-center rounded-2xl border border-border bg-card px-2 py-4"
-                  >
-                    <View
-                      className="h-11 w-11 items-center justify-center rounded-full"
-                      style={{ backgroundColor: "#F4EEFF" }}
-                    >
-                      <Ionicons name={categoryIcon(name)} size={22} color={DUTS.purple} />
-                    </View>
-                    <Text className="mt-2 text-center text-sm font-bold text-ink" numberOfLines={2}>
-                      {name}
-                    </Text>
-                  </Pressable>
+                {shopBy.map((cat) => (
+                  <StorefrontCategoryCard
+                    key={cat.slug}
+                    category={cat}
+                    onPress={() => openStorefrontCategory(navigation, cat, catalogNames)}
+                  />
                 ))}
               </ScrollView>
             </View>
@@ -176,7 +169,35 @@ export function ShopHomeScreen() {
             </View>
           ) : null}
 
-          <View className="mt-2">
+          {moreOnDuts.length > 0 ? (
+            <View className="mt-2">
+              <View className="mb-3 flex-row items-center justify-between">
+                <Text className="text-lg font-extrabold text-ink">More on DUTS</Text>
+                <Pressable
+                  onPress={() => navigation.navigate("AllCategories")}
+                  accessibilityRole="button"
+                  accessibilityLabel="All categories"
+                >
+                  <Text className="text-sm font-bold" style={{ color: DUTS.purple }}>
+                    All categories
+                  </Text>
+                </Pressable>
+              </View>
+              <View className="flex-row flex-wrap" style={{ gap: 10 }}>
+                {moreOnDuts.map((cat) => (
+                  <View key={cat.slug} style={{ width: "22%", minWidth: 72, flexGrow: 1, maxWidth: 140 }}>
+                    <StorefrontCategoryCard
+                      category={cat}
+                      compact
+                      onPress={() => openStorefrontCategory(navigation, cat, catalogNames)}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          <View className="mt-6">
             <Text className="mb-3 text-lg font-extrabold text-ink">Explore products</Text>
             {products.length === 0 && !productsQuery.isLoading ? (
               <Text className="text-sm text-muted">No products found. Try another search.</Text>

@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ProductGrid } from "../../components/ProductGrid";
 import { StoreHeader, StorePage } from "../../components/StoreHeader";
 import { isProductCardPurchasable } from "../../components/ProductCard";
+import { alcoholPurchaseAllowed } from "../../lib/storefront-categories";
 import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
 import { useShopBrowse } from "../../lib/shop-browse";
@@ -89,6 +90,7 @@ export function ShopDetailScreen({ route, navigation }: Props) {
                 })
               }
               onAdd={(p) => {
+                if (!alcoholPurchaseAllowed(p.category)) return;
                 if (!isProductCardPurchasable(p) || !p.productId || p.fromPriceCents == null) return;
                 addOffer({
                   productId: p.productId,

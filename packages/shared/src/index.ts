@@ -342,6 +342,24 @@ export {
   type CatalogImageRejectionReason
 } from "./catalog.js";
 
+export {
+  STOREFRONT_CATEGORIES,
+  STOREFRONT_CATEGORY_STATES,
+  allLiveCatalogCategories,
+  canPurchaseStorefrontCategory,
+  comingSoonCategories,
+  featuredLiveCategories,
+  isAlcoholRestrictedCategory,
+  matchComingSoonFromSearch,
+  parseAlcoholCommerceEnabled,
+  resolveStorefrontCategory,
+  slugifyStorefrontCategory,
+  storefrontCategoryIcon,
+  type ResolvedStorefrontCategory,
+  type StorefrontCategoryConfig,
+  type StorefrontCategoryState
+} from "./storefront-categories.js";
+
 
 export function calculateTieredCommissionRate(totalCents: number): number {
   if (totalCents < 10_000) {

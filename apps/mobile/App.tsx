@@ -64,6 +64,8 @@ const guestLinking = {
         }
       },
       ProductSearch: "products",
+      MarketplaceCategory: "category/:slug",
+      AllCategories: "categories",
       ProductDetail: "product",
       ShopDetail: "shop/:merchantId",
       GuestCheckoutChoice: "order",
@@ -88,6 +90,8 @@ const appLinking = {
         }
       },
       ProductSearch: "products",
+      MarketplaceCategory: "category/:slug",
+      AllCategories: "categories",
       ProductDetail: "product",
       ShopDetail: "shop/:merchantId",
       ShopLocation: "deliver-to",

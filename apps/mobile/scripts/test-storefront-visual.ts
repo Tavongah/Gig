@@ -34,6 +34,7 @@ assert.ok(header.includes("cartCount"));
 const home = read("screens/commerce/ShopHomeScreen.tsx");
 assert.ok(home.includes("ProductRail"), "category carousels");
 assert.ok(home.includes("Shop by category"));
+assert.ok(home.includes("More on DUTS"));
 assert.ok(!home.includes("Best sellers"));
 assert.ok(!home.includes("Trending"));
 assert.ok(!home.includes("Recommended for you"));

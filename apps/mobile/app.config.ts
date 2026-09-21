@@ -108,6 +108,9 @@ export default {
       firebaseAuthDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "",
       firebaseProjectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "",
       firebaseAppId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? "",
+      alcoholCommerceEnabled: ["true", "1"].includes(
+        (process.env.EXPO_PUBLIC_ALCOHOL_COMMERCE_ENABLED ?? "").trim().toLowerCase()
+      ),
       eas: {
         projectId: process.env.EAS_PROJECT_ID || "7b30aedd-9b50-43d0-af22-3fee6842c372"
       }

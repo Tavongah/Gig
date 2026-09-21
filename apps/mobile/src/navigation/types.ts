@@ -40,6 +40,8 @@ export type RootStackParamList = {
   Chat: { gigId: string; title: string };
   Review: { gigId: string; workerName: string };
   ProductSearch: { q?: string; category?: string } | undefined;
+  MarketplaceCategory: { slug: string };
+  AllCategories: undefined;
   ProductDetail: { catalogProductId?: string; productId?: string };
   ShopDetail: { merchantId: string };
   ShopLocation: undefined;

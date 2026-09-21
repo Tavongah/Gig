@@ -89,6 +89,19 @@ assert.equal(withOffer.purchasable, true);
 assert.equal(withOffer.productId, "22222222-2222-2222-2222-222222222222");
 assert.equal(withOffer.fromPriceCents, 250);
 
+const alcoholOffer = presentStorefrontCard({
+  ...catalogOnly,
+  category: "Alcohol",
+  productId: "44444444-4444-4444-4444-444444444444",
+  fromPriceCents: 999,
+  currency: "usd",
+  merchantOfferCount: 1,
+  purchasable: true
+});
+assert.equal(alcoholOffer.purchasable, false);
+assert.equal(alcoholOffer.productId, null);
+assert.equal(alcoholOffer.fromPriceCents, null);
+
 const sibling = catalogOnlyAcc({
   id: "33333333-3333-3333-3333-333333333333",
   name: "Mazoe Raspberry",

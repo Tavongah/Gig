@@ -35,7 +35,7 @@ const header = read("components/StoreHeader.tsx");
 assert.ok(header.includes("Search DUTS"), "prominent search");
 assert.ok(header.includes("Shopping near"), "approximate area label");
 assert.ok(header.includes("Cart"), "desktop cart");
-assert.ok(header.includes("isDesktopNav"), "desktop vs mobile header");
+assert.ok(header.includes("All categories"), "all categories chip");
 
 const home = read("screens/commerce/ShopHomeScreen.tsx");
 assert.ok(home.includes("Explore products"), "neutral heading");

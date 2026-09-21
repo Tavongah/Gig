@@ -1,6 +1,7 @@
 import { api } from "./api";
 import { logDutsFlow } from "./flow-log";
 import { isProductCardPurchasable, type ProductCardData } from "../components/ProductCard";
+import { alcoholPurchaseAllowed } from "./storefront-categories";
 import type { CommerceBrowseGeo } from "./api";
 import { useCommerceCartStore } from "../stores/commerce-cart.store";
 
@@ -12,6 +13,7 @@ export function addStorefrontProduct(input: {
 }) {
   const { product, geo, token, isGuest } = input;
   if (!isProductCardPurchasable(product) || !product.productId) return;
+  if (!alcoholPurchaseAllowed(product.category)) return;
   if (isGuest) logDutsFlow("GUEST_ADD_TO_CART");
   void api
     .commerceProductDetail(
@@ -25,6 +27,7 @@ export function addStorefrontProduct(input: {
     .then((detail) => {
       const offer = detail.offers[0];
       if (!offer || !detail.purchasable) return;
+      if (!alcoholPurchaseAllowed(detail.product.category)) return;
       useCommerceCartStore.getState().addOffer({
         productId: offer.productId,
         catalogProductId: detail.product.catalogProductId,

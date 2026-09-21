@@ -3,6 +3,7 @@ import { Image, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { DUTS } from "../lib/theme";
 import { productCardMeta } from "../lib/storefront-ui";
+import { alcoholPurchaseAllowed } from "../lib/storefront-categories";
 
 export type ProductCardData = {
   productId: string | null;
@@ -10,6 +11,7 @@ export type ProductCardData = {
   name: string;
   brand?: string | null;
   sizeLabel: string | null;
+  category?: string | null;
   imageUrl: string | null;
   fromPriceCents: number | null;
   offerCount?: number;
@@ -32,7 +34,9 @@ export function isProductCardPurchasable(product: {
   fromPriceCents?: number | null;
   offerCount?: number;
   merchantOfferCount?: number;
+  category?: string | null;
 }) {
+  if (!alcoholPurchaseAllowed(product.category)) return false;
   const offerCount = product.merchantOfferCount ?? product.offerCount ?? 0;
   return Boolean(
     product.purchasable && product.productId && product.fromPriceCents != null && offerCount > 0

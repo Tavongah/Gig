@@ -2,11 +2,13 @@ import {
   CATALOG_PRODUCT_SCAN_LIMIT,
   STOREFRONT_SHOW_APPROVED_CATALOG_WITHOUT_OFFERS,
   UNRESOLVED_LEGACY_CATALOG_PRODUCT_IDS,
+  canPurchaseStorefrontCategory,
   catalogSearchHaystack,
   commerceShopUiStatusLabel,
   expandSearchTerms,
   isPublicStorefrontCatalogProduct,
   normalizeProductSearchName,
+  parseAlcoholCommerceEnabled,
   type CommerceOrderStatus
 } from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
@@ -351,7 +353,12 @@ export async function getProductDetailNear(input: {
   const publicCatalog = catalog && isPublicStorefrontCatalogProduct(catalog) ? catalog : null;
   const name = publicCatalog?.name ?? seedProduct?.name ?? "Product";
   const imageUrl = browserAccessibleMediaUrl(publicCatalog?.primaryImageUrl ?? seedProduct?.imageUrl ?? null);
-  const purchasable = eligibleOffers.length > 0;
+  const category = publicCatalog?.category ?? seedProduct?.category ?? null;
+  const alcoholOk = canPurchaseStorefrontCategory(
+    category,
+    parseAlcoholCommerceEnabled(process.env.ALCOHOL_COMMERCE_ENABLED)
+  );
+  const purchasable = alcoholOk && eligibleOffers.length > 0;
 
   return {
     product: {
@@ -359,11 +366,11 @@ export async function getProductDetailNear(input: {
       name,
       brand: publicCatalog?.brand ?? null,
       sizeLabel: publicCatalog?.sizeLabel ?? seedProduct?.unit ?? null,
-      category: publicCatalog?.category ?? seedProduct?.category ?? null,
+      category,
       description: publicCatalog?.description ?? seedProduct?.description ?? null,
       imageUrl
     },
-    offers: eligibleOffers,
+    offers: purchasable ? eligibleOffers : [],
     purchasable,
     fromPriceCents: purchasable ? eligibleOffers[0]?.priceCents ?? null : null
   };

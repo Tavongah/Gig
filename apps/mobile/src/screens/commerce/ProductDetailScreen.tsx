@@ -8,6 +8,7 @@ import { logDutsFlow } from "../../lib/flow-log";
 import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import { productCardMeta } from "../../lib/storefront-ui";
+import { alcoholPurchaseAllowed } from "../../lib/storefront-categories";
 import { StoreHeader, StorePage } from "../../components/StoreHeader";
 import type { RootStackParamList } from "../../navigation/types";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
@@ -42,13 +43,15 @@ export function ProductDetailScreen({ route, navigation }: Props) {
 
   const product = detailQuery.data?.product;
   const offers = detailQuery.data?.offers ?? [];
-  const purchasable = Boolean(detailQuery.data?.purchasable && offers.length);
+  const alcoholOk = alcoholPurchaseAllowed(product?.category);
+  const purchasable = Boolean(detailQuery.data?.purchasable && offers.length && alcoholOk);
   const fromPriceCents = detailQuery.data?.fromPriceCents ?? null;
   const showImage = Boolean(product?.imageUrl) && !imgFailed;
   const meta = product ? productCardMeta(product.name, product.brand, product.sizeLabel) : "";
 
   function addFromOffer(offer: (typeof offers)[number]) {
     if (!product) return;
+    if (!alcoholPurchaseAllowed(product.category)) return;
     if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
     addOffer({
       productId: offer.productId,
@@ -134,7 +137,11 @@ export function ProductDetailScreen({ route, navigation }: Props) {
           ))}
         </View>
       ) : (
-        <Text className="mt-2 text-sm text-muted">Not available to order yet.</Text>
+        <Text className="mt-2 text-sm text-muted">
+          {product.category && !alcoholOk
+            ? "Alcohol ordering is coming at launch."
+            : "Not available to order yet."}
+        </Text>
       )}
     </View>
   ) : detailQuery.isError ? (
