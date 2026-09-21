@@ -12,7 +12,7 @@ type Props = {
 export function StorefrontCategoryCard({ category, onPress, compact }: Props) {
   const comingSoon = category.state === "COMING_SOON";
   const restricted = category.state === "RESTRICTED" || category.restricted;
-  const status = comingSoon ? "Coming soon" : restricted ? "Launching with DUTS" : null;
+  const status = comingSoon ? "Coming soon" : restricted ? "Age restricted" : null;
 
   return (
     <Pressable
