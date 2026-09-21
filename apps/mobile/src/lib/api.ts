@@ -406,7 +406,11 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       NOT_A_DELIVERY: "This action is only for deliveries.",
       COURIER_NOT_ASSIGNED: "Only the assigned courier can continue this delivery.",
       INVALID_TRANSPORT_MODE: "Choose Walking, Bicycle, or Public Transport / Kombi.",
-      PIN_REGEN_NOT_ALLOWED: "Codes can’t be regenerated for this delivery anymore."
+      PIN_REGEN_NOT_ALLOWED: "Codes can’t be regenerated for this delivery anymore.",
+      ALCOHOL_DISABLED: "Alcohol ordering isn't available yet.",
+      MERCHANT_CLOSED: "This shop is not available right now.",
+      MULTI_STORE_BASKET: "Your basket has items from more than one shop. Keep one shop per order.",
+      EMPTY_BASKET: "Your cart is empty."
     };
     const message =
       fieldMessages.length > 0

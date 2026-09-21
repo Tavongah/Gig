@@ -74,6 +74,7 @@ export async function createGuestHandoff(input: {
     merchantId: quote.merchant.id,
     itemCount: quote.lines.length
   });
+  // token is returned so the client can open wa.me with an opaque Ref only.
 
   return {
     token,
@@ -145,6 +146,11 @@ export async function applyGuestHandoffToConversation(input: {
   await prisma.guestCommerceHandoff.update({
     where: { id: row.id },
     data: { consumedAt: new Date() }
+  });
+
+  logDutsFlow("GUEST_WHATSAPP_HANDOFF_CONSUMED", {
+    merchantId: quote.merchant.id,
+    itemCount: quote.lines.length
   });
 
   const message = formatGuestHandoffAwaitingLocation({

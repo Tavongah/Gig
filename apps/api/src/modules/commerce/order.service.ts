@@ -9,7 +9,11 @@ import {
   PaymentStatus
 } from "@prisma/client";
 import type { Server } from "socket.io";
-import { commerceCustomerStatusCopy } from "@gigflow/shared";
+import {
+  canPurchaseStorefrontCategory,
+  commerceCustomerStatusCopy,
+  parseAlcoholCommerceEnabled
+} from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { logDutsFlow } from "../../lib/flow-log.js";
@@ -199,20 +203,25 @@ export async function createConfirmedCommerceOrder(input: {
 
   const merchant = await prisma.merchant.findUniqueOrThrow({ where: { id: input.merchantId } });
   if (!merchant.isActive || !merchant.acceptsOrders) {
-    throw new AppError("This shop is not accepting orders right now.", 409, "MERCHANT_CLOSED");
+    throw new AppError("This shop is not available right now.", 409, "MERCHANT_CLOSED");
   }
 
   const priceChanges: Array<{ name: string; oldCents: number; newCents: number }> = [];
   const unavailable: string[] = [];
   const refreshedLines: BasketLine[] = [];
 
+  const alcoholEnabled = parseAlcoholCommerceEnabled(process.env.ALCOHOL_COMMERCE_ENABLED);
   for (const line of input.lines) {
     const product = await prisma.product.findFirst({
-      where: { id: line.productId, merchantId: input.merchantId, archived: false }
+      where: { id: line.productId, merchantId: input.merchantId, archived: false },
+      include: { catalogProduct: { select: { category: true } } }
     });
     if (!product || !product.available) {
       unavailable.push(line.productName);
       continue;
+    }
+    if (!canPurchaseStorefrontCategory(product.catalogProduct?.category ?? product.category, alcoholEnabled)) {
+      throw new AppError("Alcohol ordering isn't available yet.", 409, "ALCOHOL_DISABLED");
     }
     if (product.priceCents !== line.unitPriceCents) {
       priceChanges.push({

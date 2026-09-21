@@ -66,7 +66,30 @@ function pass(name: string) {
 }
 
 {
+  const quote = readFileSync(resolve(here, "../src/modules/commerce/customer-commerce.service.ts"), "utf8");
+  assert.ok(quote.includes("canPurchaseStorefrontCategory"), "quoteCart uses alcohol restriction helper");
+  assert.ok(quote.includes("ALCOHOL_DISABLED"), "quoteCart blocks alcohol server-side");
+  assert.ok(quote.includes("Alcohol ordering isn't available yet."), "alcohol quote copy");
+  assert.ok(quote.includes("We can't deliver from this shop to that location yet."), "shop not nearby copy");
+  pass("quoteCart alcohol and location copy");
+}
+
+{
+  const orders = readFileSync(resolve(here, "../src/modules/commerce/order.service.ts"), "utf8");
+  assert.ok(orders.includes("canPurchaseStorefrontCategory"), "order create checks alcohol");
+  assert.ok(orders.includes("ALCOHOL_DISABLED"), "order create blocks alcohol");
+  pass("order create alcohol gate");
+}
+
+{
+  const search = readFileSync(resolve(here, "../src/modules/commerce/merchant.service.ts"), "utf8");
+  assert.ok(search.includes("canPurchaseStorefrontCategory"), "WhatsApp product search skips alcohol");
+  pass("WhatsApp search alcohol skip");
+}
+
+{
   const handoff = readFileSync(resolve(here, "../src/modules/commerce/guest-handoff.service.ts"), "utf8");
+  assert.ok(handoff.includes("GUEST_WHATSAPP_HANDOFF_CONSUMED"), "consume is logged");
   assert.ok(handoff.includes("deferDelivery: true"), "handoff quotes items without delivery");
   assert.ok(handoff.includes("locationIsApproximate: true"), "stored location is not exact");
   assert.ok(handoff.includes("AWAITING_LOCATION"), "restore waits for WhatsApp location");

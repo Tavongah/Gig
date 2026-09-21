@@ -80,5 +80,7 @@ const checkout = read("screens/commerce/CommerceCheckoutScreen.tsx");
 assert.ok(checkout.includes("ECOCASH"), "EcoCash option");
 assert.ok(checkout.includes("ONEMONEY"), "OneMoney option");
 assert.ok(checkout.includes("CASH"), "Cash option");
+assert.ok(read("navigation/AppNavigator.tsx").includes("GuestCheckoutChoice"), "account stack can return to checkout choice");
+assert.ok(read("navigation/GuestAppNavigator.tsx").includes("headerShown: false"), "guest order choice uses storefront chrome");
 
 console.log(JSON.stringify({ ok: true, filesChecked: files.length }, null, 2));

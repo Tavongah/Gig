@@ -39,7 +39,14 @@ export function CartScreen() {
         browse.token
       );
     },
-    onError: (e: Error) => setQuoteError(e.message)
+    onError: (e: Error) => {
+      const message = e.message;
+      setQuoteError(
+        /VALIDATION_ERROR|Invalid uuid|Required|INTERNAL_ERROR|Prisma|Zod/i.test(message)
+          ? "Something changed with your cart. Please review it."
+          : message
+      );
+    }
   });
 
   useEffect(() => {
@@ -141,7 +148,7 @@ export function CartScreen() {
           <View className="mt-6 gap-1 rounded-2xl border border-border bg-surface p-4">
             <Text className="text-sm text-muted">Items          ${(quote.subtotalCents / 100).toFixed(2)}</Text>
             <Text className="text-sm text-muted">
-              Delivery       {deferred ? "Calculated when you order" : `$${(quote.deliveryFeeCents / 100).toFixed(2)}`}
+              Delivery       {deferred ? "Calculated at checkout" : `$${(quote.deliveryFeeCents / 100).toFixed(2)}`}
             </Text>
             {!deferred && quote.serviceFeeCents > 0 ? (
               <Text className="text-sm text-muted">Service        ${(quote.serviceFeeCents / 100).toFixed(2)}</Text>

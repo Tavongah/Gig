@@ -1,8 +1,10 @@
 import {
   DEFAULT_MARKETPLACE_MERCHANT_RADIUS_KM,
+  canPurchaseStorefrontCategory,
   distanceKmBetween,
   expandSearchTerms,
   normalizeProductSearchName,
+  parseAlcoholCommerceEnabled,
   upsertProductSchema,
   type RequestedShoppingItem
 } from "@gigflow/shared";
@@ -385,12 +387,16 @@ export async function searchProductsNear(
       archived: false,
       ...(opts?.availableOnly === false ? {} : { available: true })
     },
-    include: { merchant: true }
+    include: { merchant: true, catalogProduct: { select: { category: true } } }
   });
 
   const merchantDist = new Map(nearby.map((n) => [n.merchant.id, n.distanceKm]));
+  const alcoholEnabled = parseAlcoholCommerceEnabled(process.env.ALCOHOL_COMMERCE_ENABLED);
   const matches: ProductMatch[] = [];
   for (const product of products) {
+    if (!canPurchaseStorefrontCategory(product.catalogProduct?.category ?? product.category, alcoholEnabled)) {
+      continue;
+    }
     const score = scoreProductMatch(product, query);
     if (score <= 0) continue;
     matches.push({

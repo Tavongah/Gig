@@ -56,15 +56,20 @@ assert.ok(!areaStore.includes("getCurrentCoordinates"), "area store must not req
 const cart = read("screens/commerce/CartScreen.tsx");
 assert.ok(cart.includes("GuestCheckoutChoice"), "guest checkout decision");
 assert.ok(cart.includes("Continue to order"), "continue CTA");
-assert.ok(cart.includes("Calculated when you order"), "deferred delivery copy");
+assert.ok(cart.includes("Calculated at checkout"), "deferred delivery copy");
 assert.ok(cart.includes("deferDelivery"), "guest quote defers delivery");
+assert.ok(!cart.includes("Total") || cart.includes("deferred"), "guest cart must not treat deferred quote as final total");
 
 const choice = read("screens/commerce/GuestCheckoutChoiceScreen.tsx");
 assert.ok(choice.includes("Continue on WhatsApp"), "WhatsApp CTA");
-assert.ok(choice.includes("Sign in / Create account"), "account path");
+assert.ok(choice.includes("Sign in or create account"), "account path");
+assert.ok(choice.includes("No account needed."), "WhatsApp is first-class");
+assert.ok(choice.includes("Use your DUTS account and saved delivery details."), "account copy");
+assert.ok(choice.includes("logo-whatsapp"), "WhatsApp icon");
+assert.ok(choice.includes("person-outline"), "account icon");
 assert.ok(choice.includes("commerceGuestHandoff"), "creates guest handoff");
 assert.ok(!choice.includes("latitude"), "handoff must not send exact coordinates");
-assert.ok(!choice.includes("Create an account to track orders") || choice.includes("Create an account to track orders and save your details."), "short account copy");
+assert.ok(!choice.includes("Create an account to track orders"), "must not push account over WhatsApp");
 
 const store = read("stores/commerce-cart.store.ts");
 assert.ok(store.includes("duts.commerce.cart"), "persists cart");

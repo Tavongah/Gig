@@ -474,11 +474,16 @@ export async function quoteCart(input: {
   const merchantIds = new Set<string>();
   const basketLines: BasketLine[] = [];
   const unavailable: string[] = [];
+  const alcoholEnabled = parseAlcoholCommerceEnabled(process.env.ALCOHOL_COMMERCE_ENABLED);
   for (const line of input.lines) {
     const product = byId.get(line.productId);
     if (!product || !offerEligible(product)) {
       unavailable.push(product?.catalogProduct?.name ?? product?.name ?? "An item");
       continue;
+    }
+    const category = product.catalogProduct?.category ?? product.category;
+    if (!canPurchaseStorefrontCategory(category, alcoholEnabled)) {
+      throw new AppError("Alcohol ordering isn't available yet.", 409, "ALCOHOL_DISABLED");
     }
     merchantIds.add(product.merchantId);
     const qty = Math.max(1, Math.min(99, Math.floor(line.quantity)));
@@ -513,7 +518,7 @@ export async function quoteCart(input: {
   const merchantId = [...merchantIds][0]!;
   const merchant = products.find((p) => p.merchantId === merchantId)?.merchant;
   if (!merchant || !merchant.isActive || !merchant.acceptsOrders) {
-    throw new AppError("This shop is not accepting orders right now.", 409, "MERCHANT_CLOSED");
+    throw new AppError("This shop is not available right now.", 409, "MERCHANT_CLOSED");
   }
 
   if (input.deferDelivery) {
@@ -541,7 +546,7 @@ export async function quoteCart(input: {
   const nearby = await findNearbyMerchants(input.lat, input.lng);
   const dist = nearby.find((n) => n.merchant.id === merchantId);
   if (!dist) {
-    throw new AppError("This shop is not available near your delivery location.", 409, "SHOP_NOT_NEARBY");
+    throw new AppError("We can't deliver from this shop to that location yet.", 409, "SHOP_NOT_NEARBY");
   }
 
   const totals = await quoteBasketTotals({

@@ -36,7 +36,7 @@ export function GuestAppNavigator() {
       <Stack.Screen
         name="GuestCheckoutChoice"
         component={GuestCheckoutChoiceScreen}
-        options={{ title: "Order" }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: "Reset password" }} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ title: "Choose new password" }} />
