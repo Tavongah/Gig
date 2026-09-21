@@ -30,9 +30,29 @@ const geoQuery = z
     message: "areaId or lat and lng required"
   });
 
+const optionalGeoQuery = z
+  .object({
+    lat: z.coerce.number().min(-90).max(90).optional(),
+    lng: z.coerce.number().min(-180).max(180).optional(),
+    areaId: z.string().min(1).max(80).optional()
+  })
+  .refine(
+    (value) =>
+      Boolean(value.areaId) ||
+      (value.lat != null && value.lng != null) ||
+      (value.lat == null && value.lng == null && !value.areaId),
+    { message: "areaId or both lat and lng required when providing a location" }
+  );
+
 function browseGeoFromQuery(query: z.infer<typeof geoQuery>): BrowseGeo {
   if (query.areaId) return { areaId: query.areaId };
   return { lat: query.lat!, lng: query.lng! };
+}
+
+function optionalBrowseGeoFromQuery(query: z.infer<typeof optionalGeoQuery>): BrowseGeo | undefined {
+  if (query.areaId) return { areaId: query.areaId };
+  if (query.lat != null && query.lng != null) return { lat: query.lat, lng: query.lng };
+  return undefined;
 }
 
 export const customerCommerceRouter = Router();
@@ -66,11 +86,13 @@ customerCommerceRouter.get("/shops/nearby", async (req, res, next) => {
 
 customerCommerceRouter.get("/products", async (req, res, next) => {
   try {
-    const geo = browseGeoFromQuery(geoQuery.parse(req.query));
+    const geoQueryParsed = optionalGeoQuery.parse(req.query);
+    const geo = optionalBrowseGeoFromQuery(geoQueryParsed);
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
     const category = typeof req.query.category === "string" ? req.query.category : undefined;
-    const limit = req.query.limit ? Number(req.query.limit) : 40;
-    const result = await browseNearbyProducts({ ...geo, q, category, limit });
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const offset = req.query.offset ? Number(req.query.offset) : undefined;
+    const result = await browseNearbyProducts({ ...geo, q, category, limit, offset });
     if (!req.header("authorization")) logDutsFlow("GUEST_STOREFRONT_VIEW", { shopsNearby: result.shopsNearby });
     res.json(result);
   } catch (err) {
@@ -80,7 +102,7 @@ customerCommerceRouter.get("/products", async (req, res, next) => {
 
 customerCommerceRouter.get("/categories", async (req, res, next) => {
   try {
-    const geo = browseGeoFromQuery(geoQuery.parse(req.query));
+    const geo = optionalBrowseGeoFromQuery(optionalGeoQuery.parse(req.query));
     res.json(await listBrowseCategories(geo));
   } catch (err) {
     next(err);
@@ -89,7 +111,7 @@ customerCommerceRouter.get("/categories", async (req, res, next) => {
 
 customerCommerceRouter.get("/products/detail", async (req, res, next) => {
   try {
-    const geo = browseGeoFromQuery(geoQuery.parse(req.query));
+    const geo = optionalBrowseGeoFromQuery(optionalGeoQuery.parse(req.query));
     const catalogProductId =
       typeof req.query.catalogProductId === "string" ? req.query.catalogProductId : undefined;
     const productId = typeof req.query.productId === "string" ? req.query.productId : undefined;

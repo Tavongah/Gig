@@ -1,7 +1,11 @@
 import {
+  CATALOG_PRODUCT_SCAN_LIMIT,
+  STOREFRONT_SHOW_APPROVED_CATALOG_WITHOUT_OFFERS,
+  UNRESOLVED_LEGACY_CATALOG_PRODUCT_IDS,
   catalogSearchHaystack,
   commerceShopUiStatusLabel,
   expandSearchTerms,
+  isPublicStorefrontCatalogProduct,
   normalizeProductSearchName,
   type CommerceOrderStatus
 } from "@gigflow/shared";
@@ -18,17 +22,29 @@ import { createConfirmedCommerceOrder, quoteBasketTotals } from "./order.service
 import { ensureAppCommerceCustomer } from "./commerce-customer.service.js";
 import type { CommercePaymentMethod, OrderSource } from "@prisma/client";
 import { browserAccessibleMediaUrl } from "../../lib/catalog-media.js";
+import {
+  catalogOnlyAcc,
+  clampStorefrontPage,
+  matchesStorefrontCategory,
+  paginateStorefront,
+  presentStorefrontCard,
+  scoreStorefrontSearch,
+  storefrontCategoryNeedle,
+  storefrontSearchTerms,
+  type StorefrontAcc
+} from "./storefront-catalog.js";
 
 export type BrowseGeo = { areaId: string } | { lat: number; lng: number };
 
-async function merchantsForBrowse(geo: BrowseGeo) {
+const unresolvedLegacyIds = [...UNRESOLVED_LEGACY_CATALOG_PRODUCT_IDS];
+
+async function merchantsForBrowse(geo?: BrowseGeo | null) {
+  if (!geo) return [];
   if ("areaId" in geo) {
     return findMerchantsInShoppingArea(geo.areaId);
   }
   return findNearbyMerchants(geo.lat, geo.lng);
 }
-
-const PLACEHOLDER_IMAGE = null;
 
 function offerEligible(product: {
   available: boolean;
@@ -42,35 +58,6 @@ function offerEligible(product: {
   if (cat.status === "ARCHIVED" || cat.status === "REJECTED") return false;
   if (cat.status === "PENDING" && cat.submittedByMerchantId !== product.merchantId) return false;
   return true;
-}
-
-function presentCatalogCard(input: {
-  catalogProductId: string | null;
-  productId: string;
-  name: string;
-  brand: string | null;
-  sizeLabel: string | null;
-  category: string | null;
-  description: string | null;
-  imageUrl: string | null;
-  fromPriceCents: number;
-  currency: string;
-  offerCount: number;
-}) {
-  return {
-    catalogProductId: input.catalogProductId,
-    /** Representative offer id for quick-add when only one nearby offer exists. */
-    productId: input.productId,
-    name: input.name,
-    brand: input.brand,
-    sizeLabel: input.sizeLabel,
-    category: input.category,
-    description: input.description,
-    imageUrl: browserAccessibleMediaUrl(input.imageUrl) ?? PLACEHOLDER_IMAGE,
-    fromPriceCents: input.fromPriceCents,
-    currency: input.currency,
-    offerCount: input.offerCount
-  };
 }
 
 export async function browseNearbyShops(geo: BrowseGeo) {
@@ -88,16 +75,15 @@ export async function browseNearbyShops(geo: BrowseGeo) {
   };
 }
 
-export async function browseNearbyProducts(input: BrowseGeo & {
-  q?: string;
-  category?: string;
-  limit?: number;
+async function collectNearbyOffers(input: {
+  geo?: BrowseGeo | null;
+  terms: string[];
+  categoryFilter?: string;
 }) {
-  const limit = Math.min(input.limit ?? 40, 80);
-  const nearby = await merchantsForBrowse(input);
-  if (nearby.length === 0) {
-    return { products: [] as ReturnType<typeof presentCatalogCard>[], shopsNearby: 0 };
-  }
+  const nearby = await merchantsForBrowse(input.geo);
+  const byCatalogId = new Map<string, StorefrontAcc>();
+  const unlinked: StorefrontAcc[] = [];
+  if (nearby.length === 0) return { nearby, byCatalogId, unlinked };
 
   const merchantIds = nearby.map((n) => n.merchant.id);
   const products = await prisma.product.findMany({
@@ -113,131 +99,186 @@ export async function browseNearbyProducts(input: BrowseGeo & {
     take: 500
   });
 
-  const q = normalizeProductSearchName(input.q ?? "");
-  const terms = q ? expandSearchTerms(q) : [];
-  const categoryFilter = input.category?.trim().toLowerCase();
-
-  type Acc = {
-    key: string;
-    catalogProductId: string | null;
-    productId: string;
-    name: string;
-    brand: string | null;
-    sizeLabel: string | null;
-    category: string | null;
-    description: string | null;
-    imageUrl: string | null;
-    fromPriceCents: number;
-    currency: string;
-    offerCount: number;
-    score: number;
-  };
-
-  const byKey = new Map<string, Acc>();
-
   for (const product of products) {
     if (!product.merchant.isActive || !product.merchant.acceptsOrders) continue;
     if (!offerEligible(product)) continue;
 
     const cat = product.catalogProduct;
+    if (cat && !isPublicStorefrontCatalogProduct(cat)) continue;
+
     const name = cat?.name ?? product.name;
     const brand = cat?.brand ?? null;
     const sizeLabel = cat?.sizeLabel ?? product.unit ?? null;
     const category = cat?.category ?? product.category ?? null;
     const description = cat?.description ?? product.description ?? null;
     const imageUrl = browserAccessibleMediaUrl(cat?.primaryImageUrl ?? product.imageUrl ?? null);
-    const key = cat?.id ?? `offer:${product.id}`;
 
-    if (categoryFilter && !(category ?? "").toLowerCase().includes(categoryFilter)) {
+    if (!matchesStorefrontCategory(category, input.categoryFilter)) continue;
+
+    const score = scoreStorefrontSearch({
+      name,
+      brand,
+      sizeLabel,
+      category,
+      barcode: cat?.barcode,
+      terms: input.terms
+    });
+    if (input.terms.length && score <= 0) continue;
+
+    const acc: StorefrontAcc = {
+      catalogProductId: cat?.id ?? null,
+      productId: product.id,
+      name,
+      brand,
+      sizeLabel,
+      category,
+      description,
+      imageUrl,
+      fromPriceCents: product.priceCents,
+      currency: product.currency,
+      merchantOfferCount: 1,
+      purchasable: true,
+      score
+    };
+
+    if (!cat?.id) {
+      unlinked.push(acc);
       continue;
     }
 
-    let score = 1;
-    if (terms.length) {
-      const hay = catalogSearchHaystack({
-        name,
-        brand,
-        sizeLabel,
-        category,
-        barcode: cat?.barcode
-      });
-      score = 0;
-      for (const t of terms) {
-        if (!t) continue;
-        if (hay === t || normalizeProductSearchName(name) === t) score += 100;
-        else if (hay.includes(t)) score += 40;
-      }
-      if (score <= 0) continue;
-    }
-
-    const existing = byKey.get(key);
+    const existing = byCatalogId.get(cat.id);
     if (!existing) {
-      byKey.set(key, {
-        key,
-        catalogProductId: cat?.id ?? null,
-        productId: product.id,
-        name,
-        brand,
-        sizeLabel,
-        category,
-        description,
-        imageUrl,
-        fromPriceCents: product.priceCents,
-        currency: product.currency,
-        offerCount: 1,
-        score
-      });
+      byCatalogId.set(cat.id, acc);
     } else {
-      existing.offerCount += 1;
+      existing.merchantOfferCount += 1;
       existing.score = Math.max(existing.score, score);
-      if (product.priceCents < existing.fromPriceCents) {
+      if (product.priceCents < (existing.fromPriceCents ?? Number.POSITIVE_INFINITY)) {
         existing.fromPriceCents = product.priceCents;
         existing.productId = product.id;
+        existing.currency = product.currency;
       }
       if (!existing.imageUrl && imageUrl) existing.imageUrl = imageUrl;
     }
   }
 
-  const productsOut = [...byKey.values()]
-    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
-    .slice(0, limit)
-    .map((row) =>
-      presentCatalogCard({
-        catalogProductId: row.catalogProductId,
-        productId: row.productId,
-        name: row.name,
-        brand: row.brand,
-        sizeLabel: row.sizeLabel,
-        category: row.category,
-        description: row.description,
-        imageUrl: row.imageUrl,
-        fromPriceCents: row.fromPriceCents,
-        currency: row.currency,
-        offerCount: row.offerCount
-      })
-    );
-
-  return { products: productsOut, shopsNearby: nearby.length };
+  return { nearby, byCatalogId, unlinked };
 }
 
-export async function listBrowseCategories(geo: BrowseGeo) {
-  const { products } = await browseNearbyProducts({ ...geo, limit: 200 });
-  const counts = new Map<string, number>();
-  for (const p of products) {
-    const cat = (p.category || "Other").trim() || "Other";
-    counts.set(cat, (counts.get(cat) ?? 0) + 1);
+export async function browseNearbyProducts(input: {
+  areaId?: string;
+  lat?: number;
+  lng?: number;
+  q?: string;
+  category?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const { limit, offset } = clampStorefrontPage(input.limit, input.offset);
+  const geo: BrowseGeo | undefined = input.areaId
+    ? { areaId: input.areaId }
+    : input.lat != null && input.lng != null
+      ? { lat: input.lat, lng: input.lng }
+      : undefined;
+  const terms = storefrontSearchTerms(input.q);
+  const categoryFilter = storefrontCategoryNeedle(input.category);
+  const { nearby, byCatalogId, unlinked } = await collectNearbyOffers({ geo, terms, categoryFilter });
+
+  if (!STOREFRONT_SHOW_APPROVED_CATALOG_WITHOUT_OFFERS) {
+    const rows = [...byCatalogId.values(), ...unlinked];
+    return { ...paginateStorefront(rows, limit, offset), shopsNearby: nearby.length };
   }
-  const categories = [...counts.entries()]
-    .map(([name, count]) => ({ name, count }))
+
+  const catalogRows = await prisma.catalogProduct.findMany({
+    where: {
+      status: "APPROVED",
+      id: { notIn: unresolvedLegacyIds }
+    },
+    take: CATALOG_PRODUCT_SCAN_LIMIT
+  });
+
+  const byKey = new Map<string, StorefrontAcc>();
+  for (const cat of catalogRows) {
+    if (!matchesStorefrontCategory(cat.category, categoryFilter)) continue;
+    const catalogAcc = catalogOnlyAcc({
+      id: cat.id,
+      name: cat.name,
+      brand: cat.brand,
+      sizeLabel: cat.sizeLabel,
+      category: cat.category,
+      description: cat.description,
+      primaryImageUrl: cat.primaryImageUrl,
+      barcode: cat.barcode,
+      terms
+    });
+    if (!catalogAcc) continue;
+    const offer = byCatalogId.get(cat.id);
+    byKey.set(
+      cat.id,
+      offer
+        ? {
+            ...offer,
+            name: cat.name,
+            brand: cat.brand,
+            sizeLabel: cat.sizeLabel,
+            category: cat.category,
+            description: cat.description,
+            imageUrl: catalogAcc.imageUrl ?? offer.imageUrl,
+            score: Math.max(offer.score, catalogAcc.score)
+          }
+        : catalogAcc
+    );
+  }
+
+  for (const row of unlinked) {
+    byKey.set(`offer:${row.productId}`, row);
+  }
+
+  return { ...paginateStorefront([...byKey.values()], limit, offset), shopsNearby: nearby.length };
+}
+
+export async function listBrowseCategories(_geo?: BrowseGeo | null) {
+  if (!STOREFRONT_SHOW_APPROVED_CATALOG_WITHOUT_OFFERS) {
+    const browseInput = _geo
+      ? "areaId" in _geo
+        ? { areaId: _geo.areaId }
+        : { lat: _geo.lat, lng: _geo.lng }
+      : {};
+    const { products } = await browseNearbyProducts({ ...browseInput, limit: 48, offset: 0 });
+    const counts = new Map<string, number>();
+    for (const p of products) {
+      const cat = (p.category || "Other").trim() || "Other";
+      counts.set(cat, (counts.get(cat) ?? 0) + 1);
+    }
+    const categories = [...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    return { categories };
+  }
+
+  const groups = await prisma.catalogProduct.groupBy({
+    by: ["category"],
+    where: { status: "APPROVED", id: { notIn: unresolvedLegacyIds } },
+    _count: { _all: true }
+  });
+  const categories = groups
+    .map((g) => ({ name: (g.category || "Other").trim() || "Other", count: g._count._all }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   return { categories };
 }
 
-export async function getProductDetailNear(input: BrowseGeo & {
+export async function getProductDetailNear(input: {
+  areaId?: string;
+  lat?: number;
+  lng?: number;
   catalogProductId?: string;
   productId?: string;
 }) {
-  const nearby = await merchantsForBrowse(input);
+  const geo: BrowseGeo | undefined = input.areaId
+    ? { areaId: input.areaId }
+    : input.lat != null && input.lng != null
+      ? { lat: input.lat, lng: input.lng }
+      : undefined;
+  const nearby = await merchantsForBrowse(geo);
   const merchantById = new Map(nearby.map((n) => [n.merchant.id, n]));
 
   let catalogId = input.catalogProductId ?? null;
@@ -256,28 +297,43 @@ export async function getProductDetailNear(input: BrowseGeo & {
     ? await prisma.catalogProduct.findUnique({ where: { id: catalogId } })
     : null;
 
-  const offers = await prisma.product.findMany({
-    where: catalogId
-      ? {
-          catalogProductId: catalogId,
-          merchantId: { in: [...merchantById.keys()] },
-          archived: false,
-          available: true
-        }
-      : {
-          id: input.productId,
-          archived: false,
-          available: true
-        },
-    include: {
-      merchant: true,
-      catalogProduct: true
-    },
-    orderBy: { priceCents: "asc" }
-  });
+  if (catalog && !isPublicStorefrontCatalogProduct(catalog)) {
+    const shopOfferOk = Boolean(seedProduct && offerEligible(seedProduct));
+    if (!shopOfferOk) {
+      throw new AppError("Product not found.", 404, "PRODUCT_NOT_FOUND");
+    }
+  }
+  if (!catalog && !seedProduct) {
+    throw new AppError("Product not found.", 404, "PRODUCT_NOT_FOUND");
+  }
+
+  const merchantIds = [...merchantById.keys()];
+  const offers =
+    merchantIds.length === 0
+      ? []
+      : await prisma.product.findMany({
+          where: catalogId
+            ? {
+                catalogProductId: catalogId,
+                merchantId: { in: merchantIds },
+                archived: false,
+                available: true
+              }
+            : {
+                id: input.productId,
+                archived: false,
+                available: true
+              },
+          include: {
+            merchant: true,
+            catalogProduct: true
+          },
+          orderBy: { priceCents: "asc" }
+        });
 
   const eligibleOffers = offers
     .filter((o) => offerEligible(o) && merchantById.has(o.merchantId))
+    .filter((o) => !o.catalogProduct || isPublicStorefrontCatalogProduct(o.catalogProduct) || Boolean(input.productId))
     .map((o) => {
       const dist = merchantById.get(o.merchantId)!;
       return {
@@ -292,21 +348,24 @@ export async function getProductDetailNear(input: BrowseGeo & {
     })
     .sort((a, b) => a.priceCents - b.priceCents || a.distanceKm - b.distanceKm);
 
-  const name = catalog?.name ?? seedProduct?.name ?? "Product";
-  const imageUrl = browserAccessibleMediaUrl(catalog?.primaryImageUrl ?? seedProduct?.imageUrl ?? null);
+  const publicCatalog = catalog && isPublicStorefrontCatalogProduct(catalog) ? catalog : null;
+  const name = publicCatalog?.name ?? seedProduct?.name ?? "Product";
+  const imageUrl = browserAccessibleMediaUrl(publicCatalog?.primaryImageUrl ?? seedProduct?.imageUrl ?? null);
+  const purchasable = eligibleOffers.length > 0;
 
   return {
     product: {
-      catalogProductId: catalog?.id ?? null,
+      catalogProductId: publicCatalog?.id ?? catalog?.id ?? null,
       name,
-      brand: catalog?.brand ?? null,
-      sizeLabel: catalog?.sizeLabel ?? seedProduct?.unit ?? null,
-      category: catalog?.category ?? seedProduct?.category ?? null,
-      description: catalog?.description ?? seedProduct?.description ?? null,
+      brand: publicCatalog?.brand ?? null,
+      sizeLabel: publicCatalog?.sizeLabel ?? seedProduct?.unit ?? null,
+      category: publicCatalog?.category ?? seedProduct?.category ?? null,
+      description: publicCatalog?.description ?? seedProduct?.description ?? null,
       imageUrl
     },
     offers: eligibleOffers,
-    fromPriceCents: eligibleOffers[0]?.priceCents ?? null
+    purchasable,
+    fromPriceCents: purchasable ? eligibleOffers[0]?.priceCents ?? null : null
   };
 }
 
@@ -355,7 +414,7 @@ export async function getShopCatalog(input: BrowseGeo & {
       }
       return {
         score,
-        card: presentCatalogCard({
+        card: presentStorefrontCard({
           catalogProductId: cat?.id ?? null,
           productId: p.id,
           name,
@@ -366,7 +425,9 @@ export async function getShopCatalog(input: BrowseGeo & {
           imageUrl: browserAccessibleMediaUrl(cat?.primaryImageUrl ?? p.imageUrl ?? null),
           fromPriceCents: p.priceCents,
           currency: p.currency,
-          offerCount: 1
+          merchantOfferCount: 1,
+          purchasable: true,
+          score
         })
       };
     })

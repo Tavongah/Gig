@@ -94,7 +94,8 @@ assert.doesNotMatch(whatsapp, /ADMIN_CATALOG_LIST_LIMIT/);
 assert.doesNotMatch(whatsapp, /CATALOG_PRODUCT_SCAN_LIMIT/);
 
 const customer = read("src/modules/commerce/customer-commerce.service.ts");
-assert.match(customer, /Math\.min\(input\.limit \?\? 40, 80\)/);
+assert.match(customer, /clampStorefrontPage/);
+assert.match(customer, /STOREFRONT_SHOW_APPROVED_CATALOG_WITHOUT_OFFERS/);
 assert.match(customer, /take:\s*500/);
 assert.doesNotMatch(customer, /ADMIN_CATALOG_LIST_LIMIT/);
 

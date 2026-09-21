@@ -42,6 +42,7 @@
     "test:catalog-image-acquisition-db": "tsx scripts/test-catalog-image-acquisition-db.ts",
     "test:customer-ecommerce": "tsx scripts/test-customer-ecommerce-phase2.ts",
     "test:guest-handoff": "tsx scripts/test-guest-handoff.ts",
+    "test:storefront-catalog-browse": "tsx scripts/test-storefront-catalog-browse.ts",
     "migrate:products-to-catalog": "tsx scripts/migrate-products-to-catalog.ts",
     "seed:pilot-merchant": "tsx scripts/seed-pilot-merchant.ts",
     "seed:meriden-test-merchant": "tsx scripts/seed-meriden-test-merchant.ts"

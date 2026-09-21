@@ -33,6 +33,36 @@ export function isUnresolvedLegacyCatalogProduct(id: string): boolean {
   return (UNRESOLVED_LEGACY_CATALOG_PRODUCT_IDS as readonly string[]).includes(id);
 }
 
+/**
+ * Temporary storefront discovery policy: show APPROVED catalog products even
+ * when no nearby merchant offer exists. Flip to false to restore offer-gated browsing.
+ * Does not make catalog-only products purchasable.
+ */
+export const STOREFRONT_SHOW_APPROVED_CATALOG_WITHOUT_OFFERS = true;
+
+export const STOREFRONT_CATALOG_PAGE_SIZE = 24;
+export const STOREFRONT_CATALOG_PAGE_SIZE_MAX = 48;
+
+export function isPublicStorefrontCatalogProduct(input: { id: string; status: string }): boolean {
+  return input.status === "APPROVED" && !isUnresolvedLegacyCatalogProduct(input.id);
+}
+
+export type StorefrontProductCard = {
+  catalogProductId: string | null;
+  productId: string | null;
+  name: string;
+  brand: string | null;
+  sizeLabel: string | null;
+  category: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  purchasable: boolean;
+  fromPriceCents: number | null;
+  currency: string | null;
+  merchantOfferCount: number;
+  offerCount: number;
+};
+
 export const adminCatalogViews = ["canonical", "archived", "unresolved", "all"] as const;
 export type AdminCatalogView = (typeof adminCatalogViews)[number];
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ActivityIndicator, ScrollView, Text, TextInput, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { ProductCard } from "../../components/ProductCard";
+import { ProductCard, isProductCardPurchasable } from "../../components/ProductCard";
 import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
 import { useShopBrowse } from "../../lib/shop-browse";
@@ -77,20 +77,23 @@ export function ShopDetailScreen({ route, navigation }: Props) {
             onPress={() =>
               navigation.navigate("ProductDetail", {
                 catalogProductId: p.catalogProductId ?? undefined,
-                productId: p.productId
+                productId: p.productId ?? undefined
               })
             }
-            onAdd={() =>
-              addOffer({
-                productId: p.productId,
-                catalogProductId: p.catalogProductId,
-                name: p.name,
-                imageUrl: p.imageUrl,
-                sizeLabel: p.sizeLabel,
-                unitPriceCents: p.fromPriceCents,
-                merchantId: shop.id,
-                merchantName: shop.name
-              })
+            onAdd={
+              isProductCardPurchasable(p) && p.productId && p.fromPriceCents != null
+                ? () =>
+                    addOffer({
+                      productId: p.productId!,
+                      catalogProductId: p.catalogProductId,
+                      name: p.name,
+                      imageUrl: p.imageUrl,
+                      sizeLabel: p.sizeLabel,
+                      unitPriceCents: p.fromPriceCents!,
+                      merchantId: shop.id,
+                      merchantName: shop.name
+                    })
+                : undefined
             }
           />
         ))}

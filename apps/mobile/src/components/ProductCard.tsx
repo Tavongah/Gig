@@ -3,13 +3,16 @@ import { Image, Pressable, Text, View } from "react-native";
 import { DUTS } from "../lib/theme";
 
 export type ProductCardData = {
-  productId: string;
+  productId: string | null;
   catalogProductId: string | null;
   name: string;
+  brand?: string | null;
   sizeLabel: string | null;
   imageUrl: string | null;
-  fromPriceCents: number;
+  fromPriceCents: number | null;
   offerCount?: number;
+  merchantOfferCount?: number;
+  purchasable?: boolean;
 };
 
 type Props = {
@@ -19,18 +22,39 @@ type Props = {
   pricePrefix?: string;
 };
 
+export function isProductCardPurchasable(product: {
+  productId?: string | null;
+  purchasable?: boolean;
+  fromPriceCents?: number | null;
+  offerCount?: number;
+  merchantOfferCount?: number;
+}) {
+  const offerCount = product.merchantOfferCount ?? product.offerCount ?? 0;
+  return Boolean(
+    product.purchasable &&
+      product.productId &&
+      product.fromPriceCents != null &&
+      offerCount > 0
+  );
+}
+
 export function ProductCard({ product, onPress, onAdd, pricePrefix }: Props) {
   const [imgFailed, setImgFailed] = useState(false);
-  const showFrom = pricePrefix ?? (product.offerCount && product.offerCount > 1 ? "From " : "");
-  const price = `${showFrom}$${(product.fromPriceCents / 100).toFixed(2)}`;
+  const purchasable = isProductCardPurchasable(product);
+  const offerCount = product.merchantOfferCount ?? product.offerCount ?? 0;
+  const showFrom = purchasable ? pricePrefix ?? (offerCount > 1 ? "From " : "") : "";
+  const price = purchasable
+    ? `${showFrom}$${(product.fromPriceCents! / 100).toFixed(2)}`
+    : "Price coming soon";
   const showImage = Boolean(product.imageUrl) && !imgFailed;
+  const meta = [product.brand, product.sizeLabel].filter(Boolean).join(" · ");
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${product.name}, ${price}`}
-      className="mb-3 w-[48%] overflow-hidden rounded-2xl border border-border bg-card"
+      className="mb-3 w-[48%] overflow-hidden rounded-2xl border border-border bg-card min-[720px]:w-[31%] min-[1100px]:w-[23%]"
     >
       <View className="aspect-square w-full items-center justify-center bg-surface">
         {showImage ? (
@@ -52,16 +76,19 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix }: Props) {
         <Text className="text-sm font-bold text-ink" numberOfLines={2}>
           {product.name}
         </Text>
-        {product.sizeLabel ? (
+        {meta ? (
           <Text className="text-xs text-muted" numberOfLines={1}>
-            {product.sizeLabel}
+            {meta}
           </Text>
         ) : null}
         <View className="mt-1 flex-row items-center justify-between gap-2">
-          <Text className="flex-1 text-sm font-extrabold text-ink" numberOfLines={1}>
+          <Text
+            className={`flex-1 text-sm ${purchasable ? "font-extrabold text-ink" : "font-semibold text-muted"}`}
+            numberOfLines={1}
+          >
             {price}
           </Text>
-          {onAdd ? (
+          {purchasable && onAdd ? (
             <Pressable
               onPress={onAdd}
               accessibilityRole="button"
@@ -71,7 +98,11 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix }: Props) {
             >
               <Text className="text-lg font-bold text-white">+</Text>
             </Pressable>
-          ) : null}
+          ) : (
+            <Text className="text-xs font-bold" style={{ color: DUTS.purple }}>
+              VIEW
+            </Text>
+          )}
         </View>
       </View>
     </Pressable>

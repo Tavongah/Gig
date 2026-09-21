@@ -53,7 +53,7 @@ assert.ok(cart.includes("productId"), "uses Product offer ids");
 
 const home = read("screens/commerce/ShopHomeScreen.tsx");
 assert.ok(home.includes("Deliver to"), "location first");
-assert.ok(home.includes("Products near you") || home.includes("Popular near you"), "popular products");
+assert.ok(home.includes("Shop DUTS") || home.includes("Products near you") || home.includes("Popular near you"), "product section heading");
 assert.ok(home.includes("Nearby shops"), "nearby shops");
 assert.ok(!/\bGig\b/.test(home.replace(/PostGig|MyGigsActivity/g, "")), "no Gig terminology on home");
 

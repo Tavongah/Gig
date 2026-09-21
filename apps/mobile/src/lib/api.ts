@@ -881,41 +881,48 @@ export const api = {
     }>(`/commerce/shops/nearby?${commerceGeoQs(geo).toString()}`, {}, token),
 
   commerceNearbyProducts: (
-    params: CommerceBrowseGeo & { q?: string; category?: string; limit?: number },
+    params: Partial<CommerceBrowseGeo> & { q?: string; category?: string; limit?: number; offset?: number },
     token?: string
   ) => {
     const qs = commerceGeoQs(params, {
-      limit: String(params.limit ?? 40),
+      limit: String(params.limit ?? 24),
+      offset: params.offset != null ? String(params.offset) : undefined,
       q: params.q,
       category: params.category
     });
     return request<{
       products: Array<{
         catalogProductId: string | null;
-        productId: string;
+        productId: string | null;
         name: string;
         brand: string | null;
         sizeLabel: string | null;
         category: string | null;
         description: string | null;
         imageUrl: string | null;
-        fromPriceCents: number;
-        currency: string;
+        purchasable: boolean;
+        fromPriceCents: number | null;
+        currency: string | null;
+        merchantOfferCount: number;
         offerCount: number;
       }>;
       shopsNearby: number;
+      total: number;
+      offset: number;
+      limit: number;
+      hasMore: boolean;
     }>(`/commerce/products?${qs.toString()}`, {}, token);
   },
 
-  commerceCategories: (geo: CommerceBrowseGeo, token?: string) =>
+  commerceCategories: (geo?: CommerceBrowseGeo | null, token?: string) =>
     request<{ categories: Array<{ name: string; count: number }> }>(
-      `/commerce/categories?${commerceGeoQs(geo).toString()}`,
+      `/commerce/categories?${commerceGeoQs(geo ?? undefined).toString()}`,
       {},
       token
     ),
 
   commerceProductDetail: (
-    params: CommerceBrowseGeo & { catalogProductId?: string; productId?: string },
+    params: Partial<CommerceBrowseGeo> & { catalogProductId?: string; productId?: string },
     token?: string
   ) => {
     const qs = commerceGeoQs(params, {
@@ -941,6 +948,7 @@ export const api = {
         currency: string;
         available: boolean;
       }>;
+      purchasable: boolean;
       fromPriceCents: number | null;
     }>(`/commerce/products/detail?${qs.toString()}`, {}, token);
   },
@@ -959,15 +967,17 @@ export const api = {
       };
       products: Array<{
         catalogProductId: string | null;
-        productId: string;
+        productId: string | null;
         name: string;
         brand: string | null;
         sizeLabel: string | null;
         category: string | null;
         description: string | null;
         imageUrl: string | null;
-        fromPriceCents: number;
-        currency: string;
+        purchasable: boolean;
+        fromPriceCents: number | null;
+        currency: string | null;
+        merchantOfferCount: number;
         offerCount: number;
       }>;
     }>(`/commerce/shops/${merchantId}?${qs.toString()}`, {}, token);
@@ -1083,10 +1093,13 @@ export const api = {
 
 export type CommerceBrowseGeo = { areaId: string } | { lat: number; lng: number };
 
-function commerceGeoQs(geo: CommerceBrowseGeo, extra?: Record<string, string | undefined>) {
+function commerceGeoQs(
+  geo?: Partial<CommerceBrowseGeo> | null,
+  extra?: Record<string, string | undefined>
+) {
   const qs = new URLSearchParams();
-  if ("areaId" in geo) qs.set("areaId", geo.areaId);
-  else {
+  if (geo && "areaId" in geo && geo.areaId) qs.set("areaId", geo.areaId);
+  else if (geo && "lat" in geo && geo.lat != null && "lng" in geo && geo.lng != null) {
     qs.set("lat", String(geo.lat));
     qs.set("lng", String(geo.lng));
   }

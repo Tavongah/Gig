@@ -4,9 +4,9 @@ import { useNavigation } from "@react-navigation/native";
 import type { CompositeNavigationProp } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { TabScreen } from "../../components/TabScreen";
-import { ProductCard } from "../../components/ProductCard";
+import { ProductCard, isProductCardPurchasable } from "../../components/ProductCard";
 import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
 import { logDutsFlow } from "../../lib/flow-log";
@@ -61,15 +61,18 @@ export function ShopHomeScreen() {
     if (pick) void setArea({ id: pick.id, name: pick.name });
   }, [browse.isGuest, browse.ready, browse.area, areasQuery.data, areasQuery.isLoading, areasQuery.isError, setArea]);
 
-  const productsQuery = useQuery({
+  const productsQuery = useInfiniteQuery({
     queryKey: ["commerce-products", ...browse.queryKey],
-    queryFn: () => api.commerceNearbyProducts({ ...browse.geo!, limit: 24 }, browse.token),
-    enabled: Boolean(browse.geo)
+    queryFn: ({ pageParam }) =>
+      api.commerceNearbyProducts({ ...(browse.geo ?? {}), limit: 24, offset: pageParam }, browse.token),
+    initialPageParam: 0,
+    getNextPageParam: (last) => (last.hasMore ? last.offset + last.products.length : undefined),
+    enabled: browse.ready
   });
   const categoriesQuery = useQuery({
     queryKey: ["commerce-categories", ...browse.queryKey],
-    queryFn: () => api.commerceCategories(browse.geo!, browse.token),
-    enabled: Boolean(browse.geo)
+    queryFn: () => api.commerceCategories(browse.geo, browse.token),
+    enabled: browse.ready
   });
   const shopsQuery = useQuery({
     queryKey: ["commerce-shops", ...browse.queryKey],
@@ -89,9 +92,13 @@ export function ShopHomeScreen() {
 
   function addFromCard(p: {
     catalogProductId: string | null;
-    productId: string;
+    productId: string | null;
+    purchasable?: boolean;
+    fromPriceCents?: number | null;
+    merchantOfferCount?: number;
+    offerCount?: number;
   }) {
-    if (!browse.geo) return;
+    if (!isProductCardPurchasable(p) || !p.productId || !browse.geo) return;
     if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
     void api
       .commerceProductDetail(
@@ -104,7 +111,7 @@ export function ShopHomeScreen() {
       )
       .then((detail) => {
         const offer = detail.offers[0];
-        if (!offer) return;
+        if (!offer || !detail.purchasable) return;
         addOffer({
           productId: offer.productId,
           catalogProductId: detail.product.catalogProductId,
@@ -118,7 +125,7 @@ export function ShopHomeScreen() {
       });
   }
 
-  const canBrowse = Boolean(browse.geo);
+  const products = productsQuery.data?.pages.flatMap((page) => page.products) ?? [];
   const areaName = browse.area?.name ?? "your area";
 
   return (
@@ -175,13 +182,7 @@ export function ShopHomeScreen() {
             {categories.map((name) => (
               <Pressable
                 key={name}
-                onPress={() => {
-                  if (!browse.isGuest && !browse.geo) {
-                    navigation.navigate("ShopLocation");
-                    return;
-                  }
-                  navigation.navigate("ProductSearch", { category: name, q: undefined });
-                }}
+                onPress={() => navigation.navigate("ProductSearch", { category: name, q: undefined })}
                 className="mr-2 rounded-full border border-border bg-card px-4 py-2.5"
                 accessibilityRole="button"
                 accessibilityLabel={`Category ${name}`}
@@ -192,63 +193,76 @@ export function ShopHomeScreen() {
           </ScrollView>
         </View>
 
-        {!browse.ready || (browse.isGuest && areasQuery.isLoading && !browse.geo) ? (
+        {!browse.ready || (browse.isGuest && areasQuery.isLoading && !browse.geo && !browse.ready) ? (
           <ActivityIndicator className="mt-8" color={DUTS.purple} />
-        ) : !canBrowse && !browse.isGuest ? (
-          <View className="mt-8 gap-3">
-            <Text className="text-base text-muted">
-              Set your location to see products available near you.
-            </Text>
-            <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
-          </View>
         ) : (
           <>
             <View className="mt-6">
-              <Text className="mb-3 text-lg font-extrabold text-ink">Products near you</Text>
+              <Text className="mb-3 text-lg font-extrabold text-ink">Shop DUTS</Text>
               {productsQuery.isLoading ? (
                 <ActivityIndicator color={DUTS.purple} />
-              ) : (productsQuery.data?.products ?? []).length === 0 ? (
-                <Text className="text-sm text-muted">
-                  No shops nearby yet. We&apos;re still expanding DUTS in this area.
-                </Text>
+              ) : products.length === 0 ? (
+                <Text className="text-sm text-muted">No products in the DUTS catalog yet.</Text>
               ) : (
-                <View className="flex-row flex-wrap justify-between">
-                  {productsQuery.data!.products.map((p) => (
-                    <ProductCard
-                      key={p.catalogProductId ?? p.productId}
-                      product={p}
-                      pricePrefix={p.offerCount > 1 ? "From " : ""}
-                      onPress={() =>
-                        navigation.navigate("ProductDetail", {
-                          catalogProductId: p.catalogProductId ?? undefined,
-                          productId: p.productId
-                        })
-                      }
-                      onAdd={() => addFromCard(p)}
-                    />
-                  ))}
-                </View>
+                <>
+                  <View className="flex-row flex-wrap justify-between">
+                    {products.map((p) => (
+                      <ProductCard
+                        key={p.catalogProductId ?? p.productId ?? p.name}
+                        product={p}
+                        pricePrefix={p.merchantOfferCount > 1 ? "From " : ""}
+                        onPress={() =>
+                          navigation.navigate("ProductDetail", {
+                            catalogProductId: p.catalogProductId ?? undefined,
+                            productId: p.productId ?? undefined
+                          })
+                        }
+                        onAdd={isProductCardPurchasable(p) ? () => addFromCard(p) : undefined}
+                      />
+                    ))}
+                  </View>
+                  {productsQuery.hasNextPage ? (
+                    <View className="mt-2">
+                      <AppButton
+                        label={productsQuery.isFetchingNextPage ? "Loading…" : "Load more"}
+                        variant="secondary"
+                        onPress={() => void productsQuery.fetchNextPage()}
+                      />
+                    </View>
+                  ) : null}
+                </>
               )}
             </View>
 
             <View className="mt-6">
               <Text className="mb-3 text-lg font-extrabold text-ink">Nearby shops</Text>
-              {(shopsQuery.data?.shops ?? []).map((shop) => (
-                <Pressable
-                  key={shop.id}
-                  onPress={() => navigation.navigate("ShopDetail", { merchantId: shop.id })}
-                  className="mb-3 rounded-2xl border border-border bg-card px-4 py-4"
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    browse.isGuest ? shop.name : `${shop.name}, ${shop.distanceKm} kilometers`
-                  }
-                >
-                  <Text className="text-base font-bold text-ink">{shop.name}</Text>
-                  <Text className="mt-1 text-sm text-muted">
-                    {browse.isGuest ? shop.locationLabel : `${shop.distanceKm} km · ${shop.locationLabel}`}
-                  </Text>
-                </Pressable>
-              ))}
+              {!browse.isGuest && !browse.geo ? (
+                <View className="gap-3">
+                  <Text className="text-sm text-muted">Set your location to see shops that can deliver to you.</Text>
+                  <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
+                </View>
+              ) : (shopsQuery.data?.shops ?? []).length === 0 ? (
+                <Text className="text-sm text-muted">
+                  No shops nearby yet. You can still browse the DUTS catalog.
+                </Text>
+              ) : (
+                (shopsQuery.data?.shops ?? []).map((shop) => (
+                  <Pressable
+                    key={shop.id}
+                    onPress={() => navigation.navigate("ShopDetail", { merchantId: shop.id })}
+                    className="mb-3 rounded-2xl border border-border bg-card px-4 py-4"
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      browse.isGuest ? shop.name : `${shop.name}, ${shop.distanceKm} kilometers`
+                    }
+                  >
+                    <Text className="text-base font-bold text-ink">{shop.name}</Text>
+                    <Text className="mt-1 text-sm text-muted">
+                      {browse.isGuest ? shop.locationLabel : `${shop.distanceKm} km · ${shop.locationLabel}`}
+                    </Text>
+                  </Pressable>
+                ))
+              )}
             </View>
 
             {!browse.isGuest ? (
@@ -302,14 +316,9 @@ export function ShopHomeScreen() {
 /** Lightweight search tab entry — navigates to ProductSearch with query. */
 export function ShopSearchTabScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const browse = useShopBrowse();
   const [q, setQ] = useState("");
 
   function runSearch() {
-    if (!browse.isGuest && !browse.geo) {
-      navigation.navigate("ShopLocation");
-      return;
-    }
     if (q.trim()) navigation.navigate("ProductSearch", { q: q.trim() });
   }
 

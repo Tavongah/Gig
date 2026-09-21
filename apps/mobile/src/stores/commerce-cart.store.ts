@@ -80,6 +80,7 @@ export const useCommerceCartStore = create<CartState>((set, get) => ({
   pendingCheckout: false,
 
   addOffer: (input) => {
+    if (!input.productId || !input.merchantId) return false;
     const state = get();
     if (state.merchantId && state.merchantId !== input.merchantId) {
       Alert.alert(
