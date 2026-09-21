@@ -104,9 +104,9 @@ export function AppNavigator() {
       <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ title: "Terms of Service" }} />
       <Stack.Screen name="Chat" component={ChatScreen} options={({ route }) => ({ title: route.params.title })} />
       <Stack.Screen name="Review" component={ReviewScreen} options={{ title: "Leave a review" }} />
-      <Stack.Screen name="ProductSearch" component={ProductSearchScreen} options={{ title: "Search" }} />
-      <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ title: "Product" }} />
-      <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{ title: "Shop" }} />
+      <Stack.Screen name="ProductSearch" component={ProductSearchScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ShopLocation" component={ShopLocationScreen} options={{ title: "Deliver to" }} />
       <Stack.Screen name="CommerceCheckout" component={CommerceCheckoutScreen} options={{ title: "Checkout" }} />
       <Stack.Screen

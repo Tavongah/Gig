@@ -26,9 +26,9 @@ export function GuestAppNavigator() {
       }}
     >
       <Stack.Screen name="MainTabs" component={GuestTabs} options={{ headerShown: false }} />
-      <Stack.Screen name="ProductSearch" component={ProductSearchScreen} options={{ title: "Search" }} />
-      <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ title: "Product" }} />
-      <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{ title: "Shop" }} />
+      <Stack.Screen name="ProductSearch" component={ProductSearchScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="GuestCheckoutChoice"
         component={GuestCheckoutChoiceScreen}

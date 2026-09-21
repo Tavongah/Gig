@@ -42,4 +42,7 @@ const guestTabs = read("navigation/GuestTabs.tsx");
 assert.ok(guestTabs.includes("isDesktopNav"));
 assert.ok(guestTabs.includes("Home") && guestTabs.includes("Search") && guestTabs.includes("Cart"));
 
+const guestNav = read("navigation/GuestAppNavigator.tsx");
+assert.ok(guestNav.includes('name="ProductSearch"') && guestNav.includes("headerShown: false"));
+
 console.log(JSON.stringify({ ok: true }, null, 2));

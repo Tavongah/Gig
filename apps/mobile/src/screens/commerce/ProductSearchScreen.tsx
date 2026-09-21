@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ProductGrid } from "../../components/ProductGrid";
 import { StoreHeader, StorePage } from "../../components/StoreHeader";
@@ -16,6 +16,12 @@ export function ProductSearchScreen({ route, navigation }: Props) {
   const browse = useShopBrowse();
   const [q] = useState(route.params?.q ?? "");
   const category = route.params?.category;
+  const categoriesQuery = useQuery({
+    queryKey: ["commerce-categories", ...browse.queryKey],
+    queryFn: () => api.commerceCategories(browse.geo, browse.token),
+    enabled: browse.ready
+  });
+  const categories = (categoriesQuery.data?.categories ?? []).map((c) => c.name).slice(0, 8);
 
   const query = useInfiniteQuery({
     queryKey: ["commerce-search", ...browse.queryKey, q, category],
@@ -48,7 +54,7 @@ export function ProductSearchScreen({ route, navigation }: Props) {
 
   return (
     <View className="flex-1 bg-background">
-      <StoreHeader initialQuery={q} compact={!category} showCategories={!q} />
+      <StoreHeader categories={categories} initialQuery={q} compact={!category} showCategories={!q} />
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
         <StorePage>
           <Text className="mt-4 text-xl font-black text-ink">{title}</Text>
