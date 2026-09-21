@@ -28,6 +28,7 @@ const files = [
   "screens/commerce/CommerceOrdersScreen.tsx",
   "screens/commerce/CommerceOrderDetailScreen.tsx",
   "components/ProductCard.tsx",
+  "components/StoreHeader.tsx",
   "stores/commerce-cart.store.ts",
   "stores/shop-location.store.ts",
   "lib/api.ts"
@@ -52,8 +53,8 @@ assert.ok(cart.includes("Different shop"), "one-store rule alert");
 assert.ok(cart.includes("productId"), "uses Product offer ids");
 
 const home = read("screens/commerce/ShopHomeScreen.tsx");
-assert.ok(home.includes("Deliver to"), "location first");
-assert.ok(home.includes("Shop DUTS") || home.includes("Products near you") || home.includes("Popular near you"), "product section heading");
+assert.ok(read("components/StoreHeader.tsx").includes("Deliver to"), "location first");
+assert.ok(home.includes("Explore products") || home.includes("Shop DUTS") || home.includes("Products near you"), "product section heading");
 assert.ok(home.includes("Nearby shops"), "nearby shops");
 assert.ok(!/\bGig\b/.test(home.replace(/PostGig|MyGigsActivity/g, "")), "no Gig terminology on home");
 

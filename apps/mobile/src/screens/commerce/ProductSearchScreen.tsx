@@ -1,21 +1,20 @@
 import { useState } from "react";
-import { ActivityIndicator, ScrollView, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { ProductCard, isProductCardPurchasable } from "../../components/ProductCard";
-import { AppButton } from "../../components/AppButton";
+import { ProductGrid } from "../../components/ProductGrid";
+import { StoreHeader, StorePage } from "../../components/StoreHeader";
+import type { ProductCardData } from "../../components/ProductCard";
 import { api } from "../../lib/api";
+import { addStorefrontProduct } from "../../lib/storefront-cart";
 import { useShopBrowse } from "../../lib/shop-browse";
-import { DUTS } from "../../lib/theme";
 import type { RootStackParamList } from "../../navigation/types";
-import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProductSearch">;
 
 export function ProductSearchScreen({ route, navigation }: Props) {
   const browse = useShopBrowse();
-  const addOffer = useCommerceCartStore((s) => s.addOffer);
-  const [q, setQ] = useState(route.params?.q ?? "");
+  const [q] = useState(route.params?.q ?? "");
   const category = route.params?.category;
 
   const query = useInfiniteQuery({
@@ -37,80 +36,64 @@ export function ProductSearchScreen({ route, navigation }: Props) {
   });
 
   const products = query.data?.pages.flatMap((page) => page.products) ?? [];
+  const total = query.data?.pages[0]?.total;
+  const title = category ?? (q.trim() ? `Results for “${q.trim()}”` : "Search");
+
+  function openProduct(p: ProductCardData) {
+    navigation.navigate("ProductDetail", {
+      catalogProductId: p.catalogProductId ?? undefined,
+      productId: p.productId ?? undefined
+    });
+  }
 
   return (
-    <ScrollView className="flex-1 bg-background px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 8 }}>
-      <Text className="text-xl font-black text-ink">{category ?? "Search"}</Text>
-      <TextInput
-        value={q}
-        onChangeText={setQ}
-        placeholder="Search products…"
-        placeholderTextColor={DUTS.placeholder}
-        className="mt-3 rounded-2xl border border-border bg-card px-4 py-3 text-base text-ink"
-        accessibilityLabel="Search products"
-      />
-      {!browse.ready || query.isLoading ? (
-        <ActivityIndicator className="mt-8" color={DUTS.purple} />
-      ) : products.length === 0 ? (
-        <Text className="mt-8 text-sm text-muted">No products found.</Text>
-      ) : (
-        <>
-          <View className="mt-4 flex-row flex-wrap justify-between">
-            {products.map((p) => (
-              <ProductCard
-                key={p.catalogProductId ?? p.productId ?? p.name}
-                product={p}
-                pricePrefix={p.merchantOfferCount > 1 ? "From " : ""}
-                onPress={() =>
-                  navigation.navigate("ProductDetail", {
-                    catalogProductId: p.catalogProductId ?? undefined,
-                    productId: p.productId ?? undefined
+    <View className="flex-1 bg-background">
+      <StoreHeader initialQuery={q} compact={!category} showCategories={!q} />
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
+        <StorePage>
+          <Text className="mt-4 text-xl font-black text-ink">{title}</Text>
+          {typeof total === "number" && !query.isLoading ? (
+            <Text className="mt-1 text-sm text-muted">
+              {total} {total === 1 ? "product" : "products"}
+            </Text>
+          ) : null}
+          {products.length === 0 && !query.isLoading ? (
+            <View className="mt-10 items-center px-6">
+              <Text className="text-center text-base font-bold text-ink">No products found</Text>
+              <Text className="mt-1 text-center text-sm text-muted">Try another search.</Text>
+            </View>
+          ) : (
+            <View className="mt-4">
+              <ProductGrid
+                products={products}
+                loading={query.isLoading}
+                onPress={openProduct}
+                onAdd={(p) =>
+                  addStorefrontProduct({
+                    product: p,
+                    geo: browse.geo,
+                    token: browse.token,
+                    isGuest: browse.isGuest
                   })
                 }
-                onAdd={
-                  isProductCardPurchasable(p)
-                    ? () => {
-                        if (!p.productId) return;
-                        void api
-                          .commerceProductDetail(
-                            {
-                              ...(browse.geo ?? {}),
-                              catalogProductId: p.catalogProductId ?? undefined,
-                              productId: p.productId
-                            },
-                            browse.token
-                          )
-                          .then((detail) => {
-                            const offer = detail.offers[0];
-                            if (!offer || !detail.purchasable) return;
-                            addOffer({
-                              productId: offer.productId,
-                              catalogProductId: detail.product.catalogProductId,
-                              name: detail.product.name,
-                              imageUrl: detail.product.imageUrl,
-                              sizeLabel: detail.product.sizeLabel,
-                              unitPriceCents: offer.priceCents,
-                              merchantId: offer.merchantId,
-                              merchantName: offer.merchantName
-                            });
-                          });
-                      }
-                    : undefined
-                }
-              />
-            ))}
-          </View>
-          {query.hasNextPage ? (
-            <View className="mt-2">
-              <AppButton
-                label={query.isFetchingNextPage ? "Loading…" : "Load more"}
-                variant="secondary"
-                onPress={() => void query.fetchNextPage()}
+                pricePrefix={(p) => ((p.merchantOfferCount ?? 0) > 1 ? "From " : "")}
               />
             </View>
+          )}
+          {query.hasNextPage ? (
+            <Pressable
+              onPress={() => void query.fetchNextPage()}
+              accessibilityRole="button"
+              accessibilityLabel="Show more products"
+              className="mt-5 self-center rounded-full border border-border bg-card px-5 py-3"
+            >
+              <Text className="text-center text-sm font-extrabold text-ink">
+                {query.isFetchingNextPage ? "Loading…" : "SHOW MORE PRODUCTS"}
+              </Text>
+            </Pressable>
           ) : null}
-        </>
-      )}
-    </ScrollView>
+        </StorePage>
+      </ScrollView>
+    </View>
   );
 }

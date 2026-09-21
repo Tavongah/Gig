@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { TabScreen } from "../../components/TabScreen";
+import { StoreHeader } from "../../components/StoreHeader";
 import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
 import { useShopBrowse } from "../../lib/shop-browse";
@@ -50,25 +51,31 @@ export function CartScreen() {
 
   if (!lines.length) {
     return (
-      <TabScreen>
-        <Text className="text-2xl font-black text-ink">Your cart</Text>
-        <Text className="mt-4 text-base text-muted">Your cart is empty. Browse products to get started.</Text>
-        <View className="mt-6">
-          <AppButton label="Continue shopping" variant="secondary" onPress={() => navigation.navigate("MainTabs", { screen: "Home" })} />
-        </View>
-      </TabScreen>
+      <View className="flex-1 bg-background">
+        <StoreHeader compact showCategories={false} />
+        <TabScreen style={{ paddingTop: 8 }}>
+          <Text className="text-2xl font-black text-ink">Your cart</Text>
+          <Text className="mt-4 text-base text-muted">Your cart is empty. Browse products to get started.</Text>
+          <View className="mt-6">
+            <AppButton label="Continue shopping" variant="secondary" onPress={() => navigation.navigate("MainTabs", { screen: "Home" })} />
+          </View>
+        </TabScreen>
+      </View>
     );
   }
 
   if (!browse.isGuest && !browse.exact) {
     return (
-      <TabScreen>
-        <Text className="text-2xl font-black text-ink">Your cart</Text>
-        <Text className="mt-4 text-base text-muted">Set your location to see products available near you.</Text>
-        <View className="mt-6">
-          <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
-        </View>
-      </TabScreen>
+      <View className="flex-1 bg-background">
+        <StoreHeader compact showCategories={false} />
+        <TabScreen style={{ paddingTop: 8 }}>
+          <Text className="text-2xl font-black text-ink">Your cart</Text>
+          <Text className="mt-4 text-base text-muted">Set your location to see products available near you.</Text>
+          <View className="mt-6">
+            <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
+          </View>
+        </TabScreen>
+      </View>
     );
   }
 
@@ -77,7 +84,9 @@ export function CartScreen() {
   const deferred = browse.isGuest || quote?.deliveryQuoteStatus === "deferred";
 
   return (
-    <TabScreen>
+    <View className="flex-1 bg-background">
+      <StoreHeader compact showCategories={false} />
+    <TabScreen style={{ paddingTop: 8 }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <Text className="text-2xl font-black text-ink">Your cart</Text>
         <Text className="mt-1 text-base font-semibold text-ink">{quote?.merchant.name ?? merchantName}</Text>
@@ -166,5 +175,6 @@ export function CartScreen() {
         </Pressable>
       </ScrollView>
     </TabScreen>
+    </View>
   );
 }

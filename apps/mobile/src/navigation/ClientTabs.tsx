@@ -9,6 +9,7 @@ import { ProfileScreen } from "../screens/shared/ProfileScreen";
 import type { ClientTabParamList } from "./types";
 import { DUTS } from "../lib/theme";
 import { useCommerceCartStore } from "../stores/commerce-cart.store";
+import { useStorefrontLayout } from "../lib/storefront-ui";
 
 const Tab = createBottomTabNavigator<ClientTabParamList>();
 
@@ -74,18 +75,21 @@ export function ClientTabs() {
   const cartCount = useCommerceCartStore((s) =>
     s.lines.reduce((n, l) => n + l.quantity, 0)
   );
+  const { isDesktopNav } = useStorefrontLayout();
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: DUTS.card,
-          borderTopColor: DUTS.border,
-          height: 58 + bottomPad,
-          paddingBottom: bottomPad,
-          paddingTop: 6
-        },
+        tabBarStyle: isDesktopNav
+          ? { display: "none", height: 0, overflow: "hidden" as const }
+          : {
+              backgroundColor: DUTS.card,
+              borderTopColor: DUTS.border,
+              height: 58 + bottomPad,
+              paddingBottom: bottomPad,
+              paddingTop: 6
+            },
         tabBarShowLabel: false,
         tabBarItemStyle: {
           flex: 1,

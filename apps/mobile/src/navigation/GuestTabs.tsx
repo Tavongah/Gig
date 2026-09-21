@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useStorefrontLayout } from "../lib/storefront-ui";
 import { ShopHomeScreen, ShopSearchTabScreen } from "../screens/commerce/ShopHomeScreen";
 import { CartScreen } from "../screens/commerce/CartScreen";
 import { AuthNavigator } from "./AuthNavigator";
@@ -70,18 +71,21 @@ export function GuestTabs() {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 8);
   const cartCount = useCommerceCartStore((s) => s.lines.reduce((n, l) => n + l.quantity, 0));
+  const { isDesktopNav } = useStorefrontLayout();
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: DUTS.card,
-          borderTopColor: DUTS.border,
-          height: 58 + bottomPad,
-          paddingBottom: bottomPad,
-          paddingTop: 6
-        },
+        tabBarStyle: isDesktopNav
+          ? { display: "none", height: 0, overflow: "hidden" as const }
+          : {
+              backgroundColor: DUTS.card,
+              borderTopColor: DUTS.border,
+              height: 58 + bottomPad,
+              paddingBottom: bottomPad,
+              paddingTop: 6
+            },
         tabBarShowLabel: false,
         tabBarItemStyle: {
           flex: 1,

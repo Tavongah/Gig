@@ -37,12 +37,15 @@ const guestNav = read("navigation/GuestAppNavigator.tsx");
 assert.ok(!guestNav.includes("ShopLocation"), "guest stack must not open exact-location screen");
 
 const home = read("screens/commerce/ShopHomeScreen.tsx");
-assert.ok(home.includes("Shopping near"), "approximate area label");
-assert.ok(home.includes("Change area"), "manual area change");
+assert.ok(home.includes("StoreHeader"), "uses storefront header");
 assert.ok(!home.includes("Use my location"), "guest home must not request GPS");
-assert.ok(!home.includes("Set your location to see products available near you.") || home.includes("browse.isGuest"), "location gate is signed-in only");
-assert.ok(home.includes("session") || home.includes("isGuest"), "home works without auth token");
+assert.ok(home.includes("session") || home.includes("isGuest") || read("components/StoreHeader.tsx").includes("isGuest"), "home works without auth token");
 assert.ok(!home.includes("session!.token"), "home must not require session");
+
+const header = read("components/StoreHeader.tsx");
+assert.ok(header.includes("Shopping near"), "approximate area label");
+assert.ok(header.includes("Change area"), "manual area change");
+assert.ok(header.includes("Search DUTS"), "homepage search available");
 
 const areaStore = read("stores/shop-area.store.ts");
 assert.ok(areaStore.includes("duts.shop.area"), "persists coarse area only");
