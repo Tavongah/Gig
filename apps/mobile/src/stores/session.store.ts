@@ -86,6 +86,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       }
     }
     await authStorage.clearToken();
+    if (typeof window !== "undefined" && typeof window.history?.replaceState === "function") {
+      window.history.replaceState(null, "", "/");
+    }
     set({ session: null, profile: null, activeRole: "CLIENT", onboardingComplete: false });
   }
 }));

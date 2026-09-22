@@ -15,6 +15,7 @@ import { initials } from "../../lib/format";
 import { APP_NAME } from "../../lib/brand";
 import { DUTS } from "../../lib/theme";
 import { needsProfilePhoto } from "../../lib/auth";
+import { showConfirm } from "../../lib/confirm";
 import type { ClientTabParamList, RootStackParamList, WorkerTabParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 
@@ -81,17 +82,15 @@ export function ProfileScreen() {
     roles.includes("CLIENT") && roles.includes("WORKER") && user.accountStatus === "APPROVED";
 
   function handleSignOut(): void {
-    Alert.alert("Log out", "Are you sure you want to log out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Log out",
-        style: "destructive",
-        onPress: () => {
-          disconnectSocket();
-          void signOut();
-        }
-      }
-    ]);
+    showConfirm(
+      "Log out",
+      "Are you sure you want to log out?",
+      () => {
+        disconnectSocket();
+        void signOut();
+      },
+      { confirmLabel: "Log out", cancelLabel: "Cancel", destructive: true }
+    );
   }
 
   function handleDeleteAccount(): void {
@@ -156,6 +155,7 @@ export function ProfileScreen() {
             </View>
           </View>
           <AppButton label="Edit Profile" variant="secondary" onPress={() => navigation.navigate("EditProfile")} />
+          <AppButton label="Log out" variant="secondary" onPress={handleSignOut} />
         </DutsCard>
 
         {needsProfilePhoto(user) && activeRole === "CLIENT" ? (
@@ -282,7 +282,7 @@ export function ProfileScreen() {
         </Section>
 
         <Section title="Account actions">
-          <ProfileRow icon="log-out-outline" label="Log Out" onPress={handleSignOut} danger />
+          <ProfileRow icon="log-out-outline" label="Log out" onPress={handleSignOut} danger />
           <ProfileRow icon="trash-outline" label="Delete Account" onPress={handleDeleteAccount} danger />
         </Section>
       </ScrollView>

@@ -1,11 +1,12 @@
 import { useCallback, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { DutsCard } from "../../components/DutsCard";
 import { Screen } from "../../components/Screen";
 import { disconnectSocket } from "../../hooks/useSocket";
 import { clearDeviceSession, ensureDeviceSession, listLoginHistory } from "../../lib/security-prefs";
+import { showConfirm } from "../../lib/confirm";
 import { DUTS } from "../../lib/theme";
 import { useSessionStore } from "../../stores/session.store";
 
@@ -36,20 +37,18 @@ export function SecurityScreen() {
   );
 
   function signOutThisDevice(): void {
-    Alert.alert("Sign out", "Sign out of DUTS on this device?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign out",
-        style: "destructive",
-        onPress: () => {
-          void (async () => {
-            await clearDeviceSession(session.user.id);
-            disconnectSocket();
-            await signOut();
-          })();
-        }
-      }
-    ]);
+    showConfirm(
+      "Sign out",
+      "Sign out of DUTS on this device?",
+      () => {
+        void (async () => {
+          await clearDeviceSession(session.user.id);
+          disconnectSocket();
+          await signOut();
+        })();
+      },
+      { confirmLabel: "Sign out", cancelLabel: "Cancel", destructive: true }
+    );
   }
 
   return (

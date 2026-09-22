@@ -154,6 +154,12 @@ function Shell() {
   useEffect(() => {
     if (!hydrated) return;
     const now = Boolean(session);
+    if (hadSession.current === true && !now) {
+      queryClient.removeQueries({ queryKey: ["worker-earnings"] });
+      queryClient.removeQueries({ queryKey: ["nearby-gigs"] });
+      queryClient.removeQueries({ queryKey: ["my-gigs"] });
+      queryClient.removeQueries({ queryKey: ["worker-matching-list"] });
+    }
     if (hadSession.current === false && now && session?.user.id) {
       void claimCartAfterLogin(session.user.id);
     }
