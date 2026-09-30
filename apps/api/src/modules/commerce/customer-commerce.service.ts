@@ -40,7 +40,7 @@ export type BrowseGeo = { areaId: string } | { lat: number; lng: number };
 
 const unresolvedLegacyIds = [...UNRESOLVED_LEGACY_CATALOG_PRODUCT_IDS];
 
-async function merchantsForBrowse(geo?: BrowseGeo | null) {
+export async function merchantsForBrowse(geo?: BrowseGeo | null) {
   if (!geo) return [];
   if ("areaId" in geo) {
     return findMerchantsInShoppingArea(geo.areaId);
@@ -48,7 +48,7 @@ async function merchantsForBrowse(geo?: BrowseGeo | null) {
   return findNearbyMerchants(geo.lat, geo.lng);
 }
 
-function offerEligible(product: {
+export function offerEligible(product: {
   available: boolean;
   archived: boolean;
   catalogProduct?: { status: string; submittedByMerchantId: string | null } | null;

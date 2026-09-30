@@ -1,9 +1,10 @@
 import { api } from "./api";
 import { logDutsFlow } from "./flow-log";
 import { isProductCardPurchasable, type ProductCardData } from "../components/ProductCard";
-import { alcoholPurchaseAllowed } from "./storefront-categories";
+import { alcoholPurchaseAllowed, isSmartBasketEnabled } from "./storefront-categories";
 import type { CommerceBrowseGeo } from "./api";
 import { useCommerceCartStore } from "../stores/commerce-cart.store";
+import { useDesiredBasketStore } from "../stores/desired-basket.store";
 
 export function addStorefrontProduct(input: {
   product: ProductCardData;
@@ -12,9 +13,22 @@ export function addStorefrontProduct(input: {
   isGuest?: boolean;
 }) {
   const { product, geo, token, isGuest } = input;
-  if (!isProductCardPurchasable(product) || !product.productId) return;
+  if (!isProductCardPurchasable(product)) return;
   if (!alcoholPurchaseAllowed(product.category)) return;
   if (isGuest) logDutsFlow("GUEST_ADD_TO_CART");
+
+  if (isSmartBasketEnabled() && product.catalogProductId) {
+    useDesiredBasketStore.getState().addItem({
+      catalogProductId: product.catalogProductId,
+      name: product.name,
+      imageUrl: product.imageUrl,
+      sizeLabel: product.sizeLabel,
+      fromPriceCents: product.fromPriceCents
+    });
+    return;
+  }
+
+  if (!product.productId) return;
   void api
     .commerceProductDetail(
       {

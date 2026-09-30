@@ -19,6 +19,8 @@ import {
 import { createGuestHandoff, publicWhatsAppDigits } from "./guest-handoff.service.js";
 import { listShoppingAreas } from "./shopping-areas.js";
 import { logDutsFlow } from "../../lib/flow-log.js";
+import { matchSmartBasket, selectSmartBasket } from "./smart-basket.service.js";
+import { parseSmartBasketEnabled } from "@gigflow/shared";
 
 const geoQuery = z
   .object({
@@ -63,7 +65,8 @@ customerCommerceRouter.get("/public-config", (_req, res) => {
   const digits = publicWhatsAppDigits();
   res.json({
     whatsappE164: digits ? `+${digits}` : null,
-    whatsappDigits: digits
+    whatsappDigits: digits,
+    smartBasketEnabled: parseSmartBasketEnabled(process.env.SMART_BASKET_ENABLED)
   });
 });
 
@@ -256,6 +259,84 @@ const textBasketSchema = z.object({
 customerCommerceRouter.post("/basket/quote-text", ...requireCustomer, validateBody(textBasketSchema), async (req, res, next) => {
   try {
     res.json(await quoteTextBasket(req.body));
+  } catch (err) {
+    next(err);
+  }
+});
+
+const desiredItemSchema = z.object({
+  catalogProductId: z.string().uuid(),
+  quantity: z.number().int().min(1).max(99)
+});
+
+const basketMatchSchema = z
+  .object({
+    location: z
+      .object({
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180)
+      })
+      .optional(),
+    areaId: z.string().min(1).max(80).optional(),
+    items: z.array(desiredItemSchema).min(1).max(40)
+  })
+  .refine((value) => Boolean(value.areaId) || Boolean(value.location), {
+    message: "location or areaId required"
+  });
+
+const basketSelectSchema = z
+  .object({
+    merchantId: z.string().uuid(),
+    location: z
+      .object({
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180)
+      })
+      .optional(),
+    areaId: z.string().min(1).max(80).optional(),
+    deferDelivery: z.boolean().optional(),
+    acceptPartial: z.boolean().optional(),
+    expectedFulfilledLines: z.number().int().min(0).max(40).optional(),
+    items: z.array(desiredItemSchema).min(1).max(40)
+  })
+  .refine((value) => Boolean(value.areaId) || Boolean(value.location), {
+    message: "location or areaId required"
+  });
+
+customerCommerceRouter.post("/basket/match", validateBody(basketMatchSchema), async (req, res, next) => {
+  try {
+    const result = await matchSmartBasket({
+      lat: req.body.location?.latitude,
+      lng: req.body.location?.longitude,
+      areaId: req.body.areaId,
+      items: req.body.items
+    });
+    const top = result.matches[0];
+    logDutsFlow("BASKET_MATCH_STARTED", { requestedLines: result.requestedLines });
+    if (top?.complete) logDutsFlow("BASKET_MATCH_COMPLETE", { merchantId: top.merchantId });
+    else if (top) logDutsFlow("BASKET_MATCH_PARTIAL", { merchantId: top.merchantId, fulfilled: top.fulfilledLineCount });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+customerCommerceRouter.post("/basket/select", validateBody(basketSelectSchema), async (req, res, next) => {
+  try {
+    const result = await selectSmartBasket({
+      merchantId: req.body.merchantId,
+      lat: req.body.location?.latitude,
+      lng: req.body.location?.longitude,
+      areaId: req.body.areaId,
+      deferDelivery: req.body.deferDelivery,
+      acceptPartial: req.body.acceptPartial,
+      expectedFulfilledLines: req.body.expectedFulfilledLines,
+      items: req.body.items
+    });
+    if (!result.changed && result.match) {
+      logDutsFlow("BASKET_MATCH_SELECTED", { merchantId: result.match.merchantId });
+    }
+    res.json(result);
   } catch (err) {
     next(err);
   }

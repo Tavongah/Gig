@@ -9,8 +9,10 @@ import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
 import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
+import { isSmartBasketEnabled } from "../../lib/storefront-categories";
 import type { RootStackParamList } from "../../navigation/types";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
+import { useDesiredBasketStore } from "../../stores/desired-basket.store";
 
 export function CartScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -19,6 +21,11 @@ export function CartScreen() {
   const merchantName = useCommerceCartStore((s) => s.merchantName);
   const setQuantity = useCommerceCartStore((s) => s.setQuantity);
   const clear = useCommerceCartStore((s) => s.clear);
+  const desired = useDesiredBasketStore((s) => s.lines);
+  const setDesiredQty = useDesiredBasketStore((s) => s.setQuantity);
+  const removeDesired = useDesiredBasketStore((s) => s.remove);
+  const clearDesired = useDesiredBasketStore((s) => s.clear);
+  const smartBasket = isSmartBasketEnabled();
   const [quoteError, setQuoteError] = useState("");
 
   const quoteMut = useMutation({
@@ -56,16 +63,91 @@ export function CartScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines, browse.isGuest, browse.exact?.latitude, browse.exact?.longitude]);
 
+  const shoppingList = smartBasket ? desired : [];
+  const empty = !lines.length && !shoppingList.length;
+
+  function shoppingListBlock() {
+    if (!shoppingList.length) return null;
+    return (
+      <View className={lines.length ? "mb-8" : undefined}>
+        <Text className="text-2xl font-black text-ink">Your shopping list</Text>
+        <Text className="mt-1 text-sm text-muted">Add products, then find one shop that has them.</Text>
+        {shoppingList.map((line) => (
+          <View key={line.catalogProductId} className="mt-4 flex-row gap-3 border-b border-border pb-4">
+            <View className="h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-surface">
+              {line.imageUrl ? (
+                <Image
+                  source={{ uri: line.imageUrl }}
+                  className="h-full w-full"
+                  resizeMode="contain"
+                  {...({ loading: "lazy" } as object)}
+                />
+              ) : (
+                <Text className="text-[10px] text-muted">No photo</Text>
+              )}
+            </View>
+            <View className="flex-1">
+              <Text className="text-base font-bold text-ink">{line.name}</Text>
+              {line.sizeLabel ? <Text className="text-xs text-muted">{line.sizeLabel}</Text> : null}
+              {line.fromPriceCents != null ? (
+                <Text className="mt-1 text-sm font-semibold text-muted">From ${(line.fromPriceCents / 100).toFixed(2)}</Text>
+              ) : null}
+              <View className="mt-2 flex-row items-center gap-3">
+                <Pressable
+                  onPress={() => setDesiredQty(line.catalogProductId, line.quantity - 1)}
+                  accessibilityLabel="Decrease quantity"
+                  className="h-11 w-11 items-center justify-center rounded-full border border-border"
+                >
+                  <Text className="text-lg font-bold">−</Text>
+                </Pressable>
+                <Text className="min-w-[20px] text-center font-bold">{line.quantity}</Text>
+                <Pressable
+                  onPress={() => setDesiredQty(line.catalogProductId, line.quantity + 1)}
+                  accessibilityLabel="Increase quantity"
+                  className="h-11 w-11 items-center justify-center rounded-full border border-border"
+                >
+                  <Text className="text-lg font-bold">+</Text>
+                </Pressable>
+                <Pressable onPress={() => removeDesired(line.catalogProductId)} accessibilityRole="button">
+                  <Text className="text-sm font-semibold text-muted">Remove</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        ))}
+        <View className="mt-6">
+          <AppButton label="Find a shop" onPress={() => navigation.navigate("BasketMatch")} />
+        </View>
+        <Pressable onPress={() => clearDesired()} className="mt-3 items-center" accessibilityRole="button">
+          <Text className="text-sm font-semibold text-muted">Clear shopping list</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (empty) {
+    return (
+      <View className="flex-1 bg-background">
+        <StoreHeader compact showCategories={false} />
+        <TabScreen style={{ paddingTop: 8 }}>
+          <Text className="text-2xl font-black text-ink">{smartBasket ? "Your shopping list" : "Your cart"}</Text>
+          <Text className="mt-4 text-base text-muted">Your cart is empty. Browse products to get started.</Text>
+          <View className="mt-6">
+            <AppButton label="Continue shopping" variant="secondary" onPress={() => navigation.navigate("MainTabs", { screen: "Home" })} />
+          </View>
+        </TabScreen>
+      </View>
+    );
+  }
+
   if (!lines.length) {
     return (
       <View className="flex-1 bg-background">
         <StoreHeader compact showCategories={false} />
         <TabScreen style={{ paddingTop: 8 }}>
-          <Text className="text-2xl font-black text-ink">Your cart</Text>
-          <Text className="mt-4 text-base text-muted">Your cart is empty. Browse products to get started.</Text>
-          <View className="mt-6">
-            <AppButton label="Continue shopping" variant="secondary" onPress={() => navigation.navigate("MainTabs", { screen: "Home" })} />
-          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+            {shoppingListBlock()}
+          </ScrollView>
         </TabScreen>
       </View>
     );
@@ -76,11 +158,14 @@ export function CartScreen() {
       <View className="flex-1 bg-background">
         <StoreHeader compact showCategories={false} />
         <TabScreen style={{ paddingTop: 8 }}>
-          <Text className="text-2xl font-black text-ink">Your cart</Text>
-          <Text className="mt-4 text-base text-muted">Set your location to see products available near you.</Text>
-          <View className="mt-6">
-            <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
-          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+            {shoppingListBlock()}
+            <Text className="text-2xl font-black text-ink">Your cart</Text>
+            <Text className="mt-4 text-base text-muted">Set your location to see products available near you.</Text>
+            <View className="mt-6">
+              <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
+            </View>
+          </ScrollView>
         </TabScreen>
       </View>
     );
@@ -95,6 +180,7 @@ export function CartScreen() {
       <StoreHeader compact showCategories={false} />
     <TabScreen style={{ paddingTop: 8 }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        {shoppingListBlock()}
         <Text className="text-2xl font-black text-ink">Your cart</Text>
         <Text className="mt-1 text-base font-semibold text-ink">{quote?.merchant.name ?? merchantName}</Text>
 

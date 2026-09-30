@@ -7,6 +7,7 @@ import { ShopDetailScreen } from "../screens/commerce/ShopDetailScreen";
 import { MarketplaceCategoryScreen } from "../screens/commerce/MarketplaceCategoryScreen";
 import { AllCategoriesScreen } from "../screens/commerce/AllCategoriesScreen";
 import { GuestCheckoutChoiceScreen } from "../screens/commerce/GuestCheckoutChoiceScreen";
+import { BasketMatchScreen } from "../screens/commerce/BasketMatchScreen";
 import { ForgotPasswordScreen } from "../screens/auth/ForgotPasswordScreen";
 import { ResetPasswordScreen } from "../screens/auth/ResetPasswordScreen";
 import { PrivacyPolicyScreen } from "../screens/support/PrivacyPolicyScreen";
@@ -38,6 +39,7 @@ export function GuestAppNavigator() {
         component={GuestCheckoutChoiceScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="BasketMatch" component={BasketMatchScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: "Reset password" }} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ title: "Choose new password" }} />
       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ title: "Privacy Policy" }} />

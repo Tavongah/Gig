@@ -13,6 +13,7 @@ import {
   isAlcoholRestrictedCategory,
   matchComingSoonFromSearch,
   parseAlcoholCommerceEnabled,
+  parseSmartBasketEnabled,
   resolveStorefrontCategory
 } from "@gigflow/shared";
 
@@ -26,6 +27,8 @@ function read(rel: string) {
 assert.equal(parseAlcoholCommerceEnabled(undefined), false);
 assert.equal(parseAlcoholCommerceEnabled("false"), false);
 assert.equal(parseAlcoholCommerceEnabled("true"), true);
+assert.equal(parseSmartBasketEnabled(undefined), true);
+assert.equal(parseSmartBasketEnabled("false"), false);
 assert.ok(isAlcoholRestrictedCategory("Alcohol"));
 assert.ok(!isAlcoholRestrictedCategory("Drinks"));
 assert.ok(!isAlcoholRestrictedCategory("Soft Drinks"));

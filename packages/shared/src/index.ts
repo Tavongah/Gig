@@ -360,6 +360,23 @@ export {
   type StorefrontCategoryState
 } from "./storefront-categories.js";
 
+export {
+  compareSmartBasketMatches,
+  coverageRatio,
+  evaluateMerchantCoverage,
+  offerQuantitySatisfied,
+  parseSmartBasketEnabled,
+  rankSmartBasketMatches,
+  type CoverageCatalog,
+  type CoverageOffer,
+  type SmartBasketAvailableLine,
+  type SmartBasketMatch,
+  type SmartBasketMissingLine,
+  type SmartBasketMissingReason,
+  type SmartBasketRankInput,
+  type SmartBasketRequestedItem
+} from "./smart-basket.js";
+
 
 export function calculateTieredCommissionRate(totalCents: number): number {
   if (totalCents < 10_000) {

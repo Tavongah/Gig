@@ -76,7 +76,12 @@ const envSchema = z.object({
   ALCOHOL_COMMERCE_ENABLED: z
     .string()
     .optional()
-    .transform((value) => value === "true" || value === "1")
+    .transform((value) => value === "true" || value === "1"),
+  /**
+   * Catalog-first Smart Basket (one merchant per order).
+   * Default on; set SMART_BASKET_ENABLED=false to disable without reverting code.
+   */
+  SMART_BASKET_ENABLED: z.string().optional()
 });
 
 export const env = envSchema.parse(process.env);

@@ -7,6 +7,7 @@ import {
   isAlcoholRestrictedCategory,
   matchComingSoonFromSearch,
   parseAlcoholCommerceEnabled,
+  parseSmartBasketEnabled,
   resolveStorefrontCategory,
   storefrontCategoryIcon,
   type ResolvedStorefrontCategory
@@ -14,6 +15,13 @@ import {
 import type { StorefrontIconName } from "./storefront-ui";
 
 export type { ResolvedStorefrontCategory };
+
+export function isSmartBasketEnabled() {
+  const extra = Constants.expoConfig?.extra as { smartBasketEnabled?: boolean | string } | undefined;
+  return parseSmartBasketEnabled(
+    extra?.smartBasketEnabled ?? process.env.EXPO_PUBLIC_SMART_BASKET_ENABLED
+  );
+}
 
 export function isAlcoholCommerceEnabled() {
   const extra = Constants.expoConfig?.extra as { alcoholCommerceEnabled?: boolean | string } | undefined;

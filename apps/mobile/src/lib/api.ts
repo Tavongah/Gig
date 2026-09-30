@@ -410,7 +410,9 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       ALCOHOL_DISABLED: "Alcohol ordering isn't available yet.",
       MERCHANT_CLOSED: "This shop is not available right now.",
       MULTI_STORE_BASKET: "Your basket has items from more than one shop. Keep one shop per order.",
-      EMPTY_BASKET: "Your cart is empty."
+      EMPTY_BASKET: "Your cart is empty.",
+      FEATURE_DISABLED: "This shopping option isn't available right now.",
+      BASKET_NO_MATCH: "This shop can't fulfill these items right now."
     };
     const message =
       fieldMessages.length > 0
@@ -1092,7 +1094,88 @@ export const api = {
       merchantName: string;
       subtotalCents: number;
       currency: string;
-    }>("/commerce/guest/handoff", { method: "POST", body: JSON.stringify(payload) })
+    }>("/commerce/guest/handoff", { method: "POST", body: JSON.stringify(payload) }),
+
+  commerceBasketMatch: (payload: {
+    location?: { latitude: number; longitude: number };
+    areaId?: string;
+    items: Array<{ catalogProductId: string; quantity: number }>;
+  }) =>
+    request<{
+      requestedLines: number;
+      locationMode: "exact" | "discovery";
+      matches: SmartBasketMatchDto[];
+    }>("/commerce/basket/match", { method: "POST", body: JSON.stringify(payload) }),
+
+  commerceBasketSelect: (payload: {
+    merchantId: string;
+    location?: { latitude: number; longitude: number };
+    areaId?: string;
+    deferDelivery?: boolean;
+    acceptPartial?: boolean;
+    expectedFulfilledLines?: number;
+    items: Array<{ catalogProductId: string; quantity: number }>;
+  }) =>
+    request<{
+      changed: boolean;
+      requestedLines: number;
+      locationMode: "exact" | "discovery";
+      match: SmartBasketMatchDto | null;
+      quote: {
+        merchant: { id: string; name: string; distanceKm: number | null };
+        lines: Array<{
+          productId: string;
+          productName: string;
+          quantity: number;
+          unitPriceCents: number;
+          lineTotalCents: number;
+          merchantId: string;
+        }>;
+        subtotalCents: number;
+        deliveryFeeCents: number;
+        serviceFeeCents: number;
+        totalCents: number;
+        currency: string;
+        deliveryQuoteStatus: "final" | "deferred";
+      } | null;
+      cartLines: Array<{
+        productId: string;
+        catalogProductId: string;
+        name: string;
+        sizeLabel: string | null;
+        quantity: number;
+        unitPriceCents: number;
+        merchantId: string;
+        merchantName: string;
+      }>;
+    }>("/commerce/basket/select", { method: "POST", body: JSON.stringify(payload) })
+};
+
+export type SmartBasketMatchDto = {
+  merchantId: string;
+  merchantName: string;
+  requestedLineCount: number;
+  fulfilledLineCount: number;
+  missingLineCount: number;
+  coverageRatio: number;
+  itemSubtotalCents: number;
+  distanceKm: number | null;
+  complete: boolean;
+  available: Array<{
+    catalogProductId: string;
+    productId: string;
+    name: string;
+    sizeLabel: string | null;
+    quantity: number;
+    unitPriceCents: number;
+  }>;
+  missing: Array<{
+    catalogProductId: string;
+    name: string;
+    sizeLabel: string | null;
+    quantity: number;
+    reason: string;
+  }>;
 };
 
 export type CommerceBrowseGeo = { areaId: string } | { lat: number; lng: number };

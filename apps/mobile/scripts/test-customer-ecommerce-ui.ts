@@ -71,7 +71,8 @@ for (const m of [
   "commerceShop",
   "commerceCartQuote",
   "commerceCheckout",
-  "commerceOrders"
+  "commerceOrders",
+  "commerceBasketMatch"
 ]) {
   assert.ok(api.includes(m), `api missing ${m}`);
 }

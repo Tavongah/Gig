@@ -38,8 +38,9 @@ export function ProductRail({
   products,
   loading,
   onPress,
-  onAdd
-}: Omit<Props, "pricePrefix">) {
+  onAdd,
+  pricePrefix
+}: Props) {
   const skeletons = [0, 1, 2, 3];
   return (
     <View className="flex-row" style={{ gap: STOREFRONT_GAP }}>
@@ -50,6 +51,7 @@ export function ProductRail({
               key={p.catalogProductId ?? p.productId ?? p.name}
               product={p}
               variant="rail"
+              pricePrefix={pricePrefix?.(p)}
               onPress={() => onPress(p)}
               onAdd={onAdd ? () => onAdd(p) : undefined}
             />

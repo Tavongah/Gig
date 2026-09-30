@@ -11,7 +11,7 @@ import { api } from "../../lib/api";
 import { addStorefrontProduct } from "../../lib/storefront-cart";
 import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
-import { moreOnDutsCategories, shopByCategories } from "../../lib/storefront-categories";
+import { moreOnDutsCategories, shopByCategories, isSmartBasketEnabled } from "../../lib/storefront-categories";
 import { openStorefrontCategory } from "../../lib/storefront-nav";
 import { StorefrontCategoryCard } from "../../components/StorefrontCategoryCard";
 import type { RootStackParamList } from "../../navigation/types";
@@ -111,6 +111,10 @@ export function ShopHomeScreen() {
     addStorefrontProduct({ product: p, geo: browse.geo, token: browse.token, isGuest: browse.isGuest });
   }
 
+  function fromPrefix(p: ProductCardData) {
+    return isSmartBasketEnabled() || (p.merchantOfferCount ?? 0) > 1 ? "From " : "";
+  }
+
   const products = productsQuery.data?.pages.flatMap((page) => page.products) ?? [];
 
   return (
@@ -161,6 +165,7 @@ export function ShopHomeScreen() {
                         loading={sectionQueries[i]?.isLoading}
                         onPress={openProduct}
                         onAdd={addProduct}
+                        pricePrefix={fromPrefix}
                       />
                     </ScrollView>
                   </View>
@@ -207,7 +212,7 @@ export function ShopHomeScreen() {
                 loading={productsQuery.isLoading}
                 onPress={openProduct}
                 onAdd={addProduct}
-                pricePrefix={(p) => ((p.merchantOfferCount ?? 0) > 1 ? "From " : "")}
+                pricePrefix={fromPrefix}
               />
             )}
             {productsQuery.hasNextPage ? (

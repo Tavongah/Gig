@@ -46,6 +46,7 @@ export type RootStackParamList = {
   ShopDetail: { merchantId: string };
   ShopLocation: undefined;
   GuestCheckoutChoice: undefined;
+  BasketMatch: undefined;
   CommerceCheckout: undefined;
   CommerceOrderDetail: { orderId: string };
   ForgotPassword: undefined;

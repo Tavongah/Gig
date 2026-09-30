@@ -10,7 +10,7 @@ import { api } from "../../lib/api";
 import { addStorefrontProduct } from "../../lib/storefront-cart";
 import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
-import { comingSoonFromQuery, destinationFor } from "../../lib/storefront-categories";
+import { comingSoonFromQuery, destinationFor, isSmartBasketEnabled } from "../../lib/storefront-categories";
 import { openStorefrontCategory } from "../../lib/storefront-nav";
 import type { RootStackParamList } from "../../navigation/types";
 
@@ -110,7 +110,7 @@ export function ProductSearchScreen({ route, navigation }: Props) {
                     isGuest: browse.isGuest
                   })
                 }
-                pricePrefix={(p) => ((p.merchantOfferCount ?? 0) > 1 ? "From " : "")}
+                pricePrefix={(p) => (isSmartBasketEnabled() || (p.merchantOfferCount ?? 0) > 1 ? "From " : "")}
               />
             </View>
           )}

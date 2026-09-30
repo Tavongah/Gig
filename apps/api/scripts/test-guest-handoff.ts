@@ -30,6 +30,8 @@ function pass(name: string) {
   assert.ok(routes.includes('customerCommerceRouter.get("/shops/:id"'), "shop page public");
   assert.ok(routes.includes('customerCommerceRouter.post("/cart/quote"'), "quote public");
   assert.ok(routes.includes('customerCommerceRouter.post("/guest/handoff"'), "guest handoff public");
+  assert.ok(routes.includes('"/basket/match"'), "smart basket match public");
+  assert.ok(routes.includes('"/basket/select"'), "smart basket select public");
   assert.ok(routes.includes('"/cart/checkout"') && routes.includes("requireCustomer"), "checkout remains protected");
   assert.ok(routes.includes('"/orders"') && routes.includes("requireCustomer"), "orders remain protected");
   assert.ok(routes.includes("quote-text") && routes.includes("requireCustomer"), "quote-text remains protected");

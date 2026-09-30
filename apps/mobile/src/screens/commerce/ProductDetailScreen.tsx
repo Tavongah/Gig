@@ -8,16 +8,19 @@ import { logDutsFlow } from "../../lib/flow-log";
 import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import { productCardMeta } from "../../lib/storefront-ui";
-import { alcoholPurchaseAllowed } from "../../lib/storefront-categories";
+import { alcoholPurchaseAllowed, isSmartBasketEnabled } from "../../lib/storefront-categories";
 import { StoreHeader, StorePage } from "../../components/StoreHeader";
 import type { RootStackParamList } from "../../navigation/types";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
+import { useDesiredBasketStore } from "../../stores/desired-basket.store";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProductDetail">;
 
 export function ProductDetailScreen({ route, navigation }: Props) {
   const browse = useShopBrowse();
   const addOffer = useCommerceCartStore((s) => s.addOffer);
+  const addToShoppingListStore = useDesiredBasketStore((s) => s.addItem);
+  const smartBasket = isSmartBasketEnabled();
   const [imgFailed, setImgFailed] = useState(false);
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
@@ -48,6 +51,18 @@ export function ProductDetailScreen({ route, navigation }: Props) {
   const fromPriceCents = detailQuery.data?.fromPriceCents ?? null;
   const showImage = Boolean(product?.imageUrl) && !imgFailed;
   const meta = product ? productCardMeta(product.name, product.brand, product.sizeLabel) : "";
+
+  function addToShoppingList() {
+    if (!product?.catalogProductId || !purchasable) return;
+    if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
+    addToShoppingListStore({
+      catalogProductId: product.catalogProductId,
+      name: product.name,
+      imageUrl: product.imageUrl,
+      sizeLabel: product.sizeLabel,
+      fromPriceCents
+    });
+  }
 
   function addFromOffer(offer: (typeof offers)[number]) {
     if (!product) return;
@@ -103,13 +118,30 @@ export function ProductDetailScreen({ route, navigation }: Props) {
       {product.category ? <Text className="text-sm text-muted">{product.category}</Text> : null}
       {purchasable && fromPriceCents != null ? (
         <Text className="mt-2 text-2xl font-black text-ink">
-          {offers.length > 1 ? "From " : ""}${(fromPriceCents / 100).toFixed(2)}
+          {smartBasket || offers.length > 1 ? "From " : ""}${(fromPriceCents / 100).toFixed(2)}
         </Text>
       ) : (
         <Text className="mt-2 text-sm font-medium text-muted">Coming soon</Text>
       )}
+      {purchasable && smartBasket ? (
+        <Text className="text-sm font-semibold text-muted">Available nearby</Text>
+      ) : null}
       {product.description ? (
         <Text className="mt-3 text-base leading-6 text-label">{product.description}</Text>
+      ) : null}
+
+      {purchasable && smartBasket && product.catalogProductId ? (
+        <View className="mt-4">
+          <Pressable
+            onPress={addToShoppingList}
+            accessibilityRole="button"
+            accessibilityLabel={`Add ${product.name} to shopping list`}
+            className="h-12 items-center justify-center rounded-full px-4"
+            style={{ backgroundColor: DUTS.purple }}
+          >
+            <Text className="font-extrabold text-white">ADD</Text>
+          </Pressable>
+        </View>
       ) : null}
 
       {purchasable ? (

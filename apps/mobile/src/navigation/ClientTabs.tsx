@@ -9,6 +9,8 @@ import { ProfileScreen } from "../screens/shared/ProfileScreen";
 import type { ClientTabParamList } from "./types";
 import { DUTS } from "../lib/theme";
 import { useCommerceCartStore } from "../stores/commerce-cart.store";
+import { useDesiredBasketStore } from "../stores/desired-basket.store";
+import { isSmartBasketEnabled } from "../lib/storefront-categories";
 import { useStorefrontLayout } from "../lib/storefront-ui";
 
 const Tab = createBottomTabNavigator<ClientTabParamList>();
@@ -72,9 +74,11 @@ function TabIcon({
 export function ClientTabs() {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 8);
-  const cartCount = useCommerceCartStore((s) =>
+  const merchantCount = useCommerceCartStore((s) =>
     s.lines.reduce((n, l) => n + l.quantity, 0)
   );
+  const listCount = useDesiredBasketStore((s) => s.lines.reduce((n, l) => n + l.quantity, 0));
+  const cartCount = merchantCount + (isSmartBasketEnabled() ? listCount : 0);
   const { isDesktopNav } = useStorefrontLayout();
 
   return (

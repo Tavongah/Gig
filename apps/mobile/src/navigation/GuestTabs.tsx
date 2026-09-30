@@ -9,6 +9,8 @@ import { AuthNavigator } from "./AuthNavigator";
 import type { GuestTabParamList } from "./types";
 import { DUTS } from "../lib/theme";
 import { useCommerceCartStore } from "../stores/commerce-cart.store";
+import { useDesiredBasketStore } from "../stores/desired-basket.store";
+import { isSmartBasketEnabled } from "../lib/storefront-categories";
 
 const Tab = createBottomTabNavigator<GuestTabParamList>();
 
@@ -70,7 +72,9 @@ function TabIcon({
 export function GuestTabs() {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 8);
-  const cartCount = useCommerceCartStore((s) => s.lines.reduce((n, l) => n + l.quantity, 0));
+  const merchantCount = useCommerceCartStore((s) => s.lines.reduce((n, l) => n + l.quantity, 0));
+  const listCount = useDesiredBasketStore((s) => s.lines.reduce((n, l) => n + l.quantity, 0));
+  const cartCount = merchantCount + (isSmartBasketEnabled() ? listCount : 0);
   const { isDesktopNav } = useStorefrontLayout();
 
   return (

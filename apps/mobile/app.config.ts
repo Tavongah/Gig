@@ -111,6 +111,9 @@ export default {
       alcoholCommerceEnabled: ["true", "1"].includes(
         (process.env.EXPO_PUBLIC_ALCOHOL_COMMERCE_ENABLED ?? "").trim().toLowerCase()
       ),
+      smartBasketEnabled: !["false", "0", "no", "off"].includes(
+        (process.env.EXPO_PUBLIC_SMART_BASKET_ENABLED ?? "true").trim().toLowerCase()
+      ),
       eas: {
         projectId: process.env.EAS_PROJECT_ID || "7b30aedd-9b50-43d0-af22-3fee6842c372"
       }

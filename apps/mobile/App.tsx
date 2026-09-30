@@ -30,6 +30,7 @@ import { EmailVerificationScreen } from "./src/screens/auth/EmailVerificationScr
 import { CompleteProfileScreen } from "./src/screens/auth/CompleteProfileScreen";
 import { appLinkingPrefixes } from "./src/lib/linking";
 import { claimCartAfterLogin, hydrateCommerceCart } from "./src/stores/commerce-cart.store";
+import { hydrateDesiredBasket } from "./src/stores/desired-basket.store";
 
 const resetPasswordLink = {
   path: "reset-password",
@@ -69,6 +70,7 @@ const guestLinking = {
       ProductDetail: "product",
       ShopDetail: "shop/:merchantId",
       GuestCheckoutChoice: "order",
+      BasketMatch: "find-shop",
       ForgotPassword: "forgot-password",
       ResetPassword: resetPasswordLink
     }
@@ -96,6 +98,7 @@ const appLinking = {
       ShopDetail: "shop/:merchantId",
       ShopLocation: "deliver-to",
       GuestCheckoutChoice: "order",
+      BasketMatch: "find-shop",
       ForgotPassword: "forgot-password",
       ResetPassword: resetPasswordLink,
       PaymentSuccess: {
@@ -147,6 +150,7 @@ function Shell() {
   useEffect(() => {
     void (async () => {
       await hydrateCommerceCart();
+      await hydrateDesiredBasket();
       await bootstrap();
     })();
   }, [bootstrap]);

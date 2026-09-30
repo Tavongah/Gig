@@ -44,6 +44,7 @@ import { ShopDetailScreen } from "../screens/commerce/ShopDetailScreen";
 import { ShopLocationScreen } from "../screens/commerce/ShopLocationScreen";
 import { CommerceCheckoutScreen } from "../screens/commerce/CommerceCheckoutScreen";
 import { GuestCheckoutChoiceScreen } from "../screens/commerce/GuestCheckoutChoiceScreen";
+import { BasketMatchScreen } from "../screens/commerce/BasketMatchScreen";
 import { CommerceOrderDetailScreen } from "../screens/commerce/CommerceOrderDetailScreen";
 import type { RootStackParamList } from "./types";
 import { useSessionStore } from "../stores/session.store";
@@ -118,6 +119,7 @@ export function AppNavigator() {
         component={GuestCheckoutChoiceScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="BasketMatch" component={BasketMatchScreen} options={{ headerShown: false }} />
       <Stack.Screen name="CommerceCheckout" component={CommerceCheckoutScreen} options={{ title: "Checkout" }} />
       <Stack.Screen
         name="CommerceOrderDetail"

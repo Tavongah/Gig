@@ -16,6 +16,7 @@
     "test:storefront-catalog-ui": "npx tsx scripts/test-storefront-catalog-ui.ts",
     "test:storefront-visual": "npx tsx scripts/test-storefront-visual.ts",
     "test:storefront-categories": "npx tsx scripts/test-storefront-categories.ts",
+    "test:smart-basket-ui": "npx tsx scripts/test-smart-basket-ui.ts",
     "test:courier-start-trip-ui": "npx tsx scripts/test-courier-start-trip-ui.ts",
     "test:courier-logout-ui": "npx tsx scripts/test-courier-logout-ui.ts",
     "test:delivery-ux-simplification": "npx tsx scripts/test-delivery-ux-simplification.ts",
