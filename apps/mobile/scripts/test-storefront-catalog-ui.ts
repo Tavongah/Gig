@@ -41,6 +41,8 @@ assert.ok(home.includes("Available now"), "purchasable-first heading");
 assert.ok(home.includes("More products"), "catalog-only heading");
 assert.ok(home.includes("Coming to DUTS"), "coming soon last");
 assert.ok(home.indexOf("Available now") < home.indexOf("Coming to DUTS"), "coming soon below purchasable");
+assert.ok(home.indexOf("Available now") < home.lastIndexOf("ProductRail"), "purchasable grid before category rails");
+assert.ok(home.indexOf("Available now") < home.indexOf("More products"), "purchasable heading before catalog-only");
 assert.ok(home.includes("isProductCardPurchasable"), "splits using purchasable field not copy");
 assert.ok(home.includes("Shop by category"), "category quick links");
 assert.ok(home.includes("See all"), "category sections");

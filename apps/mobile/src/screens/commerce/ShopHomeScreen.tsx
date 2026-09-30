@@ -141,6 +141,23 @@ export function ShopHomeScreen() {
             </View>
           ) : null}
 
+          <View className="mt-6">
+            <Text className="mb-3 text-lg font-extrabold text-ink">Available now</Text>
+            {availableNow.length === 0 && !productsQuery.isLoading && moreCatalog.length === 0 ? (
+              <Text className="text-sm text-muted">No products found. Try another search.</Text>
+            ) : availableNow.length === 0 && !productsQuery.isLoading ? (
+              <Text className="text-sm text-muted">No products with a price nearby yet.</Text>
+            ) : (
+              <ProductGrid
+                products={availableNow}
+                loading={productsQuery.isLoading && availableNow.length === 0}
+                onPress={openProduct}
+                onAdd={addProduct}
+                pricePrefix={fromPrefix}
+              />
+            )}
+          </View>
+
           {sectionCategories.length > 0 ? (
             <View className="mt-6">
               {sectionCategories.map((cat, i) => {
@@ -175,23 +192,6 @@ export function ShopHomeScreen() {
               })}
             </View>
           ) : null}
-
-          <View className="mt-6">
-            <Text className="mb-3 text-lg font-extrabold text-ink">Available now</Text>
-            {availableNow.length === 0 && !productsQuery.isLoading && moreCatalog.length === 0 ? (
-              <Text className="text-sm text-muted">No products found. Try another search.</Text>
-            ) : availableNow.length === 0 && !productsQuery.isLoading ? (
-              <Text className="text-sm text-muted">No products with a price nearby yet.</Text>
-            ) : (
-              <ProductGrid
-                products={availableNow}
-                loading={productsQuery.isLoading && availableNow.length === 0}
-                onPress={openProduct}
-                onAdd={addProduct}
-                pricePrefix={fromPrefix}
-              />
-            )}
-          </View>
 
           {moreCatalog.length > 0 ? (
             <View className="mt-6">
