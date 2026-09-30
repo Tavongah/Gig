@@ -66,7 +66,7 @@ assert.equal(matchComingSoonFromSearch("shoes")?.label, "Shoes");
 assert.equal(matchComingSoonFromSearch("mazoe"), undefined);
 
 const home = read("screens/commerce/ShopHomeScreen.tsx");
-assert.ok(home.includes("More on DUTS"));
+assert.ok(home.includes("Coming to DUTS"));
 assert.ok(home.includes("Shop by category"));
 assert.ok(!home.includes("waitlist"));
 assert.ok(!home.includes("Best sellers"));
@@ -81,7 +81,7 @@ assert.ok(!coming.includes("0 products"));
 
 const all = read("screens/commerce/AllCategoriesScreen.tsx");
 assert.ok(all.includes("All categories"));
-assert.ok(all.includes("More on DUTS"));
+assert.ok(all.includes("Coming to DUTS"));
 
 const header = read("components/StoreHeader.tsx");
 assert.ok(header.includes("All categories"));

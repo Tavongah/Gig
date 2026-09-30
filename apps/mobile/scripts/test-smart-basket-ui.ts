@@ -56,7 +56,7 @@ assert.ok(!match.includes("deliveryFee"), "no fake delivery fee on match screen"
 const detail = read("screens/commerce/ProductDetailScreen.tsx");
 assert.ok(detail.includes("ADD TO CART"), "merchant-specific add remains");
 assert.ok(detail.includes("Available nearby"), "product-first nearby copy");
-assert.ok(detail.includes("Coming soon"), "coming soon preserved");
+assert.ok(detail.includes("Price coming soon"), "coming soon preserved");
 
 const api = read("lib/api.ts");
 assert.ok(api.includes("/commerce/basket/match"), "match API");

@@ -56,7 +56,7 @@ assert.ok(cart.includes("productId"), "uses Product offer ids");
 
 const home = read("screens/commerce/ShopHomeScreen.tsx");
 assert.ok(read("components/StoreHeader.tsx").includes("Deliver to"), "location first");
-assert.ok(home.includes("Explore products") || home.includes("Shop DUTS") || home.includes("Products near you"), "product section heading");
+assert.ok(home.includes("Available now") || home.includes("Explore products") || home.includes("Shop DUTS") || home.includes("Products near you"), "product section heading");
 assert.ok(home.includes("Nearby shops"), "nearby shops");
 assert.ok(!/\bGig\b/.test(home.replace(/PostGig|MyGigsActivity/g, "")), "no Gig terminology on home");
 

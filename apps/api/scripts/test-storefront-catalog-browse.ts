@@ -20,6 +20,7 @@ import {
   paginateStorefront,
   presentStorefrontCard,
   scoreStorefrontSearch,
+  storefrontAccIsPurchasable,
   type StorefrontAcc
 } from "../src/modules/commerce/storefront-catalog.js";
 
@@ -138,12 +139,113 @@ const sorted = [sibling, catalogOnly].sort(compareStorefrontRows);
 assert.equal(sorted[0]!.imageUrl != null, true);
 
 {
+  const buyA: typeof catalogOnly = {
+    ...catalogOnly,
+    catalogProductId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+    name: "Milk",
+    productId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2",
+    fromPriceCents: 150,
+    merchantOfferCount: 1,
+    purchasable: true,
+    score: 1,
+    imageUrl: null
+  };
+  const soonB: typeof catalogOnly = {
+    ...catalogOnly,
+    catalogProductId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1",
+    name: "AAA Catalog",
+    productId: null,
+    fromPriceCents: null,
+    merchantOfferCount: 0,
+    purchasable: false,
+    score: 1,
+    imageUrl: "https://cdn.example/soon.jpg"
+  };
+  const buyC: typeof catalogOnly = {
+    ...buyA,
+    catalogProductId: "cccccccc-cccc-cccc-cccc-ccccccccccc1",
+    name: "Bread",
+    productId: "cccccccc-cccc-cccc-cccc-ccccccccccc2",
+    fromPriceCents: 200
+  };
+  const soonD: typeof catalogOnly = {
+    ...soonB,
+    catalogProductId: "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+    name: "BBB Catalog",
+    imageUrl: null
+  };
+  const merch = [soonB, buyC, soonD, buyA].sort(compareStorefrontRows);
+  assert.equal(merch[0]!.purchasable && merch[1]!.purchasable, true);
+  assert.equal(merch[2]!.purchasable || merch[3]!.purchasable, false);
+  assert.ok(merch[0]!.name === "Bread" || merch[0]!.name === "Milk");
+  assert.ok(merch[1]!.name === "Bread" || merch[1]!.name === "Milk");
+  assert.notEqual(merch[0]!.name, merch[1]!.name);
+
+  const acrossPage = paginateStorefront([soonB, soonD, buyA], 1, 0);
+  assert.equal(acrossPage.products[0]!.purchasable, true);
+  assert.equal(acrossPage.products[0]!.fromPriceCents, 150);
+  assert.equal(acrossPage.hasMore, true);
+  const page2 = paginateStorefront([soonB, soonD, buyA], 1, 1);
+  assert.equal(page2.products[0]!.purchasable, false);
+
+  const mazoeBuy = {
+    ...buyA,
+    name: "Mazoe Orange 2L",
+    score: 40
+  };
+  const mazoeSoon = {
+    ...soonB,
+    name: "Mazoe Raspberry 2L",
+    score: 40
+  };
+  const mazoeBuy2 = {
+    ...buyC,
+    name: "Mazoe Mango 2L",
+    score: 40
+  };
+  const mazoeSearch = [mazoeSoon, mazoeBuy2, mazoeBuy].sort(compareStorefrontRows);
+  assert.equal(mazoeSearch[0]!.purchasable, true);
+  assert.equal(mazoeSearch[1]!.purchasable, true);
+  assert.equal(mazoeSearch[2]!.purchasable, false);
+  assert.equal(mazoeSearch[2]!.name, "Mazoe Raspberry 2L");
+
+  const exactSoon = { ...mazoeSoon, score: 100, name: "Mazoe Raspberry 2L" };
+  const includesBuy = { ...mazoeBuy, score: 40, name: "Mazoe Orange 2L" };
+  const exactKeepsRelevance = [includesBuy, exactSoon].sort(compareStorefrontRows);
+  assert.equal(exactKeepsRelevance[0]!.name, "Mazoe Raspberry 2L");
+
+  const alcoholBuy = {
+    ...buyA,
+    category: "Alcohol",
+    name: "Beer",
+    fromPriceCents: 400
+  };
+  const drinksSoon = { ...soonB, name: "Juice", category: "Drinks" };
+  const alcoholLast = [alcoholBuy, drinksSoon].sort(compareStorefrontRows);
+  assert.equal(storefrontAccIsPurchasable(alcoholBuy), false);
+  assert.equal(alcoholLast[0]!.name, "Juice");
+}
+
+{
+  const catalogSort = readFileSync(resolve(here, "../src/modules/commerce/storefront-catalog.ts"), "utf8");
+  assert.ok(catalogSort.includes("storefrontAccIsPurchasable"), "purchasable helper");
+  assert.ok(catalogSort.indexOf("sort(compareStorefrontRows)") < catalogSort.indexOf("slice(offset"), "sort before pagination slice");
+  const smart = readFileSync(resolve(here, "../src/modules/commerce/smart-basket.service.ts"), "utf8");
+  assert.ok(smart.includes("rankSmartBasketMatches"), "smart basket ranking unchanged");
+}
+
+{
   const routes = readFileSync(resolve(here, "../src/modules/commerce/customer-commerce.routes.ts"), "utf8");
   assert.ok(routes.includes("optionalGeoQuery"), "catalog browse geo is optional");
   assert.ok(routes.includes("offset"), "pagination offset accepted");
   assert.ok(routes.includes('customerCommerceRouter.post("/cart/quote"'), "quote unchanged");
   assert.ok(routes.includes("productId: z.string().uuid()"), "cart still requires Product UUID");
-  assert.ok(!routes.includes("catalogProductId: z.string().uuid()"), "cart must not accept CatalogProduct IDs");
+  const quoteBlock = routes.slice(
+    routes.indexOf("const quoteSchema"),
+    routes.indexOf('customerCommerceRouter.post("/cart/quote"')
+  );
+  assert.ok(quoteBlock.includes("productId: z.string().uuid()"), "quote lines are Product IDs");
+  assert.ok(!quoteBlock.includes("catalogProductId"), "cart quote must not accept CatalogProduct IDs");
 }
 
 {

@@ -6,7 +6,7 @@ import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { ProductGrid, ProductRail } from "../../components/ProductGrid";
 import { StoreHeader, StorePage } from "../../components/StoreHeader";
-import { type ProductCardData } from "../../components/ProductCard";
+import { isProductCardPurchasable, type ProductCardData } from "../../components/ProductCard";
 import { api } from "../../lib/api";
 import { addStorefrontProduct } from "../../lib/storefront-cart";
 import { useShopBrowse } from "../../lib/shop-browse";
@@ -116,6 +116,8 @@ export function ShopHomeScreen() {
   }
 
   const products = productsQuery.data?.pages.flatMap((page) => page.products) ?? [];
+  const availableNow = products.filter(isProductCardPurchasable);
+  const moreCatalog = products.filter((p) => !isProductCardPurchasable(p));
 
   return (
     <View className="flex-1 bg-background">
@@ -174,60 +176,47 @@ export function ShopHomeScreen() {
             </View>
           ) : null}
 
-          {moreOnDuts.length > 0 ? (
-            <View className="mt-2">
-              <View className="mb-3 flex-row items-center justify-between">
-                <Text className="text-lg font-extrabold text-ink">More on DUTS</Text>
-                <Pressable
-                  onPress={() => navigation.navigate("AllCategories")}
-                  accessibilityRole="button"
-                  accessibilityLabel="All categories"
-                >
-                  <Text className="text-sm font-bold" style={{ color: DUTS.purple }}>
-                    All categories
-                  </Text>
-                </Pressable>
-              </View>
-              <View className="flex-row flex-wrap" style={{ gap: 10 }}>
-                {moreOnDuts.map((cat) => (
-                  <View key={cat.slug} style={{ width: "22%", minWidth: 72, flexGrow: 1, maxWidth: 140 }}>
-                    <StorefrontCategoryCard
-                      category={cat}
-                      compact
-                      onPress={() => openStorefrontCategory(navigation, cat, catalogNames)}
-                    />
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : null}
-
           <View className="mt-6">
-            <Text className="mb-3 text-lg font-extrabold text-ink">Explore products</Text>
-            {products.length === 0 && !productsQuery.isLoading ? (
+            <Text className="mb-3 text-lg font-extrabold text-ink">Available now</Text>
+            {availableNow.length === 0 && !productsQuery.isLoading && moreCatalog.length === 0 ? (
               <Text className="text-sm text-muted">No products found. Try another search.</Text>
+            ) : availableNow.length === 0 && !productsQuery.isLoading ? (
+              <Text className="text-sm text-muted">No products with a price nearby yet.</Text>
             ) : (
               <ProductGrid
-                products={products}
-                loading={productsQuery.isLoading}
+                products={availableNow}
+                loading={productsQuery.isLoading && availableNow.length === 0}
                 onPress={openProduct}
                 onAdd={addProduct}
                 pricePrefix={fromPrefix}
               />
             )}
-            {productsQuery.hasNextPage ? (
-              <Pressable
-                onPress={() => void productsQuery.fetchNextPage()}
-                accessibilityRole="button"
-                accessibilityLabel="Show more products"
-                className="mt-5 self-center rounded-full border border-border bg-card px-5 py-3"
-              >
-                <Text className="text-center text-sm font-extrabold text-ink">
-                  {productsQuery.isFetchingNextPage ? "Loading…" : "SHOW MORE PRODUCTS"}
-                </Text>
-              </Pressable>
-            ) : null}
           </View>
+
+          {moreCatalog.length > 0 ? (
+            <View className="mt-6">
+              <Text className="mb-3 text-lg font-extrabold text-ink">More products</Text>
+              <ProductGrid
+                products={moreCatalog}
+                onPress={openProduct}
+                onAdd={addProduct}
+                pricePrefix={fromPrefix}
+              />
+            </View>
+          ) : null}
+
+          {productsQuery.hasNextPage ? (
+            <Pressable
+              onPress={() => void productsQuery.fetchNextPage()}
+              accessibilityRole="button"
+              accessibilityLabel="Show more products"
+              className="mt-5 self-center rounded-full border border-border bg-card px-5 py-3"
+            >
+              <Text className="text-center text-sm font-extrabold text-ink">
+                {productsQuery.isFetchingNextPage ? "Loading…" : "SHOW MORE PRODUCTS"}
+              </Text>
+            </Pressable>
+          ) : null}
 
           <View className="mt-8">
             <Text className="mb-3 text-lg font-extrabold text-ink">Nearby shops</Text>
@@ -252,6 +241,34 @@ export function ShopHomeScreen() {
               ))
             )}
           </View>
+
+          {moreOnDuts.length > 0 ? (
+            <View className="mt-8">
+              <View className="mb-3 flex-row items-center justify-between">
+                <Text className="text-lg font-extrabold text-ink">Coming to DUTS</Text>
+                <Pressable
+                  onPress={() => navigation.navigate("AllCategories")}
+                  accessibilityRole="button"
+                  accessibilityLabel="All categories"
+                >
+                  <Text className="text-sm font-bold" style={{ color: DUTS.purple }}>
+                    All categories
+                  </Text>
+                </Pressable>
+              </View>
+              <View className="flex-row flex-wrap" style={{ gap: 10 }}>
+                {moreOnDuts.map((cat) => (
+                  <View key={cat.slug} style={{ width: "22%", minWidth: 72, flexGrow: 1, maxWidth: 140 }}>
+                    <StorefrontCategoryCard
+                      category={cat}
+                      compact
+                      onPress={() => openStorefrontCategory(navigation, cat, catalogNames)}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
 
           {!browse.isGuest ? (
             <View className="mt-8 gap-2 border-t border-border pt-6">

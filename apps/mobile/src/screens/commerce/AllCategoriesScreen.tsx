@@ -51,7 +51,7 @@ export function AllCategoriesScreen() {
 
           {soon.length > 0 ? (
             <>
-              <Text className="mb-3 mt-8 text-lg font-extrabold text-ink">More on DUTS</Text>
+              <Text className="mb-3 mt-8 text-lg font-extrabold text-ink">Coming to DUTS</Text>
               <View className="flex-row flex-wrap" style={{ gap: 10 }}>
                 {soon.map((cat) => (
                   <View key={cat.slug} style={{ width: "30%", minWidth: 96, flexGrow: 1, maxWidth: 160 }}>

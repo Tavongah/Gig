@@ -19,7 +19,7 @@ assert.ok(ui.includes("STOREFRONT_MAX_WIDTH"), "desktop max width");
 assert.ok(ui.includes("categoryIcon"), "category icons");
 
 const card = read("components/ProductCard.tsx");
-assert.ok(card.includes("Coming soon"), "subdued unavailable copy");
+assert.ok(card.includes("Price coming soon"), "subdued unavailable copy");
 assert.ok(!/\bVIEW\b/.test(card), "VIEW CTA removed");
 assert.ok(card.includes("h-8 w-8"), "compact add");
 assert.ok(card.includes("onError"), "image failure placeholder");
@@ -34,7 +34,7 @@ assert.ok(header.includes("cartCount"));
 const home = read("screens/commerce/ShopHomeScreen.tsx");
 assert.ok(home.includes("ProductRail"), "category carousels");
 assert.ok(home.includes("Shop by category"));
-assert.ok(home.includes("More on DUTS"));
+assert.ok(home.includes("Coming to DUTS"));
 assert.ok(!home.includes("Best sellers"));
 assert.ok(!home.includes("Trending"));
 assert.ok(!home.includes("Recommended for you"));

@@ -72,20 +72,6 @@ export function ProductSearchScreen({ route, navigation }: Props) {
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
         <StorePage>
           <Text className="mt-4 text-xl font-black text-ink">{title}</Text>
-          {soonMatch ? (
-            <Pressable
-              onPress={() => openStorefrontCategory(navigation, soonMatch, catalogNames)}
-              accessibilityRole="button"
-              accessibilityLabel={`${soonMatch.label}, Coming soon`}
-              className="mt-4 flex-row items-center rounded-2xl border border-border bg-card px-4 py-3"
-            >
-              <Ionicons name="time-outline" size={18} color={DUTS.purple} />
-              <View className="ml-3 flex-1">
-                <Text className="text-base font-bold text-ink">{soonMatch.label}</Text>
-                <Text className="text-sm text-muted">Coming soon</Text>
-              </View>
-            </Pressable>
-          ) : null}
           {typeof total === "number" && !query.isLoading ? (
             <Text className="mt-1 text-sm text-muted">
               {total} {total === 1 ? "product" : "products"}
@@ -124,6 +110,20 @@ export function ProductSearchScreen({ route, navigation }: Props) {
               <Text className="text-center text-sm font-extrabold text-ink">
                 {query.isFetchingNextPage ? "Loading…" : "SHOW MORE PRODUCTS"}
               </Text>
+            </Pressable>
+          ) : null}
+          {soonMatch ? (
+            <Pressable
+              onPress={() => openStorefrontCategory(navigation, soonMatch, catalogNames)}
+              accessibilityRole="button"
+              accessibilityLabel={`${soonMatch.label}, Coming soon`}
+              className="mt-8 flex-row items-center rounded-2xl border border-border bg-card px-4 py-3"
+            >
+              <Ionicons name="time-outline" size={18} color={DUTS.purple} />
+              <View className="ml-3 flex-1">
+                <Text className="text-base font-bold text-ink">{soonMatch.label}</Text>
+                <Text className="text-sm text-muted">Coming soon</Text>
+              </View>
             </Pressable>
           ) : null}
         </StorePage>

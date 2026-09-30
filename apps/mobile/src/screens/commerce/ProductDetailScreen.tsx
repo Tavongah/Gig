@@ -121,7 +121,7 @@ export function ProductDetailScreen({ route, navigation }: Props) {
           {smartBasket || offers.length > 1 ? "From " : ""}${(fromPriceCents / 100).toFixed(2)}
         </Text>
       ) : (
-        <Text className="mt-2 text-sm font-medium text-muted">Coming soon</Text>
+        <Text className="mt-2 text-sm font-medium text-muted">Price coming soon</Text>
       )}
       {purchasable && smartBasket ? (
         <Text className="text-sm font-semibold text-muted">Available nearby</Text>

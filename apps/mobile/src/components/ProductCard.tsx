@@ -48,7 +48,7 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
   const purchasable = isProductCardPurchasable(product);
   const offerCount = product.merchantOfferCount ?? product.offerCount ?? 0;
   const showFrom = purchasable ? pricePrefix ?? (offerCount > 1 ? "From " : "") : "";
-  const price = purchasable ? `${showFrom}$${(product.fromPriceCents! / 100).toFixed(2)}` : "Coming soon";
+  const price = purchasable ? `${showFrom}$${(product.fromPriceCents! / 100).toFixed(2)}` : "Price coming soon";
   const showImage = Boolean(product.imageUrl) && !imgFailed;
   const meta = productCardMeta(product.name, product.brand, product.sizeLabel);
   const rail = variant === "rail";

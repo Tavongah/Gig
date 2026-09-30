@@ -16,9 +16,8 @@ function read(rel: string) {
 }
 
 const card = read("components/ProductCard.tsx");
-assert.ok(card.includes("Coming soon"), "catalog-only price copy");
+assert.ok(card.includes("Price coming soon"), "catalog-only price copy");
 assert.ok(!card.includes("VIEW"), "non-purchasable VIEW removed");
-assert.ok(!card.includes("Price coming soon"), "do not shout Price coming soon on cards");
 assert.ok(card.includes("isProductCardPurchasable"), "purchasable gate");
 assert.ok(card.includes('resizeMode="contain"'), "object-fit contain");
 assert.ok(card.includes('loading: "lazy"'), "lazy images");
@@ -38,7 +37,11 @@ assert.ok(header.includes("Cart"), "desktop cart");
 assert.ok(header.includes("All categories"), "all categories chip");
 
 const home = read("screens/commerce/ShopHomeScreen.tsx");
-assert.ok(home.includes("Explore products"), "neutral heading");
+assert.ok(home.includes("Available now"), "purchasable-first heading");
+assert.ok(home.includes("More products"), "catalog-only heading");
+assert.ok(home.includes("Coming to DUTS"), "coming soon last");
+assert.ok(home.indexOf("Available now") < home.indexOf("Coming to DUTS"), "coming soon below purchasable");
+assert.ok(home.includes("isProductCardPurchasable"), "splits using purchasable field not copy");
 assert.ok(home.includes("Shop by category"), "category quick links");
 assert.ok(home.includes("See all"), "category sections");
 assert.ok(!home.includes("Popular"), "no fake popularity");
@@ -49,13 +52,14 @@ assert.ok(home.includes("Need it? DUTS it."), "DUTS identity");
 
 const search = read("screens/commerce/ProductSearchScreen.tsx");
 assert.ok(search.includes("commerceNearbyProducts"), "search uses catalog API");
+assert.ok(search.indexOf("<ProductGrid") < search.lastIndexOf("Coming soon"), "coming soon below search results");
 assert.ok(search.includes("SHOW MORE PRODUCTS") || search.includes("Show more"), "search pagination");
 assert.ok(search.includes("addStorefrontProduct"), "search add gated");
 assert.ok(search.includes("No products found"), "friendly empty state");
 assert.ok(!search.includes("Set your location to see products available near you."), "search not geo-gated");
 
 const detail = read("screens/commerce/ProductDetailScreen.tsx");
-assert.ok(detail.includes("Coming soon"), "detail catalog-only copy");
+assert.ok(detail.includes("Price coming soon"), "detail catalog-only copy");
 assert.ok(detail.includes("Not available to order yet"), "friendly unavailable copy");
 assert.ok(!detail.includes("No merchant"), "no internal architecture copy");
 assert.ok(!detail.includes("CatalogProduct"), "no CatalogProduct leak");

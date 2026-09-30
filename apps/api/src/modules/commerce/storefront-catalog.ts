@@ -51,6 +51,9 @@ export function matchesStorefrontCategory(category: string | null | undefined, n
   return (category ?? "").trim().toLowerCase().includes(needle);
 }
 
+/** Exact-name search bonus from scoreStorefrontSearch. Strong matches keep relevance. */
+export const STOREFRONT_EXACT_SEARCH_SCORE = 100;
+
 export function scoreStorefrontSearch(input: {
   name: string;
   brand: string | null;
@@ -70,13 +73,39 @@ export function scoreStorefrontSearch(input: {
   let score = 0;
   for (const t of input.terms) {
     if (!t) continue;
-    if (hay === t || normalizeProductSearchName(input.name) === t) score += 100;
+    if (hay === t || normalizeProductSearchName(input.name) === t) score += STOREFRONT_EXACT_SEARCH_SCORE;
     else if (hay.includes(t)) score += 40;
   }
   return score;
 }
 
+export function storefrontAccIsPurchasable(input: StorefrontAcc) {
+  if (
+    !canPurchaseStorefrontCategory(
+      input.category,
+      parseAlcoholCommerceEnabled(process.env.ALCOHOL_COMMERCE_ENABLED)
+    )
+  ) {
+    return false;
+  }
+  return Boolean(
+    input.purchasable && input.productId && input.fromPriceCents != null && input.merchantOfferCount > 0
+  );
+}
+
+/**
+ * Authoritative merchandising order applied BEFORE pagination:
+ * 1. strong exact search matches keep relevance
+ * 2. purchasable (real eligible offer + price) first
+ * 3. existing score / image / name order within each group
+ */
 export function compareStorefrontRows(a: StorefrontAcc, b: StorefrontAcc) {
+  const aExact = a.score >= STOREFRONT_EXACT_SEARCH_SCORE;
+  const bExact = b.score >= STOREFRONT_EXACT_SEARCH_SCORE;
+  if (aExact !== bExact) return bExact ? 1 : -1;
+  const aBuy = storefrontAccIsPurchasable(a) ? 1 : 0;
+  const bBuy = storefrontAccIsPurchasable(b) ? 1 : 0;
+  if (bBuy !== aBuy) return bBuy - aBuy;
   if (b.score !== a.score) return b.score - a.score;
   const aImg = a.imageUrl ? 1 : 0;
   const bImg = b.imageUrl ? 1 : 0;
@@ -85,16 +114,7 @@ export function compareStorefrontRows(a: StorefrontAcc, b: StorefrontAcc) {
 }
 
 export function presentStorefrontCard(input: StorefrontAcc): StorefrontProductCard {
-  const alcoholOk = canPurchaseStorefrontCategory(
-    input.category,
-    parseAlcoholCommerceEnabled(process.env.ALCOHOL_COMMERCE_ENABLED)
-  );
-  const purchasable =
-    alcoholOk &&
-    input.purchasable &&
-    Boolean(input.productId) &&
-    input.fromPriceCents != null &&
-    input.merchantOfferCount > 0;
+  const purchasable = storefrontAccIsPurchasable(input);
   return {
     catalogProductId: input.catalogProductId,
     productId: purchasable ? input.productId : null,
