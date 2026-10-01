@@ -11,6 +11,8 @@ import { EcoCashCommercePaymentProvider } from "./ecocash.provider.js";
 import { MockCommercePaymentProvider } from "./mock.provider.js";
 import { PaynowCommercePaymentProvider } from "./paynow.provider.js";
 import { resolvePaynowMode } from "./paynow.transport.js";
+import { ZbCommercePaymentProvider } from "./zb.provider.js";
+import { assertDutsUsdCurrency } from "./zb.config.js";
 import {
   resolveCommercePaymentProviderName,
   type CommercePaymentProvider,
@@ -24,11 +26,13 @@ export function getCommercePaymentProvider(): CommercePaymentProvider {
   if (sharedProvider) return sharedProvider;
   const name = resolveCommercePaymentProviderName();
   sharedProvider =
-    name === "ecocash"
-      ? new EcoCashCommercePaymentProvider()
-      : name === "paynow"
-        ? new PaynowCommercePaymentProvider()
-        : new MockCommercePaymentProvider();
+    name === "zb"
+      ? new ZbCommercePaymentProvider()
+      : name === "ecocash"
+        ? new EcoCashCommercePaymentProvider()
+        : name === "paynow"
+          ? new PaynowCommercePaymentProvider()
+          : new MockCommercePaymentProvider();
   return sharedProvider;
 }
 
@@ -83,6 +87,15 @@ export async function initiateMobileMoneyPaymentForOrder(input: {
       ? CommercePaymentMethod.ONEMONEY
       : CommercePaymentMethod.ECOCASH;
 
+  const provider = getCommercePaymentProvider();
+  if (provider.name === "zb" && paymentMethod !== CommercePaymentMethod.ECOCASH) {
+    throw new AppError(
+      "EcoCash USD and cash on delivery are available.",
+      400,
+      "ZB_ECOCASH_USD_ONLY"
+    );
+  }
+
   const phone = validateZimbabweMobileForEcoCash(input.payerPhoneRaw);
   if (!phone.ok) {
     throw new AppError(phone.reason, 400, "INVALID_PAYER_PHONE");
@@ -103,15 +116,33 @@ export async function initiateMobileMoneyPaymentForOrder(input: {
     },
     orderBy: { createdAt: "desc" }
   });
-  if (pending) {
+  if (pending?.status === CommercePaymentAttemptStatus.PENDING && pending.providerPaymentId) {
     throw new AppError(
-      "A payment request is already pending. Reply RETRY after it fails/expires, or CASH to pay on delivery.",
+      "Payment is still being confirmed.",
+      409,
+      "PAYMENT_ALREADY_PENDING"
+    );
+  }
+  if (pending && !pending.providerPaymentId) {
+    await prisma.commercePaymentAttempt.update({
+      where: { id: pending.id },
+      data: {
+        status: CommercePaymentAttemptStatus.CANCELLED,
+        failureReason: "superseded_unsent"
+      }
+    });
+  } else if (pending) {
+    throw new AppError(
+      "Payment is still being confirmed.",
       409,
       "PAYMENT_ALREADY_PENDING"
     );
   }
 
-  const provider = getCommercePaymentProvider();
+  if (provider.name === "zb") {
+    assertDutsUsdCurrency(order.currency);
+  }
+
   const attempt = await prisma.commercePaymentAttempt.create({
     data: {
       commerceOrderId: order.id,
@@ -123,15 +154,27 @@ export async function initiateMobileMoneyPaymentForOrder(input: {
     }
   });
 
-  const initiated = await provider.initiatePayment({
-    commerceOrderId: order.id,
-    orderNumber: order.orderNumber,
-    amountCents: order.totalCents,
-    currency: order.currency,
-    payerPhoneE164: phone.e164,
-    attemptId: attempt.id,
-    paymentMethod
-  });
+  let initiated;
+  try {
+    initiated = await provider.initiatePayment({
+      commerceOrderId: order.id,
+      orderNumber: order.orderNumber,
+      amountCents: order.totalCents,
+      currency: order.currency,
+      payerPhoneE164: phone.e164,
+      attemptId: attempt.id,
+      paymentMethod
+    });
+  } catch (err) {
+    await prisma.commercePaymentAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        status: CommercePaymentAttemptStatus.FAILED,
+        failureReason: "initiate_failed"
+      }
+    });
+    throw err;
+  }
 
   const updated = await prisma.commercePaymentAttempt.update({
     where: { id: attempt.id },
@@ -249,6 +292,13 @@ export async function applyProviderPaymentResult(
   if (attempt.amountCents !== result.amountCents) {
     throw new AppError("Payment amount mismatch.", 409, "PAYMENT_AMOUNT_MISMATCH");
   }
+  if (
+    result.merchantReference &&
+    attempt.merchantReference &&
+    result.merchantReference !== attempt.merchantReference
+  ) {
+    throw new AppError("Payment reference mismatch.", 409, "PAYMENT_REFERENCE_MISMATCH");
+  }
 
   // Validate Paynow reference when already known on the attempt.
   if (
@@ -364,6 +414,38 @@ export async function applyProviderPaymentResult(
     orderId: attempt.commerceOrderId,
     status: resolved.status
   };
+}
+
+/**
+ * Poll ZB Smile&Pay using the stored merchant orderReference.
+ */
+export async function pollZbPaymentAttempt(attemptId: string) {
+  const attempt = await prisma.commercePaymentAttempt.findUniqueOrThrow({
+    where: { id: attemptId }
+  });
+  const orderReference = attempt.merchantReference;
+  if (attempt.provider !== "zb" || !orderReference) {
+    throw new AppError("No ZB payment reference for this attempt.", 400, "ZB_POLL_UNAVAILABLE");
+  }
+  const provider = getCommercePaymentProvider();
+  if (provider.name !== "zb" || !(provider instanceof ZbCommercePaymentProvider)) {
+    throw new AppError("ZB provider not active.", 503, "ZB_PROVIDER_INACTIVE");
+  }
+  const status = await provider.getPaymentStatusByOrderReference(orderReference);
+  if (!status || status.status === "PENDING") {
+    return { applied: false, status: status?.status ?? "PENDING" };
+  }
+  if (status.status === "PAID" && status.amountCents != null && status.amountCents !== attempt.amountCents) {
+    throw new AppError("Payment amount mismatch.", 409, "PAYMENT_AMOUNT_MISMATCH");
+  }
+  return applyProviderPaymentResult({
+    providerPaymentId: status.providerPaymentId || attempt.providerPaymentId || orderReference,
+    commerceOrderId: attempt.commerceOrderId,
+    amountCents: status.amountCents ?? attempt.amountCents,
+    status: status.status,
+    failureReason: status.failureReason,
+    merchantReference: orderReference
+  });
 }
 
 /**

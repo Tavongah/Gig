@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AppButton } from "../../components/AppButton";
@@ -11,7 +11,7 @@ import { useShopLocationStore } from "../../stores/shop-location.store";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CommerceCheckout">;
-type PayMethod = "CASH" | "ECOCASH" | "ONEMONEY";
+type PayMethod = "CASH" | "ECOCASH";
 
 export function CommerceCheckoutScreen({ navigation }: Props) {
   const session = useSessionStore((s) => s.session);
@@ -22,6 +22,7 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
   const merchantName = useCommerceCartStore((s) => s.merchantName);
   const clear = useCommerceCartStore((s) => s.clear);
   const [method, setMethod] = useState<PayMethod>("CASH");
+  const [ecoCashPhone, setEcoCashPhone] = useState(user?.phoneNumber ?? "");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -40,7 +41,7 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
           deliveryLabel: location.label,
           lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
           paymentMethod: method,
-          customerPhone: user.phoneNumber ?? undefined
+          customerPhone: method === "ECOCASH" ? ecoCashPhone.trim() : user.phoneNumber ?? undefined
         },
         token
       );
@@ -76,8 +77,8 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
       <Text className="mt-2 text-base text-muted">Shop: {merchantName}</Text>
       <Text className="mt-1 text-base text-muted">Deliver to: {location?.label ?? "—"}</Text>
 
-      <Text className="mt-6 text-lg font-extrabold text-ink">Payment</Text>
-      {(["CASH", "ECOCASH", "ONEMONEY"] as const).map((m) => (
+      <Text className="mt-6 text-lg font-extrabold text-ink">Choose payment</Text>
+      {(["ECOCASH", "CASH"] as const).map((m) => (
         <Pressable
           key={m}
           onPress={() => setMethod(m)}
@@ -88,15 +89,26 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
           }}
           accessibilityRole="radio"
           accessibilityState={{ selected: method === m }}
-          accessibilityLabel={m === "CASH" ? "Cash on delivery" : m}
+          accessibilityLabel={m === "CASH" ? "Cash on delivery" : "EcoCash USD"}
         >
-          <Text className="font-bold text-ink">
-            {m === "CASH" ? "Cash on delivery" : m === "ECOCASH" ? "EcoCash" : "OneMoney"}
-          </Text>
+          <Text className="font-bold text-ink">{m === "CASH" ? "Cash on delivery" : "EcoCash USD"}</Text>
         </Pressable>
       ))}
+      {method === "ECOCASH" ? (
+        <View className="mt-3">
+          <Text className="mb-2 text-sm font-semibold text-ink">EcoCash number</Text>
+          <TextInput
+            value={ecoCashPhone}
+            onChangeText={setEcoCashPhone}
+            keyboardType="phone-pad"
+            placeholder="0771234567"
+            className="rounded-2xl border border-border bg-card px-4 py-3 text-base text-ink"
+            accessibilityLabel="EcoCash number"
+          />
+        </View>
+      ) : null}
       <Text className="mt-3 text-xs text-muted">
-        Mobile money is confirmed only after the provider reports payment. Cash is due on delivery.
+        EcoCash is confirmed only after payment is approved on your phone. Cash is due on delivery.
       </Text>
 
       {error ? <Text className="mt-4 text-sm text-danger">{error}</Text> : null}
@@ -105,7 +117,11 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
         <AppButton
           label={checkoutMut.isPending ? "Placing order…" : "Place order"}
           onPress={() => checkoutMut.mutate()}
-          disabled={checkoutMut.isPending || !lines.length}
+          disabled={
+            checkoutMut.isPending ||
+            !lines.length ||
+            (method === "ECOCASH" && !ecoCashPhone.trim())
+          }
           loading={checkoutMut.isPending}
         />
       </View>

@@ -21,6 +21,7 @@ import {
 } from "./merchant.service.js";
 import { findMerchantsInShoppingArea } from "./shopping-areas.js";
 import { createConfirmedCommerceOrder, quoteBasketTotals } from "./order.service.js";
+import { initiateMobileMoneyPaymentForOrder, cancelPendingPaymentAttempts } from "./payments/payment.service.js";
 import { ensureAppCommerceCustomer } from "./commerce-customer.service.js";
 import type { CommercePaymentMethod, OrderSource } from "@prisma/client";
 import { browserAccessibleMediaUrl } from "../../lib/catalog-media.js";
@@ -586,6 +587,15 @@ export async function checkoutCart(input: {
 
   const commerceCustomer = await ensureAppCommerceCustomer(input.userId);
 
+  const paymentMethod = (input.paymentMethod as CommercePaymentMethod | undefined) ?? "CASH";
+  if (paymentMethod === "ONEMONEY") {
+    throw new AppError(
+      "EcoCash USD and cash on delivery are available.",
+      400,
+      "ZB_ECOCASH_USD_ONLY"
+    );
+  }
+
   const order = await createConfirmedCommerceOrder({
     customerId: input.userId,
     commerceCustomerId: commerceCustomer.id,
@@ -595,21 +605,42 @@ export async function checkoutCart(input: {
     deliveryLatitude: input.lat,
     deliveryLongitude: input.lng,
     customerWhatsAppPhone: input.customerPhone,
-    paymentMethod: (input.paymentMethod as CommercePaymentMethod | undefined) ?? "CASH",
+    paymentMethod,
     orderSource: "APP" as OrderSource
   });
 
+  if (paymentMethod === "ECOCASH") {
+    if (!input.customerPhone) {
+      throw new AppError("Enter the EcoCash number you want to pay with.", 400, "INVALID_PAYER_PHONE");
+    }
+    try {
+      await initiateMobileMoneyPaymentForOrder({
+        commerceOrderId: order.id,
+        payerPhoneRaw: input.customerPhone,
+        paymentMethod: "ECOCASH"
+      });
+    } catch (err) {
+      await prisma.commerceOrder.update({
+        where: { id: order.id },
+        data: { paymentStatus: "PAYMENT_FAILED" }
+      });
+      throw err;
+    }
+  }
+
+  const fresh = await prisma.commerceOrder.findUniqueOrThrow({ where: { id: order.id } });
+
   return {
     order: {
-      id: order.id,
-      orderNumber: order.orderNumber,
-      status: order.status,
-      statusLabel: commerceShopUiStatusLabel(order.status as CommerceOrderStatus),
-      totalCents: order.totalCents,
-      currency: order.currency,
+      id: fresh.id,
+      orderNumber: fresh.orderNumber,
+      status: fresh.status,
+      statusLabel: commerceShopUiStatusLabel(fresh.status as CommerceOrderStatus),
+      totalCents: fresh.totalCents,
+      currency: fresh.currency,
       merchantName: quote.merchant.name,
-      paymentStatus: order.paymentStatus,
-      paymentMethod: order.paymentMethod
+      paymentStatus: fresh.paymentStatus,
+      paymentMethod: fresh.paymentMethod
     }
   };
 }
@@ -679,6 +710,36 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
       deliveryStatus: order.linkedDeliveryGig?.status ?? null
     }
   };
+}
+
+export async function payCustomerEcoCash(userId: string, orderId: string, payerPhone: string) {
+  const order = await prisma.commerceOrder.findFirst({
+    where: { id: orderId, customerId: userId }
+  });
+  if (!order) throw new AppError("Order not found.", 404, "ORDER_NOT_FOUND");
+  if (order.paymentStatus === "PAID") {
+    throw new AppError("This order is already paid.", 409, "ALREADY_PAID");
+  }
+  if (order.paymentStatus === "DUE_ON_DELIVERY") {
+    throw new AppError("This order is cash on delivery.", 409, "COD_ALREADY_SELECTED");
+  }
+  if (order.paymentStatus === "PAYMENT_PENDING") {
+    const pending = await prisma.commercePaymentAttempt.findFirst({
+      where: {
+        commerceOrderId: order.id,
+        status: { in: ["CREATED", "PENDING"] }
+      }
+    });
+    if (pending?.providerPaymentId) {
+      throw new AppError("Payment is still being confirmed.", 409, "PAYMENT_ALREADY_PENDING");
+    }
+  }
+  await cancelPendingPaymentAttempts(order.id);
+  return initiateMobileMoneyPaymentForOrder({
+    commerceOrderId: order.id,
+    payerPhoneRaw: payerPhone,
+    paymentMethod: "ECOCASH"
+  });
 }
 
 /** Text-query basket helper for WhatsApp-parity flows (optional). */

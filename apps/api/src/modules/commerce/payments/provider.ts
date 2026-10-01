@@ -1,9 +1,9 @@
 /**
- * Commerce payment provider abstraction (mock | paynow | ecocash).
- * Real EcoCash / live Paynow API wiring waits on official merchant docs/credentials.
+ * Commerce payment provider abstraction (mock | paynow | ecocash | zb).
+ * Customer launch rail is ZB EcoCash USD. Paynow remains for tests.
  */
 
-export type CommercePaymentProviderName = "mock" | "paynow" | "ecocash";
+export type CommercePaymentProviderName = "mock" | "paynow" | "ecocash" | "zb";
 
 export type InitiatePaymentInput = {
   commerceOrderId: string;
@@ -65,6 +65,6 @@ export function resolveCommercePaymentProviderName(
   const raw = String(override ?? process.env.COMMERCE_PAYMENT_PROVIDER ?? "mock")
     .trim()
     .toLowerCase();
-  if (raw === "ecocash" || raw === "mock" || raw === "paynow") return raw;
+  if (raw === "ecocash" || raw === "mock" || raw === "paynow" || raw === "zb") return raw;
   return "mock";
 }

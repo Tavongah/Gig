@@ -153,13 +153,14 @@ async function main() {
     formatEcoCashFailed
   } = await import("../src/modules/whatsapp/copy.js");
   const pay = formatPaymentMethodChoice(498);
-  includesAll(pay, ["choose payment", "1. ecocash", "2. onemoney", "3. cash on delivery"], "payment choice");
+  includesAll(pay, ["choose payment", "1. ecocash usd", "2. cash on delivery"], "payment choice");
+  excludesAll(pay, ["onemoney", "paynow", "innbucks", "card"], "launch methods only");
   excludesAll(pay, ["payment: cash on delivery", "PAYMENT_PENDING"], "payment choice");
   includesAll(formatEcoCashPending(), ["payment request sent", "approve", "waiting"], "ecocash pending");
   excludesAll(formatEcoCashPending(), ["payment received", "payment successful", "order paid"], "ecocash pending");
   includesAll(formatCashOrderConfirmed(498), ["cash on delivery", "$4.98", "sent to the shop"], "cash confirmed");
   includesAll(formatEcoCashPaid(498), ["payment received", "$4.98", "sent to the shop"], "paid");
-  includesAll(formatEcoCashFailed(), ["payment failed", "1. try again", "2. pay cash"], "failed");
+  includesAll(formatEcoCashFailed(), ["not completed", "1. try again", "2. cash on delivery"], "failed");
 
   const requested = formatRequestedCart([]);
   includesAll(requested, ["cart is empty", "like to buy"], "empty cart");

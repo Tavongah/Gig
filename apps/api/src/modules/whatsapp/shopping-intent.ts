@@ -250,13 +250,12 @@ export function isHelpIntent(text: string): boolean {
 
 export function isSelectEcoCashIntent(text: string): boolean {
   const t = prepareCustomerTextForMatching(text);
-  // Include bare "eco" for payment-phase short replies (caller should gate on AWAITING_PAYMENT).
-  return /^(ecocash|eco\s*cash|eco|pay with ecocash|pay eco)$/i.test(t);
+  return /^(ecocash(?:\s*usd)?|eco\s*cash(?:\s*usd)?|eco|pay with ecocash|pay eco)$/i.test(t);
 }
 
 function isSelectEcoCashIntentStrict(text: string): boolean {
   const t = prepareCustomerTextForMatching(text);
-  return /^(ecocash|eco\s*cash|pay with ecocash|pay eco)$/i.test(t);
+  return /^(ecocash(?:\s*usd)?|eco\s*cash(?:\s*usd)?|pay with ecocash|pay eco)$/i.test(t);
 }
 
 export function isSelectOneMoneyIntent(text: string): boolean {

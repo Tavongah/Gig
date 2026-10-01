@@ -211,7 +211,7 @@ async function main() {
     io
   );
   assert(
-    mock.sent.some((m) => /already pending/i.test(m.body)),
+    mock.sent.some((m) => /still being confirmed/i.test(m.body)),
     "block silent replace"
   );
 

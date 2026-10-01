@@ -53,6 +53,7 @@ import {
   formatMissingItems,
   formatOrderCartSummary,
   formatPaymentMethodChoice,
+  formatPaymentStillPending,
   formatCashOrderConfirmed,
   formatPriceChange,
   formatShopSwitch,
@@ -67,6 +68,7 @@ import {
   validateZimbabweMobileForEcoCash
 } from "../commerce/payments/payment.service.js";
 import { CommercePaymentMethod } from "@prisma/client";
+import { resolveCommercePaymentProviderName } from "../commerce/payments/provider.js";
 
 export type InboundWhatsAppMessage = {
   providerMessageId: string;
@@ -978,9 +980,8 @@ async function confirmDraftOrder(
   const paymentBody = formatPaymentMethodChoice(totals.totalCents);
   try {
     await wa.sendButtons(phone, paymentBody, [
-      { id: "pay_ecocash", title: "EcoCash" },
-      { id: "pay_onemoney", title: "OneMoney" },
-      { id: "pay_cash", title: "Cash" }
+      { id: "pay_ecocash", title: "EcoCash USD" },
+      { id: "pay_cash", title: "Cash on delivery" }
     ]);
   } catch {
     await wa.sendText(phone, paymentBody);
@@ -1011,10 +1012,7 @@ async function handlePaymentConversation(
     (phase === "SELECT_METHOD" && text.trim() === "1")
   ) {
     if (phase === "PENDING_PROVIDER") {
-      await wa.sendText(
-        phone,
-        "A payment request is already pending. Reply 1 to try again or 2 for cash."
-      );
+      await wa.sendText(phone, formatPaymentStillPending());
       return { handled: true };
     }
     ctx.selectedPaymentMethod = "ECOCASH";
@@ -1030,14 +1028,14 @@ async function handlePaymentConversation(
   if (
     buttonId === "pay_onemoney" ||
     buttonId?.trim().toLowerCase() === "onemoney" ||
-    isSelectOneMoneyIntent(text) ||
-    (phase === "SELECT_METHOD" && text.trim() === "2")
+    isSelectOneMoneyIntent(text)
   ) {
+    if (resolveCommercePaymentProviderName() !== "paynow") {
+      await wa.sendText(phone, formatPaymentMethodChoice());
+      return { handled: true };
+    }
     if (phase === "PENDING_PROVIDER") {
-      await wa.sendText(
-        phone,
-        "A payment request is already pending. Reply 1 to try again or 2 for cash."
-      );
+      await wa.sendText(phone, formatPaymentStillPending());
       return { handled: true };
     }
     ctx.selectedPaymentMethod = "ONEMONEY";
@@ -1053,8 +1051,7 @@ async function handlePaymentConversation(
   if (
     isRetryPaymentIntent(text) ||
     text.trim().toUpperCase() === "RETRY" ||
-    ((phase === "FAILED" || phase === "EXPIRED" || phase === "PENDING_PROVIDER") &&
-      text.trim() === "1")
+    ((phase === "FAILED" || phase === "EXPIRED") && text.trim() === "1")
   ) {
     if (ctx.pendingPaymentOrderId) {
       await cancelPendingPaymentAttempts(ctx.pendingPaymentOrderId);
@@ -1077,7 +1074,7 @@ async function handlePaymentConversation(
     buttonId?.trim().toLowerCase() === "cash" ||
     isSelectCashIntent(text) ||
     text.trim().toUpperCase() === "CASH" ||
-    (phase === "SELECT_METHOD" && text.trim() === "3") ||
+    (phase === "SELECT_METHOD" && text.trim() === "2") ||
     ((phase === "FAILED" || phase === "EXPIRED" || phase === "PENDING_PROVIDER") &&
       text.trim() === "2")
   ) {
@@ -1087,16 +1084,10 @@ async function handlePaymentConversation(
   if (phase === "PENDING_PROVIDER") {
     const maybePhone = validateZimbabweMobileForEcoCash(text);
     if (maybePhone.ok) {
-      await wa.sendText(
-        phone,
-        "A payment request is already pending. Reply RETRY after it fails/expires, or CASH to pay on delivery."
-      );
+      await wa.sendText(phone, formatPaymentStillPending());
       return { handled: true };
     }
-    await wa.sendText(
-      phone,
-      "We're waiting for payment confirmation. Reply RETRY if it failed, or CASH to pay on delivery."
-    );
+    await wa.sendText(phone, formatPaymentStillPending());
     return { handled: true };
   }
 

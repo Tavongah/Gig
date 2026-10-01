@@ -263,11 +263,10 @@ export function formatPaymentMethodChoice(_totalCents?: number): string {
   return [
     "Choose payment",
     "",
-    "1. EcoCash",
-    "2. OneMoney",
-    "3. Cash on delivery",
+    "1. EcoCash USD",
+    "2. Cash on delivery",
     "",
-    "Reply 1, 2 or 3."
+    "Reply 1 or 2."
   ].join("\n");
 }
 
@@ -358,20 +357,24 @@ export function formatOrderCancelled(): string {
 }
 
 export function formatEcoCashFailed(): string {
-  return ["Payment failed.", "", "1. Try again", "2. Pay cash"].join("\n");
+  return ["Payment was not completed.", "", "1. Try again", "2. Cash on delivery"].join("\n");
 }
 
 export function formatEcoCashExpired(): string {
-  return ["Payment request expired.", "", "1. Try again", "2. Pay cash"].join("\n");
+  return ["Payment was not completed.", "", "1. Try again", "2. Cash on delivery"].join("\n");
 }
 
 export function formatMobileMoneyCancelled(): string {
-  return ["Payment cancelled.", "", "1. Try again", "2. Pay cash"].join("\n");
+  return ["Payment was not completed.", "", "1. Try again", "2. Cash on delivery"].join("\n");
 }
 
 export function formatClaimPaidIgnored(): string {
   return [
-    "We'll confirm when payment clears.",
-    "If it failed, reply 1 to try again or 2 for cash."
+    "Payment is still being confirmed.",
+    "If it failed, reply 1 to try again or 2 for cash on delivery."
   ].join("\n");
+}
+
+export function formatPaymentStillPending(): string {
+  return "Payment is still being confirmed.";
 }

@@ -8,6 +8,7 @@ import {
   browseNearbyShops,
   checkoutCart,
   getCustomerCommerceOrder,
+  payCustomerEcoCash,
   getProductDetailNear,
   getShopCatalog,
   listBrowseCategories,
@@ -240,6 +241,27 @@ customerCommerceRouter.get("/orders/:id", ...requireCustomer, async (req, res, n
     next(err);
   }
 });
+
+customerCommerceRouter.post(
+  "/orders/:id/pay/ecocash",
+  ...requireCustomer,
+  validateBody(z.object({ payerPhone: z.string().min(7).max(24) })),
+  async (req, res, next) => {
+    try {
+      const result = await payCustomerEcoCash(
+        req.auth!.userId,
+        String(req.params.id),
+        req.body.payerPhone
+      );
+      res.json({
+        paymentStatus: "PAYMENT_PENDING",
+        displayLocal: result.displayLocal
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 const textBasketSchema = z.object({
   lat: z.number().min(-90).max(90),

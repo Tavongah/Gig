@@ -50,8 +50,27 @@ export function CommerceOrderDetailScreen({ route }: Props) {
         <Text className="text-sm text-muted">Items: ${(order.subtotalCents / 100).toFixed(2)}</Text>
         <Text className="text-sm text-muted">Delivery: ${(order.deliveryFeeCents / 100).toFixed(2)}</Text>
         <Text className="mt-2 text-lg font-black text-ink">Total: ${(order.totalCents / 100).toFixed(2)}</Text>
-        <Text className="mt-1 text-sm text-muted">Payment: {order.paymentMethod.replace(/_/g, " ")}</Text>
+        <Text className="mt-1 text-sm text-muted">
+          Payment: {order.paymentMethod === "CASH" ? "Cash on delivery" : order.paymentMethod === "ECOCASH" ? "EcoCash USD" : order.paymentMethod.replace(/_/g, " ")}
+        </Text>
       </View>
+
+      {order.paymentStatus === "PAYMENT_PENDING" ? (
+        <View className="mt-5 rounded-2xl border border-border bg-card p-4">
+          <Text className="text-base font-bold text-ink">EcoCash payment request sent.</Text>
+          <Text className="mt-2 text-sm text-muted">Approve the payment on your phone.</Text>
+          <Text className="mt-2 text-sm text-muted">Waiting for confirmation...</Text>
+        </View>
+      ) : null}
+      {order.paymentStatus === "PAYMENT_FAILED" || order.paymentStatus === "FAILED" ? (
+        <View className="mt-5 rounded-2xl border border-border bg-card p-4">
+          <Text className="text-base font-bold text-ink">Payment was not completed.</Text>
+          <Text className="mt-2 text-sm text-muted">Try EcoCash again from checkout, or choose cash on delivery on a new order.</Text>
+        </View>
+      ) : null}
+      {order.paymentStatus === "DUE_ON_DELIVERY" ? (
+        <Text className="mt-5 text-sm text-muted">Pay cash when your order arrives.</Text>
+      ) : null}
     </ScrollView>
   );
 }

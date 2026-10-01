@@ -112,9 +112,9 @@ async function main() {
   assert(!/confirm,\s*change,\s*or\s*cancel/i.test(review), "no uppercase command list");
   const payChoice = formatPaymentMethodChoice(milk.priceCents + 348);
   assert(/choose payment/i.test(payChoice), "payment title");
-  assert(/1\.\s*ecocash/i.test(payChoice), "ecocash");
-  assert(/2\.\s*onemoney/i.test(payChoice), "onemoney");
-  assert(/3\.\s*cash on delivery/i.test(payChoice), "cash");
+  assert(/1\.\s*ecocash usd/i.test(payChoice), "ecocash");
+  assert(/2\.\s*cash on delivery/i.test(payChoice), "cash");
+  assert(!/onemoney/i.test(payChoice), "onemoney hidden");
 
   async function send(text: string, extra?: Partial<Parameters<typeof handleCustomerWhatsAppMessage>[0]>) {
     await handleCustomerWhatsAppMessage(
@@ -158,9 +158,9 @@ async function main() {
   const afterConfirm = mock.sent.filter((m) => m.to === customerPhone).map((m) => m.body);
   const paymentMsg = afterConfirm.find((b) => /choose payment/i.test(b));
   assert(paymentMsg, "payment selection message");
-  assert(/1\.\s*ecocash/i.test(paymentMsg!), "ecocash option");
-  assert(/2\.\s*onemoney/i.test(paymentMsg!), "onemoney option");
-  assert(/3\.\s*cash/i.test(paymentMsg!), "cash option");
+  assert(/1\.\s*ecocash usd/i.test(paymentMsg!), "ecocash option");
+  assert(/2\.\s*cash on delivery/i.test(paymentMsg!), "cash option");
+  assert(!/onemoney/i.test(paymentMsg!), "onemoney hidden");
   assert(!/payment:\s*cash on delivery/i.test(paymentMsg!), "still no premature cash line");
 
   const orders = await prisma.commerceOrder.findMany({
@@ -259,9 +259,9 @@ async function main() {
   const afterWordConfirm = mock.sent.filter((m) => m.to === phoneWordConfirm).map((m) => m.body);
   const joinedConfirm = afterWordConfirm.join("\n");
   assert(/choose payment/i.test(joinedConfirm), "Confirm opens payment selection");
-  assert(/ecocash/i.test(joinedConfirm), "has EcoCash");
-  assert(/onemoney/i.test(joinedConfirm), "has OneMoney");
+  assert(/ecocash usd/i.test(joinedConfirm), "has EcoCash");
   assert(/cash on delivery/i.test(joinedConfirm), "has Cash on delivery");
+  assert(!/onemoney/i.test(joinedConfirm), "OneMoney hidden");
   assert(!/not available right now:\s*confirm/i.test(joinedConfirm), "Confirm is not a product");
   assert(!/couldn'?t find one nearby shop/i.test(joinedConfirm), "no shop-missing for Confirm");
   assert(

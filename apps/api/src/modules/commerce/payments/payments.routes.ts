@@ -7,7 +7,8 @@ import { prisma } from "../../../config/prisma.js";
 import {
   applyProviderPaymentResult,
   getCommercePaymentProvider,
-  pollPaynowPaymentAttempt
+  pollPaynowPaymentAttempt,
+  pollZbPaymentAttempt
 } from "./payment.service.js";
 import { simulateMockPaymentOutcome } from "./mock.provider.js";
 import { simulatePaynowTestOutcome } from "./paynow.transport.js";
@@ -143,6 +144,82 @@ async function notifyAfterProviderResult(result: {
 
 export function createCommercePaymentsRouter() {
   const router = Router();
+
+  /**
+   * Official Smile&Pay resultUrl webhook.
+   * Always HTTP 200 after parse so the gateway does not retry forever.
+   * PAID only after status/check verification inside the ZB provider.
+   */
+  router.post("/zb/callback", async (req, res) => {
+    try {
+      const provider = getCommercePaymentProvider();
+      if (provider.name !== "zb") {
+        res.status(200).json({ ok: true });
+        return;
+      }
+      const rawBody = Buffer.isBuffer(req.body)
+        ? req.body
+        : Buffer.from(typeof req.body === "string" ? req.body : JSON.stringify(req.body ?? {}));
+      const parsed = await provider.handleWebhook({
+        headers: req.headers as Record<string, string | string[] | undefined>,
+        rawBody,
+        body: req.body
+      });
+      if (!parsed) {
+        res.status(200).json({ ok: true });
+        return;
+      }
+      try {
+        const result = await applyProviderPaymentResult({
+          ...parsed,
+          commerceOrderId: parsed.commerceOrderId || "",
+          merchantReference: parsed.merchantReference ?? parsed.providerPaymentId
+        });
+        await notifyAfterProviderResult(result);
+      } catch (err) {
+        const code = err instanceof Error ? (err as { code?: string }).code : undefined;
+        if (
+          code === "PAYMENT_AMOUNT_MISMATCH" ||
+          code === "PAYMENT_REFERENCE_MISMATCH" ||
+          code === "PAYMENT_ORDER_MISMATCH" ||
+          code === "PAYMENT_ATTEMPT_NOT_FOUND" ||
+          code === "PAYMENT_ATTEMPT_SUPERSEDED"
+        ) {
+          console.warn("zb_callback_not_applied", { code });
+        } else {
+          console.warn("zb_callback_not_applied");
+        }
+      }
+      res.status(200).json({ ok: true });
+    } catch {
+      res.status(200).json({ ok: true });
+    }
+  });
+
+  router.get("/zb/return", (_req, res) => {
+    res.status(200).send("Payment return received.");
+  });
+  router.post("/zb/return", (_req, res) => {
+    res.status(200).send("Payment return received.");
+  });
+
+  router.post("/zb/poll", async (req, res, next) => {
+    try {
+      const body = z.object({ attemptId: z.string().uuid() }).parse(req.body);
+      const result = await pollZbPaymentAttempt(body.attemptId);
+      if (
+        "orderId" in result &&
+        result.applied &&
+        result.status === "PAID" &&
+        !result.duplicate
+      ) {
+        await notifyAfterProviderResult(result);
+      }
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   /** Real EcoCash webhook — fail closed until official signature rules exist. */
   router.post("/webhook/ecocash", async (req, res, next) => {
