@@ -30,7 +30,7 @@ assert.ok(add.includes("addItem"), "catalog ADD goes to desired basket");
 assert.ok(add.includes("addOffer"), "merchant-offer add path remains");
 
 const shop = read("screens/commerce/ShopDetailScreen.tsx");
-assert.ok(shop.includes("addOffer"), "shop page still merchant-specific");
+assert.ok(shop.includes("tryAddOfferToCart") || shop.includes("addOffer"), "shop page still merchant-specific");
 assert.ok(!shop.includes("addCatalogProduct"), "shop page is not forced through matching");
 
 const cart = read("screens/commerce/CartScreen.tsx");

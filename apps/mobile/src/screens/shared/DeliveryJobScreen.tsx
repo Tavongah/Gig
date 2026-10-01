@@ -335,7 +335,22 @@ export function DeliveryJobScreen() {
           {isPickupPhase(gig.status) ? (
             <>
               <Text className="text-xs font-bold uppercase text-brand">Pickup</Text>
-              <Text className="text-xl font-black text-ink">{pickupArea}</Text>
+              {commercePickup?.headline ? (
+                <Text className="text-sm font-extrabold text-ink">{commercePickup.headline}</Text>
+              ) : null}
+              {commercePickup?.currentLabel ? (
+                <Text className="text-base font-black text-ink">{commercePickup.currentLabel}</Text>
+              ) : null}
+              {commercePickup?.stops?.length ? (
+                commercePickup.stops.map((s) => (
+                  <Text key={`${s.sequence}-${s.shopName}`} className="text-sm text-ink">
+                    {s.status === "COLLECTED" ? "✓" : s.current ? "→" : "•"} Pickup {s.sequence + 1} of{" "}
+                    {commercePickup.pickupCount} · {s.shopName}
+                  </Text>
+                ))
+              ) : (
+                <Text className="text-xl font-black text-ink">{pickupArea}</Text>
+              )}
               {gig.pickupContactName ? <Row label="Shop contact" value={gig.pickupContactName} /> : null}
               {gig.pickupInstructions ? <Row label="Notes" value={gig.pickupInstructions} /> : null}
               {gig.status === "WORKER_ASSIGNED" || gig.status === "WORKER_EN_ROUTE" ? (

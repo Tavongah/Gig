@@ -375,6 +375,29 @@ export {
 } from "./guaranteed-order-intake.js";
 
 export {
+  chooseShortestPickupRoute,
+  evaluateCombinedRoute,
+  fulfillmentLabelAt,
+  FULFILLMENT_LABELS,
+  merchantFulfillmentRef,
+  MULTI_SHOP_TESTING_DEFAULTS,
+  parseMaxShopsPerCheckout,
+  parseMerchantFulfillmentRef,
+  parseMultiShopCheckoutEnabled,
+  parseMultiShopMaxExtraRouteKm,
+  parseMultiShopMaxExtraRouteRatio,
+  parseMultiShopMaxPickupRouteKm,
+  pathDistanceKm,
+  permute,
+  type CombinedRouteLimits,
+  type CombinedRouteResult,
+  type FulfillmentLabel,
+  type GeoPoint,
+  type MultiShopAllocation,
+  type PickupCandidate
+} from "./multi-shop-checkout.js";
+
+export {
   compareSmartBasketMatches,
   coverageRatio,
   evaluateMerchantCoverage,

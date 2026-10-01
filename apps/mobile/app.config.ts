@@ -114,6 +114,9 @@ export default {
       smartBasketEnabled: !["false", "0", "no", "off"].includes(
         (process.env.EXPO_PUBLIC_SMART_BASKET_ENABLED ?? "true").trim().toLowerCase()
       ),
+      multiShopCheckoutEnabled: ["true", "1"].includes(
+        (process.env.EXPO_PUBLIC_MULTI_SHOP_CHECKOUT_ENABLED ?? "").trim().toLowerCase()
+      ),
       eas: {
         projectId: process.env.EAS_PROJECT_ID || "7b30aedd-9b50-43d0-af22-3fee6842c372"
       }

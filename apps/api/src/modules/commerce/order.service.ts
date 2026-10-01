@@ -1,4 +1,5 @@
 import {
+  CommerceCheckoutStatus,
   CommerceOrderStatus,
   CommercePaymentMethod,
   CommercePaymentStatus,
@@ -16,7 +17,8 @@ import {
   addFulfillmentNote,
   hasFulfillmentNote,
   isAssistedFulfillment,
-  parseAlcoholCommerceEnabled
+  parseAlcoholCommerceEnabled,
+  parseMerchantFulfillmentRef
 } from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
@@ -193,6 +195,16 @@ export async function createConfirmedCommerceOrder(input: {
   paymentMethod?: CommercePaymentMethod | string;
   paymentStatus?: CommercePaymentStatus;
   orderSource?: OrderSource;
+  checkoutId?: string;
+  fulfillmentLabel?: string;
+  /** When set, skip per-shop delivery quoting (child fulfillments of a parent checkout). */
+  totals?: {
+    subtotalCents: number;
+    deliveryFeeCents: number;
+    serviceFeeCents: number;
+    totalCents: number;
+    currency?: "usd";
+  };
 }) {
   if (input.lines.length === 0) {
     throw new AppError("Basket is empty.", 400, "EMPTY_BASKET");
@@ -281,13 +293,21 @@ export async function createConfirmedCommerceOrder(input: {
   }
 
   const lines = refreshedLines;
-  const totals = await quoteBasketTotals({
-    merchantLat: Number(merchant.latitude),
-    merchantLng: Number(merchant.longitude),
-    customerLat: input.deliveryLatitude,
-    customerLng: input.deliveryLongitude,
-    lines
-  });
+  const totals = input.totals
+    ? {
+        subtotalCents: input.totals.subtotalCents,
+        deliveryFeeCents: input.totals.deliveryFeeCents,
+        serviceFeeCents: input.totals.serviceFeeCents,
+        totalCents: input.totals.totalCents,
+        currency: "usd" as const
+      }
+    : await quoteBasketTotals({
+        merchantLat: Number(merchant.latitude),
+        merchantLng: Number(merchant.longitude),
+        customerLat: input.deliveryLatitude,
+        customerLng: input.deliveryLongitude,
+        lines
+      });
 
   const isMobileMoney =
     paymentMethod === CommercePaymentMethod.ECOCASH ||
@@ -306,6 +326,8 @@ export async function createConfirmedCommerceOrder(input: {
       customerId,
       commerceCustomerId,
       merchantId: input.merchantId,
+      checkoutId: input.checkoutId ?? null,
+      fulfillmentLabel: input.fulfillmentLabel ?? null,
       status,
       paymentStatus,
       paymentMethod,
@@ -419,11 +441,15 @@ export async function merchantRejectOrder(merchantId: string, orderIdOrNumber: s
     where: { id: order.id },
     data: {
       status: CommerceOrderStatus.MERCHANT_REJECTED,
-      cancelledAt: new Date(),
+      cancelledAt: order.checkoutId ? null : new Date(),
       ...(notes != null ? { notes } : {})
     },
     include: { items: true, merchant: true, customer: true }
   });
+  if (order.checkoutId) {
+    const { markCheckoutNeedsAttention } = await import("./multi-shop-checkout.service.js");
+    await markCheckoutNeedsAttention(order.checkoutId, FULFILLMENT_NOTE.MERCHANT_REJECTED);
+  }
   logDutsFlow("COMMERCE_MERCHANT_REJECTED", {
     userId: order.customerId ?? undefined,
     orderId: order.id,
@@ -599,6 +625,26 @@ export async function merchantMarkReadyForPickup(
     );
   }
 
+  if (order.checkoutId) {
+    const updated = await prisma.commerceOrder.update({
+      where: { id: order.id },
+      data: {
+        status: CommerceOrderStatus.READY_FOR_PICKUP,
+        readyAt: new Date()
+      },
+      include: { items: true, merchant: true, customer: true, commerceCustomer: true, linkedDeliveryGig: true }
+    });
+    const { ensureCombinedCheckoutDelivery } = await import("./multi-shop-checkout.service.js");
+    const deliveryResult = await ensureCombinedCheckoutDelivery(order.checkoutId, io);
+    logDutsFlow("COMMERCE_READY_FOR_PICKUP", {
+      gigId: (deliveryResult.delivery as { id?: string } | null)?.id,
+      orderId: updated.id,
+      orderNumber: updated.orderNumber,
+      checkoutId: order.checkoutId
+    });
+    return { order: updated, delivery: deliveryResult };
+  }
+
   const deliveryResult = await linkCommerceOrderDelivery(order, io);
   const gigId = (deliveryResult.delivery as { id: string }).id;
 
@@ -634,13 +680,13 @@ export async function expireStaleMerchantPendingOrders(io?: Server): Promise<num
       status: CommerceOrderStatus.MERCHANT_PENDING,
       merchantRespondBy: { lt: now }
     },
-    include: { merchant: true, customer: true, commerceCustomer: true, items: true, linkedDeliveryGig: true }
+    include: { merchant: true, customer: true, commerceCustomer: true, items: true, linkedDeliveryGig: true, checkout: true }
   });
 
   let count = 0;
   const guaranteed = isGuaranteedOrderIntakeEnabled();
   for (const order of stale) {
-    if (guaranteed) {
+    if (guaranteed || order.checkoutId) {
       await startAssistedFulfillmentForOrder(order.id, io);
       count += 1;
       continue;
@@ -674,7 +720,14 @@ export async function expireStaleMerchantPendingOrders(io?: Server): Promise<num
 async function startAssistedFulfillmentForOrder(orderId: string, io?: Server): Promise<void> {
   const order = await prisma.commerceOrder.findUnique({
     where: { id: orderId },
-    include: { items: true, merchant: true, customer: true, commerceCustomer: true, linkedDeliveryGig: true }
+    include: {
+      items: true,
+      merchant: true,
+      customer: true,
+      commerceCustomer: true,
+      linkedDeliveryGig: true,
+      checkout: true
+    }
   });
   if (!order || order.status !== CommerceOrderStatus.MERCHANT_PENDING) return;
 
@@ -701,6 +754,39 @@ async function startAssistedFulfillmentForOrder(orderId: string, io?: Server): P
       gigId: order.linkedDeliveryGigId,
       orderId: order.id,
       orderNumber: order.orderNumber
+    });
+    await notifyAssistedCustomer(order.customerWhatsAppPhone, "slow", !alreadyAssisted);
+    return;
+  }
+
+  if (order.checkoutId) {
+    await prisma.commerceOrder.update({
+      where: { id: order.id },
+      data: {
+        status: CommerceOrderStatus.READY_FOR_PICKUP,
+        readyAt: order.readyAt ?? new Date(),
+        notes: addFulfillmentNote(order.notes, FULFILLMENT_NOTE.ASSISTED)
+      }
+    });
+    const socket = io ?? tryGetSocketServer();
+    if (socket) {
+      try {
+        const { ensureCombinedCheckoutDelivery } = await import("./multi-shop-checkout.service.js");
+        await ensureCombinedCheckoutDelivery(order.checkoutId, socket);
+      } catch {
+        await prisma.commerceCheckout.update({
+          where: { id: order.checkoutId },
+          data: {
+            notes: addFulfillmentNote(order.notes, FULFILLMENT_NOTE.NEEDS_ATTENTION)
+          }
+        });
+      }
+    }
+    logDutsFlow("COMMERCE_ASSISTED_FULFILLMENT_STARTED", {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      checkoutId: order.checkoutId,
+      reason: "child_silent"
     });
     await notifyAssistedCustomer(order.customerWhatsAppPhone, "slow", !alreadyAssisted);
     return;
@@ -892,16 +978,33 @@ export async function listMerchantActiveOrders(merchantId: string) {
 }
 
 export async function findMerchantOrder(merchantId: string, orderIdOrNumber: string | number) {
+  const raw = String(orderIdOrNumber).trim();
+  const fulfillment = parseMerchantFulfillmentRef(raw);
   const asNum = typeof orderIdOrNumber === "number" ? orderIdOrNumber : Number(orderIdOrNumber);
   const order = await prisma.commerceOrder.findFirst({
     where: {
       merchantId,
       OR: [
-        { id: String(orderIdOrNumber) },
+        { id: raw },
+        ...(fulfillment
+          ? [
+              {
+                fulfillmentLabel: fulfillment.label,
+                checkout: { checkoutNumber: fulfillment.checkoutNumber }
+              }
+            ]
+          : []),
         ...(Number.isFinite(asNum) ? [{ orderNumber: asNum }] : [])
       ]
     },
-    include: { items: true, merchant: true, customer: true, commerceCustomer: true, linkedDeliveryGig: true }
+    include: {
+      items: true,
+      merchant: true,
+      customer: true,
+      commerceCustomer: true,
+      linkedDeliveryGig: true,
+      checkout: true
+    }
   });
   if (!order) throw new AppError("Order not found.", 404, "ORDER_NOT_FOUND");
   return order;
@@ -965,6 +1068,59 @@ export function formatOrderTrackMessage(order: Awaited<ReturnType<typeof getCust
 
 /** Sync commerce order when linked delivery gig status changes. */
 export async function syncCommerceOrderFromGig(gigId: string, gigStatus: GigStatus): Promise<void> {
+  const checkout = await prisma.commerceCheckout.findFirst({
+    where: { linkedDeliveryGigId: gigId },
+    include: { orders: true, pickupStops: true }
+  });
+  if (checkout) {
+    if (gigStatus === GigStatus.WORKER_ASSIGNED || gigStatus === GigStatus.WORKER_SELECTED) {
+      await prisma.commerceCheckout.update({
+        where: { id: checkout.id },
+        data: {
+          status:
+            checkout.status === CommerceCheckoutStatus.NEEDS_ATTENTION
+              ? CommerceCheckoutStatus.NEEDS_ATTENTION
+              : CommerceCheckoutStatus.FULFILLING
+        }
+      });
+      await prisma.commerceOrder.updateMany({
+        where: {
+          checkoutId: checkout.id,
+          status: {
+            in: [CommerceOrderStatus.READY_FOR_PICKUP, CommerceOrderStatus.MERCHANT_ACCEPTED]
+          }
+        },
+        data: { status: CommerceOrderStatus.COURIER_ASSIGNED }
+      });
+    } else if (gigStatus === GigStatus.PACKAGE_COLLECTED || gigStatus === GigStatus.EN_ROUTE_TO_DROPOFF || gigStatus === GigStatus.ARRIVED_AT_DROPOFF) {
+      await prisma.commerceCheckout.update({
+        where: { id: checkout.id },
+        data: { status: CommerceCheckoutStatus.OUT_FOR_DELIVERY }
+      });
+    } else if (gigStatus === GigStatus.COMPLETED || gigStatus === GigStatus.WAITING_CUSTOMER_CONFIRMATION) {
+      await prisma.commerceCheckout.update({
+        where: { id: checkout.id },
+        data: { status: CommerceCheckoutStatus.DELIVERED, deliveredAt: new Date() }
+      });
+      await prisma.commerceOrder.updateMany({
+        where: { checkoutId: checkout.id, status: { not: CommerceOrderStatus.MERCHANT_REJECTED } },
+        data: { status: CommerceOrderStatus.DELIVERED, deliveredAt: new Date() }
+      });
+    } else if (gigStatus === GigStatus.CANCELLED) {
+      const collected = checkout.pickupStops.some((s) => s.status === "COLLECTED");
+      if (collected) {
+        const { markCheckoutNeedsAttention } = await import("./multi-shop-checkout.service.js");
+        await markCheckoutNeedsAttention(checkout.id);
+      } else {
+        await prisma.commerceCheckout.update({
+          where: { id: checkout.id },
+          data: { status: CommerceCheckoutStatus.CANCELLED, cancelledAt: new Date() }
+        });
+      }
+    }
+    return;
+  }
+
   const order = await prisma.commerceOrder.findFirst({ where: { linkedDeliveryGigId: gigId } });
   if (!order) return;
 

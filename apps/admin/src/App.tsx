@@ -357,7 +357,14 @@ export function App() {
           paymentStatus: string;
           orderSource: string;
           totalCents: number;
-          notes?: string | null;
+          displayNumber?: string | number;
+          parentCheckout?: {
+            id: string;
+            orderNumber: number;
+            status: string;
+            paymentStatus: string;
+            totalCents: number;
+          } | null;
           fulfillmentIssue?: string | null;
           waitingSince?: string;
           merchant?: { name: string };
@@ -693,9 +700,16 @@ export function App() {
                     .map((o) => (
                       <article key={o.id} className="order-card">
                         <div className="order-card-top">
-                          <strong>Order #{o.orderNumber}</strong>
+                          <strong>
+                            Order #{typeof o.displayNumber === "string" || typeof o.displayNumber === "number" ? o.displayNumber : o.orderNumber}
+                          </strong>
                           <span>${(o.totalCents / 100).toFixed(2)}</span>
                         </div>
+                        {o.parentCheckout ? (
+                          <p className="muted">
+                            Parent #{o.parentCheckout.orderNumber} · {String(o.parentCheckout.status).replace(/_/g, " ")}
+                          </p>
+                        ) : null}
                         <p className="muted">{o.merchant?.name ?? "Shop"}</p>
                         <p className="muted">
                           {o.customer?.fullName ?? "Customer"}

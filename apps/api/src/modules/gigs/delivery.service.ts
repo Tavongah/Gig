@@ -548,9 +548,15 @@ export async function verifyPickupPin(
       "INVALID_STATUS_TRANSITION"
     );
   }
-  const commerceOrder = await prisma.commerceOrder.findFirst({
-    where: { linkedDeliveryGigId: gigId }
-  });
+  const { currentChildOrderForGig, findCheckoutForGig, stopPinScope } = await import(
+    "../commerce/multi-shop-checkout.service.js"
+  );
+  const checkout = await findCheckoutForGig(gigId);
+  const commerceOrder = checkout
+    ? await currentChildOrderForGig(gigId)
+    : await prisma.commerceOrder.findFirst({
+        where: { linkedDeliveryGigId: gigId }
+      });
   if (commerceOrder && hasFulfillmentNote(commerceOrder.notes, FULFILLMENT_NOTE.PICKUP_PROBLEM)) {
     throw new AppError(
       "This pickup is waiting for DUTS. Do not collect the order.",
@@ -571,9 +577,69 @@ export async function verifyPickupPin(
       "ASSISTED_PICKUP_CONFIRMATION_REQUIRED"
     );
   }
+  const currentStop = checkout?.pickupStops.find((s) => s.commerceOrderId === commerceOrder?.id);
+  const pinScope = currentStop ? stopPinScope(gigId, currentStop.commerceOrderId) : gigId;
+  const storedPin = currentStop?.pickupPin ?? gig.pickupPin;
   assertPinNotLocked(gig.pickupPinLockedUntil, "pickup");
-  if (!hashedPinsMatch(gig.pickupPin, pin, gigId)) {
+  if (!hashedPinsMatch(storedPin, pin, pinScope)) {
     await recordFailedPinAttempt(gigId, "pickup", gig.pickupPinFailCount);
+  }
+
+  if (checkout && currentStop && commerceOrder) {
+    const remaining = checkout.pickupStops.filter((s) => s.sequence > currentStop.sequence);
+    await prisma.commerceCheckoutPickupStop.update({
+      where: { id: currentStop.id },
+      data: { status: "COLLECTED", collectedAt: new Date() }
+    });
+    await prisma.commerceOrder.update({
+      where: { id: commerceOrder.id },
+      data: { status: "PICKED_UP" }
+    });
+
+    if (remaining.length > 0) {
+      const nextStop = remaining.sort((a, b) => a.sequence - b.sequence)[0]!;
+      const nextOrder = checkout.orders.find((o) => o.id === nextStop.commerceOrderId);
+      const nextMerchant = nextOrder?.merchant;
+      await prisma.commerceCheckout.update({
+        where: { id: checkout.id },
+        data: { currentPickupIndex: nextStop.sequence }
+      });
+      const updated = await prisma.gig.update({
+        where: { id: gigId },
+        data: {
+          status: GigStatus.WORKER_EN_ROUTE,
+          pickupPinFailCount: 0,
+          pickupPinLockedUntil: null,
+          ...(nextMerchant
+            ? {
+                latitude: nextMerchant.latitude,
+                longitude: nextMerchant.longitude,
+                formattedAddress: `${nextMerchant.name}, ${nextMerchant.locationLabel}`,
+                addressLine1: nextMerchant.locationLabel,
+                pickupContactName: (nextMerchant.contactName?.trim() || nextMerchant.name).slice(0, 80),
+                pickupInstructions: `Pickup ${nextStop.sequence + 1} of ${checkout.pickupStops.length} · ${nextMerchant.name}`
+              }
+            : {})
+        },
+        include: { assignments: true, serviceCategory: true, payment: true }
+      });
+      if (io) {
+        io.to(`gig:${gigId}`).emit("gig:status", {
+          gigId,
+          status: GigStatus.WORKER_EN_ROUTE,
+          gig: stripPinsForCourierSafe(updated as unknown as Record<string, unknown>)
+        });
+      }
+      logDutsFlow("PACKAGE_COLLECTED", {
+        gigId,
+        userId: courierUserId,
+        userRole: "WORKER",
+        fulfillmentType: "DELIVERY",
+        checkoutId: checkout.id,
+        stop: currentStop.sequence
+      });
+      return stripPinsForCourierSafe(updated as unknown as Record<string, unknown>);
+    }
   }
 
   const updated = await prisma.gig.update({
@@ -632,9 +698,11 @@ export async function confirmAssistedPickup(gigId: string, courierUserId: string
       "INVALID_STATUS_TRANSITION"
     );
   }
-  const order = await prisma.commerceOrder.findFirst({
-    where: { linkedDeliveryGigId: gigId }
-  });
+  const order =
+    (await (await import("../commerce/multi-shop-checkout.service.js")).currentChildOrderForGig(gigId)) ??
+    (await prisma.commerceOrder.findFirst({
+      where: { linkedDeliveryGigId: gigId }
+    }));
   if (!order) {
     throw new AppError("This delivery is not a shop order.", 409, "NOT_COMMERCE_DELIVERY");
   }
@@ -676,9 +744,11 @@ export async function reportAssistedPickupProblem(gigId: string, courierUserId: 
   ) {
     throw new AppError("Cannot report a shop problem in this delivery state.", 409, "INVALID_STATUS_TRANSITION");
   }
-  const order = await prisma.commerceOrder.findFirst({
-    where: { linkedDeliveryGigId: gigId }
-  });
+  const order =
+    (await (await import("../commerce/multi-shop-checkout.service.js")).currentChildOrderForGig(gigId)) ??
+    (await prisma.commerceOrder.findFirst({
+      where: { linkedDeliveryGigId: gigId }
+    }));
   if (!order) {
     throw new AppError("This delivery is not a shop order.", 409, "NOT_COMMERCE_DELIVERY");
   }
@@ -690,6 +760,14 @@ export async function reportAssistedPickupProblem(gigId: string, courierUserId: 
     where: { id: order.id },
     data: { notes }
   });
+  if (order.checkoutId) {
+    const { markCheckoutNeedsAttention } = await import("../commerce/multi-shop-checkout.service.js");
+    await markCheckoutNeedsAttention(order.checkoutId, FULFILLMENT_NOTE.PICKUP_PROBLEM);
+    await prisma.commerceCheckoutPickupStop.updateMany({
+      where: { commerceOrderId: order.id },
+      data: { status: "PROBLEM" }
+    });
+  }
   logDutsFlow("COMMERCE_ASSISTED_PICKUP_PROBLEM", {
     gigId,
     userId: courierUserId,

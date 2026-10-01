@@ -51,7 +51,7 @@ async function notifyAfterProviderResult(result: {
   if (result.applied && result.status === "PAID" && !result.duplicate) {
     const order = await prisma.commerceOrder.findUnique({
       where: { id: result.orderId },
-      include: { merchant: true, items: true, customer: true }
+      include: { merchant: true, items: true, customer: true, checkout: true }
     });
     if (order?.customerWhatsAppPhone) {
       const { notifyCustomerStatus, notifyMerchantNewOrder } = await import(
@@ -63,6 +63,16 @@ async function notifyAfterProviderResult(result: {
         formatEcoCashPaid(order.totalCents)
       );
       await notifyMerchantNewOrder(order);
+
+      if (order.checkoutId) {
+        const siblings = await prisma.commerceOrder.findMany({
+          where: { checkoutId: order.checkoutId, id: { not: order.id } },
+          include: { merchant: true, items: true, customer: true }
+        });
+        for (const sibling of siblings) {
+          await notifyMerchantNewOrder(sibling);
+        }
+      }
 
       const { WhatsAppConversationState, WhatsAppParty } = await import("@prisma/client");
       const conv = await prisma.whatsAppConversation.findUnique({

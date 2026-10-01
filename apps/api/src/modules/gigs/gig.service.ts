@@ -1151,7 +1151,57 @@ export async function sendChatMessage(gigId: string, userId: string, body: strin
   return persistAndBroadcastChatMessage(io, { gigId, senderId: userId, body });
 }
 
-async function attachCommercePickupContext<T extends { id: string }>(gig: T) {
+async function attachCommercePickupContext<T extends { id: string; status?: string }>(gig: T) {
+  const { findCheckoutForGig, currentChildOrderForGig } = await import(
+    "../commerce/multi-shop-checkout.service.js"
+  );
+  const checkout = await findCheckoutForGig(gig.id);
+  if (checkout) {
+    const current = await currentChildOrderForGig(gig.id);
+    const order = current ?? checkout.orders[0];
+    if (!order) return gig;
+    const confirmationRequired = isAssistedPickupConfirmationRequired({
+      notes: order.notes,
+      merchantAcceptedAt: order.merchantAcceptedAt
+    });
+    const problemReported = hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.PICKUP_PROBLEM);
+    const merchantConfirmed = Boolean(order.merchantAcceptedAt);
+    const stops = checkout.pickupStops
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((s) => {
+        const child = checkout.orders.find((o) => o.id === s.commerceOrderId);
+        return {
+          shopName: child?.merchant.name ?? "Shop",
+          sequence: s.sequence,
+          status: s.status,
+          current: s.commerceOrderId === order.id
+        };
+      });
+    const pickupCount = stops.length;
+    const pickupIndex = (stops.find((s) => s.current)?.sequence ?? 0) + 1;
+    return {
+      ...gig,
+      commercePickup: {
+        shopName: order.merchant.name,
+        items: order.items.map((i) => ({ name: i.productNameSnapshot, quantity: i.quantity })),
+        merchantConfirmed,
+        confirmationRequired,
+        itemsConfirmed: hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.PICKUP_CONFIRMED),
+        problemReported,
+        pickupIndex,
+        pickupCount,
+        headline: `${pickupCount} pickups · 1 delivery`,
+        currentLabel: `Pickup ${pickupIndex} of ${pickupCount}`,
+        stops,
+        warning:
+          isAssistedFulfillment(order.notes) && !merchantConfirmed
+            ? "Merchant has not confirmed this order yet. Please confirm availability with the shop before collecting."
+            : null
+      }
+    };
+  }
+
   const order = await prisma.commerceOrder.findFirst({
     where: { linkedDeliveryGigId: gig.id },
     include: {

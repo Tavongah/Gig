@@ -11,14 +11,13 @@ import { productCardMeta } from "../../lib/storefront-ui";
 import { alcoholPurchaseAllowed, isSmartBasketEnabled } from "../../lib/storefront-categories";
 import { StoreHeader, StorePage } from "../../components/StoreHeader";
 import type { RootStackParamList } from "../../navigation/types";
-import { useCommerceCartStore } from "../../stores/commerce-cart.store";
+import { tryAddOfferToCart } from "../../lib/storefront-cart";
 import { useDesiredBasketStore } from "../../stores/desired-basket.store";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProductDetail">;
 
 export function ProductDetailScreen({ route, navigation }: Props) {
   const browse = useShopBrowse();
-  const addOffer = useCommerceCartStore((s) => s.addOffer);
   const addToShoppingListStore = useDesiredBasketStore((s) => s.addItem);
   const smartBasket = isSmartBasketEnabled();
   const [imgFailed, setImgFailed] = useState(false);
@@ -68,16 +67,20 @@ export function ProductDetailScreen({ route, navigation }: Props) {
     if (!product) return;
     if (!alcoholPurchaseAllowed(product.category)) return;
     if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
-    addOffer({
-      productId: offer.productId,
-      catalogProductId: product.catalogProductId,
-      name: product.name,
-      imageUrl: product.imageUrl,
-      sizeLabel: product.sizeLabel,
-      unitPriceCents: offer.priceCents,
-      merchantId: offer.merchantId,
-      merchantName: offer.merchantName
-    });
+    void tryAddOfferToCart(
+      {
+        productId: offer.productId,
+        catalogProductId: product.catalogProductId,
+        name: product.name,
+        imageUrl: product.imageUrl,
+        sizeLabel: product.sizeLabel,
+        unitPriceCents: offer.priceCents,
+        merchantId: offer.merchantId,
+        merchantName: offer.merchantName
+      },
+      browse.geo,
+      browse.token
+    );
   }
 
   const imageCanvas = (

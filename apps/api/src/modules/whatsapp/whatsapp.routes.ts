@@ -386,15 +386,29 @@ commerceAdminRouter.get("/orders", async (_req, res, next) => {
         customer: { select: { id: true, fullName: true, phoneNumber: true } },
         commerceCustomer: { select: { id: true, displayName: true, whatsappPhone: true } },
         items: true,
+        checkout: { select: { id: true, checkoutNumber: true, status: true, totalCents: true, paymentStatus: true } },
         linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true, updatedAt: true } }
       }
     });
     const orders = raw.map((o) => ({
       ...o,
+      displayNumber: o.checkout
+        ? `${o.checkout.checkoutNumber}-${o.fulfillmentLabel ?? "?"}`
+        : o.orderNumber,
+      parentCheckout: o.checkout
+        ? {
+            id: o.checkout.id,
+            orderNumber: o.checkout.checkoutNumber,
+            status: o.checkout.status,
+            paymentStatus: o.checkout.paymentStatus,
+            totalCents: o.checkout.totalCents,
+            shopCount: undefined as number | undefined
+          }
+        : null,
       fulfillmentIssue: fulfillmentAdminLabel({
         notes: o.notes,
         status: o.status,
-        hasCourier: Boolean(o.linkedDeliveryGig?.assignedWorkerId)
+        hasCourier: Boolean(o.linkedDeliveryGig?.assignedWorkerId) || Boolean(o.checkout)
       }),
       waitingSince: o.confirmedAt ?? o.createdAt
     }));

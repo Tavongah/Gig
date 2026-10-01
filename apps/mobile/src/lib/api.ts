@@ -233,6 +233,11 @@ export interface GigDetail {
     confirmationRequired: boolean;
     itemsConfirmed: boolean;
     problemReported: boolean;
+    pickupIndex?: number;
+    pickupCount?: number;
+    headline?: string;
+    currentLabel?: string;
+    stops?: Array<{ shopName: string; sequence: number; status: string; current: boolean }>;
     warning?: string | null;
   };
   offer?: {
@@ -419,6 +424,9 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       ALCOHOL_DISABLED: "Alcohol ordering isn't available yet.",
       MERCHANT_CLOSED: "This shop is not available right now.",
       MULTI_STORE_BASKET: "Your basket has items from more than one shop. Keep one shop per order.",
+      SHOP_LIMIT_REACHED: "Your delivery already includes 3 shops. Remove a shop before adding this item.",
+      ROUTE_NOT_ELIGIBLE:
+        "This shop is too far from the shops already in your delivery. You can place it as a separate order.",
       EMPTY_BASKET: "Your cart is empty.",
       FEATURE_DISABLED: "This shopping option isn't available right now.",
       BASKET_NO_MATCH: "This shop can't fulfill these items right now."
@@ -889,6 +897,30 @@ export const api = {
   commerceShoppingAreas: () =>
     request<{ areas: Array<{ id: string; name: string; shopCount: number }> }>("/commerce/shopping-areas"),
 
+  commercePublicConfig: () =>
+    request<{
+      whatsappE164: string | null;
+      whatsappDigits: string | null;
+      smartBasketEnabled: boolean;
+      multiShopCheckoutEnabled: boolean;
+      maxShopsPerCheckout: number;
+    }>("/commerce/public-config"),
+
+  commerceCartCanJoin: (
+    payload: {
+      lat: number;
+      lng: number;
+      currentMerchantIds: string[];
+      newMerchantId: string;
+    },
+    token?: string
+  ) =>
+    request<{ ok: true; shopCount: number; message: string | null }>(
+      "/commerce/cart/can-join",
+      { method: "POST", body: JSON.stringify(payload) },
+      token
+    ),
+
   commerceNearbyShops: (geo: CommerceBrowseGeo, token?: string) =>
     request<{
       shops: Array<{
@@ -1030,6 +1062,14 @@ export const api = {
       totalCents: number;
       currency: string;
       deliveryQuoteStatus: "final" | "deferred";
+      shopCount?: number;
+      merchants?: Array<{
+        id: string;
+        name: string;
+        distanceKm: number | null;
+        itemsSubtotalCents: number;
+        itemCount: number;
+      }>;
     }>("/commerce/cart/quote", { method: "POST", body: JSON.stringify(payload) }, token),
 
   commerceCheckout: (
@@ -1095,8 +1135,11 @@ export const api = {
           quantity: number;
           unitPriceCents: number;
           lineTotalCents: number;
+          shopName?: string;
         }>;
         deliveryStatus: string | null;
+        shopCount?: number;
+        pickupProgress?: Array<{ shopName: string; collected: boolean }>;
       };
     }>(`/commerce/orders/${orderId}`, {}, token),
 

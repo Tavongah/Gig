@@ -11,13 +11,12 @@ import { api } from "../../lib/api";
 import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import type { RootStackParamList } from "../../navigation/types";
-import { useCommerceCartStore } from "../../stores/commerce-cart.store";
+import { tryAddOfferToCart } from "../../lib/storefront-cart";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ShopDetail">;
 
 export function ShopDetailScreen({ route, navigation }: Props) {
   const browse = useShopBrowse();
-  const addOffer = useCommerceCartStore((s) => s.addOffer);
   const [q, setQ] = useState("");
 
   const shopQuery = useQuery({
@@ -92,16 +91,20 @@ export function ShopDetailScreen({ route, navigation }: Props) {
               onAdd={(p) => {
                 if (!alcoholPurchaseAllowed(p.category)) return;
                 if (!isProductCardPurchasable(p) || !p.productId || p.fromPriceCents == null) return;
-                addOffer({
-                  productId: p.productId,
-                  catalogProductId: p.catalogProductId,
-                  name: p.name,
-                  imageUrl: p.imageUrl,
-                  sizeLabel: p.sizeLabel,
-                  unitPriceCents: p.fromPriceCents,
-                  merchantId: shop.id,
-                  merchantName: shop.name
-                });
+                void tryAddOfferToCart(
+                  {
+                    productId: p.productId,
+                    catalogProductId: p.catalogProductId,
+                    name: p.name,
+                    imageUrl: p.imageUrl,
+                    sizeLabel: p.sizeLabel,
+                    unitPriceCents: p.fromPriceCents,
+                    merchantId: shop.id,
+                    merchantName: shop.name
+                  },
+                  browse.geo,
+                  browse.token
+                );
               }}
             />
           </View>

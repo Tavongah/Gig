@@ -74,7 +74,9 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
   return (
     <ScrollView className="flex-1 bg-background px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>
       <Text className="text-2xl font-black text-ink">Checkout</Text>
-      <Text className="mt-2 text-base text-muted">Shop: {merchantName}</Text>
+      <Text className="mt-2 text-base text-muted">
+        {lines.length ? `${new Set(lines.map((l) => l.merchantId)).size > 1 ? `${new Set(lines.map((l) => l.merchantId)).size} shops` : merchantName}` : "Shop"}
+      </Text>
       <Text className="mt-1 text-base text-muted">Deliver to: {location?.label ?? "—"}</Text>
 
       <Text className="mt-6 text-lg font-extrabold text-ink">Choose payment</Text>

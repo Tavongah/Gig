@@ -21,7 +21,7 @@ import { createGuestHandoff, publicWhatsAppDigits } from "./guest-handoff.servic
 import { listShoppingAreas } from "./shopping-areas.js";
 import { logDutsFlow } from "../../lib/flow-log.js";
 import { matchSmartBasket, selectSmartBasket } from "./smart-basket.service.js";
-import { parseSmartBasketEnabled } from "@gigflow/shared";
+import { parseSmartBasketEnabled, parseMultiShopCheckoutEnabled, parseMaxShopsPerCheckout } from "@gigflow/shared";
 
 const geoQuery = z
   .object({
@@ -67,7 +67,11 @@ customerCommerceRouter.get("/public-config", (_req, res) => {
   res.json({
     whatsappE164: digits ? `+${digits}` : null,
     whatsappDigits: digits,
-    smartBasketEnabled: parseSmartBasketEnabled(process.env.SMART_BASKET_ENABLED)
+    smartBasketEnabled: parseSmartBasketEnabled(process.env.SMART_BASKET_ENABLED),
+    multiShopCheckoutEnabled: parseMultiShopCheckoutEnabled(process.env.MULTI_SHOP_CHECKOUT_ENABLED),
+    maxShopsPerCheckout: parseMaxShopsPerCheckout(
+      process.env.MAX_SHOPS_PER_CHECKOUT ?? process.env.MULTI_SHOP_MAX_SHOPS
+    )
   });
 });
 
@@ -168,6 +172,22 @@ const quoteSchema = z
 customerCommerceRouter.post("/cart/quote", validateBody(quoteSchema), async (req, res, next) => {
   try {
     res.json(await quoteCart(req.body));
+  } catch (err) {
+    next(err);
+  }
+});
+
+const joinShopSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  currentMerchantIds: z.array(z.string().uuid()).max(3),
+  newMerchantId: z.string().uuid()
+});
+
+customerCommerceRouter.post("/cart/can-join", validateBody(joinShopSchema), async (req, res, next) => {
+  try {
+    const { canJoinShop } = await import("./multi-shop-checkout.service.js");
+    res.json(await canJoinShop(req.body));
   } catch (err) {
     next(err);
   }

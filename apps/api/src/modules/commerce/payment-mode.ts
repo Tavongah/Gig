@@ -1,5 +1,5 @@
 import { CommercePaymentMethod, CommercePaymentStatus } from "@prisma/client";
-import { parseGuaranteedOrderIntakeEnabled } from "@gigflow/shared";
+import { parseGuaranteedOrderIntakeEnabled, parseMultiShopCheckoutEnabled } from "@gigflow/shared";
 import { AppError } from "../../lib/errors.js";
 import { getAppEnv, isPilotOrStagingEnv, isProductionEnv } from "../../lib/production-guards.js";
 
@@ -67,6 +67,11 @@ export function getMerchantResponseTimeoutSeconds(): number {
 /** Merchant-silence fallback + persistent courier search. Off unless explicitly enabled. */
 export function isGuaranteedOrderIntakeEnabled(): boolean {
   return parseGuaranteedOrderIntakeEnabled(process.env.GUARANTEED_ORDER_INTAKE_ENABLED);
+}
+
+/** Multi-shop combined checkout. Default FALSE — do not enable publicly. */
+export function isMultiShopCheckoutEnabled(): boolean {
+  return parseMultiShopCheckoutEnabled(process.env.MULTI_SHOP_CHECKOUT_ENABLED);
 }
 
 /** Bounded courier rebroadcast interval (default 2 minutes). */

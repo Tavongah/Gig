@@ -210,6 +210,7 @@ model User {
   earningsTransactions WorkerEarningsTransaction[]
   ownedMerchants       Merchant[]                  @relation("MerchantOwner")
   commerceOrders       CommerceOrder[]             @relation("CommerceOrderUser")
+  commerceCheckouts    CommerceCheckout[]          @relation("CommerceCheckoutUser")
   commerceCustomers    CommerceCustomer[]          @relation("CommerceCustomerUser")
 }
 
@@ -414,6 +415,7 @@ model Gig {
   chatThread            ChatThread?
   notifications         Notification[]
   commerceOrder         CommerceOrder?
+  commerceCheckout      CommerceCheckout?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
@@ -904,6 +906,7 @@ model CommerceCustomer {
   displayName    String?
   source         CommerceCustomerSource
   orders         CommerceOrder[]
+  checkouts      CommerceCheckout[]
   conversations  WhatsAppConversation[]
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
@@ -925,6 +928,11 @@ model CommerceOrder {
   commerceCustomer     CommerceCustomer?     @relation(fields: [commerceCustomerId], references: [id], onDelete: Restrict)
   merchantId           String
   merchant             Merchant              @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  /** Parent customer checkout when this order is a multi-shop fulfillment. Null for historical / one-shop orders. */
+  checkoutId           String?
+  checkout             CommerceCheckout?     @relation(fields: [checkoutId], references: [id], onDelete: Restrict)
+  /** Merchant-facing suffix A/B/C under the parent checkout number. */
+  fulfillmentLabel     String?
   status               CommerceOrderStatus   @default(DRAFT)
   paymentStatus        CommercePaymentStatus @default(PENDING)
   paymentMethod        CommercePaymentMethod @default(CASH)
@@ -945,6 +953,7 @@ model CommerceOrder {
   merchantRespondBy    DateTime?
   items                CommerceOrderItem[]
   paymentAttempts      CommercePaymentAttempt[]
+  pickupStop           CommerceCheckoutPickupStop?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   confirmedAt          DateTime?
@@ -956,6 +965,7 @@ model CommerceOrder {
   @@index([merchantId, status])
   @@index([customerId, status])
   @@index([commerceCustomerId, status])
+  @@index([checkoutId])
   @@index([status])
 }
 
@@ -972,6 +982,9 @@ model CommercePaymentAttempt {
   id                 String                        @id @default(uuid())
   commerceOrderId    String
   commerceOrder      CommerceOrder                 @relation(fields: [commerceOrderId], references: [id], onDelete: Cascade)
+  /** Parent checkout when this is the single customer payment for a multi-shop order. */
+  commerceCheckoutId String?
+  commerceCheckout   CommerceCheckout?             @relation(fields: [commerceCheckoutId], references: [id], onDelete: SetNull)
   provider           String
   providerPaymentId  String?
   /** Merchant-site reference sent to Paynow (unique). */
@@ -993,7 +1006,85 @@ model CommercePaymentAttempt {
 
   @@unique([provider, providerPaymentId])
   @@index([commerceOrderId, status])
+  @@index([commerceCheckoutId, status])
   @@index([status, expiresAt])
+}
+
+enum CommerceCheckoutStatus {
+  CONFIRMED
+  PAYMENT_PENDING
+  FULFILLING
+  NEEDS_ATTENTION
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  PAYMENT_FAILED
+}
+
+/**
+ * Parent customer checkout for 2–3 shop combined delivery.
+ * One-shop / historical orders do not create this row.
+ */
+model CommerceCheckout {
+  id                     String                  @id @default(uuid())
+  checkoutNumber         Int                     @unique @default(autoincrement())
+  customerId             String?
+  customer               User?                   @relation("CommerceCheckoutUser", fields: [customerId], references: [id], onDelete: Restrict)
+  commerceCustomerId     String?
+  commerceCustomer       CommerceCustomer?       @relation(fields: [commerceCustomerId], references: [id], onDelete: Restrict)
+  status                 CommerceCheckoutStatus  @default(CONFIRMED)
+  paymentStatus          CommercePaymentStatus   @default(PENDING)
+  paymentMethod          CommercePaymentMethod   @default(CASH)
+  orderSource            OrderSource             @default(APP)
+  itemsSubtotalCents     Int
+  deliveryFeeCents       Int
+  serviceFeeCents        Int                     @default(0)
+  totalCents             Int
+  currency               String                  @default("usd")
+  deliveryLabel          String
+  deliveryLatitude       Decimal                 @db.Decimal(9, 6)
+  deliveryLongitude      Decimal                 @db.Decimal(9, 6)
+  customerWhatsAppPhone  String?
+  linkedDeliveryGigId    String?                 @unique
+  linkedDeliveryGig      Gig?                    @relation(fields: [linkedDeliveryGigId], references: [id], onDelete: SetNull)
+  /** Ordered child CommerceOrder ids. */
+  pickupSequence         Json
+  currentPickupIndex     Int                     @default(0)
+  /** Authoritative merchant item allocations + delivery/service split. */
+  allocations            Json
+  notes                  String?
+  idempotencyKey         String?                 @unique
+  confirmedAt            DateTime?
+  cancelledAt            DateTime?
+  deliveredAt            DateTime?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  orders                 CommerceOrder[]
+  pickupStops            CommerceCheckoutPickupStop[]
+  paymentAttempts        CommercePaymentAttempt[]
+
+  @@index([customerId, status])
+  @@index([commerceCustomerId, status])
+  @@index([status])
+}
+
+model CommerceCheckoutPickupStop {
+  id               String            @id @default(uuid())
+  checkoutId       String
+  checkout         CommerceCheckout  @relation(fields: [checkoutId], references: [id], onDelete: Cascade)
+  commerceOrderId  String            @unique
+  commerceOrder    CommerceOrder     @relation(fields: [commerceOrderId], references: [id], onDelete: Restrict)
+  merchantId       String
+  sequence         Int
+  /** SHA-256 hash — never log plaintext. */
+  pickupPin        String
+  status           String            @default("PENDING")
+  arrivedAt        DateTime?
+  collectedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([checkoutId, sequence])
 }
 
 model CommerceOrderItem {

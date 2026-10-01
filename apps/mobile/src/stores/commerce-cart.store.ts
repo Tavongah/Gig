@@ -29,7 +29,9 @@ type CartState = {
   merchantName: string | null;
   hydrated: boolean;
   pendingCheckout: boolean;
-  addOffer: (line: Omit<CartLine, "quantity"> & { quantity?: number }) => boolean;
+  addOffer: (line: Omit<CartLine, "quantity"> & { quantity?: number }, options?: { allowMulti?: boolean }) => boolean;
+  notice: string | null;
+  clearNotice: () => void;
   setQuantity: (productId: string, quantity: number) => void;
   remove: (productId: string) => void;
   clear: () => void;
@@ -78,11 +80,14 @@ export const useCommerceCartStore = create<CartState>((set, get) => ({
   merchantName: null,
   hydrated: false,
   pendingCheckout: false,
+  notice: null,
 
-  addOffer: (input) => {
+  clearNotice: () => set({ notice: null }),
+
+  addOffer: (input, options) => {
     if (!input.productId || !input.merchantId) return false;
     const state = get();
-    if (state.merchantId && state.merchantId !== input.merchantId) {
+    if (state.merchantId && state.merchantId !== input.merchantId && !options?.allowMulti) {
       Alert.alert(
         "Different shop",
         "This item is from another shop. Starting a new basket will replace your current basket.",
@@ -95,13 +100,40 @@ export const useCommerceCartStore = create<CartState>((set, get) => ({
               set({
                 merchantId: input.merchantId,
                 merchantName: input.merchantName,
-                lines: [{ ...input, quantity: input.quantity ?? 1 }]
+                lines: [{ ...input, quantity: input.quantity ?? 1 }],
+                notice: null
               });
             }
           }
         ]
       );
       return false;
+    }
+
+    if (options?.allowMulti && state.merchantId && state.merchantId !== input.merchantId) {
+      const shops = new Set(state.lines.map((l) => l.merchantId));
+      shops.add(input.merchantId);
+      const shopCount = shops.size;
+      const notice =
+        shopCount > 1 ? `Added ✓  Your delivery now includes ${shopCount} nearby shops.` : null;
+      const qty = input.quantity ?? 1;
+      const existing = state.lines.find((l) => l.productId === input.productId);
+      if (existing) {
+        set({
+          lines: state.lines.map((l) =>
+            l.productId === input.productId
+              ? { ...l, quantity: Math.min(99, l.quantity + qty), unitPriceCents: input.unitPriceCents }
+              : l
+          ),
+          notice
+        });
+        return true;
+      }
+      set({
+        lines: [...state.lines, { ...input, quantity: qty }],
+        notice
+      });
+      return true;
     }
 
     const qty = input.quantity ?? 1;

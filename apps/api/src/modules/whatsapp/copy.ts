@@ -214,14 +214,18 @@ export function formatMerchantNewOrder(input: {
   lines: string[];
   itemsTotalCents: number;
   totalCents?: number;
+  displayRef?: string;
 }): string {
   const total = input.totalCents ?? input.itemsTotalCents;
+  const heading = input.displayRef
+    ? `NEW DUTS ORDER #${input.displayRef}`
+    : `NEW ORDER #${input.orderNumber}`;
   return [
-    `NEW ORDER #${input.orderNumber}`,
+    heading,
     "",
     ...input.lines,
     "",
-    `Total: ${money(total)}`,
+    input.displayRef ? `Items: ${money(input.itemsTotalCents)}` : `Total: ${money(total)}`,
     "",
     "1. ACCEPT",
     "2. REJECT"

@@ -26,6 +26,13 @@ import { initiateMobileMoneyPaymentForOrder, cancelPendingPaymentAttempts } from
 import { ensureAppCommerceCustomer } from "./commerce-customer.service.js";
 import type { CommercePaymentMethod, OrderSource } from "@prisma/client";
 import { browserAccessibleMediaUrl } from "../../lib/catalog-media.js";
+import { isMultiShopCheckoutEnabled } from "./payment-mode.js";
+import {
+  createMultiShopCheckout,
+  getMultiShopRuntimeConfig,
+  presentCustomerCheckout,
+  quoteCombinedCart
+} from "./multi-shop-checkout.service.js";
 import {
   catalogOnlyAcc,
   clampStorefrontPage,
@@ -510,11 +517,60 @@ export async function quoteCart(input: {
   }
 
   if (merchantIds.size > 1) {
-    throw new AppError(
-      "Your basket has items from more than one shop. Keep one shop per order.",
-      409,
-      "MULTI_STORE_BASKET"
-    );
+    if (!isMultiShopCheckoutEnabled()) {
+      throw new AppError(
+        "Your basket has items from more than one shop. Keep one shop per order.",
+        409,
+        "MULTI_STORE_BASKET"
+      );
+    }
+    const cfg = getMultiShopRuntimeConfig();
+    if (merchantIds.size > cfg.maxShops) {
+      throw new AppError(
+        "Your delivery already includes 3 shops. Remove a shop before adding this item.",
+        409,
+        "SHOP_LIMIT_REACHED"
+      );
+    }
+    if (input.deferDelivery) {
+      const subtotalCents = basketLines.reduce((sum, line) => sum + line.lineTotalCents, 0);
+      const shops = [...merchantIds].map((id) => {
+        const merchant = products.find((p) => p.merchantId === id)?.merchant;
+        const shopLines = basketLines.filter((l) => l.merchantId === id);
+        return {
+          id,
+          name: merchant?.name ?? "Shop",
+          distanceKm: null as number | null,
+          itemsSubtotalCents: shopLines.reduce((s, l) => s + l.lineTotalCents, 0),
+          itemCount: shopLines.reduce((s, l) => s + l.quantity, 0)
+        };
+      });
+      return {
+        merchant: {
+          id: shops[0]!.id,
+          name: `${shops.length} shops`,
+          distanceKm: null as number | null
+        },
+        merchants: shops,
+        shopCount: shops.length,
+        lines: basketLines,
+        subtotalCents,
+        deliveryFeeCents: 0,
+        serviceFeeCents: 0,
+        totalCents: subtotalCents,
+        currency: "usd" as const,
+        deliveryQuoteStatus: "deferred" as const
+      };
+    }
+    if (input.lat == null || input.lng == null) {
+      throw new AppError("Delivery location is required to calculate delivery.", 400, "LOCATION_REQUIRED");
+    }
+    return quoteCombinedCart({
+      lat: input.lat,
+      lng: input.lng,
+      lines: basketLines,
+      merchantIds: [...merchantIds]
+    });
   }
 
   const merchantId = [...merchantIds][0]!;
@@ -537,7 +593,8 @@ export async function quoteCart(input: {
       serviceFeeCents: 0,
       totalCents: subtotalCents,
       currency: "usd" as const,
-      deliveryQuoteStatus: "deferred" as const
+      deliveryQuoteStatus: "deferred" as const,
+      shopCount: 1
     };
   }
 
@@ -567,7 +624,8 @@ export async function quoteCart(input: {
     },
     lines: basketLines,
     ...totals,
-    deliveryQuoteStatus: "final" as const
+    deliveryQuoteStatus: "final" as const,
+    shopCount: 1
   };
 }
 
@@ -595,6 +653,99 @@ export async function checkoutCart(input: {
       400,
       "ZB_ECOCASH_USD_ONLY"
     );
+  }
+
+  const shopCount = quote.shopCount ?? 1;
+  if (shopCount > 1) {
+    const { paymentStatusForMethod, resolveCommercePaymentMethod, assertCommercePaymentMethodAllowed } =
+      await import("./payment-mode.js");
+    const method = resolveCommercePaymentMethod(paymentMethod);
+    assertCommercePaymentMethodAllowed(method);
+    const checkout = await createMultiShopCheckout({
+      userId: input.userId,
+      lat: input.lat,
+      lng: input.lng,
+      deliveryLabel: input.deliveryLabel.trim() || "Delivery location",
+      lines: quote.lines,
+      paymentMethod: method,
+      paymentStatus: paymentStatusForMethod(method),
+      orderSource: "APP" as OrderSource,
+      customerPhone: input.customerPhone,
+      commerceCustomerId: commerceCustomer.id,
+      quote: quote as Awaited<ReturnType<typeof quoteCombinedCart>>
+    });
+
+    if (paymentMethod !== "ECOCASH") {
+      const children = await prisma.commerceOrder.findMany({
+        where: { checkoutId: checkout.id },
+        include: { merchant: true, items: true, customer: true, checkout: true }
+      });
+      const { notifyMerchantNewOrder } = await import("../whatsapp/merchant-handler.js");
+      for (const child of children) {
+        try {
+          await notifyMerchantNewOrder(child);
+        } catch {
+          /* non-blocking */
+        }
+      }
+    }
+
+    if (paymentMethod === "ECOCASH") {
+      if (!input.customerPhone) {
+        throw new AppError("Enter the EcoCash number you want to pay with.", 400, "INVALID_PAYER_PHONE");
+      }
+      const firstChild = checkout.orders[0];
+      if (!firstChild) {
+        throw new AppError("Checkout is missing shop orders.", 500, "CHECKOUT_INCOMPLETE");
+      }
+      try {
+        await initiateMobileMoneyPaymentForOrder({
+          commerceOrderId: firstChild.id,
+          payerPhoneRaw: input.customerPhone,
+          paymentMethod: "ECOCASH",
+          commerceCheckoutId: checkout.id
+        });
+      } catch (err) {
+        await prisma.commerceCheckout.update({
+          where: { id: checkout.id },
+          data: { paymentStatus: "PAYMENT_FAILED", status: "PAYMENT_FAILED" }
+        });
+        await prisma.commerceOrder.updateMany({
+          where: { checkoutId: checkout.id },
+          data: { paymentStatus: "PAYMENT_FAILED" }
+        });
+        throw err;
+      }
+    }
+
+    const fresh = await prisma.commerceCheckout.findUniqueOrThrow({
+      where: { id: checkout.id },
+      include: {
+        orders: {
+          include: {
+            merchant: { select: { id: true, name: true, locationLabel: true } },
+            items: true
+          }
+        },
+        linkedDeliveryGig: { select: { status: true, assignedWorkerId: true } },
+        pickupStops: true
+      }
+    });
+    const view = presentCustomerCheckout(fresh);
+    return {
+      order: {
+        id: view.id,
+        orderNumber: view.orderNumber,
+        status: view.status,
+        statusLabel: view.statusLabel ?? "Order confirmed",
+        totalCents: view.totalCents,
+        currency: view.currency,
+        merchantName: view.merchantName,
+        paymentStatus: view.paymentStatus,
+        paymentMethod: view.paymentMethod,
+        shopCount: view.shopCount
+      }
+    };
   }
 
   const order = await createConfirmedCommerceOrder({
@@ -647,44 +798,107 @@ export async function checkoutCart(input: {
 }
 
 export async function listCustomerCommerceOrders(userId: string) {
-  const orders = await prisma.commerceOrder.findMany({
-    where: { customerId: userId },
-    orderBy: { createdAt: "desc" },
-    take: 30,
-    include: {
-      merchant: { select: { id: true, name: true } },
-      items: true,
-      linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true } }
-    }
+  const [orders, checkouts] = await Promise.all([
+    prisma.commerceOrder.findMany({
+      where: { customerId: userId, checkoutId: null },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      include: {
+        merchant: { select: { id: true, name: true } },
+        items: true,
+        linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true } }
+      }
+    }),
+    prisma.commerceCheckout.findMany({
+      where: { customerId: userId },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      include: {
+        orders: {
+          include: {
+            merchant: { select: { id: true, name: true, locationLabel: true } },
+            items: true
+          }
+        },
+        linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true } },
+        pickupStops: true
+      }
+    })
+  ]);
+
+  const singles = orders.map((o) => ({
+    id: o.id,
+    orderNumber: o.orderNumber,
+    status: o.status,
+    statusLabel: commerceShopUiStatusLabel(
+      o.status as CommerceOrderStatus,
+      o.linkedDeliveryGig?.status ?? null
+    ),
+    fulfillmentHint: customerFulfillmentHint({
+      notes: o.notes,
+      status: o.status,
+      hasCourier: Boolean(o.linkedDeliveryGig?.assignedWorkerId)
+    }),
+    totalCents: o.totalCents,
+    currency: o.currency,
+    merchantName: o.merchant.name,
+    itemCount: o.items.reduce((s, i) => s + i.quantity, 0),
+    createdAt: o.createdAt,
+    paymentStatus: o.paymentStatus,
+    shopCount: 1
+  }));
+
+  const multi = checkouts.map((c) => {
+    const view = presentCustomerCheckout(c);
+    return {
+      id: view.id,
+      orderNumber: view.orderNumber,
+      status: view.status,
+      statusLabel: view.statusLabel ?? "Order confirmed",
+      fulfillmentHint: view.fulfillmentHint,
+      totalCents: view.totalCents,
+      currency: view.currency,
+      merchantName: view.merchantName,
+      itemCount: view.items.reduce((s, i) => s + i.quantity, 0),
+      createdAt: c.createdAt,
+      paymentStatus: view.paymentStatus,
+      shopCount: view.shopCount
+    };
   });
 
   return {
-    orders: orders.map((o) => ({
-      id: o.id,
-      orderNumber: o.orderNumber,
-      status: o.status,
-      statusLabel: commerceShopUiStatusLabel(
-        o.status as CommerceOrderStatus,
-        o.linkedDeliveryGig?.status ?? null
-      ),
-      fulfillmentHint: customerFulfillmentHint({
-        notes: o.notes,
-        status: o.status,
-        hasCourier: Boolean(o.linkedDeliveryGig?.assignedWorkerId)
-      }),
-      totalCents: o.totalCents,
-      currency: o.currency,
-      merchantName: o.merchant.name,
-      itemCount: o.items.reduce((s, i) => s + i.quantity, 0),
-      createdAt: o.createdAt,
-      paymentStatus: o.paymentStatus
-    }))
+    orders: [...singles, ...multi]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 30)
   };
 }
 
 export async function getCustomerCommerceOrder(userId: string, orderId: string) {
-  const order = await prisma.commerceOrder.findFirst({
+  const checkout = await prisma.commerceCheckout.findFirst({
     where: { id: orderId, customerId: userId },
+    include: {
+      orders: {
+        include: {
+          merchant: { select: { id: true, name: true, locationLabel: true } },
+          items: true
+        }
+      },
+      linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true } },
+      pickupStops: true
+    }
+  });
+  if (checkout) {
+    const view = presentCustomerCheckout(checkout);
+    return {
+      order: {
+        ...view,
+        statusLabel: view.statusLabel ?? "Order confirmed"
+      }
+    };
+  }
+
+  const order = await prisma.commerceOrder.findFirst({
+    where: { id: orderId, customerId: userId, checkoutId: null },
     include: {
       merchant: { select: { id: true, name: true, locationLabel: true } },
       items: true,

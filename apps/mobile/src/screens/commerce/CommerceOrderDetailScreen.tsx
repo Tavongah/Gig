@@ -33,7 +33,21 @@ export function CommerceOrderDetailScreen({ route }: Props) {
       {order.fulfillmentHint ? (
         <Text className="mt-2 text-base text-muted">{order.fulfillmentHint}</Text>
       ) : null}
-      <Text className="mt-4 text-base text-muted">Shop: {order.merchant.name}</Text>
+      {order.shopCount && order.shopCount > 1 ? (
+        <Text className="mt-2 text-sm font-semibold text-muted">{order.shopCount} shops • One delivery</Text>
+      ) : null}
+      {order.pickupProgress?.length ? (
+        <View className="mt-4 gap-1">
+          <Text className="text-base font-bold text-ink">Picking up your order</Text>
+          {order.pickupProgress.map((p) => (
+            <Text key={p.shopName} className="text-base text-ink">
+              {p.collected ? "✓" : "•"} {p.shopName}
+            </Text>
+          ))}
+        </View>
+      ) : (
+        <Text className="mt-4 text-base text-muted">Shop: {order.merchant.name}</Text>
+      )}
       <Text className="mt-1 text-base text-muted">Deliver to: {order.deliveryLabel}</Text>
 
       <View className="mt-6 gap-2">

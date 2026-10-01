@@ -56,10 +56,17 @@ export async function notifyMerchantNewOrder(
   order: CommerceOrder & {
     merchant: { whatsappPhone: string; name: string };
     items: Array<{ quantity: number; productNameSnapshot: string; lineTotalCents: number }>;
+    checkout?: { checkoutNumber: number } | null;
+    fulfillmentLabel?: string | null;
   }
 ): Promise<void> {
+  const displayRef =
+    order.checkout?.checkoutNumber && order.fulfillmentLabel
+      ? `${order.checkout.checkoutNumber}-${order.fulfillmentLabel}`
+      : undefined;
   const body = formatMerchantNewOrder({
     orderNumber: order.orderNumber,
+    displayRef,
     lines: order.items.map((i) => `${i.quantity} × ${i.productNameSnapshot}`),
     itemsTotalCents: order.subtotalCents,
     totalCents: order.totalCents
@@ -152,6 +159,9 @@ export async function handleMerchantWhatsAppMessage(
   const acceptBtn = buttonId.match(/^accept_(\d+)$/);
   const rejectBtn = buttonId.match(/^reject_(\d+)$/);
   const readyBtn = buttonId.match(/^ready_(\d+)$/);
+  const acceptRef = text.match(/^accept\s+(\d+\s*[-–]\s*[A-C])$/i);
+  const rejectRef = text.match(/^reject\s+(\d+\s*[-–]\s*[A-C])$/i);
+  const readyRef = text.match(/^ready(?:\s+for\s+pickup)?\s+(\d+\s*[-–]\s*[A-C])$/i);
 
   async function resolveBareOrderNumber(
     action: "accept" | "reject" | "ready"
@@ -181,15 +191,18 @@ export async function handleMerchantWhatsAppMessage(
   try {
     if (
       acceptBtn ||
+      acceptRef ||
       /^accept\s+(\d+)$/i.test(text) ||
       /^accept$/i.test(text) ||
       /^(1|yes)$/i.test(text.trim())
     ) {
-      let num: number | null = acceptBtn
+      let num: string | number | null = acceptBtn
         ? Number(acceptBtn[1])
-        : /^accept\s+(\d+)$/i.test(text)
-          ? Number(text.match(/^accept\s+(\d+)$/i)![1])
-          : null;
+        : acceptRef
+          ? acceptRef[1]!.replace(/\s+/g, "")
+          : /^accept\s+(\d+)$/i.test(text)
+            ? Number(text.match(/^accept\s+(\d+)$/i)![1])
+            : null;
       if (num == null) num = await resolveBareOrderNumber("accept");
       if (num == null) return { handled: true };
       const order = await merchantAcceptOrder(merchant.id, num);
@@ -202,15 +215,18 @@ export async function handleMerchantWhatsAppMessage(
 
     if (
       rejectBtn ||
+      rejectRef ||
       /^reject\s+(\d+)$/i.test(text) ||
       /^reject$/i.test(text) ||
       /^(2|no)$/i.test(text.trim())
     ) {
-      let num: number | null = rejectBtn
+      let num: string | number | null = rejectBtn
         ? Number(rejectBtn[1])
-        : /^reject\s+(\d+)$/i.test(text)
-          ? Number(text.match(/^reject\s+(\d+)$/i)![1])
-          : null;
+        : rejectRef
+          ? rejectRef[1]!.replace(/\s+/g, "")
+          : /^reject\s+(\d+)$/i.test(text)
+            ? Number(text.match(/^reject\s+(\d+)$/i)![1])
+            : null;
       if (num == null) num = await resolveBareOrderNumber("reject");
       if (num == null) return { handled: true };
       const order = await merchantRejectOrder(merchant.id, num);
@@ -230,19 +246,22 @@ export async function handleMerchantWhatsAppMessage(
 
     if (
       readyBtn ||
+      readyRef ||
       /order\s+(\d+)\s+is\s+ready/i.test(text) ||
       /^ready\s+(\d+)$/i.test(text) ||
       /^ready for pickup\s+(\d+)$/i.test(text) ||
       /^ready$/i.test(text)
     ) {
-      let num: number | null = readyBtn
+      let num: string | number | null = readyBtn
         ? Number(readyBtn[1])
-        : Number(
-            text.match(/order\s+(\d+)\s+is\s+ready/i)?.[1] ||
-              text.match(/^ready(?:\s+for\s+pickup)?\s+(\d+)$/i)?.[1] ||
-              NaN
-          );
-      if (!Number.isFinite(num)) num = await resolveBareOrderNumber("ready");
+        : readyRef
+          ? readyRef[1]!.replace(/\s+/g, "")
+          : Number(
+              text.match(/order\s+(\d+)\s+is\s+ready/i)?.[1] ||
+                text.match(/^ready(?:\s+for\s+pickup)?\s+(\d+)$/i)?.[1] ||
+                NaN
+            );
+      if (typeof num === "number" && !Number.isFinite(num)) num = await resolveBareOrderNumber("ready");
       if (num == null) return { handled: true };
       const { order } = await merchantMarkReadyForPickup(merchant.id, num, io);
       await wa.sendText(phone, formatMerchantReady(order.orderNumber));

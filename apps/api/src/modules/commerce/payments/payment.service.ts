@@ -74,6 +74,7 @@ export async function initiateMobileMoneyPaymentForOrder(input: {
   commerceOrderId: string;
   payerPhoneRaw: string;
   paymentMethod?: MobileMoneyMethod;
+  commerceCheckoutId?: string;
 }): Promise<{
   attempt: Awaited<ReturnType<typeof prisma.commercePaymentAttempt.create>>;
   displayLocal: string;
@@ -105,14 +106,22 @@ export async function initiateMobileMoneyPaymentForOrder(input: {
     where: { id: input.commerceOrderId }
   });
 
-  if (order.paymentStatus === CommercePaymentStatus.PAID) {
+  const checkoutId = input.commerceCheckoutId ?? order.checkoutId ?? null;
+  const checkout = checkoutId
+    ? await prisma.commerceCheckout.findUnique({ where: { id: checkoutId } })
+    : null;
+
+  if ((checkout ?? order).paymentStatus === CommercePaymentStatus.PAID) {
     throw new AppError("This order is already paid.", 409, "ALREADY_PAID");
   }
 
   const pending = await prisma.commercePaymentAttempt.findFirst({
     where: {
-      commerceOrderId: order.id,
-      status: { in: [CommercePaymentAttemptStatus.CREATED, CommercePaymentAttemptStatus.PENDING] }
+      status: { in: [CommercePaymentAttemptStatus.CREATED, CommercePaymentAttemptStatus.PENDING] },
+      OR: [
+        { commerceOrderId: order.id },
+        ...(checkout ? [{ commerceCheckoutId: checkout.id }] : [])
+      ]
     },
     orderBy: { createdAt: "desc" }
   });
@@ -139,17 +148,22 @@ export async function initiateMobileMoneyPaymentForOrder(input: {
     );
   }
 
+  const payAmountCents = checkout?.totalCents ?? order.totalCents;
+  const payCurrency = checkout?.currency ?? order.currency;
+  const payOrderNumber = checkout?.checkoutNumber ?? order.orderNumber;
+
   if (provider.name === "zb") {
-    assertDutsUsdCurrency(order.currency);
+    assertDutsUsdCurrency(payCurrency);
   }
 
   const attempt = await prisma.commercePaymentAttempt.create({
     data: {
       commerceOrderId: order.id,
+      commerceCheckoutId: checkout?.id ?? null,
       provider: provider.name,
       payerPhone: phone.e164,
-      amountCents: order.totalCents,
-      currency: order.currency,
+      amountCents: payAmountCents,
+      currency: payCurrency,
       status: CommercePaymentAttemptStatus.CREATED
     }
   });
@@ -157,10 +171,10 @@ export async function initiateMobileMoneyPaymentForOrder(input: {
   let initiated;
   try {
     initiated = await provider.initiatePayment({
-      commerceOrderId: order.id,
-      orderNumber: order.orderNumber,
-      amountCents: order.totalCents,
-      currency: order.currency,
+      commerceOrderId: checkout?.id ?? order.id,
+      orderNumber: payOrderNumber,
+      amountCents: payAmountCents,
+      currency: payCurrency,
       payerPhoneE164: phone.e164,
       attemptId: attempt.id,
       paymentMethod
@@ -189,19 +203,38 @@ export async function initiateMobileMoneyPaymentForOrder(input: {
     }
   });
 
-  await prisma.commerceOrder.update({
-    where: { id: order.id },
-    data: {
-      paymentMethod,
-      paymentStatus: CommercePaymentStatus.PAYMENT_PENDING
-    }
-  });
+  if (checkout) {
+    await prisma.commerceCheckout.update({
+      where: { id: checkout.id },
+      data: {
+        paymentMethod,
+        paymentStatus: CommercePaymentStatus.PAYMENT_PENDING,
+        status: "PAYMENT_PENDING"
+      }
+    });
+    await prisma.commerceOrder.updateMany({
+      where: { checkoutId: checkout.id },
+      data: {
+        paymentMethod,
+        paymentStatus: CommercePaymentStatus.PAYMENT_PENDING
+      }
+    });
+  } else {
+    await prisma.commerceOrder.update({
+      where: { id: order.id },
+      data: {
+        paymentMethod,
+        paymentStatus: CommercePaymentStatus.PAYMENT_PENDING
+      }
+    });
+  }
 
   logDutsFlow("COMMERCE_PAYMENT_INITIATED", {
     orderId: order.id,
-    orderNumber: order.orderNumber,
+    orderNumber: payOrderNumber,
+    checkoutId: checkout?.id,
     provider: provider.name,
-    amountCents: order.totalCents,
+    amountCents: payAmountCents,
     paymentMethod
   });
 
@@ -276,7 +309,7 @@ export async function applyProviderPaymentResult(
           ]
         }
       : { providerPaymentId: result.providerPaymentId },
-    include: { commerceOrder: { include: { merchant: true, items: true, customer: true } } }
+    include: { commerceOrder: { include: { merchant: true, items: true, customer: true } }, commerceCheckout: true }
   });
 
   if (!attempt) {
@@ -310,6 +343,14 @@ export async function applyProviderPaymentResult(
   }
 
   if (attempt.status === CommercePaymentAttemptStatus.PAID) {
+    return {
+      applied: false,
+      duplicate: true,
+      orderId: attempt.commerceOrderId,
+      status: "PAID"
+    };
+  }
+  if (attempt.commerceCheckout?.paymentStatus === CommercePaymentStatus.PAID) {
     return {
       applied: false,
       duplicate: true,
@@ -356,18 +397,42 @@ export async function applyProviderPaymentResult(
           ...(result.paynowReference ? { paynowReference: result.paynowReference } : {})
         }
       });
-      await tx.commerceOrder.update({
-        where: { id: attempt.commerceOrderId },
-        data: {
-          paymentStatus: CommercePaymentStatus.PAID,
-          paymentMethod: paidMethod,
-          status: CommerceOrderStatus.MERCHANT_PENDING,
-          confirmedAt: new Date(),
-          merchantRespondBy: new Date(
-            Date.now() + Number(process.env.COMMERCE_MERCHANT_TIMEOUT_SECONDS || 900) * 1000
-          )
-        }
-      });
+      const paidAt = new Date();
+      const respondBy = new Date(
+        Date.now() + Number(process.env.COMMERCE_MERCHANT_TIMEOUT_SECONDS || 900) * 1000
+      );
+      if (attempt.commerceCheckoutId) {
+        await tx.commerceCheckout.update({
+          where: { id: attempt.commerceCheckoutId },
+          data: {
+            paymentStatus: CommercePaymentStatus.PAID,
+            paymentMethod: paidMethod,
+            status: "CONFIRMED",
+            confirmedAt: paidAt
+          }
+        });
+        await tx.commerceOrder.updateMany({
+          where: { checkoutId: attempt.commerceCheckoutId },
+          data: {
+            paymentStatus: CommercePaymentStatus.PAID,
+            paymentMethod: paidMethod,
+            status: CommerceOrderStatus.MERCHANT_PENDING,
+            confirmedAt: paidAt,
+            merchantRespondBy: respondBy
+          }
+        });
+      } else {
+        await tx.commerceOrder.update({
+          where: { id: attempt.commerceOrderId },
+          data: {
+            paymentStatus: CommercePaymentStatus.PAID,
+            paymentMethod: paidMethod,
+            status: CommerceOrderStatus.MERCHANT_PENDING,
+            confirmedAt: paidAt,
+            merchantRespondBy: respondBy
+          }
+        });
+      }
     });
 
     logDutsFlow("COMMERCE_PAYMENT_PAID", {
@@ -400,6 +465,19 @@ export async function applyProviderPaymentResult(
       paymentStatus: CommercePaymentStatus.PAYMENT_FAILED
     }
   });
+  if (attempt.commerceCheckoutId) {
+    await prisma.commerceCheckout.update({
+      where: { id: attempt.commerceCheckoutId },
+      data: {
+        paymentStatus: CommercePaymentStatus.PAYMENT_FAILED,
+        status: "PAYMENT_FAILED"
+      }
+    });
+    await prisma.commerceOrder.updateMany({
+      where: { checkoutId: attempt.commerceCheckoutId },
+      data: { paymentStatus: CommercePaymentStatus.PAYMENT_FAILED }
+    });
+  }
 
   logDutsFlow("COMMERCE_PAYMENT_FAILED", {
     orderId: attempt.commerceOrderId,

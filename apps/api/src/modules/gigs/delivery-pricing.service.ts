@@ -40,6 +40,14 @@ export async function estimateDeliveryFee(input: {
   dropoff: { latitude: number; longitude: number };
 }): Promise<DeliveryPriceBreakdown> {
   const distanceKm = distanceKmBetween(input.pickup, input.dropoff);
+  return estimateDeliveryFeeForDistance(distanceKm);
+}
+
+/**
+ * V1 combined-route fee: same formula as a single pickup→dropoff,
+ * using the shortest haversine pickup permutation + customer.
+ */
+export async function estimateDeliveryFeeForDistance(distanceKm: number): Promise<DeliveryPriceBreakdown> {
   const config = await getDeliveryPricingConfig();
   return calculateDeliveryPrice(distanceKm, config);
 }
