@@ -361,6 +361,20 @@ export {
 } from "./storefront-categories.js";
 
 export {
+  FULFILLMENT_NOTE,
+  addFulfillmentNote,
+  customerFulfillmentHint,
+  fulfillmentAdminLabel,
+  hasFulfillmentNote,
+  isAssistedFulfillment,
+  isAssistedPickupConfirmationRequired,
+  needsFulfillmentAttention,
+  parseFulfillmentNotes,
+  parseGuaranteedOrderIntakeEnabled,
+  type FulfillmentNoteToken
+} from "./guaranteed-order-intake.js";
+
+export {
   compareSmartBasketMatches,
   coverageRatio,
   evaluateMerchantCoverage,

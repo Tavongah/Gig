@@ -71,10 +71,10 @@ async function bootstrap(): Promise<void> {
     void import("./modules/gigs/gig-workflow.service.js").then(({ autoApproveStaleGigs }) => autoApproveStaleGigs());
   }, 30 * 1000);
 
-  // Commerce: expire merchant-pending WhatsApp orders past merchantRespondBy.
+  // Commerce: merchant timeout + guaranteed intake rematch (bounded, 60s).
   setInterval(() => {
-    void import("./modules/commerce/order.service.js").then(({ expireStaleMerchantPendingOrders }) =>
-      expireStaleMerchantPendingOrders().catch(() => undefined)
+    void import("./modules/commerce/order.service.js").then(({ runGuaranteedOrderIntakeJobs }) =>
+      runGuaranteedOrderIntakeJobs(io).catch(() => undefined)
     );
   }, 60 * 1000);
 

@@ -357,9 +357,13 @@ export function App() {
           paymentStatus: string;
           orderSource: string;
           totalCents: number;
+          notes?: string | null;
+          fulfillmentIssue?: string | null;
+          waitingSince?: string;
           merchant?: { name: string };
           customer?: { fullName: string; phoneNumber: string | null };
-          linkedDeliveryGig?: { id: string; status: string } | null;
+          commerceCustomer?: { displayName: string | null; whatsappPhone: string | null };
+          linkedDeliveryGig?: { id: string; status: string; assignedWorkerId?: string | null } | null;
           createdAt: string;
         }>;
       }>("/admin/commerce/orders"),
@@ -699,7 +703,16 @@ export function App() {
                         </p>
                         <p>
                           <span className="status-badge tone-muted">{String(o.status).replace(/_/g, " ")}</span>
+                          {o.fulfillmentIssue ? (
+                            <span className="status-badge" style={{ marginLeft: 8 }}>
+                              {o.fulfillmentIssue}
+                            </span>
+                          ) : null}
                         </p>
+                        <p className="muted">Payment: {String(o.paymentStatus).replace(/_/g, " ")}</p>
+                        {o.waitingSince ? (
+                          <p className="muted">Waiting since {new Date(o.waitingSince).toLocaleString()}</p>
+                        ) : null}
                         {o.linkedDeliveryGig ? (
                           <p className="muted">Delivery: {o.linkedDeliveryGig.status}</p>
                         ) : commerceSubTab === "orders" ? (

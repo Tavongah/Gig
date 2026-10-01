@@ -13,7 +13,11 @@ import {
   getGigMatchingRadiusMiles,
   isWithinMatchingRadius,
   isTimeBasedPricing,
-  resolvePricingType
+  resolvePricingType,
+  isAssistedFulfillment,
+  isAssistedPickupConfirmationRequired,
+  hasFulfillmentNote,
+  FULFILLMENT_NOTE
 } from "@gigflow/shared";
 
 import type { CreateGigInput, GigEstimateInput } from "@gigflow/shared";
@@ -1098,11 +1102,13 @@ export async function getGigDetail(gigId: string, userId: string) {
       haversineMiles(workerLat, workerLng, Number(gig.latitude), Number(gig.longitude)) * 10
     ) / 10;
 
-    return sanitizeGigForViewer(gig, userId, {
-      distanceMiles,
-      viewerRoles: viewer?.roles,
-      isAdmin: viewer?.roles.includes(UserRole.ADMIN)
-    });
+    return attachCommercePickupContext(
+      sanitizeGigForViewer(gig, userId, {
+        distanceMiles,
+        viewerRoles: viewer?.roles,
+        isAdmin: viewer?.roles.includes(UserRole.ADMIN)
+      })
+    );
 
   }
 
@@ -1110,10 +1116,12 @@ export async function getGigDetail(gigId: string, userId: string) {
     void maybeNotifyGracePeriodExpired(gigId, userId);
   }
 
-  return sanitizeGigForViewer(gig, userId, {
-    viewerRoles: viewer?.roles,
-    isAdmin: viewer?.roles.includes(UserRole.ADMIN)
-  });
+  return attachCommercePickupContext(
+    sanitizeGigForViewer(gig, userId, {
+      viewerRoles: viewer?.roles,
+      isAdmin: viewer?.roles.includes(UserRole.ADMIN)
+    })
+  );
 
 }
 
@@ -1141,6 +1149,38 @@ export async function listChatMessages(gigId: string, userId: string) {
 export async function sendChatMessage(gigId: string, userId: string, body: string, io: Server) {
   const { persistAndBroadcastChatMessage } = await import("../realtime/realtime.service.js");
   return persistAndBroadcastChatMessage(io, { gigId, senderId: userId, body });
+}
+
+async function attachCommercePickupContext<T extends { id: string }>(gig: T) {
+  const order = await prisma.commerceOrder.findFirst({
+    where: { linkedDeliveryGigId: gig.id },
+    include: {
+      items: { select: { productNameSnapshot: true, quantity: true } },
+      merchant: { select: { name: true } }
+    }
+  });
+  if (!order) return gig;
+  const confirmationRequired = isAssistedPickupConfirmationRequired({
+    notes: order.notes,
+    merchantAcceptedAt: order.merchantAcceptedAt
+  });
+  const problemReported = hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.PICKUP_PROBLEM);
+  const merchantConfirmed = Boolean(order.merchantAcceptedAt);
+  return {
+    ...gig,
+    commercePickup: {
+      shopName: order.merchant.name,
+      items: order.items.map((i) => ({ name: i.productNameSnapshot, quantity: i.quantity })),
+      merchantConfirmed,
+      confirmationRequired,
+      itemsConfirmed: hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.PICKUP_CONFIRMED),
+      problemReported,
+      warning:
+        isAssistedFulfillment(order.notes) && !merchantConfirmed
+          ? "Merchant has not confirmed this order yet. Please confirm availability with the shop before collecting."
+          : null
+    }
+  };
 }
 
 

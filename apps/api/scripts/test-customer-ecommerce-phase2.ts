@@ -21,9 +21,9 @@ const statuses: CommerceOrderStatus[] = [
   "DELIVERED"
 ];
 
-assert.equal(commerceShopUiStatusLabel("MERCHANT_PENDING"), "Waiting for shop");
+assert.equal(commerceShopUiStatusLabel("MERCHANT_PENDING"), "Order confirmed");
 assert.equal(commerceShopUiStatusLabel("MERCHANT_ACCEPTED"), "Shop preparing order");
-assert.equal(commerceShopUiStatusLabel("READY_FOR_PICKUP"), "Ready for pickup");
+assert.equal(commerceShopUiStatusLabel("READY_FOR_PICKUP"), "Finding courier");
 assert.equal(commerceShopUiStatusLabel("COURIER_ASSIGNED"), "Courier assigned");
 assert.equal(commerceShopUiStatusLabel("PICKED_UP"), "Order picked up");
 assert.equal(commerceShopUiStatusLabel("OUT_FOR_DELIVERY"), "On the way");

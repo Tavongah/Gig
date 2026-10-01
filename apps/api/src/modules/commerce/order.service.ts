@@ -12,11 +12,16 @@ import type { Server } from "socket.io";
 import {
   canPurchaseStorefrontCategory,
   commerceCustomerStatusCopy,
+  FULFILLMENT_NOTE,
+  addFulfillmentNote,
+  hasFulfillmentNote,
+  isAssistedFulfillment,
   parseAlcoholCommerceEnabled
 } from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { logDutsFlow } from "../../lib/flow-log.js";
+import { getSocketServer } from "../../lib/socket.js";
 import { createDelivery } from "../gigs/delivery.service.js";
 import { estimateDeliveryFee } from "../gigs/delivery-pricing.service.js";
 import { getMarketplaceSettings, type BasketLine } from "./merchant.service.js";
@@ -25,7 +30,10 @@ import { normalizeMerchantPhone } from "./merchant.service.js";
 import { broadcastGigOffer } from "../realtime/realtime.service.js";
 import {
   assertCommercePaymentMethodAllowed,
+  getCourierRematchIntervalSeconds,
+  getFulfillmentAttentionMinutes,
   getMerchantResponseTimeoutSeconds,
+  isGuaranteedOrderIntakeEnabled,
   paymentStatusForMethod,
   resolveCommercePaymentMethod
 } from "./payment-mode.js";
@@ -346,36 +354,74 @@ export async function createConfirmedCommerceOrder(input: {
 
 export async function merchantAcceptOrder(merchantId: string, orderIdOrNumber: string | number) {
   const order = await findMerchantOrder(merchantId, orderIdOrNumber);
-  if (order.status !== CommerceOrderStatus.MERCHANT_PENDING) {
-    throw new AppError("Order is not awaiting merchant acceptance.", 409, "INVALID_ORDER_STATE");
+  if (order.status === CommerceOrderStatus.MERCHANT_PENDING) {
+    const updated = await prisma.commerceOrder.update({
+      where: { id: order.id },
+      data: {
+        status: CommerceOrderStatus.MERCHANT_ACCEPTED,
+        merchantAcceptedAt: new Date()
+      },
+      include: { items: true, merchant: true, customer: true }
+    });
+    logDutsFlow("COMMERCE_MERCHANT_ACCEPTED", {
+      userId: order.customerId ?? undefined,
+      orderId: order.id,
+      orderNumber: order.orderNumber
+    });
+    return updated;
   }
-  const updated = await prisma.commerceOrder.update({
-    where: { id: order.id },
-    data: {
-      status: CommerceOrderStatus.MERCHANT_ACCEPTED,
-      merchantAcceptedAt: new Date()
-    },
-    include: { items: true, merchant: true, customer: true }
-  });
-  logDutsFlow("COMMERCE_MERCHANT_ACCEPTED", {
-    userId: order.customerId ?? undefined,
-    orderId: order.id,
-    orderNumber: order.orderNumber
-  });
-  return updated;
+
+  const assistedLate =
+    isGuaranteedOrderIntakeEnabled() &&
+    isAssistedFulfillment(order.notes) &&
+    !order.merchantAcceptedAt &&
+    (order.status === CommerceOrderStatus.READY_FOR_PICKUP ||
+      order.status === CommerceOrderStatus.COURIER_ASSIGNED);
+  if (assistedLate) {
+    const updated = await prisma.commerceOrder.update({
+      where: { id: order.id },
+      data: { merchantAcceptedAt: new Date() },
+      include: { items: true, merchant: true, customer: true }
+    });
+    logDutsFlow("COMMERCE_MERCHANT_ACCEPTED", {
+      userId: order.customerId ?? undefined,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      reason: "late_accept_after_assist"
+    });
+    return updated;
+  }
+
+  throw new AppError("Order is not awaiting merchant acceptance.", 409, "INVALID_ORDER_STATE");
 }
 
 export async function merchantRejectOrder(merchantId: string, orderIdOrNumber: string | number) {
   const order = await findMerchantOrder(merchantId, orderIdOrNumber);
+  const assistedOpen =
+    isGuaranteedOrderIntakeEnabled() &&
+    isAssistedFulfillment(order.notes) &&
+    (order.status === CommerceOrderStatus.READY_FOR_PICKUP ||
+      order.status === CommerceOrderStatus.COURIER_ASSIGNED);
   if (
     order.status !== CommerceOrderStatus.MERCHANT_PENDING &&
-    order.status !== CommerceOrderStatus.MERCHANT_ACCEPTED
+    order.status !== CommerceOrderStatus.MERCHANT_ACCEPTED &&
+    !assistedOpen
   ) {
     throw new AppError("Order cannot be rejected in its current state.", 409, "INVALID_ORDER_STATE");
   }
+  const notes = isGuaranteedOrderIntakeEnabled()
+    ? addFulfillmentNote(
+        addFulfillmentNote(order.notes, FULFILLMENT_NOTE.MERCHANT_REJECTED),
+        FULFILLMENT_NOTE.NEEDS_ATTENTION
+      )
+    : order.notes;
   const updated = await prisma.commerceOrder.update({
     where: { id: order.id },
-    data: { status: CommerceOrderStatus.MERCHANT_REJECTED, cancelledAt: new Date() },
+    data: {
+      status: CommerceOrderStatus.MERCHANT_REJECTED,
+      cancelledAt: new Date(),
+      ...(notes != null ? { notes } : {})
+    },
     include: { items: true, merchant: true, customer: true }
   });
   logDutsFlow("COMMERCE_MERCHANT_REJECTED", {
@@ -422,48 +468,10 @@ export async function merchantMarkItemUnavailable(
   });
 }
 
-export async function merchantMarkReadyForPickup(
-  merchantId: string,
-  orderIdOrNumber: string | number,
+async function linkCommerceOrderDelivery(
+  order: Awaited<ReturnType<typeof findMerchantOrder>>,
   io: Server
 ) {
-  const order = await findMerchantOrder(merchantId, orderIdOrNumber);
-
-  // Idempotent: READY (or later) with an existing linked gig must not create a second delivery.
-  if (
-    order.linkedDeliveryGigId &&
-    (order.status === CommerceOrderStatus.READY_FOR_PICKUP ||
-      order.status === CommerceOrderStatus.COURIER_ASSIGNED ||
-      order.status === CommerceOrderStatus.PICKED_UP ||
-      order.status === CommerceOrderStatus.OUT_FOR_DELIVERY ||
-      order.status === CommerceOrderStatus.DELIVERED)
-  ) {
-    logDutsFlow("COMMERCE_READY_IDEMPOTENT", {
-      gigId: order.linkedDeliveryGigId,
-      orderId: order.id,
-      orderNumber: order.orderNumber
-    });
-    return {
-      order,
-      delivery: {
-        delivery: order.linkedDeliveryGig,
-        secrets: null,
-        idempotentReplay: true
-      }
-    };
-  }
-
-  if (order.status !== CommerceOrderStatus.MERCHANT_ACCEPTED) {
-    throw new AppError("Accept the order before marking it ready.", 409, "INVALID_ORDER_STATE");
-  }
-  if (order.items.some((i) => i.unavailableMarked)) {
-    throw new AppError(
-      "Resolve unavailable items before marking ready (customer must confirm changes).",
-      409,
-      "UNAVAILABLE_ITEMS_PENDING"
-    );
-  }
-
   const customer = order.customer;
   const commerceCustomer = order.commerceCustomer;
   const merchant = order.merchant;
@@ -472,10 +480,7 @@ export async function merchantMarkReadyForPickup(
   const deliveryClientId = await resolveDeliveryClientUserId(
     commerceCustomer ?? { userId: customer?.id ?? null }
   );
-  const contactName =
-    commerceCustomer?.displayName ||
-    customer?.fullName ||
-    "Customer";
+  const contactName = commerceCustomer?.displayName || customer?.fullName || "Customer";
   const pickupContactPhone = resolveMerchantPickupContactPhone(merchant);
   const dropoffContactPhone = resolveCustomerDropoffContactPhone({
     customerWhatsAppPhone: order.customerWhatsAppPhone,
@@ -485,9 +490,8 @@ export async function merchantMarkReadyForPickup(
   });
   const pickupContactName = (merchant.contactName?.trim() || merchant.name).slice(0, 80);
 
-  let deliveryResult: Awaited<ReturnType<typeof createDelivery>>;
   try {
-    deliveryResult = await createDelivery(
+    return await createDelivery(
       deliveryClientId,
       {
         pickup: {
@@ -537,17 +541,65 @@ export async function merchantMarkReadyForPickup(
     logDutsFlow("COMMERCE_READY_DELIVERY_FAILED", {
       orderId: order.id,
       orderNumber: order.orderNumber,
-      merchantId,
+      merchantId: order.merchantId,
       reason: error instanceof Error ? error.name : "unknown"
     });
     if (error instanceof AppError) throw error;
+    throw new AppError("Could not start delivery for this order.", 502, "DELIVERY_CREATE_FAILED");
+  }
+}
+
+function tryGetSocketServer(): Server | null {
+  try {
+    return getSocketServer();
+  } catch {
+    return null;
+  }
+}
+
+export async function merchantMarkReadyForPickup(
+  merchantId: string,
+  orderIdOrNumber: string | number,
+  io: Server
+) {
+  const order = await findMerchantOrder(merchantId, orderIdOrNumber);
+
+  // Idempotent: READY (or later) with an existing linked gig must not create a second delivery.
+  if (
+    order.linkedDeliveryGigId &&
+    (order.status === CommerceOrderStatus.READY_FOR_PICKUP ||
+      order.status === CommerceOrderStatus.COURIER_ASSIGNED ||
+      order.status === CommerceOrderStatus.PICKED_UP ||
+      order.status === CommerceOrderStatus.OUT_FOR_DELIVERY ||
+      order.status === CommerceOrderStatus.DELIVERED)
+  ) {
+    logDutsFlow("COMMERCE_READY_IDEMPOTENT", {
+      gigId: order.linkedDeliveryGigId,
+      orderId: order.id,
+      orderNumber: order.orderNumber
+    });
+    return {
+      order,
+      delivery: {
+        delivery: order.linkedDeliveryGig,
+        secrets: null,
+        idempotentReplay: true
+      }
+    };
+  }
+
+  if (order.status !== CommerceOrderStatus.MERCHANT_ACCEPTED) {
+    throw new AppError("Accept the order before marking it ready.", 409, "INVALID_ORDER_STATE");
+  }
+  if (order.items.some((i) => i.unavailableMarked)) {
     throw new AppError(
-      "Could not start delivery for this order.",
-      502,
-      "DELIVERY_CREATE_FAILED"
+      "Resolve unavailable items before marking ready (customer must confirm changes).",
+      409,
+      "UNAVAILABLE_ITEMS_PENDING"
     );
   }
 
+  const deliveryResult = await linkCommerceOrderDelivery(order, io);
   const gigId = (deliveryResult.delivery as { id: string }).id;
 
   const updated = await prisma.commerceOrder.update({
@@ -560,14 +612,13 @@ export async function merchantMarkReadyForPickup(
     include: { items: true, merchant: true, customer: true, commerceCustomer: true, linkedDeliveryGig: true }
   });
 
-  // Link must exist before opening courier matching (openMarketplace checks commerceOrder).
   if (!deliveryResult.idempotentReplay) {
     await openMarketplaceDeliveryForCouriers(gigId, io);
   }
 
   logDutsFlow("COMMERCE_READY_FOR_PICKUP", {
     gigId,
-    userId: customer?.id ?? commerceCustomer?.id ?? undefined,
+    userId: order.customer?.id ?? order.commerceCustomer?.id ?? undefined,
     orderId: order.id,
     orderNumber: order.orderNumber
   });
@@ -576,18 +627,24 @@ export async function merchantMarkReadyForPickup(
 }
 
 /** Expire MERCHANT_PENDING orders past merchantRespondBy. */
-export async function expireStaleMerchantPendingOrders(): Promise<number> {
+export async function expireStaleMerchantPendingOrders(io?: Server): Promise<number> {
   const now = new Date();
   const stale = await prisma.commerceOrder.findMany({
     where: {
       status: CommerceOrderStatus.MERCHANT_PENDING,
       merchantRespondBy: { lt: now }
     },
-    include: { merchant: true, customer: true }
+    include: { merchant: true, customer: true, commerceCustomer: true, items: true, linkedDeliveryGig: true }
   });
 
   let count = 0;
+  const guaranteed = isGuaranteedOrderIntakeEnabled();
   for (const order of stale) {
+    if (guaranteed) {
+      await startAssistedFulfillmentForOrder(order.id, io);
+      count += 1;
+      continue;
+    }
     await prisma.commerceOrder.update({
       where: { id: order.id },
       data: { status: CommerceOrderStatus.CANCELLED, cancelledAt: now, notes: "merchant_timeout" }
@@ -612,6 +669,206 @@ export async function expireStaleMerchantPendingOrders(): Promise<number> {
     count += 1;
   }
   return count;
+}
+
+async function startAssistedFulfillmentForOrder(orderId: string, io?: Server): Promise<void> {
+  const order = await prisma.commerceOrder.findUnique({
+    where: { id: orderId },
+    include: { items: true, merchant: true, customer: true, commerceCustomer: true, linkedDeliveryGig: true }
+  });
+  if (!order || order.status !== CommerceOrderStatus.MERCHANT_PENDING) return;
+
+  const alreadyAssisted = isAssistedFulfillment(order.notes);
+
+  logDutsFlow("COMMERCE_MERCHANT_TIMEOUT", {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    userId: order.customerId ?? undefined,
+    merchantId: order.merchantId,
+    reason: "assisted_fulfillment"
+  });
+
+  if (order.linkedDeliveryGigId) {
+    await prisma.commerceOrder.update({
+      where: { id: order.id },
+      data: {
+        status: CommerceOrderStatus.READY_FOR_PICKUP,
+        readyAt: order.readyAt ?? new Date(),
+        notes: addFulfillmentNote(order.notes, FULFILLMENT_NOTE.ASSISTED)
+      }
+    });
+    logDutsFlow("COMMERCE_ASSISTED_FULFILLMENT_STARTED", {
+      gigId: order.linkedDeliveryGigId,
+      orderId: order.id,
+      orderNumber: order.orderNumber
+    });
+    await notifyAssistedCustomer(order.customerWhatsAppPhone, "slow", !alreadyAssisted);
+    return;
+  }
+
+  const socket = io ?? tryGetSocketServer();
+  if (!socket) {
+    await prisma.commerceOrder.update({
+      where: { id: order.id },
+      data: {
+        notes: addFulfillmentNote(
+          addFulfillmentNote(order.notes, FULFILLMENT_NOTE.ASSISTED),
+          FULFILLMENT_NOTE.NEEDS_ATTENTION
+        )
+      }
+    });
+    logDutsFlow("COMMERCE_ASSISTED_FULFILLMENT_STARTED", {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      reason: "socket_unavailable"
+    });
+    return;
+  }
+
+  try {
+    const deliveryResult = await linkCommerceOrderDelivery(order, socket);
+    const gigId = (deliveryResult.delivery as { id: string }).id;
+    await prisma.commerceOrder.update({
+      where: { id: order.id },
+      data: {
+        status: CommerceOrderStatus.READY_FOR_PICKUP,
+        readyAt: new Date(),
+        linkedDeliveryGigId: gigId,
+        notes: addFulfillmentNote(order.notes, FULFILLMENT_NOTE.ASSISTED)
+      }
+    });
+    if (!deliveryResult.idempotentReplay) {
+      await openMarketplaceDeliveryForCouriers(gigId, socket);
+    }
+    logDutsFlow("COMMERCE_ASSISTED_FULFILLMENT_STARTED", {
+      gigId,
+      orderId: order.id,
+      orderNumber: order.orderNumber
+    });
+    await notifyAssistedCustomer(order.customerWhatsAppPhone, "slow", !alreadyAssisted);
+  } catch {
+    await prisma.commerceOrder.update({
+      where: { id: order.id },
+      data: {
+        notes: addFulfillmentNote(
+          addFulfillmentNote(order.notes, FULFILLMENT_NOTE.ASSISTED),
+          FULFILLMENT_NOTE.NEEDS_ATTENTION
+        )
+      }
+    });
+    logDutsFlow("COMMERCE_ASSISTED_FULFILLMENT_STARTED", {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      reason: "delivery_create_deferred"
+    });
+  }
+}
+
+async function notifyAssistedCustomer(
+  phone: string | null | undefined,
+  kind: "slow" | "finding" | "problem",
+  send = true
+): Promise<void> {
+  if (!send || !phone) return;
+  try {
+    const { notifyCustomerStatus } = await import("../whatsapp/merchant-handler.js");
+    const { formatCustomerMerchantSlow, formatCustomerFindingCourier, formatCustomerFulfillmentProblem } =
+      await import("../whatsapp/copy.js");
+    const body =
+      kind === "finding"
+        ? formatCustomerFindingCourier()
+        : kind === "problem"
+          ? formatCustomerFulfillmentProblem()
+          : formatCustomerMerchantSlow();
+    await notifyCustomerStatus(phone, body);
+  } catch {
+    /* non-blocking */
+  }
+}
+
+export async function rematchWaitingCommerceCouriers(io?: Server): Promise<number> {
+  if (!isGuaranteedOrderIntakeEnabled()) return 0;
+  const socket = io ?? tryGetSocketServer();
+  if (!socket) return 0;
+
+  const staleBefore = new Date(Date.now() - getCourierRematchIntervalSeconds() * 1000);
+  const waiting = await prisma.commerceOrder.findMany({
+    where: {
+      status: CommerceOrderStatus.READY_FOR_PICKUP,
+      linkedDeliveryGigId: { not: null },
+      linkedDeliveryGig: {
+        status: { in: [GigStatus.SEARCHING_FOR_WORKER, GigStatus.POSTED] },
+        assignedWorkerId: null,
+        updatedAt: { lt: staleBefore }
+      }
+    },
+    include: { linkedDeliveryGig: true }
+  });
+
+  let count = 0;
+  for (const order of waiting) {
+    if (hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.PICKUP_PROBLEM)) continue;
+    if (hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.MERCHANT_REJECTED)) continue;
+    const gigId = order.linkedDeliveryGigId;
+    if (!gigId) continue;
+    const firstWait = !hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.COURIER_SEARCH_WAITING);
+    await openMarketplaceDeliveryForCouriers(gigId, socket);
+    await prisma.commerceOrder.update({
+      where: { id: order.id },
+      data: {
+        notes: addFulfillmentNote(order.notes, FULFILLMENT_NOTE.COURIER_SEARCH_WAITING)
+      }
+    });
+    logDutsFlow("COMMERCE_COURIER_SEARCH_WAITING", {
+      gigId,
+      orderId: order.id,
+      orderNumber: order.orderNumber
+    });
+    if (firstWait) await notifyAssistedCustomer(order.customerWhatsAppPhone, "finding");
+    count += 1;
+  }
+  return count;
+}
+
+export async function flagLongWaitCommerceOrders(): Promise<number> {
+  if (!isGuaranteedOrderIntakeEnabled()) return 0;
+  const cutoff = new Date(Date.now() - getFulfillmentAttentionMinutes() * 60 * 1000);
+  const waiting = await prisma.commerceOrder.findMany({
+    where: {
+      status: {
+        in: [
+          CommerceOrderStatus.MERCHANT_PENDING,
+          CommerceOrderStatus.MERCHANT_ACCEPTED,
+          CommerceOrderStatus.READY_FOR_PICKUP
+        ]
+      },
+      confirmedAt: { lt: cutoff }
+    },
+    include: { linkedDeliveryGig: { select: { assignedWorkerId: true, status: true } } }
+  });
+
+  let count = 0;
+  for (const order of waiting) {
+    if (hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.NEEDS_ATTENTION)) continue;
+    const courierAssigned = Boolean(order.linkedDeliveryGig?.assignedWorkerId);
+    if (courierAssigned) continue;
+    await prisma.commerceOrder.update({
+      where: { id: order.id },
+      data: { notes: addFulfillmentNote(order.notes, FULFILLMENT_NOTE.NEEDS_ATTENTION) }
+    });
+    logDutsFlow("COMMERCE_FULFILLMENT_NEEDS_ATTENTION", {
+      orderId: order.id,
+      orderNumber: order.orderNumber
+    });
+    count += 1;
+  }
+  return count;
+}
+
+export async function runGuaranteedOrderIntakeJobs(io?: Server): Promise<void> {
+  await expireStaleMerchantPendingOrders(io);
+  await rematchWaitingCommerceCouriers(io);
+  await flagLongWaitCommerceOrders();
 }
 
 export async function listMerchantActiveOrders(merchantId: string) {
@@ -682,7 +939,7 @@ export function formatOrderTrackMessage(order: Awaited<ReturnType<typeof getCust
   const gigStatus = order.linkedDeliveryGig?.status;
   let deliveryLine: string | null = null;
   if (order.status === CommerceOrderStatus.READY_FOR_PICKUP && !courier) {
-    deliveryLine = "Waiting for a courier to accept the job.";
+    deliveryLine = "We're finding a courier. Delivery may take longer than usual.";
   } else if (gigStatus === GigStatus.WORKER_EN_ROUTE || gigStatus === GigStatus.WORKER_ARRIVED) {
     deliveryLine = "Courier is collecting from the shop.";
   } else if (
@@ -757,6 +1014,13 @@ export async function syncCommerceOrderFromGig(gigId: string, gigStatus: GigStat
   });
 
   if (next === CommerceOrderStatus.COURIER_ASSIGNED && order.customerWhatsAppPhone) {
+    if (hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.COURIER_SEARCH_WAITING)) {
+      logDutsFlow("COMMERCE_COURIER_ASSIGNED_AFTER_WAIT", {
+        gigId,
+        orderId: order.id,
+        orderNumber: order.orderNumber
+      });
+    }
     try {
       const { notifyCustomerStatus } = await import("../whatsapp/merchant-handler.js");
       await notifyCustomerStatus(

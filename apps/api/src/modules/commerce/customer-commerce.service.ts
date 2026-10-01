@@ -5,6 +5,7 @@ import {
   canPurchaseStorefrontCategory,
   catalogSearchHaystack,
   commerceShopUiStatusLabel,
+  customerFulfillmentHint,
   expandSearchTerms,
   isPublicStorefrontCatalogProduct,
   normalizeProductSearchName,
@@ -652,7 +653,8 @@ export async function listCustomerCommerceOrders(userId: string) {
     take: 30,
     include: {
       merchant: { select: { id: true, name: true } },
-      items: true
+      items: true,
+      linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true } }
     }
   });
 
@@ -661,7 +663,15 @@ export async function listCustomerCommerceOrders(userId: string) {
       id: o.id,
       orderNumber: o.orderNumber,
       status: o.status,
-      statusLabel: commerceShopUiStatusLabel(o.status as CommerceOrderStatus),
+      statusLabel: commerceShopUiStatusLabel(
+        o.status as CommerceOrderStatus,
+        o.linkedDeliveryGig?.status ?? null
+      ),
+      fulfillmentHint: customerFulfillmentHint({
+        notes: o.notes,
+        status: o.status,
+        hasCourier: Boolean(o.linkedDeliveryGig?.assignedWorkerId)
+      }),
       totalCents: o.totalCents,
       currency: o.currency,
       merchantName: o.merchant.name,
@@ -678,7 +688,7 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
     include: {
       merchant: { select: { id: true, name: true, locationLabel: true } },
       items: true,
-      linkedDeliveryGig: { select: { id: true, status: true } }
+      linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true } }
     }
   });
   if (!order) throw new AppError("Order not found.", 404, "ORDER_NOT_FOUND");
@@ -692,6 +702,11 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
         order.status as CommerceOrderStatus,
         order.linkedDeliveryGig?.status ?? null
       ),
+      fulfillmentHint: customerFulfillmentHint({
+        notes: order.notes,
+        status: order.status,
+        hasCourier: Boolean(order.linkedDeliveryGig?.assignedWorkerId)
+      }),
       totalCents: order.totalCents,
       subtotalCents: order.subtotalCents,
       deliveryFeeCents: order.deliveryFeeCents,

@@ -81,7 +81,12 @@ const envSchema = z.object({
    * Catalog-first Smart Basket (one merchant per order).
    * Default on; set SMART_BASKET_ENABLED=false to disable without reverting code.
    */
-  SMART_BASKET_ENABLED: z.string().optional()
+  SMART_BASKET_ENABLED: z.string().optional(),
+  /**
+   * Merchant-silence fallback + persistent courier search.
+   * Off unless GUARANTEED_ORDER_INTAKE_ENABLED=true.
+   */
+  GUARANTEED_ORDER_INTAKE_ENABLED: z.string().optional()
 });
 
 export const env = envSchema.parse(process.env);

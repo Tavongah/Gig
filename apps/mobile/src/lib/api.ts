@@ -226,6 +226,15 @@ export interface GigDetail {
   packageCategory?: string | null;
   packageDescription?: string | null;
   packageSize?: string | null;
+  commercePickup?: {
+    shopName: string;
+    items: Array<{ name: string; quantity: number }>;
+    merchantConfirmed: boolean;
+    confirmationRequired: boolean;
+    itemsConfirmed: boolean;
+    problemReported: boolean;
+    warning?: string | null;
+  };
   offer?: {
     id: string;
     fulfillmentType?: string;
@@ -834,6 +843,13 @@ export const api = {
       token
     ),
 
+  confirmAssistedPickup: (gigId: string, token: string, outcome: "AVAILABLE" | "PROBLEM") =>
+    request<{ success?: boolean; confirmed?: boolean; reported?: boolean }>(
+      `/gigs/${gigId}/delivery/assisted-pickup`,
+      { method: "POST", body: JSON.stringify({ outcome }) },
+      token
+    ),
+
   startTravelToDropoff: (gigId: string, token: string) =>
     request<{ success?: boolean; gig: GigDetail }>(
       `/gigs/${gigId}/delivery/start-travel-to-dropoff`,
@@ -1064,6 +1080,7 @@ export const api = {
         orderNumber: number;
         status: string;
         statusLabel: string;
+        fulfillmentHint?: string | null;
         totalCents: number;
         subtotalCents: number;
         deliveryFeeCents: number;

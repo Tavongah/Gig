@@ -55,6 +55,13 @@ export function DeliveryJobScreen() {
   const gig = gigQuery.data?.gig;
   const courier = gig?.assignments?.[0]?.worker;
   const action = gig ? nextCourierDeliveryAction(gig.status) : null;
+  const commercePickup = gig?.commercePickup;
+  const assistedConfirmNeeded = Boolean(
+    activeRole === "WORKER" &&
+      gig?.assignedWorkerId === session.user.id &&
+      commercePickup?.confirmationRequired &&
+      gig?.status === "WORKER_ARRIVED"
+  );
   const socket = useSocket();
   const { payWithStripe, isPaying } = useStripeCheckout();
 
@@ -169,6 +176,18 @@ export function DeliveryJobScreen() {
     onError: (error: Error) => showAlert("Couldn't regenerate codes", friendlyDeliveryError(error))
   });
 
+  const assistedPickupMutation = useMutation({
+    mutationFn: (outcome: "AVAILABLE" | "PROBLEM") =>
+      api.confirmAssistedPickup(route.params.gigId, session.token, outcome),
+    onSuccess: (_data, outcome) => {
+      invalidate();
+      if (outcome === "PROBLEM") {
+        showAlert("Problem reported", "DUTS is checking this order. Do not collect it.");
+      }
+    },
+    onError: (error: Error) => showAlert("Couldn't update pickup", friendlyDeliveryError(error))
+  });
+
   function openMaps(lat?: string | number | null, lng?: string | number | null, label?: string): void {
     void openExternalNavigation(lat, lng, label).catch(() => {
       showAlert("Couldn't open maps", "Please try again.");
@@ -224,7 +243,8 @@ export function DeliveryJobScreen() {
   const needsPin =
     activeRole === "WORKER" &&
     (action?.kind === "verify_pickup" || action?.kind === "verify_delivery") &&
-    !pinLocked;
+    !pinLocked &&
+    !(action?.kind === "verify_pickup" && assistedConfirmNeeded);
 
   return (
     <KeyboardAvoidingView
@@ -362,6 +382,43 @@ export function DeliveryJobScreen() {
         </DutsCard>
       ) : null}
 
+      {activeRole === "WORKER" && gig.assignedWorkerId === session.user.id && commercePickup ? (
+        <DutsCard className="gap-3 p-5">
+          <Text className="text-xs font-bold uppercase text-brand">Pickup from</Text>
+          <Text className="text-xl font-black text-ink">{commercePickup.shopName}</Text>
+          <Text className="text-xs font-bold uppercase text-brand">Shopping list</Text>
+          {commercePickup.items.map((item) => (
+            <Text key={`${item.name}-${item.quantity}`} className="text-base text-ink">
+              {item.quantity}× {item.name}
+            </Text>
+          ))}
+          {commercePickup.warning ? (
+            <Text className="text-sm font-semibold text-ink">{commercePickup.warning}</Text>
+          ) : null}
+          {commercePickup.problemReported ? (
+            <Text className="text-sm font-semibold text-ink">
+              Problem reported. DUTS is checking this order. Do not collect it.
+            </Text>
+          ) : null}
+          {assistedConfirmNeeded ? (
+            <>
+              <Text className="text-base font-bold text-ink">Items available as ordered?</Text>
+              <LoadingButton
+                label="Yes — continue"
+                loading={assistedPickupMutation.isPending}
+                onPress={() => assistedPickupMutation.mutate("AVAILABLE")}
+              />
+              <LoadingButton
+                label="Report a problem"
+                variant="secondary"
+                loading={assistedPickupMutation.isPending}
+                onPress={() => assistedPickupMutation.mutate("PROBLEM")}
+              />
+            </>
+          ) : null}
+        </DutsCard>
+      ) : null}
+
       {needsPin ? (
         <DutsCard className="gap-3 p-5">
           <Text className="text-sm font-bold text-ink">
@@ -420,7 +477,8 @@ export function DeliveryJobScreen() {
         gig.assignedWorkerId === session.user.id &&
         action &&
         !pinLocked &&
-        !isDeliveryCompleteUi(gig.status) ? (
+        !isDeliveryCompleteUi(gig.status) &&
+        !(action.kind === "verify_pickup" && assistedConfirmNeeded) ? (
           <LoadingButton
             label={action.label}
             loading={actionMutation.isPending}

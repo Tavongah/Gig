@@ -43,8 +43,10 @@ import {
   arriveAtDropoff,
   arriveAtPickup,
   createDelivery,
+  confirmAssistedPickup,
   quoteDelivery,
   regenerateDeliveryPins,
+  reportAssistedPickupProblem,
   startTravelToDropoff,
   startTravelToPickup,
   verifyDeliveryPinAndComplete,
@@ -276,6 +278,31 @@ export function createGigRouter(io: Server): Router {
       try {
         const gig = await verifyPickupPin(String(req.params.gigId), req.auth!.userId, req.body.pin, io);
         res.json({ success: true, gig });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/assisted-pickup",
+    requireAuth,
+    requireApprovedWorker,
+    validateBody(
+      z.object({
+        outcome: z.enum(["AVAILABLE", "PROBLEM"])
+      })
+    ),
+    async (req, res, next) => {
+      try {
+        const outcome = (req.body as { outcome: "AVAILABLE" | "PROBLEM" }).outcome;
+        if (outcome === "PROBLEM") {
+          const result = await reportAssistedPickupProblem(String(req.params.gigId), req.auth!.userId);
+          res.json({ success: true, ...result });
+          return;
+        }
+        const result = await confirmAssistedPickup(String(req.params.gigId), req.auth!.userId);
+        res.json({ success: true, ...result });
       } catch (error) {
         next(error);
       }

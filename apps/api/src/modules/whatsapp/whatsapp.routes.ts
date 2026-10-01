@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Server } from "socket.io";
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
-import { createMerchantSchema, updateMerchantSchema, upsertProductSchema } from "@gigflow/shared";
+import { createMerchantSchema, fulfillmentAdminLabel, updateMerchantSchema, upsertProductSchema } from "@gigflow/shared";
 import { requireAuth, requireRole } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
 import { prisma } from "../../config/prisma.js";
@@ -378,7 +378,7 @@ commerceAdminRouter.post("/merchants/:id/test-basket", async (req, res, next) =>
 
 commerceAdminRouter.get("/orders", async (_req, res, next) => {
   try {
-    const orders = await prisma.commerceOrder.findMany({
+    const raw = await prisma.commerceOrder.findMany({
       take: 100,
       orderBy: { createdAt: "desc" },
       include: {
@@ -386,9 +386,18 @@ commerceAdminRouter.get("/orders", async (_req, res, next) => {
         customer: { select: { id: true, fullName: true, phoneNumber: true } },
         commerceCustomer: { select: { id: true, displayName: true, whatsappPhone: true } },
         items: true,
-        linkedDeliveryGig: { select: { id: true, status: true } }
+        linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true, updatedAt: true } }
       }
     });
+    const orders = raw.map((o) => ({
+      ...o,
+      fulfillmentIssue: fulfillmentAdminLabel({
+        notes: o.notes,
+        status: o.status,
+        hasCourier: Boolean(o.linkedDeliveryGig?.assignedWorkerId)
+      }),
+      waitingSince: o.confirmedAt ?? o.createdAt
+    }));
     res.json({ orders });
   } catch (e) {
     next(e);

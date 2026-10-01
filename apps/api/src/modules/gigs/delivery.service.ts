@@ -38,7 +38,11 @@ import {
   createDeliverySchema,
   DELIVERY_PIN_LOCK_MINUTES,
   DELIVERY_PIN_MAX_ATTEMPTS,
+  FULFILLMENT_NOTE,
+  addFulfillmentNote,
   generateDeliveryPin,
+  hasFulfillmentNote,
+  isAssistedPickupConfirmationRequired,
   isPhase1TransportMode,
   packageCategoryLabels,
   type CreateDeliveryInput
@@ -544,6 +548,29 @@ export async function verifyPickupPin(
       "INVALID_STATUS_TRANSITION"
     );
   }
+  const commerceOrder = await prisma.commerceOrder.findFirst({
+    where: { linkedDeliveryGigId: gigId }
+  });
+  if (commerceOrder && hasFulfillmentNote(commerceOrder.notes, FULFILLMENT_NOTE.PICKUP_PROBLEM)) {
+    throw new AppError(
+      "This pickup is waiting for DUTS. Do not collect the order.",
+      409,
+      "ASSISTED_PICKUP_BLOCKED"
+    );
+  }
+  if (
+    commerceOrder &&
+    isAssistedPickupConfirmationRequired({
+      notes: commerceOrder.notes,
+      merchantAcceptedAt: commerceOrder.merchantAcceptedAt
+    })
+  ) {
+    throw new AppError(
+      "Confirm the shopping list with the shop before collecting.",
+      409,
+      "ASSISTED_PICKUP_CONFIRMATION_REQUIRED"
+    );
+  }
   assertPinNotLocked(gig.pickupPinLockedUntil, "pickup");
   if (!hashedPinsMatch(gig.pickupPin, pin, gigId)) {
     await recordFailedPinAttempt(gigId, "pickup", gig.pickupPinFailCount);
@@ -594,6 +621,92 @@ export async function verifyPickupPin(
   }
 
   return stripPinsForCourierSafe(updated as unknown as Record<string, unknown>);
+}
+
+export async function confirmAssistedPickup(gigId: string, courierUserId: string) {
+  const { gig } = await loadAssignedDelivery(gigId, courierUserId);
+  if (gig.status !== GigStatus.WORKER_ARRIVED) {
+    throw new AppError(
+      "Confirm items only after arriving at the shop.",
+      409,
+      "INVALID_STATUS_TRANSITION"
+    );
+  }
+  const order = await prisma.commerceOrder.findFirst({
+    where: { linkedDeliveryGigId: gigId }
+  });
+  if (!order) {
+    throw new AppError("This delivery is not a shop order.", 409, "NOT_COMMERCE_DELIVERY");
+  }
+  if (hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.PICKUP_PROBLEM)) {
+    throw new AppError(
+      "This pickup is waiting for DUTS. Do not collect the order.",
+      409,
+      "ASSISTED_PICKUP_BLOCKED"
+    );
+  }
+  if (
+    !isAssistedPickupConfirmationRequired({
+      notes: order.notes,
+      merchantAcceptedAt: order.merchantAcceptedAt
+    })
+  ) {
+    return { confirmed: true, alreadyConfirmed: true };
+  }
+  await prisma.commerceOrder.update({
+    where: { id: order.id },
+    data: { notes: addFulfillmentNote(order.notes, FULFILLMENT_NOTE.PICKUP_CONFIRMED) }
+  });
+  logDutsFlow("COMMERCE_ASSISTED_PICKUP_CONFIRMED", {
+    gigId,
+    userId: courierUserId,
+    userRole: "WORKER",
+    orderId: order.id,
+    orderNumber: order.orderNumber
+  });
+  return { confirmed: true, alreadyConfirmed: false };
+}
+
+export async function reportAssistedPickupProblem(gigId: string, courierUserId: string) {
+  const { gig } = await loadAssignedDelivery(gigId, courierUserId);
+  if (
+    gig.status !== GigStatus.WORKER_ARRIVED &&
+    gig.status !== GigStatus.WORKER_EN_ROUTE &&
+    gig.status !== GigStatus.WORKER_ASSIGNED
+  ) {
+    throw new AppError("Cannot report a shop problem in this delivery state.", 409, "INVALID_STATUS_TRANSITION");
+  }
+  const order = await prisma.commerceOrder.findFirst({
+    where: { linkedDeliveryGigId: gigId }
+  });
+  if (!order) {
+    throw new AppError("This delivery is not a shop order.", 409, "NOT_COMMERCE_DELIVERY");
+  }
+  const notes = addFulfillmentNote(
+    addFulfillmentNote(order.notes, FULFILLMENT_NOTE.PICKUP_PROBLEM),
+    FULFILLMENT_NOTE.NEEDS_ATTENTION
+  );
+  await prisma.commerceOrder.update({
+    where: { id: order.id },
+    data: { notes }
+  });
+  logDutsFlow("COMMERCE_ASSISTED_PICKUP_PROBLEM", {
+    gigId,
+    userId: courierUserId,
+    userRole: "WORKER",
+    orderId: order.id,
+    orderNumber: order.orderNumber
+  });
+  if (order.customerWhatsAppPhone) {
+    try {
+      const { notifyCustomerStatus } = await import("../whatsapp/merchant-handler.js");
+      const { formatCustomerFulfillmentProblem } = await import("../whatsapp/copy.js");
+      await notifyCustomerStatus(order.customerWhatsAppPhone, formatCustomerFulfillmentProblem());
+    } catch {
+      /* non-blocking */
+    }
+  }
+  return { reported: true };
 }
 
 export async function startTravelToDropoff(gigId: string, courierUserId: string, io?: Server) {

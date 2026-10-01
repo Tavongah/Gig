@@ -1,4 +1,5 @@
 import { CommercePaymentMethod, CommercePaymentStatus } from "@prisma/client";
+import { parseGuaranteedOrderIntakeEnabled } from "@gigflow/shared";
 import { AppError } from "../../lib/errors.js";
 import { getAppEnv, isPilotOrStagingEnv, isProductionEnv } from "../../lib/production-guards.js";
 
@@ -61,6 +62,31 @@ export function getMerchantResponseTimeoutSeconds(): number {
     if (n >= 60 && n <= 86_400) return n;
   }
   return 15 * 60;
+}
+
+/** Merchant-silence fallback + persistent courier search. Off unless explicitly enabled. */
+export function isGuaranteedOrderIntakeEnabled(): boolean {
+  return parseGuaranteedOrderIntakeEnabled(process.env.GUARANTEED_ORDER_INTAKE_ENABLED);
+}
+
+/** Bounded courier rebroadcast interval (default 2 minutes). */
+export function getCourierRematchIntervalSeconds(): number {
+  const raw = process.env.COMMERCE_COURIER_REMATCH_SECONDS;
+  if (raw && /^\d+$/.test(raw)) {
+    const n = Number(raw);
+    if (n >= 60 && n <= 3_600) return n;
+  }
+  return 120;
+}
+
+/** Flag unfulfilled orders for admin without cancelling (default 60 minutes). */
+export function getFulfillmentAttentionMinutes(): number {
+  const raw = process.env.COMMERCE_FULFILLMENT_ATTENTION_MINUTES;
+  if (raw && /^\d+$/.test(raw)) {
+    const n = Number(raw);
+    if (n >= 15 && n <= 7 * 24 * 60) return n;
+  }
+  return 60;
 }
 
 /** Mock WhatsApp inbound: only development/test unless ALLOW_WHATSAPP_MOCK=true (never default in pilot). */

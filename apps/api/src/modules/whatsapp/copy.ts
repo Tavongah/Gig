@@ -259,6 +259,39 @@ export function formatCustomerOrderReady(): string {
   return ["✓ Your order is ready.", "", "Finding a courier..."].join("\n");
 }
 
+export function formatCustomerOrderConfirmedArranging(): string {
+  return [
+    "Order confirmed ✓",
+    "",
+    "We're arranging your delivery.",
+    "It may take a little longer than usual.",
+    "",
+    "We'll update you when your courier is assigned."
+  ].join("\n");
+}
+
+export function formatCustomerMerchantSlow(): string {
+  return [
+    "Your order is confirmed ✓",
+    "",
+    "We're arranging pickup.",
+    "It may take a little longer than usual."
+  ].join("\n");
+}
+
+export function formatCustomerFindingCourier(): string {
+  return [
+    "Order confirmed ✓",
+    "",
+    "We're finding a courier.",
+    "Delivery may take longer than usual."
+  ].join("\n");
+}
+
+export function formatCustomerFulfillmentProblem(): string {
+  return ["There's a problem fulfilling your order.", "DUTS is checking it now."].join("\n");
+}
+
 export function formatPaymentMethodChoice(_totalCents?: number): string {
   return [
     "Choose payment",

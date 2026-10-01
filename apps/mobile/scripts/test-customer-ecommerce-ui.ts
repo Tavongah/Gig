@@ -83,6 +83,9 @@ assert.ok(checkout.includes("EcoCash USD"), "EcoCash USD label");
 assert.ok(checkout.includes("Cash on delivery"), "COD option");
 assert.ok(!checkout.includes("ONEMONEY"), "OneMoney hidden");
 assert.ok(checkout.includes("CASH"), "Cash option");
+assert.ok(read("screens/shared/DeliveryJobScreen.tsx").includes("Shopping list"), "courier shopping list");
+assert.ok(read("screens/shared/DeliveryJobScreen.tsx").includes("Report a problem"), "courier report problem");
+assert.ok(!read("screens/shared/DeliveryJobScreen.tsx").includes("ASSISTED_FULFILLMENT"), "no raw assisted enum");
 assert.ok(read("navigation/AppNavigator.tsx").includes("GuestCheckoutChoice"), "account stack can return to checkout choice");
 assert.ok(read("navigation/GuestAppNavigator.tsx").includes("headerShown: false"), "guest order choice uses storefront chrome");
 

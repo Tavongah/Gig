@@ -91,11 +91,11 @@ export function commerceCustomerStatusCopy(status: CommerceOrderStatus): string 
       return "We're preparing your order summary.";
     case "CUSTOMER_CONFIRMED":
     case "MERCHANT_PENDING":
-      return "Your order is with the shop for confirmation.";
+      return "Your order is confirmed. We're arranging your delivery.";
     case "MERCHANT_ACCEPTED":
       return "Your order is being prepared.";
     case "READY_FOR_PICKUP":
-      return "Your order is ready. We are finding a courier.";
+      return "We're finding a courier. Delivery may take longer than usual.";
     case "COURIER_ASSIGNED":
       return "A courier is on the way.";
     case "PICKED_UP":
@@ -105,7 +105,7 @@ export function commerceCustomerStatusCopy(status: CommerceOrderStatus): string 
     case "DELIVERED":
       return "Your order has been delivered.";
     case "MERCHANT_REJECTED":
-      return "The shop couldn't take this order.";
+      return "There's a problem fulfilling your order. DUTS is checking it now.";
     case "CANCELLED":
       return "Your order was cancelled.";
     case "PAYMENT_FAILED":
@@ -127,6 +127,7 @@ export function commerceShopUiStatusLabel(
     if (d.includes("PICKED") || d === "PACKAGE_PICKED_UP") return "Order picked up";
     if (d.includes("EN_ROUTE_PICKUP") || d.includes("GOING_TO_SHOP")) return "Courier going to shop";
     if (d === "ASSIGNED" || d === "WORKER_ASSIGNED" || d === "ACCEPTED") return "Courier assigned";
+    if (d === "SEARCHING_FOR_WORKER" || d === "POSTED" || d.includes("SEARCHING")) return "Finding courier";
     if (d === "COMPLETED" || d === "DELIVERED") return "Delivered";
   }
 
@@ -135,11 +136,11 @@ export function commerceShopUiStatusLabel(
       return "Waiting for shop";
     case "CUSTOMER_CONFIRMED":
     case "MERCHANT_PENDING":
-      return "Waiting for shop";
+      return "Order confirmed";
     case "MERCHANT_ACCEPTED":
       return "Shop preparing order";
     case "READY_FOR_PICKUP":
-      return "Ready for pickup";
+      return "Finding courier";
     case "COURIER_ASSIGNED":
       return "Courier assigned";
     case "PICKED_UP":
@@ -149,7 +150,7 @@ export function commerceShopUiStatusLabel(
     case "DELIVERED":
       return "Delivered";
     case "MERCHANT_REJECTED":
-      return "Shop couldn't take order";
+      return "DUTS is checking your order";
     case "CANCELLED":
       return "Cancelled";
     case "PAYMENT_FAILED":

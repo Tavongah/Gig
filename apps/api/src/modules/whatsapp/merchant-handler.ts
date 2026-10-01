@@ -216,9 +216,13 @@ export async function handleMerchantWhatsAppMessage(
       const order = await merchantRejectOrder(merchant.id, num);
       await wa.sendText(phone, `Order #${order.orderNumber} rejected.`);
       if (order.customerWhatsAppPhone) {
+        const { formatCustomerFulfillmentProblem } = await import("./copy.js");
+        const { isGuaranteedOrderIntakeEnabled } = await import("../commerce/payment-mode.js");
         await notifyCustomerStatus(
           order.customerWhatsAppPhone,
-          `${merchant.name} couldn't take your order. You can place a new one anytime.`
+          isGuaranteedOrderIntakeEnabled()
+            ? formatCustomerFulfillmentProblem()
+            : `${merchant.name} couldn't take your order. You can place a new one anytime.`
         );
       }
       return { handled: true };
