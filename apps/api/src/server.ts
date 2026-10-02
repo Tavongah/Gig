@@ -85,7 +85,12 @@ async function bootstrap(): Promise<void> {
     );
   }, 30 * 1000);
 
-  // Poll active timers so ESTIMATE_TIMER / auth-limit pauses do not depend only on Start Gig.
+  // Expire unfinished WhatsApp checkout drafts (never placed orders / payments).
+  setInterval(() => {
+    void import("./modules/whatsapp/conversation.service.js").then(({ expireStaleCheckoutConversations }) =>
+      expireStaleCheckoutConversations().catch(() => undefined)
+    );
+  }, 5 * 60 * 1000);
   setInterval(() => {
     void import("./modules/gigs/gig-workflow.service.js").then(async ({ checkTimerThreshold }) => {
       const { prisma } = await import("./config/prisma.js");

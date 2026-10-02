@@ -1,11 +1,17 @@
 import { createHash, randomBytes } from "node:crypto";
-import { WhatsAppConversationState } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { logDutsFlow } from "../../lib/flow-log.js";
 import { getCartTtlMs } from "../whatsapp/cart-mutations.js";
-import { formatGuestHandoffAwaitingLocation } from "../whatsapp/copy.js";
-import { updateConversation, type ConversationContext } from "../whatsapp/conversation.service.js";
+import { formatGuestHandoffAwaitingLocation, formatHandoffExpired } from "../whatsapp/copy.js";
+import {
+  beginCheckoutSession,
+  conversationStateForExpected,
+  isUnfinishedCheckout,
+  setExpected,
+  supersedeCheckoutDraft
+} from "../whatsapp/checkout-session.js";
+import { readContext, updateConversation, type ConversationContext } from "../whatsapp/conversation.service.js";
 import { quoteCart } from "./customer-commerce.service.js";
 
 export type GuestHandoffBasket = {
@@ -89,8 +95,9 @@ export async function createGuestHandoff(input: {
 export async function applyGuestHandoffToConversation(input: {
   conversationId: string;
   token: string;
-}): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
-  const tokenHash = hashHandoffToken(input.token);
+}): Promise<{ ok: true; message: string; superseded?: boolean; resumed?: boolean } | { ok: false; message: string }> {
+  const token = input.token.trim().toUpperCase();
+  const tokenHash = hashHandoffToken(token);
   const row = await prisma.guestCommerceHandoff.findUnique({ where: { tokenHash } });
   if (!row) {
     return {
@@ -98,17 +105,36 @@ export async function applyGuestHandoffToConversation(input: {
       message: "I couldn't find that basket. Open DUTS and tap Continue on WhatsApp again."
     };
   }
+
+  const conv = await prisma.whatsAppConversation.findUnique({ where: { id: input.conversationId } });
+  const existing = conv ? readContext(conv) : {};
+
   if (row.consumedAt) {
+    if (existing.consumedHandoffToken === token && existing.checkoutStatus === "ACTIVE") {
+      const resumeLines = (existing.lockedProductLines ?? []).map((l) => ({
+        quantity: l.quantity,
+        productName: l.productName,
+        lineTotalCents: l.quantity * l.unitPriceCents
+      }));
+      return {
+        ok: true,
+        resumed: true,
+        message: formatGuestHandoffAwaitingLocation({
+          lines: resumeLines,
+          subtotalCents: resumeLines.reduce((s, l) => s + l.lineTotalCents, 0)
+        })
+      };
+    }
     return {
       ok: false,
       message: "That basket was already opened. Tell me if you'd like to change it."
     };
   }
   if (row.expiresAt.getTime() <= Date.now()) {
-    return {
-      ok: false,
-      message: "This cart has expired.\n\nReturn to DUTS and tap Continue on WhatsApp again."
-    };
+    return { ok: false, message: formatHandoffExpired() };
+  }
+  if (!conv) {
+    return { ok: false, message: "I couldn't open that basket. Please try Continue on WhatsApp again." };
   }
 
   const payload = row.basketJson as GuestHandoffBasket;
@@ -131,14 +157,39 @@ export async function applyGuestHandoffToConversation(input: {
     return { ok: false, message };
   }
 
+  const unfinished = conv
+    ? isUnfinishedCheckout(existing, conv.state)
+    : Boolean(existing.pendingChoices?.length || existing.requestedItems?.length);
+  const superseded = unfinished && existing.consumedHandoffToken !== token;
+  const base = superseded ? supersedeCheckoutDraft(existing) : snapshotKeepOrders(existing);
   const ctx: ConversationContext = {
+    ...beginCheckoutSession(base, "WEB_HANDOFF", "LOCATION"),
     merchantId: quote.merchant.id,
     previousMerchantId: quote.merchant.id,
-    requestedItems: quote.lines.map((l) => ({ query: l.productName, quantity: l.quantity }))
+    consumedHandoffToken: token,
+    lockedProductLines: quote.lines.map((l) => ({
+      productId: l.productId,
+      quantity: l.quantity,
+      productName: l.productName,
+      unitPriceCents: l.unitPriceCents,
+      merchantId: l.merchantId
+    })),
+    requestedItems: quote.lines.map((l) => ({ query: l.productName, quantity: l.quantity })),
+    draftLines: undefined,
+    pendingChoices: undefined,
+    lastDisambiguationQuery: undefined,
+    choiceId: undefined,
+    paymentPhase: undefined,
+    paymentAttemptId: undefined,
+    pendingPaymentOrderId: undefined,
+    payerPhoneDisplay: undefined,
+    selectedPaymentMethod: undefined,
+    pendingHandoffToken: undefined
   };
+  setExpected(ctx, "LOCATION");
 
   await updateConversation(input.conversationId, {
-    state: WhatsAppConversationState.AWAITING_LOCATION,
+    state: conversationStateForExpected("LOCATION"),
     context: ctx,
     merchantId: quote.merchant.id
   });
@@ -160,8 +211,19 @@ export async function applyGuestHandoffToConversation(input: {
       productName: l.productName,
       lineTotalCents: l.lineTotalCents
     })),
-    subtotalCents: quote.subtotalCents
+    subtotalCents: quote.subtotalCents,
+    superseded
   });
 
-  return { ok: true, message };
+  return { ok: true, message, superseded };
+}
+
+function snapshotKeepOrders(ctx: ConversationContext): ConversationContext {
+  return {
+    activeOrderId: ctx.activeOrderId,
+    parkedPayments: ctx.parkedPayments,
+    lastDeliveryLat: ctx.deliveryLat ?? ctx.lastDeliveryLat,
+    lastDeliveryLng: ctx.deliveryLng ?? ctx.lastDeliveryLng,
+    lastDeliveryLabel: ctx.deliveryLabel ?? ctx.lastDeliveryLabel
+  };
 }

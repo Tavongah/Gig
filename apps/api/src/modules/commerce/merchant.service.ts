@@ -410,6 +410,51 @@ export async function searchProductsNear(
   return matches.sort((a, b) => b.score - a.score || a.distanceKm - b.distanceKm);
 }
 
+/** Catalog-backed product match without requiring a delivery pin (clarification-before-location). */
+export async function searchProductsByQuery(
+  query: string,
+  opts?: { merchantId?: string; availableOnly?: boolean }
+): Promise<ProductMatch[]> {
+  const alcoholEnabled = parseAlcoholCommerceEnabled(process.env.ALCOHOL_COMMERCE_ENABLED);
+  const products = await prisma.product.findMany({
+    where: {
+      archived: false,
+      ...(opts?.availableOnly === false ? {} : { available: true }),
+      merchant: {
+        isActive: true,
+        acceptsOrders: true,
+        ...(opts?.merchantId ? { id: opts.merchantId } : {})
+      }
+    },
+    include: { merchant: true, catalogProduct: { select: { category: true } } },
+    take: 500
+  });
+  const matches: ProductMatch[] = [];
+  for (const product of products) {
+    if (!canPurchaseStorefrontCategory(product.catalogProduct?.category ?? product.category, alcoholEnabled)) {
+      continue;
+    }
+    const score = scoreProductMatch(product, query);
+    if (score <= 0) continue;
+    matches.push({
+      product,
+      merchant: product.merchant,
+      distanceKm: 0,
+      score
+    });
+  }
+  matches.sort((a, b) => b.score - a.score || a.product.priceCents - b.product.priceCents);
+  const seen = new Set<string>();
+  const unique: ProductMatch[] = [];
+  for (const m of matches) {
+    const key = m.product.name.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(m);
+  }
+  return unique;
+}
+
 export type BasketLine = {
   productId: string;
   productName: string;

@@ -1010,7 +1010,12 @@ export async function findMerchantOrder(merchantId: string, orderIdOrNumber: str
 }
 
 export async function getCustomerActiveOrder(commerceCustomerId: string) {
-  return prisma.commerceOrder.findFirst({
+  const orders = await getCustomerActiveOrders(commerceCustomerId);
+  return orders[0] ?? null;
+}
+
+export async function getCustomerActiveOrders(commerceCustomerId: string) {
+  return prisma.commerceOrder.findMany({
     where: {
       commerceCustomerId,
       status: {
@@ -1030,7 +1035,8 @@ export async function getCustomerActiveOrder(commerceCustomerId: string) {
         include: { assignments: { include: { worker: true } } }
       }
     },
-    orderBy: { createdAt: "desc" }
+    orderBy: { createdAt: "desc" },
+    take: 8
   });
 }
 

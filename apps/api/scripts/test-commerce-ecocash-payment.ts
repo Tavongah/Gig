@@ -176,7 +176,7 @@ async function main() {
     io
   );
   const pendingMsg = mock.sent.filter((m) => m.to === customerPhone).pop()?.body ?? "";
-  assert(/EcoCash payment request sent/i.test(pendingMsg), `pending: ${pendingMsg}`);
+  assert(/EcoCash request sent/i.test(pendingMsg), `pending: ${pendingMsg}`);
 
   const order = await prisma.commerceOrder.findFirst({
     where: { merchantId: merchant.id },

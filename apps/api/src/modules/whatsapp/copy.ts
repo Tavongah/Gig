@@ -40,9 +40,12 @@ export function formatGuestHandoffAwaitingLocation(input: {
   shopName?: string;
   lines: Array<{ quantity: number; productName: string; lineTotalCents: number }>;
   subtotalCents: number;
+  superseded?: boolean;
 }): string {
   void input.shopName;
   return [
+    input.superseded ? "Got it — I've opened your new basket." : null,
+    input.superseded ? "" : null,
     "Your DUTS cart",
     "",
     formatCartLines(input.lines),
@@ -50,17 +53,22 @@ export function formatGuestHandoffAwaitingLocation(input: {
     `Items: ${money(input.subtotalCents)}`,
     "",
     formatLocationAsk()
-  ].join("\n");
+  ]
+    .filter((x) => x != null)
+    .join("\n");
 }
 
 export function formatLocationAsk(): string {
-  return ["Where should we deliver?", "", "Send your location or type your address."].join("\n");
+  return ["Where should we deliver?", "", "📍 Send your location", "or type your address."].join("\n");
 }
 
-/** Prefer human-readable delivery labels; keep coordinate strings as safe fallback. */
+const COORD_RE = /^-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+$/;
+
+/** Prefer suburb/city labels. Never show raw lat/lng to the customer. */
 export function formatCustomerDeliveryLabel(label: string | null | undefined): string | null {
   const trimmed = String(label ?? "").trim();
   if (!trimmed) return null;
+  if (COORD_RE.test(trimmed)) return "Pinned location ✓";
   return trimmed;
 }
 
@@ -300,14 +308,7 @@ export function formatCustomerFulfillmentProblem(): string {
 }
 
 export function formatPaymentMethodChoice(_totalCents?: number): string {
-  return [
-    "Choose payment",
-    "",
-    "1. EcoCash USD",
-    "2. Cash on delivery",
-    "",
-    "Reply 1 or 2."
-  ].join("\n");
+  return ["Choose payment", "", "1. EcoCash USD", "2. Cash on delivery"].join("\n");
 }
 
 export function formatEcoCashPrompt(): string {
@@ -336,11 +337,11 @@ export function formatMobileMoneyPhonePrompt(method: "ECOCASH" | "ONEMONEY"): st
 
 export function formatEcoCashPending(_displayLocal?: string): string {
   return [
-    "EcoCash payment request sent.",
+    "EcoCash request sent ✓",
     "",
     "Approve the payment on your phone.",
     "",
-    "Waiting for confirmation..."
+    "Waiting for confirmation…"
   ].join("\n");
 }
 
@@ -369,31 +370,39 @@ export function formatMobileMoneyPending(input: {
   return input.method === "ONEMONEY" ? formatOneMoneyPending() : formatEcoCashPending();
 }
 
-export function formatEcoCashPaid(totalCents?: number): string {
+export function formatEcoCashPaid(totalCents?: number, orderNumber?: number): string {
   return [
-    "✓ Payment received",
+    "Payment received ✓",
+    "",
+    orderNumber != null ? `Order #${orderNumber} confirmed.` : "Your order is confirmed.",
     totalCents != null ? `Total: ${money(totalCents)}` : null,
     "",
-    "Your order has been sent to the shop."
+    "We're sending it to the shop now."
   ]
     .filter((x) => x != null && x !== "")
     .join("\n");
 }
 
-export function formatCashOrderConfirmed(totalCents: number): string {
+export function formatCashOrderConfirmed(totalCents: number, orderNumber?: number): string {
   return [
-    "✓ Cash on delivery",
+    "Order confirmed ✓",
     "",
+    orderNumber != null ? `Order #${orderNumber}` : null,
     `Total: ${money(totalCents)}`,
+    "Payment: Cash on delivery",
     "",
-    "Pay when your order arrives.",
-    "",
-    "Your order has been sent to the shop."
-  ].join("\n");
+    "We're sending it to the shop now."
+  ]
+    .filter((x) => x != null && x !== "")
+    .join("\n");
 }
 
 export function formatOrderCancelled(): string {
-  return "Order cancelled.";
+  return [
+    "No problem — your checkout was cancelled.",
+    "",
+    "You can start another order anytime."
+  ].join("\n");
 }
 
 export function formatEcoCashFailed(): string {
@@ -418,3 +427,88 @@ export function formatClaimPaidIgnored(): string {
 export function formatPaymentStillPending(): string {
   return "Payment is still being confirmed.";
 }
+
+export function formatReadyToOrder(input: {
+  lines: Array<{ quantity: number; productName: string; lineTotalCents: number }>;
+  subtotalCents: number;
+}): string {
+  return [
+    "Your cart",
+    "",
+    formatCartLines(input.lines),
+    "",
+    `Items: ${money(input.subtotalCents)}`,
+    "",
+    "Ready to order?",
+    "",
+    "1. Yes",
+    "2. Add more"
+  ].join("\n");
+}
+
+export function formatChangeWhat(includePayment: boolean): string {
+  return [
+    "What would you like to change?",
+    "",
+    "1. Items",
+    "2. Delivery location",
+    includePayment ? "3. Payment method" : null
+  ]
+    .filter((x) => x != null)
+    .join("\n");
+}
+
+export function formatPendingPaymentHandoff(): string {
+  return [
+    "Your previous payment is still being checked.",
+    "",
+    "1. Check previous payment",
+    "2. Start new basket"
+  ].join("\n");
+}
+
+export function formatHandoffExpired(): string {
+  return [
+    "That basket link has expired.",
+    "",
+    "Please return to DUTS and continue your order again."
+  ].join("\n");
+}
+
+export function formatStatusChoices(
+  orders: Array<{ orderNumber: number; label: string }>
+): string {
+  return [
+    `You have ${orders.length} active orders:`,
+    "",
+    ...orders.map((o, i) => `${i + 1}. #${o.orderNumber} — ${o.label}`)
+  ].join("\n");
+}
+
+export function formatCheckoutHelp(expected?: string): string {
+  switch (expected) {
+    case "PRODUCT_DISAMBIGUATION":
+      return "Reply with 1, 2, or 3 to pick a product.";
+    case "READY_TO_ORDER":
+      return "Reply 1 to continue, or 2 to add more items.";
+    case "LOCATION":
+      return formatLocationAsk();
+    case "ORDER_CONFIRMATION":
+      return ["Confirm order?", "", "1. Confirm", "2. Change", "3. Cancel"].join("\n");
+    case "PAYMENT_METHOD":
+      return formatPaymentMethodChoice();
+    case "ECOCASH_NUMBER":
+      return formatEcoCashPrompt();
+    case "PAYMENT_PENDING":
+      return formatPaymentStillPending();
+    case "PAYMENT_RETRY":
+      return formatEcoCashFailed();
+    case "CHANGE_WHAT":
+      return formatChangeWhat(true);
+    case "PENDING_PAYMENT_HANDOFF":
+      return formatPendingPaymentHandoff();
+    default:
+      return CUSTOMER_HELP_FULL;
+  }
+}
+

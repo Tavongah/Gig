@@ -180,7 +180,7 @@ async function main() {
   );
   const ecoPending = mock.sent.filter((m) => m.to === customerPhone).pop()?.body ?? "";
   assert(
-    /EcoCash payment request sent/i.test(ecoPending) &&
+    /EcoCash request sent/i.test(ecoPending) &&
       /Approve the payment on your phone/i.test(ecoPending) &&
       /Waiting for confirmation/i.test(ecoPending),
     `test pending copy: ${ecoPending}`

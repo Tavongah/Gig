@@ -7,6 +7,46 @@ import { prisma } from "../../config/prisma.js";
 import { normalizePhoneNumber } from "../auth/access.service.js";
 
 export type ConversationContext = {
+  /** One active unfinished checkout per phone. Placed orders stay independent. */
+  checkoutSessionId?: string;
+  checkoutSource?: "WHATSAPP" | "WEB_HANDOFF";
+  checkoutStatus?: "ACTIVE" | "COMPLETED" | "CANCELLED" | "SUPERSEDED" | "EXPIRED";
+  expectedInput?:
+    | "NONE"
+    | "PRODUCT_TEXT"
+    | "PRODUCT_DISAMBIGUATION"
+    | "READY_TO_ORDER"
+    | "LOCATION"
+    | "ORDER_CONFIRMATION"
+    | "PAYMENT_METHOD"
+    | "ECOCASH_NUMBER"
+    | "PAYMENT_PENDING"
+    | "PAYMENT_RETRY"
+    | "CHANGE_WHAT"
+    | "ACTIVE_ORDER_STATUS"
+    | "PENDING_PAYMENT_HANDOFF";
+  choiceType?: ConversationContext["expectedInput"];
+  choiceId?: string;
+  sessionStartedAt?: string;
+  consumedHandoffToken?: string;
+  pendingHandoffToken?: string;
+  lockedProductLines?: Array<{
+    productId: string;
+    quantity: number;
+    productName: string;
+    unitPriceCents: number;
+    merchantId: string;
+  }>;
+  parkedPayments?: Array<{
+    checkoutSessionId: string;
+    paymentAttemptId?: string;
+    pendingPaymentOrderId?: string;
+    paymentPhase?: ConversationContext["paymentPhase"];
+  }>;
+  statusOrderIds?: string[];
+  lastDeliveryLat?: number;
+  lastDeliveryLng?: number;
+  lastDeliveryLabel?: string;
   requestedItems?: Array<{ query: string; quantity: number }>;
   deliveryLat?: number;
   deliveryLng?: number;
@@ -14,6 +54,7 @@ export type ConversationContext = {
   pendingChoices?: Array<{
     query: string;
     options: Array<{ productId: string; name: string; priceCents: number }>;
+    choiceId?: string;
   }>;
   /** Merchant product ambiguity (price update / OOS). */
   pendingMerchantProductChoices?: Array<{ productId: string; name: string; priceCents: number }>;
@@ -85,6 +126,40 @@ export function readContext(conv: { contextJson: Prisma.JsonValue }): Conversati
     return conv.contextJson as ConversationContext;
   }
   return {};
+}
+
+/** Expire unfinished WhatsApp checkout drafts. Never cancels placed orders or payments. */
+export async function expireStaleCheckoutConversations(): Promise<number> {
+  const { sanitizeCheckoutContext, isLivePendingPayment, sessionIsExpired, isUnfinishedCheckout } =
+    await import("./checkout-session.js");
+  const convs = await prisma.whatsAppConversation.findMany({
+    where: {
+      party: WhatsAppParty.CUSTOMER,
+      state: {
+        in: [
+          WhatsAppConversationState.IDLE,
+          WhatsAppConversationState.BUILDING_CART,
+          WhatsAppConversationState.AWAITING_LOCATION,
+          WhatsAppConversationState.AWAITING_PRODUCT_CHOICE,
+          WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION,
+          WhatsAppConversationState.AWAITING_PAYMENT
+        ]
+      }
+    },
+    take: 200,
+    orderBy: { updatedAt: "asc" }
+  });
+  let n = 0;
+  for (const conv of convs) {
+    const ctx = readContext(conv);
+    if (isLivePendingPayment(ctx)) continue;
+    if (!sessionIsExpired(ctx) || !isUnfinishedCheckout(ctx, conv.state)) continue;
+    const sanitized = sanitizeCheckoutContext(conv.state, ctx);
+    if (!sanitized.expired) continue;
+    await updateConversation(conv.id, { state: sanitized.state, context: sanitized.ctx });
+    n += 1;
+  }
+  return n;
 }
 
 export async function updateConversation(

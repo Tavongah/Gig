@@ -156,10 +156,10 @@ async function main() {
   includesAll(pay, ["choose payment", "1. ecocash usd", "2. cash on delivery"], "payment choice");
   excludesAll(pay, ["onemoney", "paynow", "innbucks", "card"], "launch methods only");
   excludesAll(pay, ["payment: cash on delivery", "PAYMENT_PENDING"], "payment choice");
-  includesAll(formatEcoCashPending(), ["payment request sent", "approve", "waiting"], "ecocash pending");
+  includesAll(formatEcoCashPending(), ["ecocash request sent", "approve", "waiting"], "ecocash pending");
   excludesAll(formatEcoCashPending(), ["payment received", "payment successful", "order paid"], "ecocash pending");
-  includesAll(formatCashOrderConfirmed(498), ["cash on delivery", "$4.98", "sent to the shop"], "cash confirmed");
-  includesAll(formatEcoCashPaid(498), ["payment received", "$4.98", "sent to the shop"], "paid");
+  includesAll(formatCashOrderConfirmed(498), ["cash on delivery", "$4.98", "sending it to the shop"], "cash confirmed");
+  includesAll(formatEcoCashPaid(498), ["payment received", "$4.98", "sending it to the shop"], "paid");
   includesAll(formatEcoCashFailed(), ["not completed", "1. try again", "2. cash on delivery"], "failed");
 
   const requested = formatRequestedCart([]);

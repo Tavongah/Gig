@@ -458,7 +458,10 @@ export async function notifyAfterPaidCommerceOrder(orderId: string): Promise<voi
     try {
       const { notifyCustomerStatus } = await import("../whatsapp/merchant-handler.js");
       const { formatEcoCashPaid } = await import("../whatsapp/copy.js");
-      await notifyCustomerStatus(order.customerWhatsAppPhone, formatEcoCashPaid(order.totalCents));
+      await notifyCustomerStatus(
+        order.customerWhatsAppPhone,
+        formatEcoCashPaid(order.totalCents, order.orderNumber)
+      );
     } catch {
       /* customer WhatsApp is not a fulfillment gate */
     }
@@ -474,23 +477,26 @@ export async function notifyAfterPaidCommerceOrder(orderId: string): Promise<voi
         }
       });
       if (conv) {
-        const ctx =
-          conv.contextJson && typeof conv.contextJson === "object" && !Array.isArray(conv.contextJson)
-            ? { ...(conv.contextJson as Record<string, unknown>) }
-            : {};
-        delete ctx.paymentPhase;
-        delete ctx.paymentAttemptId;
-        delete ctx.pendingPaymentOrderId;
-        delete ctx.payerPhoneDisplay;
-        delete ctx.selectedPaymentMethod;
-        ctx.activeOrderId = order.id;
-        await prisma.whatsAppConversation.update({
-          where: { id: conv.id },
-          data: {
-            state: WhatsAppConversationState.ORDER_ACTIVE,
-            contextJson: ctx as import("@prisma/client").Prisma.InputJsonValue
-          }
-        });
+        const { readContext } = await import("../whatsapp/conversation.service.js");
+        const { applyPaidOrderToConversation } = await import("../whatsapp/checkout-session.js");
+        const current = readContext(conv);
+        const applied = applyPaidOrderToConversation(current, order.id);
+        if (applied.completedCurrent) {
+          await prisma.whatsAppConversation.update({
+            where: { id: conv.id },
+            data: {
+              state: WhatsAppConversationState.ORDER_ACTIVE,
+              contextJson: applied.ctx as import("@prisma/client").Prisma.InputJsonValue
+            }
+          });
+        } else if (applied.ctx !== current) {
+          await prisma.whatsAppConversation.update({
+            where: { id: conv.id },
+            data: {
+              contextJson: applied.ctx as import("@prisma/client").Prisma.InputJsonValue
+            }
+          });
+        }
       }
     } catch {
       /* conversation update is best-effort */

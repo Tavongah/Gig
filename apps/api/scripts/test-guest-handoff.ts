@@ -55,8 +55,8 @@ function pass(name: string) {
 {
   const copy = readFileSync(resolve(here, "../src/modules/whatsapp/copy.ts"), "utf8");
   assert.ok(copy.includes("formatGuestHandoffAwaitingLocation"), "guest restore asks for WhatsApp location");
-  assert.ok(copy.includes("Send your location or type your address."), "native location request copy");
   assert.ok(copy.includes("formatLocationAsk"), "shared location ask");
+  assert.ok(copy.includes("Send your location"), "native location request copy");
   pass("WhatsApp location copy after handoff");
 }
 
@@ -94,7 +94,9 @@ function pass(name: string) {
   assert.ok(handoff.includes("GUEST_WHATSAPP_HANDOFF_CONSUMED"), "consume is logged");
   assert.ok(handoff.includes("deferDelivery: true"), "handoff quotes items without delivery");
   assert.ok(handoff.includes("locationIsApproximate: true"), "stored location is not exact");
-  assert.ok(handoff.includes("AWAITING_LOCATION"), "restore waits for WhatsApp location");
+  assert.ok(handoff.includes("lockedProductLines"), "handoff stores exact product IDs");
+  assert.ok(handoff.includes("WEB_HANDOFF"), "handoff source is web");
+  assert.ok(handoff.includes('setExpected(ctx, "LOCATION")'), "restore waits for WhatsApp location");
   assert.ok(!handoff.includes("AWAITING_ORDER_CONFIRMATION"), "must not confirm before exact location");
   pass("handoff defers delivery until WhatsApp location");
 }
@@ -141,7 +143,8 @@ const {
   });
   assert.match(message, /Items: \$2\.50/);
   assert.match(message, /Where should we deliver\?/);
-  assert.match(message, /Send your location or type your address/);
+  assert.match(message, /Send your location/);
+  assert.match(message, /or type your address/);
   assert.doesNotMatch(message, /Delivery:\s*\$/);
   assert.doesNotMatch(message, /Confirm order/);
   pass("handoff restore copy has no delivery fee");

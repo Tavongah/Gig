@@ -270,7 +270,7 @@ assert.match(choice, /2\.\s*Cash on delivery/i);
 assert.doesNotMatch(choice, /onemoney/i);
 assert.doesNotMatch(choice, /innbucks|o'?mari|card|paynow|smilecash/i);
 assert.doesNotMatch(choice, /\bZB\b/);
-assert.match(formatEcoCashPending(), /payment request sent/i);
+assert.match(formatEcoCashPending(), /request sent/i);
 assert.doesNotMatch(formatEcoCashPending(), /payment received|order paid|paid\b/i);
 assert.match(formatEcoCashFailed(), /not completed/i);
 assert.match(formatPaymentStillPending(), /still being confirmed/i);

@@ -216,7 +216,7 @@ async function main() {
   mock.clear();
   await sendAs(phoneCancel, "3");
   assert(
-    mock.sent.some((m) => /order cancelled/i.test(m.body)),
+    mock.sent.some((m) => /checkout was cancelled|order cancelled/i.test(m.body)),
     "cancel ack"
   );
 

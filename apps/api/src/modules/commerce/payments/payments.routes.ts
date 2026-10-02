@@ -62,20 +62,6 @@ async function notifyAfterProviderResult(result: {
     try {
       const order = await prisma.commerceOrder.findUnique({ where: { id: result.orderId } });
       if (order?.customerWhatsAppPhone) {
-        const { notifyCustomerStatus } = await import("../../whatsapp/merchant-handler.js");
-        const {
-          formatEcoCashExpired,
-          formatEcoCashFailed,
-          formatMobileMoneyCancelled
-        } = await import("../../whatsapp/copy.js");
-        const msg =
-          result.status === "EXPIRED"
-            ? formatEcoCashExpired()
-            : result.status === "CANCELLED"
-              ? formatMobileMoneyCancelled()
-              : formatEcoCashFailed();
-        await notifyCustomerStatus(order.customerWhatsAppPhone, msg);
-
         const { WhatsAppParty } = await import("@prisma/client");
         const conv = await prisma.whatsAppConversation.findUnique({
           where: {
@@ -85,21 +71,42 @@ async function notifyAfterProviderResult(result: {
             }
           }
         });
+        let promptRetry = true;
         if (conv) {
-          const ctx =
-            conv.contextJson && typeof conv.contextJson === "object" && !Array.isArray(conv.contextJson)
-              ? { ...(conv.contextJson as Record<string, unknown>) }
-              : {};
-          ctx.paymentPhase =
+          const { readContext } = await import("../../whatsapp/conversation.service.js");
+          const { applyFailedPaymentToConversation } = await import("../../whatsapp/checkout-session.js");
+          const { WhatsAppConversationState } = await import("@prisma/client");
+          const current = readContext(conv);
+          const phase =
+            result.status === "EXPIRED" ? ("EXPIRED" as const) : ("FAILED" as const);
+          const applied = applyFailedPaymentToConversation(current, result.orderId, phase);
+          promptRetry = applied.updateCurrent;
+          if (applied.updateCurrent || applied.ctx !== current) {
+            await prisma.whatsAppConversation.update({
+              where: { id: conv.id },
+              data: {
+                state: applied.updateCurrent
+                  ? WhatsAppConversationState.AWAITING_PAYMENT
+                  : conv.state,
+                contextJson: applied.ctx as Prisma.InputJsonValue
+              }
+            });
+          }
+        }
+        if (promptRetry) {
+          const { notifyCustomerStatus } = await import("../../whatsapp/merchant-handler.js");
+          const {
+            formatEcoCashExpired,
+            formatEcoCashFailed,
+            formatMobileMoneyCancelled
+          } = await import("../../whatsapp/copy.js");
+          const msg =
             result.status === "EXPIRED"
-              ? "EXPIRED"
+              ? formatEcoCashExpired()
               : result.status === "CANCELLED"
-                ? "FAILED"
-                : "FAILED";
-          await prisma.whatsAppConversation.update({
-            where: { id: conv.id },
-            data: { contextJson: ctx as Prisma.InputJsonValue }
-          });
+                ? formatMobileMoneyCancelled()
+                : formatEcoCashFailed();
+          await notifyCustomerStatus(order.customerWhatsAppPhone, msg);
         }
       }
     } catch {
