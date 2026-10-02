@@ -239,6 +239,10 @@ export interface GigDetail {
     currentLabel?: string;
     stops?: Array<{ shopName: string; sequence: number; status: string; current: boolean }>;
     warning?: string | null;
+    paid?: boolean;
+    collectCash?: boolean;
+    collectCents?: number;
+    paymentLabel?: string;
   };
   offer?: {
     id: string;
@@ -251,6 +255,14 @@ export interface GigDetail {
     estimatedDistanceKm?: number | null;
     distanceToPickupMiles?: number | null;
     estimatedEarningsCents?: number;
+    commerce?: {
+      shopName: string;
+      itemCount: number;
+      pickupCount: number;
+      paymentLabel: string;
+      collectCash: boolean;
+      paid: boolean;
+    };
   };
 }
 
@@ -729,6 +741,26 @@ export const api = {
     request<{ rematching: boolean; status: string }>(
       `/gigs/${gigId}/cancel-by-worker`,
       { method: "POST", body: JSON.stringify({ reason }) },
+      token
+    ),
+  releaseDelivery: (
+    gigId: string,
+    payload: { reason: string; note?: string },
+    token: string
+  ) =>
+    request<{ success?: boolean; released?: boolean; rematching?: boolean; needsAttention?: boolean; status?: string }>(
+      `/gigs/${gigId}/delivery/release`,
+      { method: "POST", body: JSON.stringify(payload) },
+      token
+    ),
+  reportDeliveryProblem: (
+    gigId: string,
+    payload: { reason: string; note?: string },
+    token: string
+  ) =>
+    request<{ success?: boolean; reported?: boolean; needsAttention?: boolean }>(
+      `/gigs/${gigId}/delivery/report-problem`,
+      { method: "POST", body: JSON.stringify(payload) },
       token
     ),
   updateGigStatus: (

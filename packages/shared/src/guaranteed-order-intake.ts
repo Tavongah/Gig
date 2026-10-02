@@ -17,7 +17,12 @@ export const FULFILLMENT_NOTE = {
   PICKUP_CONFIRMED: "assisted_pickup_confirmed",
   PICKUP_PROBLEM: "assisted_pickup_problem",
   MERCHANT_REJECTED: "merchant_rejected",
-  COURIER_SEARCH_WAITING: "courier_search_waiting"
+  COURIER_SEARCH_WAITING: "courier_search_waiting",
+  MERCHANT_NOTIFY_FAILED: "merchant_notify_failed",
+  MERCHANT_NOTIFY_PENDING: "merchant_notify_pending",
+  COURIER_RELEASED: "courier_released",
+  COURIER_POST_PICKUP_FAILURE: "courier_post_pickup_failure",
+  FINDING_REPLACEMENT_COURIER: "finding_replacement_courier"
 } as const;
 
 export type FulfillmentNoteToken = (typeof FULFILLMENT_NOTE)[keyof typeof FULFILLMENT_NOTE];
@@ -55,7 +60,8 @@ export function isAssistedPickupConfirmationRequired(input: {
   notes?: string | null;
   merchantAcceptedAt?: Date | string | null;
 }): boolean {
-  if (!isAssistedFulfillment(input.notes)) return false;
+  const notifyFailed = hasFulfillmentNote(input.notes, FULFILLMENT_NOTE.MERCHANT_NOTIFY_FAILED);
+  if (!isAssistedFulfillment(input.notes) && !notifyFailed) return false;
   if (input.merchantAcceptedAt) return false;
   if (hasFulfillmentNote(input.notes, FULFILLMENT_NOTE.PICKUP_PROBLEM)) return false;
   return !hasFulfillmentNote(input.notes, FULFILLMENT_NOTE.PICKUP_CONFIRMED);
@@ -68,8 +74,17 @@ export function fulfillmentAdminLabel(input: {
 }): string | null {
   const notes = input.notes;
   if (hasFulfillmentNote(notes, FULFILLMENT_NOTE.PICKUP_PROBLEM)) return "Courier reported problem";
+  if (hasFulfillmentNote(notes, FULFILLMENT_NOTE.COURIER_POST_PICKUP_FAILURE)) {
+    return "Courier unable to continue";
+  }
   if (hasFulfillmentNote(notes, FULFILLMENT_NOTE.MERCHANT_REJECTED)) return "Merchant rejected";
   if (needsFulfillmentAttention(notes)) return "Needs attention";
+  if (hasFulfillmentNote(notes, FULFILLMENT_NOTE.FINDING_REPLACEMENT_COURIER) && !input.hasCourier) {
+    return "Finding replacement courier";
+  }
+  if (hasFulfillmentNote(notes, FULFILLMENT_NOTE.COURIER_RELEASED) && !input.hasCourier) {
+    return "Finding replacement courier";
+  }
   if (isAssistedFulfillment(notes) && !input.hasCourier) {
     if (input.status === "READY_FOR_PICKUP" || hasFulfillmentNote(notes, FULFILLMENT_NOTE.COURIER_SEARCH_WAITING)) {
       return "Finding courier";
@@ -81,6 +96,24 @@ export function fulfillmentAdminLabel(input: {
   }
   if (isAssistedFulfillment(notes)) return "Merchant not responding";
   return null;
+}
+
+export function merchantNotificationAdminLabel(status?: string | null): string | null {
+  switch (status) {
+    case "DELIVERED":
+      return "Merchant notified ✓";
+    case "QUEUED":
+    case "SENT":
+    case "PENDING":
+      return "Merchant notification pending";
+    case "FAILED":
+    case "UNDELIVERED":
+      return "Merchant WhatsApp failed";
+    case "NEEDS_ATTENTION":
+      return "Needs attention";
+    default:
+      return null;
+  }
 }
 
 export function customerFulfillmentHint(input: {
@@ -102,6 +135,9 @@ export function customerFulfillmentHint(input: {
   if (input.hasCourier) return null;
   if (input.status === "READY_FOR_PICKUP" || hasFulfillmentNote(input.notes, FULFILLMENT_NOTE.COURIER_SEARCH_WAITING)) {
     return "We're finding a courier. Delivery may take longer than usual.";
+  }
+  if (hasFulfillmentNote(input.notes, FULFILLMENT_NOTE.FINDING_REPLACEMENT_COURIER) || hasFulfillmentNote(input.notes, FULFILLMENT_NOTE.COURIER_RELEASED)) {
+    return "We're finding another courier for your order. Your order is still confirmed.";
   }
   if (isAssistedFulfillment(input.notes)) {
     return "We're arranging your delivery. It may take a little longer than usual.";

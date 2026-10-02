@@ -262,6 +262,10 @@ export function formatCustomerOrderReady(): string {
   return ["✓ Your order is ready.", "", "Finding a courier..."].join("\n");
 }
 
+export function formatFindingAnotherCourier(): string {
+  return ["We're finding another courier for your order.", "", "Your order is still confirmed."].join("\n");
+}
+
 export function formatCustomerOrderConfirmedArranging(): string {
   return [
     "Order confirmed ✓",

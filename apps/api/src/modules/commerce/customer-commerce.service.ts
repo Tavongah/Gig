@@ -828,6 +828,15 @@ export async function checkoutCart(input: {
     }
   }
 
+  if (paymentMethod !== "ECOCASH") {
+    try {
+      const { notifyMerchantNewOrderSafe } = await import("./merchant-notification.service.js");
+      await notifyMerchantNewOrderSafe(order);
+    } catch {
+      /* notification is not a persistence gate */
+    }
+  }
+
   const fresh = await prisma.commerceOrder.findUniqueOrThrow({ where: { id: order.id } });
 
   return {

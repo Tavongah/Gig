@@ -45,6 +45,14 @@ export function DeliveryJobScreen() {
   const queryClient = useQueryClient();
   const [pin, setPin] = useState("");
   const [pinLocked, setPinLocked] = useState(false);
+  const [releasePanel, setReleasePanel] = useState<"none" | "reasons" | "confirm">("none");
+  const [problemPanel, setProblemPanel] = useState(false);
+  const [releaseReason, setReleaseReason] = useState<
+    "TRANSPORT" | "PERSONAL_EMERGENCY" | "SHOP_PROBLEM" | "CUSTOMER_PROBLEM" | "ROUTE_PROBLEM" | "OTHER"
+  >("TRANSPORT");
+  const [problemReason, setProblemReason] = useState<
+    "SHOP_CLOSED" | "SHOP_CANNOT_FULFILL" | "ITEM_UNAVAILABLE" | "CANNOT_FIND_SHOP" | "CUSTOMER_UNREACHABLE" | "OTHER"
+  >("SHOP_CLOSED");
 
   const gigQuery = useQuery({
     queryKey: ["gig", route.params.gigId],
@@ -188,6 +196,35 @@ export function DeliveryJobScreen() {
     onError: (error: Error) => showAlert("Couldn't update pickup", friendlyDeliveryError(error))
   });
 
+  const releaseMutation = useMutation({
+    mutationFn: () =>
+      api.releaseDelivery(route.params.gigId, { reason: releaseReason }, session.token),
+    onSuccess: (result) => {
+      setReleasePanel("none");
+      invalidate();
+      if (result.needsAttention) {
+        showAlert("DUTS will help", "You already collected this order. DUTS needs to help complete the delivery.");
+        return;
+      }
+      showAlert("Delivery released", "DUTS will find another courier. The customer order stays confirmed.");
+      navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
+    },
+    onError: (error: Error) => {
+      showAlert("We couldn't update this delivery.", friendlyDeliveryError(error) || "Please try again.");
+    }
+  });
+
+  const problemMutation = useMutation({
+    mutationFn: () =>
+      api.reportDeliveryProblem(route.params.gigId, { reason: problemReason }, session.token),
+    onSuccess: () => {
+      setProblemPanel(false);
+      invalidate();
+      showAlert("Problem reported", "DUTS is checking this delivery.");
+    },
+    onError: (error: Error) => showAlert("Couldn't report problem", friendlyDeliveryError(error))
+  });
+
   function openMaps(lat?: string | number | null, lng?: string | number | null, label?: string): void {
     void openExternalNavigation(lat, lng, label).catch(() => {
       showAlert("Couldn't open maps", "Please try again.");
@@ -284,10 +321,19 @@ export function DeliveryJobScreen() {
         {gig.estimatedDistanceKm != null ? (
           <Row label="Distance" value={`${Number(gig.estimatedDistanceKm).toFixed(1)} km`} />
         ) : null}
-        <Row
-          label={activeRole === "WORKER" ? "You earn" : "Delivery fee"}
-          value={formatCents(activeRole === "WORKER" ? gig.workerPayoutCents ?? gig.totalCents : gig.totalCents)}
-        />
+        {activeRole === "WORKER" && commercePickup?.paymentLabel ? (
+          <>
+            <Row label="Payment" value={commercePickup.paymentLabel} />
+            {commercePickup.paid ? (
+              <Text className="text-sm font-semibold text-ink">Do not collect payment.</Text>
+            ) : (
+              <Text className="text-sm font-semibold text-ink">Cash on delivery — collect the amount shown.</Text>
+            )}
+          </>
+        ) : null}
+        {activeRole === "CLIENT" ? (
+          <Row label="Delivery fee" value={formatCents(gig.totalCents)} />
+        ) : null}
       </DutsCard>
 
       {activeRole === "CLIENT" && courier ? (
@@ -353,9 +399,14 @@ export function DeliveryJobScreen() {
               )}
               {gig.pickupContactName ? <Row label="Shop contact" value={gig.pickupContactName} /> : null}
               {gig.pickupInstructions ? <Row label="Notes" value={gig.pickupInstructions} /> : null}
-              {gig.status === "WORKER_ASSIGNED" || gig.status === "WORKER_EN_ROUTE" ? (
+          {commercePickup?.pickupCount && commercePickup.pickupCount > 1 ? (
+            <Text className="text-sm font-semibold text-ink">
+              {commercePickup.currentLabel ?? `Pickup ${(commercePickup.pickupIndex ?? 1)} of ${commercePickup.pickupCount}`}
+            </Text>
+          ) : null}
+          {gig.status === "WORKER_ASSIGNED" || gig.status === "WORKER_EN_ROUTE" ? (
                 <LoadingButton
-                  label="Directions to shop"
+                  label={commercePickup && (commercePickup.pickupCount ?? 1) > 1 ? "Directions to next pickup" : "Directions to shop"}
                   variant="secondary"
                   loading={ensureTravelMutation.isPending}
                   onPress={() => void openPickupDirections()}
@@ -384,10 +435,12 @@ export function DeliveryJobScreen() {
           {isDeliveryCompleteUi(gig.status) ? (
             <>
               <Text className="text-xl font-black text-ink">✓ Delivery complete</Text>
-              <Row
-                label="Earnings"
-                value={formatCents(gig.workerPayoutCents ?? gig.totalCents)}
-              />
+              {commercePickup ? null : (
+                <Row
+                  label="Earnings"
+                  value={formatCents(gig.workerPayoutCents ?? gig.totalCents)}
+                />
+              )}
               <LoadingButton
                 label="Done"
                 onPress={() => navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] })}
@@ -419,7 +472,7 @@ export function DeliveryJobScreen() {
             <>
               <Text className="text-base font-bold text-ink">Items available as ordered?</Text>
               <LoadingButton
-                label="Yes — continue"
+                label="Items confirmed — continue"
                 loading={assistedPickupMutation.isPending}
                 onPress={() => assistedPickupMutation.mutate("AVAILABLE")}
               />
@@ -500,6 +553,104 @@ export function DeliveryJobScreen() {
             loadingLabel={"requiresGps" in action && action.requiresGps ? "Getting location…" : "Updating…"}
             onPress={() => actionMutation.mutate()}
           />
+        ) : null}
+
+        {activeRole === "WORKER" &&
+        gig.assignedWorkerId === session.user.id &&
+        !isDeliveryCompleteUi(gig.status) &&
+        !isSearching(gig.status) ? (
+          <View className="mt-4 gap-3">
+            <LoadingButton
+              label="Report a problem"
+              variant="secondary"
+              onPress={() => setProblemPanel(true)}
+            />
+            <LoadingButton
+              label="Can't complete delivery"
+              variant="secondary"
+              onPress={() => setReleasePanel("reasons")}
+            />
+          </View>
+        ) : null}
+
+        {activeRole === "WORKER" && problemPanel ? (
+          <DutsCard className="gap-3 p-5">
+            <Text className="text-lg font-black text-ink">Report a problem</Text>
+            {(
+              [
+                ["SHOP_CLOSED", "Shop closed"],
+                ["SHOP_CANNOT_FULFILL", "Shop cannot fulfill order"],
+                ["ITEM_UNAVAILABLE", "Item unavailable"],
+                ["CANNOT_FIND_SHOP", "Cannot find shop"],
+                ["CUSTOMER_UNREACHABLE", "Customer unreachable"],
+                ["OTHER", "Other"]
+              ] as const
+            ).map(([id, label]) => (
+              <LoadingButton
+                key={id}
+                label={`${problemReason === id ? "● " : "○ "}${label}`}
+                variant={problemReason === id ? "primary" : "secondary"}
+                onPress={() => setProblemReason(id)}
+              />
+            ))}
+            <LoadingButton
+              label="Submit"
+              loading={problemMutation.isPending}
+              onPress={() => problemMutation.mutate()}
+            />
+            <LoadingButton label="Go back" variant="secondary" onPress={() => setProblemPanel(false)} />
+          </DutsCard>
+        ) : null}
+
+        {activeRole === "WORKER" && releasePanel !== "none" ? (
+          <DutsCard className="gap-3 p-5">
+            {releasePanel === "reasons" ? (
+              <>
+                <Text className="text-lg font-black text-ink">Can't complete this delivery?</Text>
+                {(
+                  [
+                    ["TRANSPORT", "Transport problem"],
+                    ["PERSONAL_EMERGENCY", "Personal emergency"],
+                    ["SHOP_PROBLEM", "Shop problem"],
+                    ["CUSTOMER_PROBLEM", "Customer problem"],
+                    ["ROUTE_PROBLEM", "Too far / route problem"],
+                    ["OTHER", "Other"]
+                  ] as const
+                ).map(([id, label]) => (
+                  <LoadingButton
+                    key={id}
+                    label={`${releaseReason === id ? "● " : "○ "}${label}`}
+                    variant={releaseReason === id ? "primary" : "secondary"}
+                    onPress={() => setReleaseReason(id)}
+                  />
+                ))}
+                <LoadingButton label="Continue" onPress={() => setReleasePanel("confirm")} />
+                <LoadingButton label="Go back" variant="secondary" onPress={() => setReleasePanel("none")} />
+              </>
+            ) : isPostPickupDelivery(gig.status) ? (
+              <>
+                <Text className="text-lg font-black text-ink">You already collected this order.</Text>
+                <Text className="text-sm text-ink">DUTS needs to help complete the delivery.</Text>
+                <LoadingButton
+                  label="Report and get help"
+                  loading={releaseMutation.isPending}
+                  onPress={() => releaseMutation.mutate()}
+                />
+                <LoadingButton label="Go back" variant="secondary" onPress={() => setReleasePanel("none")} />
+              </>
+            ) : (
+              <>
+                <Text className="text-lg font-black text-ink">Release this delivery?</Text>
+                <Text className="text-sm text-ink">DUTS will find another courier. The customer order stays confirmed.</Text>
+                <LoadingButton
+                  label="Release delivery"
+                  loading={releaseMutation.isPending}
+                  onPress={() => releaseMutation.mutate()}
+                />
+                <LoadingButton label="Keep delivery" variant="secondary" onPress={() => setReleasePanel("none")} />
+              </>
+            )}
+          </DutsCard>
         ) : null}
 
         {activeRole === "CLIENT" ? (

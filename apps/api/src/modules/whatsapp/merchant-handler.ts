@@ -30,8 +30,7 @@ import {
 } from "./conversation.service.js";
 import { getWhatsAppProvider } from "./provider.js";
 import type { InboundWhatsAppMessage } from "./customer-handler.js";
-import { sendCommerceNotification } from "./templates.js";
-import { formatMerchantAccepted, formatMerchantNewOrder, formatMerchantReady, formatMerchantReadyDeliveryFailed, formatCustomerMerchantAccepted, formatCustomerOrderReady, MERCHANT_HELP, money } from "./copy.js";
+import { formatMerchantAccepted, formatMerchantReady, formatMerchantReadyDeliveryFailed, formatCustomerMerchantAccepted, formatCustomerOrderReady, MERCHANT_HELP, money } from "./copy.js";
 
 function friendlyMerchantOrderStatus(status: string): string {
   switch (status) {
@@ -60,27 +59,8 @@ export async function notifyMerchantNewOrder(
     fulfillmentLabel?: string | null;
   }
 ): Promise<void> {
-  const displayRef =
-    order.checkout?.checkoutNumber && order.fulfillmentLabel
-      ? `${order.checkout.checkoutNumber}-${order.fulfillmentLabel}`
-      : undefined;
-  const body = formatMerchantNewOrder({
-    orderNumber: order.orderNumber,
-    displayRef,
-    lines: order.items.map((i) => `${i.quantity} × ${i.productNameSnapshot}`),
-    itemsTotalCents: order.subtotalCents,
-    totalCents: order.totalCents
-  });
-  await sendCommerceNotification(order.merchant.whatsappPhone, "merchant_new_order", body, [
-    { id: `accept_${order.orderNumber}`, title: "Accept" },
-    { id: `reject_${order.orderNumber}`, title: "Reject" }
-  ]);
-  const { logDutsFlow } = await import("../../lib/flow-log.js");
-  logDutsFlow("COMMERCE_MERCHANT_NOTIFIED", {
-    orderId: order.id,
-    orderNumber: order.orderNumber,
-    merchantId: order.merchantId
-  });
+  const { notifyMerchantNewOrderSafe } = await import("../commerce/merchant-notification.service.js");
+  await notifyMerchantNewOrderSafe(order);
 }
 
 export async function notifyCustomerStatus(phone: string, message: string): Promise<void> {

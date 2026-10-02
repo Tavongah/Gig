@@ -47,6 +47,9 @@ import {
   quoteDelivery,
   regenerateDeliveryPins,
   reportAssistedPickupProblem,
+  releaseCommerceDelivery,
+  reportCourierDeliveryProblem,
+  COURIER_RELEASE_REASONS,
   startTravelToDropoff,
   startTravelToPickup,
   verifyDeliveryPinAndComplete,
@@ -302,6 +305,71 @@ export function createGigRouter(io: Server): Router {
           return;
         }
         const result = await confirmAssistedPickup(String(req.params.gigId), req.auth!.userId);
+        res.json({ success: true, ...result });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/release",
+    requireAuth,
+    requireApprovedWorker,
+    validateBody(
+      z.object({
+        reason: z.enum([
+          "TRANSPORT",
+          "PERSONAL_EMERGENCY",
+          "SHOP_PROBLEM",
+          "CUSTOMER_PROBLEM",
+          "ROUTE_PROBLEM",
+          "OTHER"
+        ]),
+        note: z.string().trim().max(400).optional()
+      })
+    ),
+    async (req, res, next) => {
+      try {
+        const result = await releaseCommerceDelivery(
+          String(req.params.gigId),
+          req.auth!.userId,
+          req.body as { reason: (typeof COURIER_RELEASE_REASONS)[number]; note?: string },
+          io
+        );
+        res.json({ success: true, ...result });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/report-problem",
+    requireAuth,
+    requireApprovedWorker,
+    validateBody(
+      z.object({
+        reason: z.enum([
+          "SHOP_CLOSED",
+          "SHOP_CANNOT_FULFILL",
+          "ITEM_UNAVAILABLE",
+          "CANNOT_FIND_SHOP",
+          "CUSTOMER_UNREACHABLE",
+          "TRANSPORT",
+          "PERSONAL_EMERGENCY",
+          "OTHER"
+        ]),
+        note: z.string().trim().max(400).optional()
+      })
+    ),
+    async (req, res, next) => {
+      try {
+        const result = await reportCourierDeliveryProblem(
+          String(req.params.gigId),
+          req.auth!.userId,
+          req.body as { reason: string; note?: string }
+        );
         res.json({ success: true, ...result });
       } catch (error) {
         next(error);

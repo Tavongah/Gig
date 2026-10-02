@@ -1080,10 +1080,10 @@ export async function cancelAssignedWorkerAndRematch(
     notifyUser(io, gig.clientId, {
       type: "WORKER_CANCELLED_REMATCH",
       title: gig.fulfillmentType === "DELIVERY" ? "Finding another courier" : "Finding another worker",
-      body:
-        gig.fulfillmentType === "DELIVERY"
-          ? "Your previous courier cancelled. We’re searching for another available courier nearby."
-          : "Your previous worker cancelled. We’re searching for another available worker nearby.",
+        body:
+          gig.fulfillmentType === "DELIVERY"
+            ? "We're finding another courier for your order. Your order is still confirmed."
+            : "Your previous worker cancelled. We’re searching for another available worker nearby.",
       gigId
     });
 

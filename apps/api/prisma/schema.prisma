@@ -953,6 +953,7 @@ model CommerceOrder {
   merchantRespondBy    DateTime?
   items                CommerceOrderItem[]
   paymentAttempts      CommercePaymentAttempt[]
+  notificationAttempts CommerceNotificationAttempt[]
   pickupStop           CommerceCheckoutPickupStop?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
@@ -1099,6 +1100,61 @@ model CommerceOrderItem {
   lineTotalCents       Int
   unavailableMarked    Boolean       @default(false)
   createdAt            DateTime      @default(now())
+}
+
+enum CommerceNotificationStatus {
+  PENDING
+  QUEUED
+  SENT
+  DELIVERED
+  UNDELIVERED
+  FAILED
+  NEEDS_ATTENTION
+}
+
+/** Durable merchant/customer WhatsApp (and future channel) notification outbox. */
+model CommerceNotificationAttempt {
+  id                 String                       @id @default(uuid())
+  /** Stable identity e.g. merchant-new-order-{commerceOrderId} */
+  idempotencyKey     String                       @unique
+  commerceOrderId    String
+  commerceOrder      CommerceOrder                @relation(fields: [commerceOrderId], references: [id], onDelete: Cascade)
+  merchantId         String
+  channel            String                       @default("WHATSAPP")
+  messagePurpose     String                       @default("NEW_ORDER")
+  provider           String
+  providerMessageSid String?
+  toPhone            String
+  attemptCount       Int                          @default(0)
+  status             CommerceNotificationStatus   @default(PENDING)
+  lastAttemptAt      DateTime?
+  nextRetryAt        DateTime?
+  lastErrorCode      String?
+  lastErrorCategory  String?
+  deliveredAt        DateTime?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  @@index([status, nextRetryAt])
+  @@index([commerceOrderId, messagePurpose])
+  @@index([providerMessageSid])
+}
+
+/** Courier assignment release / post-pickup failure audit. Does not cancel CommerceOrder. */
+model CourierDeliveryRelease {
+  id               String   @id @default(uuid())
+  courierId        String
+  gigId            String
+  commerceOrderId  String?
+  reason           String
+  note             String?
+  stage            String
+  outcome          String
+  createdAt        DateTime @default(now())
+
+  @@index([courierId, createdAt])
+  @@index([gigId, createdAt])
+  @@index([commerceOrderId])
 }
 
 model WhatsAppConversation {

@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Server } from "socket.io";
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
-import { createMerchantSchema, fulfillmentAdminLabel, updateMerchantSchema, upsertProductSchema } from "@gigflow/shared";
+import { createMerchantSchema, fulfillmentAdminLabel, merchantNotificationAdminLabel, updateMerchantSchema, upsertProductSchema } from "@gigflow/shared";
 import { requireAuth, requireRole } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
 import { prisma } from "../../config/prisma.js";
@@ -28,6 +28,7 @@ import { extractMetaMessages, type MetaWebhookPayload } from "./meta-payload.js"
 import {
   extractTwilioMessage,
   resolveTwilioWebhookUrl,
+  resolveTwilioStatusCallbackUrl,
   twilioFormParamsForSignature
 } from "./twilio-payload.js";
 
@@ -153,6 +154,52 @@ export function createWhatsAppRouter(io: Server) {
     } catch (error) {
       console.error("[whatsapp:twilio] webhook error", error instanceof Error ? error.message : "unknown");
       res.status(200).type("text/xml").send("<Response></Response>");
+    }
+  });
+
+  router.post("/twilio/status", async (req, res) => {
+    try {
+      const provider = getWhatsAppProvider();
+      const params = twilioFormParamsForSignature((req.body ?? {}) as Record<string, unknown>);
+      const sig = req.header("x-twilio-signature") ?? undefined;
+      const webhookUrl = resolveTwilioStatusCallbackUrl();
+      const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
+      const requireTwilioSig = !isDevOrTestEnv() || Boolean(authToken);
+      if (requireTwilioSig) {
+        if (!authToken) {
+          res.status(401).type("text/plain").send("Twilio auth token not configured");
+          return;
+        }
+        const ok =
+          provider.verifyTwilioSignature?.({
+            signatureHeader: sig,
+            url: webhookUrl,
+            params
+          }) ??
+          (await import("./twilio-payload.js")).validateTwilioRequest({
+            authToken,
+            signatureHeader: sig,
+            url: webhookUrl,
+            params
+          });
+        if (!ok) {
+          res.sendStatus(403);
+          return;
+        }
+      }
+      const messageSid = params.MessageSid || params.SmsSid || "";
+      const messageStatus = params.MessageStatus || params.SmsStatus || "";
+      if (messageSid && messageStatus) {
+        const { applyTwilioMessageStatus } = await import("../commerce/merchant-notification.service.js");
+        await applyTwilioMessageStatus({
+          messageSid,
+          messageStatus,
+          errorCode: params.ErrorCode
+        });
+      }
+      res.status(200).type("text/plain").send("ok");
+    } catch {
+      res.status(200).type("text/plain").send("ok");
     }
   });
 
@@ -387,10 +434,34 @@ commerceAdminRouter.get("/orders", async (_req, res, next) => {
         commerceCustomer: { select: { id: true, displayName: true, whatsappPhone: true } },
         items: true,
         checkout: { select: { id: true, checkoutNumber: true, status: true, totalCents: true, paymentStatus: true } },
-        linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true, updatedAt: true } }
+        linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true, updatedAt: true } },
+        notificationAttempts: { orderBy: { updatedAt: "desc" }, take: 1 }
       }
     });
-    const orders = raw.map((o) => ({
+    const orderIds = raw.map((o) => o.id);
+    const gigIds = raw.map((o) => o.linkedDeliveryGig?.id).filter((id): id is string => Boolean(id));
+    const releases = await prisma.courierDeliveryRelease.findMany({
+      where: {
+        OR: [
+          ...(orderIds.length ? [{ commerceOrderId: { in: orderIds } }] : []),
+          ...(gigIds.length ? [{ gigId: { in: gigIds } }] : [])
+        ]
+      },
+      orderBy: { createdAt: "desc" }
+    });
+    const releaseByOrder = new Map<string, (typeof releases)[number]>();
+    const releaseByGig = new Map<string, (typeof releases)[number]>();
+    for (const r of releases) {
+      if (r.commerceOrderId && !releaseByOrder.has(r.commerceOrderId)) releaseByOrder.set(r.commerceOrderId, r);
+      if (!releaseByGig.has(r.gigId)) releaseByGig.set(r.gigId, r);
+    }
+    const orders = raw.map((o) => {
+      const latestNotify = o.notificationAttempts[0] ?? null;
+      const release =
+        (o.id ? releaseByOrder.get(o.id) : undefined) ??
+        (o.linkedDeliveryGig?.id ? releaseByGig.get(o.linkedDeliveryGig.id) : undefined) ??
+        null;
+      return {
       ...o,
       displayNumber: o.checkout
         ? `${o.checkout.checkoutNumber}-${o.fulfillmentLabel ?? "?"}`
@@ -408,11 +479,59 @@ commerceAdminRouter.get("/orders", async (_req, res, next) => {
       fulfillmentIssue: fulfillmentAdminLabel({
         notes: o.notes,
         status: o.status,
-        hasCourier: Boolean(o.linkedDeliveryGig?.assignedWorkerId) || Boolean(o.checkout)
+        hasCourier: Boolean(o.linkedDeliveryGig?.assignedWorkerId)
       }),
+      merchantNotification: latestNotify
+        ? {
+            status: latestNotify.status,
+            label: merchantNotificationAdminLabel(latestNotify.status),
+            attemptCount: latestNotify.attemptCount,
+            lastErrorCategory: latestNotify.lastErrorCategory,
+            providerMessageSid: latestNotify.providerMessageSid,
+            deliveredAt: latestNotify.deliveredAt
+          }
+        : null,
+      courierRelease: release
+        ? {
+            reason: release.reason,
+            stage: release.stage,
+            outcome: release.outcome,
+            createdAt: release.createdAt
+          }
+        : null,
       waitingSince: o.confirmedAt ?? o.createdAt
-    }));
+    };
+    });
     res.json({ orders });
+  } catch (e) {
+    next(e);
+  }
+});
+
+commerceAdminRouter.post("/orders/:id/retry-whatsapp", async (req, res, next) => {
+  try {
+    const order = await prisma.commerceOrder.findUnique({
+      where: { id: String(req.params.id) },
+      select: { id: true, paymentStatus: true, orderNumber: true }
+    });
+    if (!order) {
+      res.status(404).json({ error: "ORDER_NOT_FOUND" });
+      return;
+    }
+    if (order.orderNumber === 2) {
+      res.status(409).json({ error: "ORDER_LOCKED", message: "This historical order cannot be retried." });
+      return;
+    }
+    const { retryMerchantNewOrderNotification } = await import("../commerce/merchant-notification.service.js");
+    const result = await retryMerchantNewOrderNotification(order.id);
+    res.json({
+      ok: true,
+      orderId: order.id,
+      notification: {
+        status: result.status,
+        providerMessageSid: result.providerMessageSid ?? null
+      }
+    });
   } catch (e) {
     next(e);
   }

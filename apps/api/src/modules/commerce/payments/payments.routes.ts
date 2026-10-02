@@ -49,105 +49,61 @@ async function notifyAfterProviderResult(result: {
   status: string;
 }) {
   if (result.applied && result.status === "PAID" && !result.duplicate) {
-    const order = await prisma.commerceOrder.findUnique({
-      where: { id: result.orderId },
-      include: { merchant: true, items: true, customer: true, checkout: true }
-    });
-    if (order?.customerWhatsAppPhone) {
-      const { notifyCustomerStatus, notifyMerchantNewOrder } = await import(
-        "../../whatsapp/merchant-handler.js"
-      );
-      const { formatEcoCashPaid } = await import("../../whatsapp/copy.js");
-      await notifyCustomerStatus(
-        order.customerWhatsAppPhone,
-        formatEcoCashPaid(order.totalCents)
-      );
-      await notifyMerchantNewOrder(order);
-
-      if (order.checkoutId) {
-        const siblings = await prisma.commerceOrder.findMany({
-          where: { checkoutId: order.checkoutId, id: { not: order.id } },
-          include: { merchant: true, items: true, customer: true }
-        });
-        for (const sibling of siblings) {
-          await notifyMerchantNewOrder(sibling);
-        }
-      }
-
-      const { WhatsAppConversationState, WhatsAppParty } = await import("@prisma/client");
-      const conv = await prisma.whatsAppConversation.findUnique({
-        where: {
-          phoneNormalized_party: {
-            phoneNormalized: order.customerWhatsAppPhone,
-            party: WhatsAppParty.CUSTOMER
-          }
-        }
-      });
-      if (conv) {
-        const ctx =
-          conv.contextJson && typeof conv.contextJson === "object" && !Array.isArray(conv.contextJson)
-            ? { ...(conv.contextJson as Record<string, unknown>) }
-            : {};
-        delete ctx.paymentPhase;
-        delete ctx.paymentAttemptId;
-        delete ctx.pendingPaymentOrderId;
-        delete ctx.payerPhoneDisplay;
-        delete ctx.selectedPaymentMethod;
-        ctx.activeOrderId = order.id;
-        await prisma.whatsAppConversation.update({
-          where: { id: conv.id },
-          data: {
-            state: WhatsAppConversationState.ORDER_ACTIVE,
-            contextJson: ctx as Prisma.InputJsonValue
-          }
-        });
-      }
+    try {
+      const { notifyAfterPaidCommerceOrder } = await import("../merchant-notification.service.js");
+      await notifyAfterPaidCommerceOrder(result.orderId);
+    } catch {
+      /* merchant WhatsApp is not a payment persistence gate */
     }
     return;
   }
 
   if (result.applied && result.status !== "PAID") {
-    const order = await prisma.commerceOrder.findUnique({ where: { id: result.orderId } });
-    if (order?.customerWhatsAppPhone) {
-      const { notifyCustomerStatus } = await import("../../whatsapp/merchant-handler.js");
-      const {
-        formatEcoCashExpired,
-        formatEcoCashFailed,
-        formatMobileMoneyCancelled
-      } = await import("../../whatsapp/copy.js");
-      const msg =
-        result.status === "EXPIRED"
-          ? formatEcoCashExpired()
-          : result.status === "CANCELLED"
-            ? formatMobileMoneyCancelled()
-            : formatEcoCashFailed();
-      await notifyCustomerStatus(order.customerWhatsAppPhone, msg);
-
-      const { WhatsAppParty } = await import("@prisma/client");
-      const conv = await prisma.whatsAppConversation.findUnique({
-        where: {
-          phoneNormalized_party: {
-            phoneNormalized: order.customerWhatsAppPhone,
-            party: WhatsAppParty.CUSTOMER
-          }
-        }
-      });
-      if (conv) {
-        const ctx =
-          conv.contextJson && typeof conv.contextJson === "object" && !Array.isArray(conv.contextJson)
-            ? { ...(conv.contextJson as Record<string, unknown>) }
-            : {};
-        ctx.paymentPhase =
+    try {
+      const order = await prisma.commerceOrder.findUnique({ where: { id: result.orderId } });
+      if (order?.customerWhatsAppPhone) {
+        const { notifyCustomerStatus } = await import("../../whatsapp/merchant-handler.js");
+        const {
+          formatEcoCashExpired,
+          formatEcoCashFailed,
+          formatMobileMoneyCancelled
+        } = await import("../../whatsapp/copy.js");
+        const msg =
           result.status === "EXPIRED"
-            ? "EXPIRED"
+            ? formatEcoCashExpired()
             : result.status === "CANCELLED"
-              ? "FAILED"
-              : "FAILED";
-        await prisma.whatsAppConversation.update({
-          where: { id: conv.id },
-          data: { contextJson: ctx as Prisma.InputJsonValue }
+              ? formatMobileMoneyCancelled()
+              : formatEcoCashFailed();
+        await notifyCustomerStatus(order.customerWhatsAppPhone, msg);
+
+        const { WhatsAppParty } = await import("@prisma/client");
+        const conv = await prisma.whatsAppConversation.findUnique({
+          where: {
+            phoneNormalized_party: {
+              phoneNormalized: order.customerWhatsAppPhone,
+              party: WhatsAppParty.CUSTOMER
+            }
+          }
         });
+        if (conv) {
+          const ctx =
+            conv.contextJson && typeof conv.contextJson === "object" && !Array.isArray(conv.contextJson)
+              ? { ...(conv.contextJson as Record<string, unknown>) }
+              : {};
+          ctx.paymentPhase =
+            result.status === "EXPIRED"
+              ? "EXPIRED"
+              : result.status === "CANCELLED"
+                ? "FAILED"
+                : "FAILED";
+          await prisma.whatsAppConversation.update({
+            where: { id: conv.id },
+            data: { contextJson: ctx as Prisma.InputJsonValue }
+          });
+        }
       }
+    } catch {
+      /* customer WhatsApp is not a payment-state gate */
     }
   }
 }

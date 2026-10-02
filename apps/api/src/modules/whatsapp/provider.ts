@@ -8,12 +8,30 @@ export type OutboundWhatsAppMessage = {
   body: string;
   buttons?: WhatsAppButton[];
   at: string;
+  providerMessageSid?: string;
+};
+
+export type WhatsAppSendResult = {
+  ok: boolean;
+  providerMessageSid?: string;
+  errorCode?: string;
+  errorCategory?: "TRANSIENT" | "SESSION_WINDOW" | "INVALID_NUMBER" | "TEMPLATE_REQUIRED" | "PROVIDER" | "UNKNOWN";
+  errorMessage?: string;
+};
+
+export type WhatsAppOutboundOptions = {
+  body?: string;
+  buttons?: WhatsAppButton[];
+  contentSid?: string;
+  contentVariables?: Record<string, string>;
+  statusCallbackUrl?: string;
 };
 
 export interface WhatsAppProvider {
   readonly name: string;
   sendText(to: string, body: string): Promise<void>;
   sendButtons(to: string, body: string, buttons: WhatsAppButton[]): Promise<void>;
+  sendOutbound?(to: string, opts: WhatsAppOutboundOptions): Promise<WhatsAppSendResult>;
   verifyWebhookSignature?(rawBody: Buffer, signatureHeader: string | undefined): boolean;
   /** Twilio uses form params + full URL (not raw JSON HMAC). */
   verifyTwilioSignature?(input: {
@@ -23,21 +41,42 @@ export interface WhatsAppProvider {
   }): boolean;
 }
 
+function mockSid(): string {
+  return `SM${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`;
+}
+
 /** In-memory mock for tests and local Stage 4 development. */
 export class MockWhatsAppProvider implements WhatsAppProvider {
   readonly name = "mock";
   readonly sent: OutboundWhatsAppMessage[] = [];
+  /** Test hook: next sendOutbound fails with this result then clears. */
+  nextFailure: WhatsAppSendResult | null = null;
+  failUntilCleared: WhatsAppSendResult | null = null;
 
   async sendText(to: string, body: string): Promise<void> {
-    this.sent.push({ to, body, at: new Date().toISOString() });
+    const result = await this.sendOutbound(to, { body });
+    if (!result.ok) throw new Error("WhatsApp send failed");
   }
 
   async sendButtons(to: string, body: string, buttons: WhatsAppButton[]): Promise<void> {
-    this.sent.push({ to, body, buttons, at: new Date().toISOString() });
+    const result = await this.sendOutbound(to, { body, buttons });
+    if (!result.ok) throw new Error("WhatsApp send failed");
+  }
+
+  async sendOutbound(to: string, opts: WhatsAppOutboundOptions): Promise<WhatsAppSendResult> {
+    const fail = this.nextFailure ?? this.failUntilCleared;
+    if (this.nextFailure) this.nextFailure = null;
+    if (fail) return fail;
+    const sid = mockSid();
+    const body = opts.body ?? "";
+    this.sent.push({ to, body, buttons: opts.buttons, at: new Date().toISOString(), providerMessageSid: sid });
+    return { ok: true, providerMessageSid: sid };
   }
 
   clear(): void {
     this.sent.length = 0;
+    this.nextFailure = null;
+    this.failUntilCleared = null;
   }
 }
 
@@ -136,43 +175,86 @@ export class TwilioWhatsAppProvider implements WhatsAppProvider {
     return `whatsapp:${e164}`;
   }
 
-  private async createMessage(to: string, body: string): Promise<void> {
+  private classifyTwilioError(code: string | undefined, httpStatus: number): WhatsAppSendResult["errorCategory"] {
+    if (code === "63016" || code === "63024") return "SESSION_WINDOW";
+    if (code === "21211" || code === "21614" || code === "21612") return "INVALID_NUMBER";
+    if (httpStatus === 429 || httpStatus >= 500 || code === "20429") return "TRANSIENT";
+    if (httpStatus >= 400 && httpStatus < 500) return "PROVIDER";
+    return "UNKNOWN";
+  }
+
+  async sendOutbound(to: string, opts: WhatsAppOutboundOptions): Promise<WhatsAppSendResult> {
     const fetchImpl = this.opts.fetchImpl ?? fetch;
     const url = `https://api.twilio.com/2010-04-01/Accounts/${this.opts.accountSid}/Messages.json`;
     const auth = Buffer.from(`${this.opts.accountSid}:${this.opts.authToken}`).toString("base64");
-    const res = await fetchImpl(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({
-        From: this.opts.fromWhatsApp,
-        To: this.toWhatsAppAddress(to),
-        Body: body.slice(0, 1600)
-      }).toString()
+    const params = new URLSearchParams({
+      From: this.opts.fromWhatsApp,
+      To: this.toWhatsAppAddress(to)
     });
-    if (!res.ok) {
+    if (opts.contentSid) {
+      params.set("ContentSid", opts.contentSid);
+      if (opts.contentVariables && Object.keys(opts.contentVariables).length > 0) {
+        params.set("ContentVariables", JSON.stringify(opts.contentVariables));
+      }
+    } else {
+      const hints = (opts.buttons ?? []).slice(0, 3).map((b) => b.title).filter(Boolean);
+      const body = opts.body ?? "";
+      const combined =
+        hints.length > 0 ? `${body.slice(0, 1400)}\n\nReply: ${hints.join(" · ")}` : body.slice(0, 1600);
+      params.set("Body", combined);
+    }
+    if (opts.statusCallbackUrl) {
+      params.set("StatusCallback", opts.statusCallbackUrl);
+    }
+    try {
+      const res = await fetchImpl(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: params.toString()
+      });
       const text = await res.text();
-      console.error("[whatsapp:twilio] send failed", res.status, text.slice(0, 300));
-      throw new Error("WhatsApp send failed");
+      let parsed: { sid?: string; error_code?: number; code?: number; message?: string; status?: string } = {};
+      try {
+        parsed = JSON.parse(text) as typeof parsed;
+      } catch {
+        parsed = {};
+      }
+      if (!res.ok) {
+        const code = String(parsed.code ?? parsed.error_code ?? res.status);
+        const category = this.classifyTwilioError(code, res.status);
+        console.error("[whatsapp:twilio] send failed", res.status, code, (parsed.message ?? text).slice(0, 180));
+        return {
+          ok: false,
+          errorCode: code,
+          errorCategory: category === "SESSION_WINDOW" ? "TEMPLATE_REQUIRED" : category,
+          errorMessage: (parsed.message ?? "WhatsApp send failed").slice(0, 180)
+        };
+      }
+      const sid = parsed.sid;
+      this.sent.push({
+        to,
+        body: opts.body ?? "",
+        buttons: opts.buttons,
+        at: new Date().toISOString(),
+        providerMessageSid: sid
+      });
+      return { ok: true, providerMessageSid: sid };
+    } catch {
+      return { ok: false, errorCategory: "TRANSIENT", errorMessage: "WhatsApp send failed" };
     }
   }
 
   async sendText(to: string, body: string): Promise<void> {
-    this.sent.push({ to, body, at: new Date().toISOString() });
-    await this.createMessage(to, body);
+    const result = await this.sendOutbound(to, { body });
+    if (!result.ok) throw new Error("WhatsApp send failed");
   }
 
   async sendButtons(to: string, body: string, buttons: WhatsAppButton[]): Promise<void> {
-    const hints = buttons
-      .slice(0, 3)
-      .map((b) => b.title)
-      .filter(Boolean);
-    const combined =
-      hints.length > 0 ? `${body.slice(0, 1400)}\n\nReply: ${hints.join(" · ")}` : body.slice(0, 1600);
-    this.sent.push({ to, body: combined, buttons, at: new Date().toISOString() });
-    await this.createMessage(to, combined);
+    const result = await this.sendOutbound(to, { body, buttons });
+    if (!result.ok) throw new Error("WhatsApp send failed");
   }
 
   verifyTwilioSignature(input: {

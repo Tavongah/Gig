@@ -371,6 +371,20 @@ export function App() {
           customer?: { fullName: string; phoneNumber: string | null };
           commerceCustomer?: { displayName: string | null; whatsappPhone: string | null };
           linkedDeliveryGig?: { id: string; status: string; assignedWorkerId?: string | null } | null;
+          merchantNotification?: {
+            status: string;
+            label: string | null;
+            attemptCount: number;
+            lastErrorCategory: string | null;
+            providerMessageSid: string | null;
+            deliveredAt: string | null;
+          } | null;
+          courierRelease?: {
+            reason: string;
+            stage: string;
+            outcome: string;
+            createdAt: string;
+          } | null;
           createdAt: string;
         }>;
       }>("/admin/commerce/orders"),
@@ -408,6 +422,12 @@ export function App() {
         body: JSON.stringify({ status })
       }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-pending-workers"] })
+  });
+
+  const retryWhatsAppMutation = useMutation({
+    mutationFn: (orderId: string) =>
+      apiRequest(`/admin/commerce/orders/${orderId}/retry-whatsapp`, { method: "POST", body: JSON.stringify({}) }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-commerce-orders"] })
   });
 
   const cancellationSettingsMutation = useMutation({
@@ -724,6 +744,33 @@ export function App() {
                           ) : null}
                         </p>
                         <p className="muted">Payment: {String(o.paymentStatus).replace(/_/g, " ")}</p>
+                        {o.merchantNotification?.label ? (
+                          <p className="muted">{o.merchantNotification.label}</p>
+                        ) : (
+                          <p className="muted">Merchant notification pending</p>
+                        )}
+                        {o.courierRelease ? (
+                          <p className="muted">
+                            {o.courierRelease.outcome === "NEEDS_ATTENTION"
+                              ? "Courier unable to continue"
+                              : "Courier released delivery"}
+                            {" · "}
+                            {o.courierRelease.stage === "AFTER_PICKUP" ? "After pickup" : "Before pickup"}
+                            {" · "}
+                            {o.courierRelease.reason.replace(/_/g, " ").toLowerCase()}
+                            {o.courierRelease.outcome === "RELEASED" ? " · Finding replacement courier" : " · Needs attention"}
+                          </p>
+                        ) : null}
+                        {o.orderNumber !== 2 && o.merchantNotification?.status !== "DELIVERED" ? (
+                          <button
+                            type="button"
+                            className="secondary"
+                            disabled={retryWhatsAppMutation.isPending}
+                            onClick={() => retryWhatsAppMutation.mutate(o.id)}
+                          >
+                            Retry WhatsApp
+                          </button>
+                        ) : null}
                         {o.waitingSince ? (
                           <p className="muted">Waiting since {new Date(o.waitingSince).toLocaleString()}</p>
                         ) : null}

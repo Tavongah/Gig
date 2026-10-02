@@ -132,3 +132,11 @@ export function resolveTwilioWebhookUrl(reqProtocol?: string, reqHost?: string):
   if (reqProtocol && reqHost) return `${reqProtocol}://${reqHost}/v1/whatsapp/twilio`;
   return "http://localhost:4000/v1/whatsapp/twilio";
 }
+
+export function resolveTwilioStatusCallbackUrl(): string {
+  const base = (process.env.API_PUBLIC_URL || "").replace(/\/$/, "");
+  if (base) return `${base}/v1/whatsapp/twilio/status`;
+  const inbound = process.env.TWILIO_WHATSAPP_WEBHOOK_URL?.trim().replace(/\/$/, "");
+  if (inbound) return inbound.endsWith("/status") ? inbound : `${inbound}/status`;
+  return "http://localhost:4000/v1/whatsapp/twilio/status";
+}

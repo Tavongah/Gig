@@ -78,6 +78,13 @@ async function bootstrap(): Promise<void> {
     );
   }, 60 * 1000);
 
+  // Merchant WhatsApp outbox — bounded retry, never blocks order persistence.
+  setInterval(() => {
+    void import("./modules/commerce/merchant-notification.service.js").then(({ processDueMerchantNotifications }) =>
+      processDueMerchantNotifications().catch(() => undefined)
+    );
+  }, 30 * 1000);
+
   // Poll active timers so ESTIMATE_TIMER / auth-limit pauses do not depend only on Start Gig.
   setInterval(() => {
     void import("./modules/gigs/gig-workflow.service.js").then(async ({ checkTimerThreshold }) => {

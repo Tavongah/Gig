@@ -15,6 +15,7 @@ const DELIVERY_ERROR_MESSAGES: Record<string, string> = {
   NOT_A_DELIVERY: "This action is only for deliveries.",
   COURIER_NOT_ASSIGNED: "Only the assigned courier can continue this delivery.",
   INVALID_STATUS_TRANSITION: "That step isn’t available yet. Refresh and try again.",
+  RELEASE_FAILED: "We couldn't update this delivery. Please try again.",
   INVALID_TRANSPORT_MODE: "Choose Walking, Bicycle, or Public Transport / Kombi.",
   PIN_REGEN_NOT_ALLOWED: "Codes can’t be regenerated for this delivery anymore.",
   GPS_REQUIRED: "Turn on location so we can confirm your arrival.",

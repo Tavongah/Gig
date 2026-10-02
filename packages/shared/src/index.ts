@@ -365,6 +365,7 @@ export {
   addFulfillmentNote,
   customerFulfillmentHint,
   fulfillmentAdminLabel,
+  merchantNotificationAdminLabel,
   hasFulfillmentNote,
   isAssistedFulfillment,
   isAssistedPickupConfirmationRequired,

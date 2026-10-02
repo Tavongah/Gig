@@ -13,6 +13,7 @@ import {
   commerceShopUiStatusLabel,
   customerFulfillmentHint,
   fulfillmentAdminLabel,
+  merchantNotificationAdminLabel,
   hasFulfillmentNote,
   isAssistedPickupConfirmationRequired,
   parseGuaranteedOrderIntakeEnabled
@@ -54,12 +55,36 @@ assert.equal(
   false,
   "I confirmed"
 );
+assert.equal(
+  isAssistedPickupConfirmationRequired({
+    notes: addFulfillmentNote(null, FULFILLMENT_NOTE.MERCHANT_NOTIFY_FAILED),
+    merchantAcceptedAt: null
+  }),
+  true,
+  "merchant WhatsApp failure still requires shop confirmation"
+);
 
 const problemNotes = addFulfillmentNote(
   addFulfillmentNote(notes, FULFILLMENT_NOTE.PICKUP_PROBLEM),
   FULFILLMENT_NOTE.NEEDS_ATTENTION
 );
 assert.equal(fulfillmentAdminLabel({ notes: problemNotes }), "Courier reported problem", "J/K/L admin");
+assert.equal(merchantNotificationAdminLabel("DELIVERED"), "Merchant notified ✓");
+assert.equal(merchantNotificationAdminLabel("FAILED"), "Merchant WhatsApp failed");
+assert.equal(merchantNotificationAdminLabel("PENDING"), "Merchant notification pending");
+assert.equal(
+  fulfillmentAdminLabel({
+    notes: addFulfillmentNote(null, FULFILLMENT_NOTE.COURIER_POST_PICKUP_FAILURE)
+  }),
+  "Courier unable to continue"
+);
+assert.match(
+  customerFulfillmentHint({
+    notes: addFulfillmentNote(null, FULFILLMENT_NOTE.FINDING_REPLACEMENT_COURIER),
+    hasCourier: false
+  }) ?? "",
+  /finding another courier|still confirmed/i
+);
 assert.match(
   customerFulfillmentHint({ notes: problemNotes, status: "READY_FOR_PICKUP" }) ?? "",
   /checking it now/i
@@ -128,7 +153,7 @@ const jobScreen = readFileSync(
   "utf8"
 );
 assert.match(jobScreen, /Shopping list/);
-assert.match(jobScreen, /Yes — continue/);
+assert.match(jobScreen, /Items confirmed — continue/);
 assert.match(jobScreen, /Report a problem/);
 assert.doesNotMatch(jobScreen, /ASSISTED_FULFILLMENT|MERCHANT_PENDING/);
 

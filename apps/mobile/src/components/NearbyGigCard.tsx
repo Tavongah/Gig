@@ -22,22 +22,36 @@ export function NearbyGigCard({ gig, onView, onAccept, onDecline, acceptDisabled
   const offer = gig.offer;
 
   if (isDelivery) {
-    const pickup = offer?.pickupArea ?? gig.locationSummary ?? `${gig.city}, ${gig.region}`;
+    const commerce = offer?.commerce ?? (gig.commercePickup?.paymentLabel ? {
+      shopName: gig.commercePickup.shopName,
+      itemCount: gig.commercePickup.items.reduce((n, i) => n + i.quantity, 0),
+      pickupCount: gig.commercePickup.pickupCount ?? 1,
+      paymentLabel: gig.commercePickup.paymentLabel,
+      collectCash: Boolean(gig.commercePickup.collectCash),
+      paid: Boolean(gig.commercePickup.paid)
+    } : null);
+    const pickup = commerce?.shopName ?? offer?.pickupArea ?? gig.locationSummary ?? `${gig.city}, ${gig.region}`;
     const dropoff = offer?.dropoffArea ?? (gig.dropoffCity ? `${gig.dropoffCity}` : "Drop-off area");
     const deliveryDist =
       offer?.estimatedDistanceKm != null
-        ? `${(Number(offer.estimatedDistanceKm) * 0.621371).toFixed(1)} mi`
+        ? `${Number(offer.estimatedDistanceKm).toFixed(1)} km`
         : gig.estimatedDistanceKm != null
-          ? `${(Number(gig.estimatedDistanceKm) * 0.621371).toFixed(1)} mi`
+          ? `${Number(gig.estimatedDistanceKm).toFixed(1)} km`
           : null;
     const toShop = milesLabel(offer?.distanceToPickupMiles ?? gig.distanceMiles);
-    const earnings = offer?.estimatedEarningsCents ?? gig.workerPayoutCents ?? gig.totalCents;
+    const itemCount = commerce?.itemCount ?? gig.commercePickup?.items.reduce((n, i) => n + i.quantity, 0);
+    const pickupCount = commerce?.pickupCount ?? gig.commercePickup?.pickupCount ?? 1;
 
     return (
       <DutsCard className="gap-4 p-5">
         <Pressable className="gap-1" onPress={onView}>
-          <Text className="text-xs font-bold uppercase text-brand">Delivery available</Text>
+          <Text className="text-xs font-bold uppercase text-brand">DUTS DELIVERY</Text>
           <Text className="text-xl font-black text-ink">{pickup}</Text>
+          {itemCount ? (
+            <Text className="text-sm font-semibold text-ink">
+              {pickupCount} pickup{pickupCount === 1 ? "" : "s"} · {itemCount} item{itemCount === 1 ? "" : "s"}
+            </Text>
+          ) : null}
         </Pressable>
 
         <View className="gap-2">
@@ -50,16 +64,18 @@ export function NearbyGigCard({ gig, onView, onAccept, onDecline, acceptDisabled
             </Text>
           ) : null}
           <Text className="text-sm text-muted">
-            Drop-off area <Text className="font-bold text-ink">{dropoff}</Text>
+            Deliver to <Text className="font-bold text-ink">{dropoff}</Text>
           </Text>
           {deliveryDist ? (
             <Text className="text-sm text-muted">
-              Estimated delivery <Text className="font-bold text-ink">{deliveryDist}</Text>
+              Route <Text className="font-bold text-ink">{deliveryDist}</Text>
             </Text>
           ) : null}
-          <Text className="text-sm text-muted">
-            Earnings <Text className="font-bold text-ink">{formatCents(earnings)}</Text>
-          </Text>
+          {commerce ? (
+            <Text className="text-sm text-muted">
+              Payment <Text className="font-black text-ink">{commerce.paymentLabel}</Text>
+            </Text>
+          ) : null}
         </View>
 
         <View className="flex-row gap-2">
@@ -70,7 +86,7 @@ export function NearbyGigCard({ gig, onView, onAccept, onDecline, acceptDisabled
           ) : null}
           <View className="flex-1">
             <AppButton
-              label="Accept"
+              label="Accept delivery"
               onPress={onAccept}
               disabled={acceptDisabled}
               variant="primary"

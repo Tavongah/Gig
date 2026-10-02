@@ -26,13 +26,15 @@ import {
 } from "../../lib/production-guards.js";
 import {
   FulfillmentType,
+  GigInterestStatus,
   GigStatus,
   LaunchPhase,
   OrderSource,
   PackageCategory,
   PricingType,
   Prisma,
-  TransportMode
+  TransportMode,
+  CommerceOrderStatus
 } from "@prisma/client";
 import {
   createDeliverySchema,
@@ -486,7 +488,8 @@ export function buildCourierOfferPayload(
     totalCents: number;
     fulfillmentType: FulfillmentType;
   },
-  courierToPickupMiles?: number
+  courierToPickupMiles?: number,
+  commerce?: CourierCommerceOffer | null
 ) {
   const distanceKm =
     typeof gig.estimatedDistanceKm === "number"
@@ -507,9 +510,28 @@ export function buildCourierOfferPayload(
     packageDescription: gig.packageDescription,
     estimatedDistanceKm: distanceKm,
     distanceToPickupMiles: courierToPickupMiles,
-    estimatedEarningsCents: gig.workerPayoutCents
+    estimatedEarningsCents: commerce ? undefined : gig.workerPayoutCents,
+    commerce: commerce
+      ? {
+          shopName: commerce.shopName,
+          itemCount: commerce.itemCount,
+          pickupCount: commerce.pickupCount,
+          paymentLabel: commerce.paymentLabel,
+          collectCash: commerce.collectCash,
+          paid: commerce.paid
+        }
+      : undefined
   };
 }
+
+type CourierCommerceOffer = {
+  shopName: string;
+  itemCount: number;
+  pickupCount: number;
+  paymentLabel: string;
+  collectCash: boolean;
+  paid: boolean;
+};
 
 export async function startTravelToPickup(gigId: string, courierUserId: string, io?: Server) {
   const { gig } = await loadAssignedDelivery(gigId, courierUserId);
@@ -1033,4 +1055,281 @@ export async function setDeliveryCourierEligibility(
     },
     include: { serviceCategories: true }
   });
+}
+
+export const COURIER_RELEASE_REASONS = [
+  "TRANSPORT",
+  "PERSONAL_EMERGENCY",
+  "SHOP_PROBLEM",
+  "CUSTOMER_PROBLEM",
+  "ROUTE_PROBLEM",
+  "OTHER"
+] as const;
+
+export type CourierReleaseReason = (typeof COURIER_RELEASE_REASONS)[number];
+
+const POST_PICKUP_FOR_RELEASE: GigStatus[] = [
+  GigStatus.PACKAGE_COLLECTED,
+  GigStatus.EN_ROUTE_TO_DROPOFF,
+  GigStatus.ARRIVED_AT_DROPOFF
+];
+
+function isCommercePostPickup(status: GigStatus, checkoutCollected?: boolean): boolean {
+  if (POST_PICKUP_FOR_RELEASE.includes(status)) return true;
+  return Boolean(checkoutCollected);
+}
+
+export async function releaseCommerceDelivery(
+  gigId: string,
+  courierUserId: string,
+  input: { reason: CourierReleaseReason; note?: string },
+  io?: Server
+): Promise<{
+  released: boolean;
+  rematching: boolean;
+  needsAttention: boolean;
+  status: string;
+  alreadyProcessed?: boolean;
+}> {
+  const gig = await prisma.gig.findUnique({
+    where: { id: gigId },
+    include: { assignments: true, serviceCategory: true }
+  });
+  if (!gig || gig.fulfillmentType !== FulfillmentType.DELIVERY) {
+    throw new AppError("This action is only for deliveries.", 409, "NOT_A_DELIVERY");
+  }
+
+  const recent = await prisma.courierDeliveryRelease.findFirst({
+    where: { gigId, courierId: courierUserId },
+    orderBy: { createdAt: "desc" }
+  });
+  if (
+    recent &&
+    Date.now() - recent.createdAt.getTime() < 15_000 &&
+    (recent.outcome === "RELEASED" || recent.outcome === "NEEDS_ATTENTION")
+  ) {
+    return {
+      released: recent.outcome === "RELEASED",
+      rematching: recent.outcome === "RELEASED",
+      needsAttention: recent.outcome === "NEEDS_ATTENTION",
+      status: gig.status,
+      alreadyProcessed: true
+    };
+  }
+
+  if (gig.assignedWorkerId !== courierUserId) {
+    if (recent && !gig.assignedWorkerId) {
+      return {
+        released: true,
+        rematching: true,
+        needsAttention: false,
+        status: gig.status,
+        alreadyProcessed: true
+      };
+    }
+    throw new AppError("Only the assigned courier can release this delivery.", 403, "COURIER_NOT_ASSIGNED");
+  }
+
+  const { findCheckoutForGig } = await import("../commerce/multi-shop-checkout.service.js");
+  const checkout = await findCheckoutForGig(gigId);
+  const order =
+    (await prisma.commerceOrder.findFirst({ where: { linkedDeliveryGigId: gigId } })) ??
+    checkout?.orders[0] ??
+    null;
+
+  const anyStopCollected = Boolean(
+    checkout?.pickupStops.some((s) => s.status === "COLLECTED" || Boolean(s.collectedAt))
+  );
+  const postPickup = isCommercePostPickup(gig.status, anyStopCollected);
+  const reason = input.reason;
+  const note = input.note?.trim().slice(0, 400) || null;
+  const stage = postPickup ? "AFTER_PICKUP" : "BEFORE_PICKUP";
+
+  logDutsFlow("COURIER_RELEASE_REQUESTED", {
+    gigId,
+    userId: courierUserId,
+    userRole: "WORKER",
+    orderId: order?.id,
+    reason,
+    stage
+  });
+
+  if (postPickup) {
+    await prisma.$transaction(async (tx) => {
+      await tx.courierDeliveryRelease.create({
+        data: {
+          courierId: courierUserId,
+          gigId,
+          commerceOrderId: order?.id ?? null,
+          reason,
+          note,
+          stage,
+          outcome: "NEEDS_ATTENTION"
+        }
+      });
+      if (order) {
+        await tx.commerceOrder.update({
+          where: { id: order.id },
+          data: {
+            notes: addFulfillmentNote(
+              addFulfillmentNote(order.notes, FULFILLMENT_NOTE.COURIER_POST_PICKUP_FAILURE),
+              FULFILLMENT_NOTE.NEEDS_ATTENTION
+            )
+          }
+        });
+      }
+    });
+    if (order?.checkoutId) {
+      const { markCheckoutNeedsAttention } = await import("../commerce/multi-shop-checkout.service.js");
+      await markCheckoutNeedsAttention(order.checkoutId, FULFILLMENT_NOTE.COURIER_POST_PICKUP_FAILURE);
+    }
+    logDutsFlow("COURIER_POST_PICKUP_FAILURE", {
+      gigId,
+      userId: courierUserId,
+      userRole: "WORKER",
+      orderId: order?.id,
+      reason
+    });
+    return {
+      released: false,
+      rematching: false,
+      needsAttention: true,
+      status: gig.status
+    };
+  }
+
+  const assignment = gig.assignments.find((a) => a.workerId === courierUserId && !a.cancelledAt);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.courierDeliveryRelease.create({
+      data: {
+        courierId: courierUserId,
+        gigId,
+        commerceOrderId: order?.id ?? null,
+        reason,
+        note,
+        stage,
+        outcome: "RELEASED"
+      }
+    });
+    if (assignment) {
+      await tx.gigAssignment.update({
+        where: { id: assignment.id },
+        data: { cancelledAt: new Date(), completionNotes: reason }
+      });
+    }
+    await tx.gigInterest.updateMany({
+      where: { gigId, workerId: courierUserId },
+      data: { status: GigInterestStatus.WITHDRAWN }
+    });
+    await tx.gig.update({
+      where: { id: gigId, assignedWorkerId: courierUserId },
+      data: {
+        status: GigStatus.SEARCHING_FOR_WORKER,
+        assignedWorkerId: null
+      }
+    });
+    if (order) {
+      await tx.commerceOrder.update({
+        where: { id: order.id },
+        data: {
+          status:
+            order.status === CommerceOrderStatus.COURIER_ASSIGNED
+              ? CommerceOrderStatus.READY_FOR_PICKUP
+              : order.status,
+          notes: addFulfillmentNote(
+            addFulfillmentNote(order.notes, FULFILLMENT_NOTE.COURIER_RELEASED),
+            FULFILLMENT_NOTE.FINDING_REPLACEMENT_COURIER
+          )
+        }
+      });
+    }
+  });
+
+  logDutsFlow("COURIER_RELEASED", {
+    gigId,
+    userId: courierUserId,
+    userRole: "WORKER",
+    orderId: order?.id,
+    reason
+  });
+  logDutsFlow("COURIER_REPLACEMENT_SEARCH_STARTED", {
+    gigId,
+    userId: courierUserId,
+    orderId: order?.id
+  });
+
+  const { syncCommerceOrderFromGig } = await import("../commerce/order.service.js");
+  await syncCommerceOrderFromGig(gigId, GigStatus.SEARCHING_FOR_WORKER).catch(() => undefined);
+
+  if (io) {
+    io.to(`gig:${gigId}`).emit("gig:status", { gigId, status: GigStatus.SEARCHING_FOR_WORKER });
+    const { broadcastGigOffer } = await import("../realtime/realtime.service.js");
+    await broadcastGigOffer(io, {
+      gigId: gig.id,
+      title: gig.title,
+      serviceCategoryId: gig.serviceCategoryId,
+      serviceCategoryName: gig.serviceCategory.name,
+      latitude: Number(gig.latitude),
+      longitude: Number(gig.longitude),
+      city: gig.city,
+      region: gig.region,
+      size: gig.size,
+      totalCents: gig.totalCents,
+      workerPayoutCents: gig.workerPayoutCents,
+      startsAt: gig.startsAt.toISOString(),
+      urgency: gig.urgency,
+      estimatedHours: Number(gig.estimatedHours),
+      fulfillmentType: gig.fulfillmentType
+    });
+  }
+
+  const lastNotify = await prisma.courierDeliveryRelease.findMany({
+    where: { gigId, outcome: "RELEASED" },
+    orderBy: { createdAt: "desc" },
+    take: 2
+  });
+  const shouldNotifyCustomer =
+    lastNotify.length < 2 || Date.now() - lastNotify[1]!.createdAt.getTime() > 10 * 60 * 1000;
+  if (shouldNotifyCustomer && order?.customerWhatsAppPhone) {
+    try {
+      const { notifyCustomerStatus } = await import("../whatsapp/merchant-handler.js");
+      const { formatFindingAnotherCourier } = await import("../whatsapp/copy.js");
+      await notifyCustomerStatus(order.customerWhatsAppPhone, formatFindingAnotherCourier());
+    } catch {
+      /* non-blocking */
+    }
+  }
+
+  return {
+    released: true,
+    rematching: true,
+    needsAttention: false,
+    status: GigStatus.SEARCHING_FOR_WORKER
+  };
+}
+
+export async function reportCourierDeliveryProblem(
+  gigId: string,
+  courierUserId: string,
+  input: { reason: string; note?: string }
+) {
+  await loadAssignedDelivery(gigId, courierUserId);
+  const shopReasons = new Set(["SHOP_CLOSED", "SHOP_CANNOT_FULFILL", "ITEM_UNAVAILABLE", "CANNOT_FIND_SHOP", "SHOP_PROBLEM"]);
+  if (shopReasons.has(input.reason)) {
+    return reportAssistedPickupProblem(gigId, courierUserId);
+  }
+  const gig = await prisma.gig.findUniqueOrThrow({ where: { id: gigId } });
+  const postPickup = POST_PICKUP_FOR_RELEASE.includes(gig.status);
+  if (postPickup) {
+    return releaseCommerceDelivery(
+      gigId,
+      courierUserId,
+      {
+        reason: input.reason === "CUSTOMER_UNREACHABLE" ? "CUSTOMER_PROBLEM" : "OTHER",
+        note: input.note
+      }
+    );
+  }
+  return { reported: true, recorded: true };
 }

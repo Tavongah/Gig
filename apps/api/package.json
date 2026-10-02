@@ -48,6 +48,7 @@
     "test:multi-shop-checkout": "tsx scripts/test-multi-shop-checkout.ts",
     "test:checkout-prep": "tsx scripts/test-checkout-prep.ts",
     "test:pilot-delivery-pricing": "tsx scripts/test-pilot-delivery-pricing.ts",
+    "test:post-payment-courier": "tsx scripts/test-post-payment-courier-reliability.ts",
     "migrate:products-to-catalog": "tsx scripts/migrate-products-to-catalog.ts",
     "seed:pilot-merchant": "tsx scripts/seed-pilot-merchant.ts",
     "seed:meriden-test-merchant": "tsx scripts/seed-meriden-test-merchant.ts"

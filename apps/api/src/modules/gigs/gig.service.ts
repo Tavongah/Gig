@@ -429,6 +429,32 @@ export async function findNearbyGigs(workerId: string) {
     .slice(0, 20);
 
   const { buildCourierOfferPayload } = await import("./delivery.service.js");
+  const deliveryIds = ranked.filter((item) => item.gig.fulfillmentType === "DELIVERY").map((item) => item.gig.id);
+  const commerceRows = deliveryIds.length
+    ? await prisma.commerceOrder.findMany({
+        where: { linkedDeliveryGigId: { in: deliveryIds } },
+        select: {
+          linkedDeliveryGigId: true,
+          paymentStatus: true,
+          paymentMethod: true,
+          totalCents: true,
+          merchant: { select: { name: true } },
+          items: { select: { quantity: true } },
+          checkout: { select: { pickupStops: { select: { id: true } } } }
+        }
+      })
+    : [];
+  const commerceByGig = new Map(
+    commerceRows.map((row) => [
+      row.linkedDeliveryGigId!,
+      {
+        shopName: row.merchant.name,
+        itemCount: row.items.reduce((n, i) => n + i.quantity, 0),
+        pickupCount: Math.max(1, row.checkout?.pickupStops.length ?? 1),
+        ...commerceCourierPayment(row)
+      }
+    ])
+  );
 
   return ranked.map((item) => {
     const sanitized = sanitizeGigForViewer(item.gig, workerId, {
@@ -437,11 +463,27 @@ export async function findNearbyGigs(workerId: string) {
     });
 
     if (item.gig.fulfillmentType === "DELIVERY") {
+      const commerce = commerceByGig.get(item.gig.id) ?? null;
       return {
         ...sanitized,
         distanceMiles: item.distanceMiles,
         estimatedResponseMinutes: item.estimatedResponseMinutes,
-        offer: buildCourierOfferPayload(item.gig, item.distanceMiles)
+        offer: buildCourierOfferPayload(item.gig, item.distanceMiles, commerce),
+        commercePickup: commerce
+          ? {
+              shopName: commerce.shopName,
+              items: [],
+              merchantConfirmed: true,
+              confirmationRequired: false,
+              itemsConfirmed: false,
+              problemReported: false,
+              pickupCount: commerce.pickupCount,
+              paid: commerce.paid,
+              collectCash: commerce.collectCash,
+              collectCents: commerce.collectCash ? undefined : 0,
+              paymentLabel: commerce.paymentLabel
+            }
+          : undefined
       };
     }
 
@@ -1151,6 +1193,34 @@ export async function sendChatMessage(gigId: string, userId: string, body: strin
   return persistAndBroadcastChatMessage(io, { gigId, senderId: userId, body });
 }
 
+function commerceCourierPayment(order: {
+  paymentStatus: string;
+  paymentMethod: string;
+  totalCents: number;
+}) {
+  const paid = order.paymentStatus === "PAID";
+  return {
+    paid,
+    collectCash: !paid,
+    collectCents: paid ? 0 : order.totalCents,
+    paymentLabel: paid ? "PAID ✓" : `COLLECT $${(order.totalCents / 100).toFixed(2)}`
+  };
+}
+
+function commerceCourierWarning(order: {
+  notes: string | null;
+  merchantAcceptedAt: Date | null;
+}): string | null {
+  const merchantConfirmed = Boolean(order.merchantAcceptedAt);
+  if (hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.MERCHANT_NOTIFY_FAILED) && !merchantConfirmed) {
+    return "SHOP HAS NOT RECEIVED/CONFIRMED THE DIGITAL ORDER. Please confirm the items with the shop before collecting.";
+  }
+  if (isAssistedFulfillment(order.notes) && !merchantConfirmed) {
+    return "SHOP HAS NOT CONFIRMED THIS ORDER. Please confirm the items with the shop before collecting.";
+  }
+  return null;
+}
+
 async function attachCommercePickupContext<T extends { id: string; status?: string }>(gig: T) {
   const { findCheckoutForGig, currentChildOrderForGig } = await import(
     "../commerce/multi-shop-checkout.service.js"
@@ -1194,10 +1264,8 @@ async function attachCommercePickupContext<T extends { id: string; status?: stri
         headline: `${pickupCount} pickups · 1 delivery`,
         currentLabel: `Pickup ${pickupIndex} of ${pickupCount}`,
         stops,
-        warning:
-          isAssistedFulfillment(order.notes) && !merchantConfirmed
-            ? "Merchant has not confirmed this order yet. Please confirm availability with the shop before collecting."
-            : null
+        warning: commerceCourierWarning(order),
+        ...commerceCourierPayment(order)
       }
     };
   }
@@ -1225,10 +1293,8 @@ async function attachCommercePickupContext<T extends { id: string; status?: stri
       confirmationRequired,
       itemsConfirmed: hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.PICKUP_CONFIRMED),
       problemReported,
-      warning:
-        isAssistedFulfillment(order.notes) && !merchantConfirmed
-          ? "Merchant has not confirmed this order yet. Please confirm availability with the shop before collecting."
-          : null
+      warning: commerceCourierWarning(order),
+      ...commerceCourierPayment(order)
     }
   };
 }
