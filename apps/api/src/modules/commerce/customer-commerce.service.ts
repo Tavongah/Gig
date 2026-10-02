@@ -629,6 +629,54 @@ export async function quoteCart(input: {
   };
 }
 
+const CHECKOUT_PREP_COPY: Record<string, string> = {
+  LOCATION_REQUIRED: "Tell us where to deliver.",
+  PRODUCT_UNAVAILABLE: "Some items are no longer available.",
+  MERCHANT_CLOSED: "This shop isn't taking orders right now.",
+  SHOP_NOT_NEARBY: "We can't deliver there yet.",
+  SHOP_LIMIT_REACHED: "Your delivery already includes 3 shops.",
+  TOO_MANY_ITEMS: "That's too many items for one order.",
+  EMPTY_BASKET: "Your cart is empty.",
+  MULTI_STORE_BASKET: "Your basket has items from more than one shop. Keep one shop per order.",
+  ROUTE_NOT_ELIGIBLE:
+    "This shop is too far from the shops already in your delivery. You can place it as a separate order.",
+  ALCOHOL_DISABLED: "Alcohol ordering isn't available yet."
+};
+
+function throwCheckoutPrepError(error: unknown): never {
+  if (error instanceof AppError) {
+    const message = CHECKOUT_PREP_COPY[error.code ?? ""] ?? error.message;
+    throw new AppError(message, error.statusCode, error.code, error.errors);
+  }
+  throw error;
+}
+
+/** One checkout-prep call: location, products, route, and quote — or a human error. */
+export async function prepareCheckout(input: {
+  lat: number;
+  lng: number;
+  lines: Array<{ productId: string; quantity: number }>;
+}) {
+  if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) {
+    throw new AppError("Tell us where to deliver.", 400, "LOCATION_REQUIRED");
+  }
+  if (!input.lines.length) {
+    throw new AppError("Your cart is empty.", 400, "EMPTY_BASKET");
+  }
+  if (input.lines.length > 40) {
+    throw new AppError("That's too many items for one order.", 400, "TOO_MANY_ITEMS");
+  }
+  try {
+    return await quoteCart({
+      lat: input.lat,
+      lng: input.lng,
+      lines: input.lines
+    });
+  } catch (error) {
+    throwCheckoutPrepError(error);
+  }
+}
+
 export async function checkoutCart(input: {
   userId: string;
   lat: number;
@@ -638,7 +686,7 @@ export async function checkoutCart(input: {
   paymentMethod?: string;
   customerPhone?: string;
 }) {
-  const quote = await quoteCart({
+  const quote = await prepareCheckout({
     lat: input.lat,
     lng: input.lng,
     lines: input.lines

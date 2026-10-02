@@ -46,6 +46,7 @@
     "test:storefront-catalog-browse": "tsx scripts/test-storefront-catalog-browse.ts",
     "test:smart-basket": "tsx scripts/test-smart-basket-match.ts",
     "test:multi-shop-checkout": "tsx scripts/test-multi-shop-checkout.ts",
+    "test:checkout-prep": "tsx scripts/test-checkout-prep.ts",
     "migrate:products-to-catalog": "tsx scripts/migrate-products-to-catalog.ts",
     "seed:pilot-merchant": "tsx scripts/seed-pilot-merchant.ts",
     "seed:meriden-test-merchant": "tsx scripts/seed-meriden-test-merchant.ts"

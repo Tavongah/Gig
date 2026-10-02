@@ -7,6 +7,7 @@ import { TabScreen } from "../../components/TabScreen";
 import { StoreHeader } from "../../components/StoreHeader";
 import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
+import { friendlyCheckoutError, moneyLabel } from "../../lib/checkout-flow";
 import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import { isSmartBasketEnabled } from "../../lib/storefront-categories";
@@ -20,6 +21,7 @@ export function CartScreen() {
   const lines = useCommerceCartStore((s) => s.lines);
   const setQuantity = useCommerceCartStore((s) => s.setQuantity);
   const clear = useCommerceCartStore((s) => s.clear);
+  const notice = useCommerceCartStore((s) => s.notice);
   const desired = useDesiredBasketStore((s) => s.lines);
   const setDesiredQty = useDesiredBasketStore((s) => s.setQuantity);
   const removeDesired = useDesiredBasketStore((s) => s.remove);
@@ -29,13 +31,12 @@ export function CartScreen() {
 
   const quoteMut = useMutation({
     mutationFn: () => {
-      if (browse.isGuest) {
+      if (browse.isGuest || !browse.exact) {
         return api.commerceCartQuote({
           deferDelivery: true,
           lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
         });
       }
-      if (!browse.exact) throw new Error("Set delivery location first.");
       return api.commerceCartQuote(
         {
           lat: browse.exact.latitude,
@@ -45,25 +46,30 @@ export function CartScreen() {
         browse.token
       );
     },
-    onError: (e: Error) => {
-      const message = e.message;
-      setQuoteError(
-        /VALIDATION_ERROR|Invalid uuid|Required|INTERNAL_ERROR|Prisma|Zod/i.test(message)
-          ? "Something changed with your cart. Please review it."
-          : message
-      );
-    }
+    onError: (e: Error) => setQuoteError(friendlyCheckoutError(e.message))
   });
 
   useEffect(() => {
     setQuoteError("");
     if (!lines.length) return;
-    if (browse.isGuest || browse.exact) quoteMut.mutate();
+    quoteMut.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines, browse.isGuest, browse.exact?.latitude, browse.exact?.longitude]);
 
   const shoppingList = smartBasket ? desired : [];
   const empty = !lines.length && !shoppingList.length;
+
+  function continueCheckout() {
+    if (browse.isGuest) {
+      navigation.navigate("GuestCheckoutChoice");
+      return;
+    }
+    if (!browse.exact) {
+      navigation.navigate("ShopLocation", { next: "checkout" });
+      return;
+    }
+    navigation.navigate("CommerceCheckout");
+  }
 
   function shoppingListBlock() {
     if (!shoppingList.length) return null;
@@ -152,28 +158,9 @@ export function CartScreen() {
     );
   }
 
-  if (!browse.isGuest && !browse.exact) {
-    return (
-      <View className="flex-1 bg-background">
-        <StoreHeader compact showCategories={false} />
-        <TabScreen style={{ paddingTop: 8 }}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-            {shoppingListBlock()}
-            <Text className="text-2xl font-black text-ink">Your cart</Text>
-            <Text className="mt-4 text-base text-muted">Set your location to see products available near you.</Text>
-            <View className="mt-6">
-              <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
-            </View>
-          </ScrollView>
-        </TabScreen>
-      </View>
-    );
-  }
-
   const quote = quoteMut.data;
   const quotedLine = (productId: string) => quote?.lines.find((l) => l.productId === productId);
-  const deferred = browse.isGuest || quote?.deliveryQuoteStatus === "deferred";
-  const notice = useCommerceCartStore((s) => s.notice);
+  const deferred = browse.isGuest || !browse.exact || quote?.deliveryQuoteStatus === "deferred";
   const shopGroups = (() => {
     const map = new Map<string, { merchantId: string; merchantName: string; lines: typeof lines }>();
     for (const line of lines) {
@@ -184,6 +171,7 @@ export function CartScreen() {
     return [...map.values()];
   })();
   const shopCount = quote?.shopCount ?? shopGroups.length;
+  const canContinue = Boolean(quote) && !quoteMut.isPending && !quoteError;
 
   function renderLine(line: (typeof lines)[number]) {
     const priced = quotedLine(line.productId);
@@ -231,71 +219,61 @@ export function CartScreen() {
   return (
     <View className="flex-1 bg-background">
       <StoreHeader compact showCategories={false} />
-    <TabScreen style={{ paddingTop: 8 }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        {shoppingListBlock()}
-        <Text className="text-2xl font-black text-ink">Your cart</Text>
-        {notice ? <Text className="mt-2 text-sm font-semibold text-ink">{notice}</Text> : null}
+      <TabScreen style={{ paddingTop: 8, flex: 1 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+          {shoppingListBlock()}
+          <Text className="text-2xl font-black text-ink">Your cart</Text>
+          {notice ? <Text className="mt-2 text-sm font-semibold text-ink">{notice}</Text> : null}
 
-        {shopGroups.map((group) => (
-          <View key={group.merchantId} className="mt-4 rounded-2xl border border-border bg-card p-4">
-            <Text className="text-base font-extrabold text-ink">{group.merchantName}</Text>
-            <Text className="mt-0.5 text-xs text-muted">
-              {group.lines.reduce((s, l) => s + l.quantity, 0)}{" "}
-              {group.lines.reduce((s, l) => s + l.quantity, 0) === 1 ? "item" : "items"}
-            </Text>
-            <View className="mt-2 h-px bg-border" />
-            {group.lines.map(renderLine)}
-          </View>
-        ))}
-
-        {quoteMut.isPending ? <ActivityIndicator className="mt-4" color={DUTS.purple} /> : null}
-        {quoteError ? <Text className="mt-3 text-sm text-danger">{quoteError}</Text> : null}
-
-        {quote ? (
-          <View className="mt-6 gap-1 rounded-2xl border border-border bg-surface p-4">
-            <Text className="text-sm text-muted">Items          ${(quote.subtotalCents / 100).toFixed(2)}</Text>
-            <Text className="text-sm text-muted">
-              Delivery       {deferred ? "Calculated at checkout" : `$${(quote.deliveryFeeCents / 100).toFixed(2)}`}
-            </Text>
-            {!deferred && quote.serviceFeeCents > 0 ? (
-              <Text className="text-sm text-muted">Service        ${(quote.serviceFeeCents / 100).toFixed(2)}</Text>
-            ) : null}
-            {!deferred ? (
-              <Text className="mt-2 text-lg font-black text-ink">
-                Total          ${(quote.totalCents / 100).toFixed(2)}
+          {shopGroups.map((group) => (
+            <View key={group.merchantId} className="mt-4 rounded-2xl border border-border bg-card p-4">
+              <Text className="text-base font-extrabold text-ink">{group.merchantName}</Text>
+              <Text className="mt-0.5 text-xs text-muted">
+                {group.lines.reduce((s, l) => s + l.quantity, 0)}{" "}
+                {group.lines.reduce((s, l) => s + l.quantity, 0) === 1 ? "item" : "items"}
               </Text>
-            ) : null}
-          </View>
-        ) : null}
+              <View className="mt-2 h-px bg-border" />
+              {group.lines.map(renderLine)}
+            </View>
+          ))}
 
-        {shopCount > 1 ? (
-          <Text className="mt-3 text-sm font-semibold text-muted">
-            {shopCount} shops • One delivery
-          </Text>
-        ) : null}
+          {quoteMut.isPending ? <ActivityIndicator className="mt-4" color={DUTS.purple} /> : null}
+          {quoteError ? <Text className="mt-3 text-sm text-danger">{quoteError}</Text> : null}
 
-        <View className="mt-6">
-          <AppButton
-            label="Continue to order"
-            onPress={() =>
-              browse.isGuest ? navigation.navigate("GuestCheckoutChoice") : navigation.navigate("CommerceCheckout")
-            }
-            disabled={!quote || quoteMut.isPending}
-          />
+          {quote ? (
+            <View className="mt-6 gap-1 rounded-2xl border border-border bg-surface p-4">
+              <Text className="text-sm text-muted">Items          {moneyLabel(quote.subtotalCents)}</Text>
+              <Text className="text-sm text-muted">
+                Delivery       {deferred ? "Calculated at checkout" : moneyLabel(quote.deliveryFeeCents)}
+              </Text>
+              {!deferred && quote.serviceFeeCents > 0 ? (
+                <Text className="text-sm text-muted">Service        {moneyLabel(quote.serviceFeeCents)}</Text>
+              ) : null}
+              {!deferred ? (
+                <Text className="mt-2 text-lg font-black text-ink">Total          {moneyLabel(quote.totalCents)}</Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          {shopCount > 1 ? (
+            <Text className="mt-3 text-sm font-semibold text-muted">DUTS will collect from more than one shop.</Text>
+          ) : null}
+
+          <Pressable
+            onPress={() => navigation.navigate("MainTabs", { screen: "Home" })}
+            className="mt-4 items-center"
+            accessibilityRole="button"
+          >
+            <Text className="text-sm font-semibold text-muted">Continue shopping</Text>
+          </Pressable>
+          <Pressable onPress={() => clear()} className="mt-3 items-center" accessibilityRole="button">
+            <Text className="text-sm font-semibold text-muted">Clear basket</Text>
+          </Pressable>
+        </ScrollView>
+        <View className="border-t border-border bg-background pb-4 pt-3">
+          <AppButton label="Continue" onPress={continueCheckout} disabled={!canContinue} />
         </View>
-        <Pressable
-          onPress={() => navigation.navigate("MainTabs", { screen: "Home" })}
-          className="mt-4 items-center"
-          accessibilityRole="button"
-        >
-          <Text className="text-sm font-semibold text-muted">Continue shopping</Text>
-        </Pressable>
-        <Pressable onPress={() => clear()} className="mt-3 items-center" accessibilityRole="button">
-          <Text className="text-sm font-semibold text-muted">Clear basket</Text>
-        </Pressable>
-      </ScrollView>
-    </TabScreen>
+      </TabScreen>
     </View>
   );
 }

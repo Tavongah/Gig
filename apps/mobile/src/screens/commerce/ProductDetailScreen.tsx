@@ -16,11 +16,12 @@ import { useDesiredBasketStore } from "../../stores/desired-basket.store";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProductDetail">;
 
-export function ProductDetailScreen({ route, navigation }: Props) {
+export function ProductDetailScreen({ route }: Props) {
   const browse = useShopBrowse();
   const addToShoppingListStore = useDesiredBasketStore((s) => s.addItem);
   const smartBasket = isSmartBasketEnabled();
   const [imgFailed, setImgFailed] = useState(false);
+  const [addedKey, setAddedKey] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
 
@@ -51,9 +52,15 @@ export function ProductDetailScreen({ route, navigation }: Props) {
   const showImage = Boolean(product?.imageUrl) && !imgFailed;
   const meta = product ? productCardMeta(product.name, product.brand, product.sizeLabel) : "";
 
+  function markAdded(key: string) {
+    setAddedKey(key);
+    setTimeout(() => setAddedKey((cur) => (cur === key ? null : cur)), 1200);
+  }
+
   function addToShoppingList() {
     if (!product?.catalogProductId || !purchasable) return;
     if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
+    markAdded("list");
     addToShoppingListStore({
       catalogProductId: product.catalogProductId,
       name: product.name,
@@ -67,6 +74,7 @@ export function ProductDetailScreen({ route, navigation }: Props) {
     if (!product) return;
     if (!alcoholPurchaseAllowed(product.category)) return;
     if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
+    markAdded(offer.productId);
     void tryAddOfferToCart(
       {
         productId: offer.productId,
@@ -142,7 +150,7 @@ export function ProductDetailScreen({ route, navigation }: Props) {
             className="h-12 items-center justify-center rounded-full px-4"
             style={{ backgroundColor: DUTS.purple }}
           >
-            <Text className="font-extrabold text-white">ADD</Text>
+            <Text className="font-extrabold text-white">{addedKey === "list" ? "Added ✓" : "ADD"}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -166,7 +174,9 @@ export function ProductDetailScreen({ route, navigation }: Props) {
                 className="h-11 min-w-[44px] rounded-full px-4"
                 style={{ backgroundColor: DUTS.purple, justifyContent: "center" }}
               >
-                <Text className="font-extrabold text-white">ADD TO CART</Text>
+                <Text className="font-extrabold text-white">
+                  {addedKey === offer.productId ? "Added ✓" : "ADD TO CART"}
+                </Text>
               </Pressable>
             </View>
           ))}

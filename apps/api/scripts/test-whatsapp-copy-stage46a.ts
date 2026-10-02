@@ -136,7 +136,7 @@ async function main() {
   });
   includesAll(
     cart,
-    ["your order", "2 × bread", "eggs", "mazoe", "items: $7.70", "delivery: $1.50", "total: $9.20", "1. confirm", "2. change"],
+    ["your duts order", "2 × bread", "eggs", "mazoe", "items: $7.70", "delivery: $1.50", "total: $9.20", "1. confirm", "2. change"],
     "cart summary"
   );
   excludesAll(

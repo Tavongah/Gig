@@ -113,7 +113,7 @@ export function AppNavigator() {
       <Stack.Screen name="AllCategories" component={AllCategoriesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="ShopLocation" component={ShopLocationScreen} options={{ title: "Deliver to" }} />
+      <Stack.Screen name="ShopLocation" component={ShopLocationScreen} options={{ title: "Delivery" }} />
       <Stack.Screen
         name="GuestCheckoutChoice"
         component={GuestCheckoutChoiceScreen}

@@ -12,7 +12,7 @@ export type ShoppingAreaChoice = {
 type AreaState = {
   area: ShoppingAreaChoice | null;
   hydrated: boolean;
-  hydrate: () => Promise<void>;
+  hydrate: (opts?: { preserveExact?: boolean }) => Promise<void>;
   setArea: (area: ShoppingAreaChoice) => Promise<void>;
 };
 
@@ -30,9 +30,11 @@ export const useShopAreaStore = create<AreaState>((set) => ({
   area: null,
   hydrated: false,
 
-  hydrate: async () => {
+  hydrate: async (opts) => {
     try {
-      await AsyncStorage.removeItem(EXACT_KEY);
+      if (!opts?.preserveExact) {
+        await AsyncStorage.removeItem(EXACT_KEY);
+      }
       const raw = await AsyncStorage.getItem(AREA_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as ShoppingAreaChoice;

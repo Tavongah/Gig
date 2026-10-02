@@ -28,8 +28,11 @@ export function CommerceOrderDetailScreen({ route }: Props) {
 
   return (
     <ScrollView className="flex-1 bg-background px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>
-      <Text className="text-2xl font-black text-ink">Order #{order.orderNumber}</Text>
-      <Text className="mt-2 text-lg font-bold text-ink">{order.statusLabel}</Text>
+      <Text className="text-2xl font-black text-ink">Thank you</Text>
+      <Text className="mt-2 text-lg font-bold text-ink">Order confirmed</Text>
+      <Text className="mt-2 text-base text-muted">DUTS is arranging your delivery.</Text>
+      <Text className="mt-4 text-lg font-black text-ink">Order #{order.orderNumber}</Text>
+      <Text className="mt-1 text-base font-bold text-ink">{order.statusLabel}</Text>
       {order.fulfillmentHint ? (
         <Text className="mt-2 text-base text-muted">{order.fulfillmentHint}</Text>
       ) : null}

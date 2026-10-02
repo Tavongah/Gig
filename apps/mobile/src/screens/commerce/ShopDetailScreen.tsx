@@ -6,7 +6,6 @@ import { ProductGrid } from "../../components/ProductGrid";
 import { StoreHeader, StorePage } from "../../components/StoreHeader";
 import { isProductCardPurchasable } from "../../components/ProductCard";
 import { alcoholPurchaseAllowed } from "../../lib/storefront-categories";
-import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
 import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
@@ -31,16 +30,7 @@ export function ShopDetailScreen({ route, navigation }: Props) {
       <View className="flex-1 bg-background">
         <StoreHeader compact showCategories={false} />
         <View className="flex-1 items-center justify-center px-6">
-          {browse.isGuest ? (
-            <Text className="text-center text-muted">Loading shops near you…</Text>
-          ) : (
-            <>
-              <Text className="text-center text-muted">Set your location to see products available near you.</Text>
-              <View className="mt-4 w-full max-w-sm">
-                <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
-              </View>
-            </>
-          )}
+          <Text className="text-center text-muted">Loading shops near you…</Text>
         </View>
       </View>
     );

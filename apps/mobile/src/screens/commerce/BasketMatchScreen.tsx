@@ -140,17 +140,9 @@ export function BasketMatchScreen({ navigation }: Props) {
         <StoreHeader compact showCategories={false} />
         <StorePage>
           <Text className="mt-6 text-2xl font-black text-ink">Find a shop</Text>
-          <Text className="mt-3 text-base text-muted">
-            {browse.isGuest
-              ? "Choose a shopping area to find nearby shops."
-              : "Set your delivery location so we can find a shop that has your items."}
-          </Text>
+          <Text className="mt-3 text-base text-muted">Choose a shopping area to find nearby shops.</Text>
           <View className="mt-6">
-            {browse.isGuest ? (
-              <AppButton label="Keep shopping" variant="secondary" onPress={() => navigation.navigate("MainTabs", { screen: "Home" })} />
-            ) : (
-              <AppButton label="Set location" onPress={() => navigation.navigate("ShopLocation")} />
-            )}
+            <AppButton label="Keep shopping" variant="secondary" onPress={() => navigation.navigate("MainTabs", { screen: "Home" })} />
           </View>
         </StorePage>
       </View>

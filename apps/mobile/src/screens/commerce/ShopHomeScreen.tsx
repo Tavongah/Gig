@@ -36,25 +36,26 @@ export function ShopHomeScreen() {
   useEffect(() => {
     if (!browse.isGuest && pendingCheckout && lines.length && browse.ready) {
       setPendingCheckout(false);
-      navigation.navigate(browse.exact ? "CommerceCheckout" : "ShopLocation");
+      if (browse.exact) navigation.navigate("CommerceCheckout");
+      else navigation.navigate("ShopLocation", { next: "checkout" });
     }
   }, [browse.isGuest, browse.ready, browse.exact, pendingCheckout, lines.length, navigation, setPendingCheckout]);
 
   const areasQuery = useQuery({
     queryKey: ["commerce-shopping-areas"],
     queryFn: () => api.commerceShoppingAreas(),
-    enabled: browse.isGuest
+    enabled: !browse.exact
   });
 
   useEffect(() => {
-    if (!browse.isGuest || !browse.ready) return;
+    if (!browse.ready || browse.exact) return;
     if (areasQuery.isLoading && !areasQuery.data && !areasQuery.isError) return;
     const areas = areasQuery.data?.areas.length ? areasQuery.data.areas : FALLBACK_AREAS;
     if (browse.area && areas.some((a) => a.id === browse.area?.id)) return;
     const hinted = timezoneAreaHint();
     const pick = areas.find((a) => a.id === hinted) ?? areas[0];
     if (pick) void setArea({ id: pick.id, name: pick.name });
-  }, [browse.isGuest, browse.ready, browse.area, areasQuery.data, areasQuery.isLoading, areasQuery.isError, setArea]);
+  }, [browse.ready, browse.exact, browse.area, areasQuery.data, areasQuery.isLoading, areasQuery.isError, setArea]);
 
   const productsQuery = useInfiniteQuery({
     queryKey: ["commerce-products", ...browse.queryKey],
@@ -220,9 +221,7 @@ export function ShopHomeScreen() {
 
           <View className="mt-8">
             <Text className="mb-3 text-lg font-extrabold text-ink">Nearby shops</Text>
-            {!browse.isGuest && !browse.geo ? (
-              <Text className="text-sm text-muted">Set your location to see shops that can deliver to you.</Text>
-            ) : (shopsQuery.data?.shops ?? []).length === 0 ? (
+            {(shopsQuery.data?.shops ?? []).length === 0 ? (
               <Text className="text-sm text-muted">No shops nearby yet. You can still browse the DUTS catalog.</Text>
             ) : (
               (shopsQuery.data?.shops ?? []).map((shop) => (

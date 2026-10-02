@@ -428,6 +428,10 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       ROUTE_NOT_ELIGIBLE:
         "This shop is too far from the shops already in your delivery. You can place it as a separate order.",
       EMPTY_BASKET: "Your cart is empty.",
+      LOCATION_REQUIRED: "Tell us where to deliver.",
+      PRODUCT_UNAVAILABLE: "Some items are no longer available.",
+      SHOP_NOT_NEARBY: "We can't deliver there yet.",
+      TOO_MANY_ITEMS: "That's too many items for one order.",
       FEATURE_DISABLED: "This shopping option isn't available right now.",
       BASKET_NO_MATCH: "This shop can't fulfill these items right now."
     };
@@ -1071,6 +1075,40 @@ export const api = {
         itemCount: number;
       }>;
     }>("/commerce/cart/quote", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  commerceCheckoutPrepare: (
+    payload: {
+      lat: number;
+      lng: number;
+      lines: Array<{ productId: string; quantity: number }>;
+    },
+    token?: string
+  ) =>
+    request<{
+      merchant: { id: string; name: string; distanceKm: number | null };
+      lines: Array<{
+        productId: string;
+        productName: string;
+        quantity: number;
+        unitPriceCents: number;
+        lineTotalCents: number;
+        merchantId: string;
+      }>;
+      subtotalCents: number;
+      deliveryFeeCents: number;
+      serviceFeeCents: number;
+      totalCents: number;
+      currency: string;
+      deliveryQuoteStatus: "final" | "deferred";
+      shopCount?: number;
+      merchants?: Array<{
+        id: string;
+        name: string;
+        distanceKm: number | null;
+        itemsSubtotalCents: number;
+        itemCount: number;
+      }>;
+    }>("/commerce/cart/prepare", { method: "POST", body: JSON.stringify(payload) }, token),
 
   commerceCheckout: (
     payload: {

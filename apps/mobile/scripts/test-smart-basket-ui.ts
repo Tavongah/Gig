@@ -37,7 +37,7 @@ const cart = read("screens/commerce/CartScreen.tsx");
 assert.ok(cart.includes("Your shopping list"), "shopping list heading");
 assert.ok(cart.includes("Find a shop"), "Find a Shop CTA");
 assert.ok(cart.includes("From $"), "From price labeled");
-assert.ok(cart.includes("Continue to order"), "merchant cart checkout remains");
+assert.ok(cart.includes('label="Continue"'), "merchant cart checkout remains");
 assert.ok(cart.includes("GuestCheckoutChoice"), "WhatsApp/account handoff unchanged");
 
 const match = read("screens/commerce/BasketMatchScreen.tsx");

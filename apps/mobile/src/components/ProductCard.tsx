@@ -45,6 +45,7 @@ export function isProductCardPurchasable(product: {
 
 export function ProductCard({ product, onPress, onAdd, pricePrefix, width, variant = "grid" }: Props) {
   const [imgFailed, setImgFailed] = useState(false);
+  const [added, setAdded] = useState(false);
   const purchasable = isProductCardPurchasable(product);
   const offerCount = product.merchantOfferCount ?? product.offerCount ?? 0;
   const showFrom = purchasable ? pricePrefix ?? (offerCount > 1 ? "From " : "") : "";
@@ -117,14 +118,20 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
               onPress={(e) => {
                 e.stopPropagation?.();
                 onAdd();
+                setAdded(true);
+                setTimeout(() => setAdded(false), 1200);
               }}
               accessibilityRole="button"
-              accessibilityLabel={`Add ${product.name}`}
-              className="h-8 w-8 items-center justify-center rounded-full"
+              accessibilityLabel={added ? `Added ${product.name}` : `Add ${product.name}`}
+              className="h-8 min-w-[32px] items-center justify-center rounded-full px-1"
               style={{ backgroundColor: DUTS.purple }}
               hitSlop={6}
             >
-              <Ionicons name="add" size={18} color="#FFFFFF" />
+              {added ? (
+                <Text className="text-[10px] font-black text-white">Added ✓</Text>
+              ) : (
+                <Ionicons name="add" size={18} color="#FFFFFF" />
+              )}
             </Pressable>
           ) : null}
         </View>

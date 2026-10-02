@@ -55,8 +55,8 @@ function pass(name: string) {
 {
   const copy = readFileSync(resolve(here, "../src/modules/whatsapp/copy.ts"), "utf8");
   assert.ok(copy.includes("formatGuestHandoffAwaitingLocation"), "guest restore asks for WhatsApp location");
-  assert.ok(copy.includes("Please send your location using WhatsApp."), "native location request copy");
-  assert.ok(copy.includes("Delivery: Calculated when you send your location"), "no authoritative delivery fee on restore");
+  assert.ok(copy.includes("Send your location or type your address."), "native location request copy");
+  assert.ok(copy.includes("formatLocationAsk"), "shared location ask");
   pass("WhatsApp location copy after handoff");
 }
 
@@ -141,7 +141,7 @@ const {
   });
   assert.match(message, /Items: \$2\.50/);
   assert.match(message, /Where should we deliver\?/);
-  assert.match(message, /Please send your location using WhatsApp/);
+  assert.match(message, /Send your location or type your address/);
   assert.doesNotMatch(message, /Delivery:\s*\$/);
   assert.doesNotMatch(message, /Confirm order/);
   pass("handoff restore copy has no delivery fee");

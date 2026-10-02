@@ -41,16 +41,17 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
   const { isDesktopNav } = useStorefrontLayout();
   const [q, setQ] = useState(initialQuery);
   const [areaOpen, setAreaOpen] = useState(false);
+  const useAreaPicker = browse.isGuest || !browse.exact;
   const areasQuery = useQuery({
     queryKey: ["commerce-shopping-areas"],
     queryFn: () => api.commerceShoppingAreas(),
-    enabled: browse.isGuest
+    enabled: useAreaPicker
   });
   const areas = areasQuery.data?.areas.length ? areasQuery.data.areas : FALLBACK_AREAS;
 
-  const areaName = browse.isGuest
+  const areaName = useAreaPicker
     ? (browse.area?.name ?? "your area")
-    : (browse.exact?.label ?? "Set your location");
+    : (browse.exact?.label ?? "your area");
 
   function runSearch(value = q) {
     const next = value.trim();
@@ -71,7 +72,7 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
   }
 
   function onAreaPress() {
-    if (browse.isGuest) {
+    if (useAreaPicker) {
       setAreaOpen(true);
       return;
     }
@@ -99,14 +100,14 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
     <Pressable
       onPress={onAreaPress}
       accessibilityRole="button"
-      accessibilityLabel={browse.isGuest ? "Change shopping area" : "Set delivery location"}
+      accessibilityLabel={useAreaPicker ? "Change shopping area" : "Change delivery location"}
       className="flex-row items-center"
       hitSlop={6}
     >
       <Ionicons name="location-outline" size={16} color={DUTS.purple} />
       <View className="ml-1">
         <Text className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-          {browse.isGuest ? "Shopping near" : "Deliver to"}
+          {useAreaPicker ? "Shopping near" : "Deliver to"}
         </Text>
         <Text className="text-sm font-bold text-ink" numberOfLines={1}>
           {areaName} ▾

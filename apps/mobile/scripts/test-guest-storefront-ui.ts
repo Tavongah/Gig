@@ -55,7 +55,7 @@ assert.ok(!areaStore.includes("getCurrentCoordinates"), "area store must not req
 
 const cart = read("screens/commerce/CartScreen.tsx");
 assert.ok(cart.includes("GuestCheckoutChoice"), "guest checkout decision");
-assert.ok(cart.includes("Continue to order"), "continue CTA");
+assert.ok(cart.includes('label="Continue"'), "continue CTA");
 assert.ok(cart.includes("Calculated at checkout"), "deferred delivery copy");
 assert.ok(cart.includes("deferDelivery"), "guest quote defers delivery");
 assert.ok(!cart.includes("Total") || cart.includes("deferred"), "guest cart must not treat deferred quote as final total");
@@ -83,6 +83,9 @@ assert.ok(api.includes("/commerce/shopping-areas"), "shopping areas API");
 assert.ok(api.includes("deferDelivery"), "deferred quote payload");
 
 const checkout = read("screens/commerce/CommerceCheckoutScreen.tsx");
-assert.ok(checkout.includes("Choose delivery location"), "account path collects exact address");
+assert.ok(checkout.includes("Review order"), "one review screen");
+assert.ok(checkout.includes("commerceCheckoutPrepare"), "one checkout-prep call");
+assert.ok(checkout.includes("PLACE ORDER"), "place order CTA");
+assert.ok(checkout.includes("Deliver to"), "shows delivery address");
 
 console.log(JSON.stringify({ ok: true }, null, 2));

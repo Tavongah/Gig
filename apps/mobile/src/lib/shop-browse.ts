@@ -16,18 +16,16 @@ export function useShopBrowse() {
   const hydrateArea = useShopAreaStore((s) => s.hydrate);
 
   useEffect(() => {
+    void hydrateArea({ preserveExact: Boolean(session) });
     if (session) void hydrateExact(userId);
-    else void hydrateArea();
   }, [session, userId, hydrateExact, hydrateArea]);
 
   const isGuest = !session;
-  const ready = isGuest ? areaHydrated : exactHydrated;
-  const geo: CommerceBrowseGeo | null = isGuest
-    ? area
+  const ready = isGuest ? areaHydrated : exactHydrated && areaHydrated;
+  const geo: CommerceBrowseGeo | null = exact
+    ? { lat: exact.latitude, lng: exact.longitude }
+    : area
       ? { areaId: area.id }
-      : null
-    : exact
-      ? { lat: exact.latitude, lng: exact.longitude }
       : null;
 
   return {
@@ -37,6 +35,8 @@ export function useShopBrowse() {
     area,
     exact,
     geo,
-    queryKey: isGuest ? (["area", area?.id] as const) : (["exact", exact?.latitude, exact?.longitude] as const)
+    queryKey: exact
+      ? (["exact", exact.latitude, exact.longitude] as const)
+      : (["area", area?.id] as const)
   };
 }

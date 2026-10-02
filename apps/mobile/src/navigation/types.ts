@@ -44,7 +44,7 @@ export type RootStackParamList = {
   AllCategories: undefined;
   ProductDetail: { catalogProductId?: string; productId?: string };
   ShopDetail: { merchantId: string };
-  ShopLocation: undefined;
+  ShopLocation: { next?: "checkout" } | undefined;
   GuestCheckoutChoice: undefined;
   BasketMatch: undefined;
   CommerceCheckout: undefined;

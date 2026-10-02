@@ -48,6 +48,7 @@ import {
   formatClaimPaidIgnored,
   formatCompactMutation,
   formatDisambiguation,
+  formatLocationAsk,
   formatMobileMoneyPending,
   formatMobileMoneyPhonePrompt,
   formatMissingItems,
@@ -229,7 +230,7 @@ export async function handleCustomerWhatsAppMessage(
     await updateConversation(conv.id, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
     await wa.sendText(
       phone,
-      "Please share your delivery location first so I can check nearby shops."
+      formatLocationAsk()
     );
     return { handled: true };
   }
@@ -253,7 +254,7 @@ export async function handleCustomerWhatsAppMessage(
       });
       await wa.sendText(
         phone,
-        "Please share your delivery location using WhatsApp's location button."
+        formatLocationAsk()
       );
       return { handled: true };
     }
@@ -387,7 +388,7 @@ export async function handleCustomerWhatsAppMessage(
       });
       await wa.sendText(
         phone,
-        "Please share your delivery location using WhatsApp's location button."
+        formatLocationAsk()
       );
       return { handled: true };
     }
@@ -448,16 +449,13 @@ export async function handleCustomerWhatsAppMessage(
         });
         await wa.sendText(
           phone,
-          "Please share your delivery location using WhatsApp's location button."
+          formatLocationAsk()
         );
         return { handled: true };
       }
     }
     await updateConversation(conv.id, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
-    await wa.sendText(
-      phone,
-      "Please share your delivery location using WhatsApp's location button."
-    );
+    await wa.sendText(phone, formatLocationAsk());
     return { handled: true };
   }
 
@@ -623,7 +621,7 @@ async function buildAndPresentQuote(
   const wa = getWhatsAppProvider();
   if (ctx.deliveryLat == null || ctx.deliveryLng == null || !ctx.requestedItems?.length) {
     await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
-    await wa.sendText(phone, "Please share your delivery location using WhatsApp's location button.");
+    await wa.sendText(phone, formatLocationAsk());
     return { handled: true };
   }
 

@@ -16,7 +16,7 @@ export const CUSTOMER_HELP = [
 ].join("\n");
 
 export const CUSTOMER_HELP_FULL = [
-  "Share your location, then tell me what you need.",
+  "Tell me what you need, then we'll confirm delivery.",
   "You can also: add · remove · show cart · checkout"
 ].join("\n");
 
@@ -41,21 +41,20 @@ export function formatGuestHandoffAwaitingLocation(input: {
   lines: Array<{ quantity: number; productName: string; lineTotalCents: number }>;
   subtotalCents: number;
 }): string {
+  void input.shopName;
   return [
     "Your DUTS cart",
     "",
     formatCartLines(input.lines),
     "",
-    input.shopName ? `Shop: ${input.shopName}` : null,
     `Items: ${money(input.subtotalCents)}`,
-    "Delivery: Calculated when you send your location",
     "",
-    "Where should we deliver?",
-    "",
-    "Please send your location using WhatsApp."
-  ]
-    .filter((p) => p != null)
-    .join("\n");
+    formatLocationAsk()
+  ].join("\n");
+}
+
+export function formatLocationAsk(): string {
+  return ["Where should we deliver?", "", "Send your location or type your address."].join("\n");
 }
 
 /** Prefer human-readable delivery labels; keep coordinate strings as safe fallback. */
@@ -82,7 +81,7 @@ export function formatOrderCartSummary(input: {
 }): string {
   const delivery = formatCustomerDeliveryLabel(input.deliveryLabel);
   const parts = [
-    input.heading ?? "Your order",
+    input.heading ?? "Your DUTS order",
     "",
     formatCartLines(input.lines),
     "",
@@ -309,7 +308,7 @@ export function formatPaymentMethodChoice(_totalCents?: number): string {
 
 export function formatEcoCashPrompt(): string {
   return [
-    "EcoCash",
+    "EcoCash number",
     "",
     "Enter the EcoCash number you want to pay with.",
     "",

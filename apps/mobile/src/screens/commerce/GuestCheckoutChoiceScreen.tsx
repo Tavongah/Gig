@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { AppButton } from "../../components/AppButton";
 import { StoreHeader } from "../../components/StoreHeader";
 import { api } from "../../lib/api";
+import { friendlyCheckoutError } from "../../lib/checkout-flow";
 import { logDutsFlow } from "../../lib/flow-log";
 import { DUTS } from "../../lib/theme";
 import type { GuestStackParamList } from "../../navigation/types";
@@ -13,13 +14,6 @@ import { useShopAreaStore } from "../../stores/shop-area.store";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 
 type Props = NativeStackScreenProps<GuestStackParamList, "GuestCheckoutChoice">;
-
-function friendlyCheckoutError(message: string) {
-  if (/VALIDATION_ERROR|Invalid uuid|Required|INTERNAL_ERROR|Prisma|Zod/i.test(message)) {
-    return "Something changed with your cart. Please review it.";
-  }
-  return message;
-}
 
 export function GuestCheckoutChoiceScreen({ navigation }: Props) {
   const area = useShopAreaStore((s) => s.area);

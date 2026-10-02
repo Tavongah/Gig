@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AppButton } from "../../components/AppButton";
 import { api } from "../../lib/api";
+import { friendlyCheckoutError, moneyLabel } from "../../lib/checkout-flow";
 import { DUTS } from "../../lib/theme";
 import type { RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
@@ -19,7 +20,6 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
   const user = session?.user;
   const location = useShopLocationStore((s) => s.location);
   const lines = useCommerceCartStore((s) => s.lines);
-  const merchantName = useCommerceCartStore((s) => s.merchantName);
   const clear = useCommerceCartStore((s) => s.clear);
   const [method, setMethod] = useState<PayMethod>("CASH");
   const [ecoCashPhone, setEcoCashPhone] = useState(user?.phoneNumber ?? "");
@@ -29,10 +29,40 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
     if (!session) navigation.replace("GuestCheckoutChoice");
   }, [session, navigation]);
 
+  useEffect(() => {
+    if (session && !location && lines.length) {
+      navigation.replace("ShopLocation", { next: "checkout" });
+    }
+  }, [session, location, lines.length, navigation]);
+
+  const prepQuery = useQuery({
+    queryKey: [
+      "checkout-prep",
+      location?.latitude,
+      location?.longitude,
+      lines.map((l) => `${l.productId}:${l.quantity}`).join(",")
+    ],
+    queryFn: () =>
+      api.commerceCheckoutPrepare(
+        {
+          lat: location!.latitude,
+          lng: location!.longitude,
+          lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
+        },
+        token
+      ),
+    enabled: Boolean(session && token && location && lines.length)
+  });
+
+  useEffect(() => {
+    if (prepQuery.error) setError(friendlyCheckoutError((prepQuery.error as Error).message));
+    else setError("");
+  }, [prepQuery.error]);
+
   const checkoutMut = useMutation({
     mutationFn: async () => {
       if (!token || !user) throw new Error("Sign in to check out.");
-      if (!location) throw new Error("Set delivery location first.");
+      if (!location) throw new Error("Tell us where to deliver.");
       if (!lines.length) throw new Error("Your cart is empty.");
       return api.commerceCheckout(
         {
@@ -50,7 +80,7 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
       clear();
       navigation.replace("CommerceOrderDetail", { orderId: res.order.id });
     },
-    onError: (e: Error) => setError(e.message)
+    onError: (e: Error) => setError(friendlyCheckoutError(e.message))
   });
 
   if (!session || !token || !user) {
@@ -58,75 +88,125 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
   }
 
   if (!location) {
-    return (
-      <ScrollView className="flex-1 bg-background px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>
-        <Text className="text-2xl font-black text-ink">Checkout</Text>
-        <Text className="mt-4 text-base text-muted">
-          Choose a delivery address so we can confirm the shop and delivery fee.
-        </Text>
-        <View className="mt-6">
-          <AppButton label="Choose delivery location" onPress={() => navigation.navigate("ShopLocation")} />
-        </View>
-      </ScrollView>
-    );
+    return null;
   }
 
+  const quote = prepQuery.data;
+  const placing = checkoutMut.isPending;
+  const ready = Boolean(quote) && !prepQuery.isFetching && !placing;
+  const placeLabel = quote
+    ? placing
+      ? "Placing order…"
+      : `PLACE ORDER • ${moneyLabel(quote.totalCents)}`
+    : "PLACE ORDER";
+
   return (
-    <ScrollView className="flex-1 bg-background px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>
-      <Text className="text-2xl font-black text-ink">Checkout</Text>
-      <Text className="mt-2 text-base text-muted">
-        {lines.length ? `${new Set(lines.map((l) => l.merchantId)).size > 1 ? `${new Set(lines.map((l) => l.merchantId)).size} shops` : merchantName}` : "Shop"}
-      </Text>
-      <Text className="mt-1 text-base text-muted">Deliver to: {location?.label ?? "—"}</Text>
+    <View className="flex-1 bg-background">
+      <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 24, paddingTop: 12 }}>
+        <Text className="text-2xl font-black text-ink">Review order</Text>
+        {prepQuery.isFetching && !quote ? (
+          <Text className="mt-4 text-base text-muted">Getting your order ready…</Text>
+        ) : null}
 
-      <Text className="mt-6 text-lg font-extrabold text-ink">Choose payment</Text>
-      {(["ECOCASH", "CASH"] as const).map((m) => (
-        <Pressable
-          key={m}
-          onPress={() => setMethod(m)}
-          className="mt-2 rounded-2xl border px-4 py-3.5"
-          style={{
-            borderColor: method === m ? DUTS.purple : DUTS.border,
-            backgroundColor: method === m ? "#F5F0FF" : DUTS.card
-          }}
-          accessibilityRole="radio"
-          accessibilityState={{ selected: method === m }}
-          accessibilityLabel={m === "CASH" ? "Cash on delivery" : "EcoCash USD"}
-        >
-          <Text className="font-bold text-ink">{m === "CASH" ? "Cash on delivery" : "EcoCash USD"}</Text>
-        </Pressable>
-      ))}
-      {method === "ECOCASH" ? (
-        <View className="mt-3">
-          <Text className="mb-2 text-sm font-semibold text-ink">EcoCash number</Text>
-          <TextInput
-            value={ecoCashPhone}
-            onChangeText={setEcoCashPhone}
-            keyboardType="phone-pad"
-            placeholder="0771234567"
-            className="rounded-2xl border border-border bg-card px-4 py-3 text-base text-ink"
-            accessibilityLabel="EcoCash number"
-          />
+        <View className="mt-5 rounded-2xl border border-border bg-card p-4">
+          <Text className="text-sm font-semibold uppercase text-muted">Deliver to</Text>
+          <Text className="mt-1 text-base font-bold text-ink">{location.label}</Text>
+          <Pressable
+            onPress={() => navigation.navigate("ShopLocation")}
+            className="mt-2 self-start"
+            accessibilityRole="button"
+            accessibilityLabel="Change delivery location"
+          >
+            <Text className="text-sm font-bold" style={{ color: DUTS.purple }}>
+              Change
+            </Text>
+          </Pressable>
         </View>
-      ) : null}
-      <Text className="mt-3 text-xs text-muted">
-        EcoCash is confirmed only after payment is approved on your phone. Cash is due on delivery.
-      </Text>
 
-      {error ? <Text className="mt-4 text-sm text-danger">{error}</Text> : null}
+        <View className="mt-4 rounded-2xl border border-border bg-card p-4">
+          <Text className="text-sm font-semibold uppercase text-muted">Items</Text>
+          {quote
+            ? quote.lines.map((line) => (
+                <View key={line.productId} className="mt-3 flex-row justify-between">
+                  <Text className="flex-1 text-base text-ink">
+                    {line.quantity}× {line.productName}
+                  </Text>
+                  <Text className="text-base font-semibold text-ink">{moneyLabel(line.lineTotalCents)}</Text>
+                </View>
+              ))
+            : lines.map((line) => (
+                <View key={line.productId} className="mt-3 flex-row justify-between">
+                  <Text className="flex-1 text-base text-ink">
+                    {line.quantity}× {line.name}
+                  </Text>
+                  <Text className="text-base font-semibold text-ink">
+                    {moneyLabel(line.unitPriceCents * line.quantity)}
+                  </Text>
+                </View>
+              ))}
+        </View>
 
-      <View className="mt-6">
+        {quote ? (
+          <View className="mt-4 gap-1 rounded-2xl border border-border bg-surface p-4">
+            <Text className="text-sm text-muted">Items          {moneyLabel(quote.subtotalCents)}</Text>
+            <Text className="text-sm text-muted">Delivery       {moneyLabel(quote.deliveryFeeCents)}</Text>
+            {quote.serviceFeeCents > 0 ? (
+              <Text className="text-sm text-muted">Service        {moneyLabel(quote.serviceFeeCents)}</Text>
+            ) : null}
+            <Text className="mt-2 text-lg font-black text-ink">Total          {moneyLabel(quote.totalCents)}</Text>
+            {(quote.shopCount ?? 1) > 1 ? (
+              <Text className="mt-2 text-sm text-muted">DUTS will collect from more than one shop.</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        <Text className="mt-6 text-lg font-extrabold text-ink">Payment</Text>
+        {(["ECOCASH", "CASH"] as const).map((m) => (
+          <Pressable
+            key={m}
+            onPress={() => setMethod(m)}
+            className="mt-2 rounded-2xl border px-4 py-3.5"
+            style={{
+              borderColor: method === m ? DUTS.purple : DUTS.border,
+              backgroundColor: method === m ? "#F5F0FF" : DUTS.card
+            }}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: method === m }}
+            accessibilityLabel={m === "CASH" ? "Cash on delivery" : "EcoCash USD"}
+          >
+            <Text className="font-bold text-ink">{m === "CASH" ? "Cash on delivery" : "EcoCash USD"}</Text>
+          </Pressable>
+        ))}
+        {method === "ECOCASH" ? (
+          <View className="mt-3">
+            <Text className="mb-2 text-sm font-semibold text-ink">EcoCash number</Text>
+            <TextInput
+              value={ecoCashPhone}
+              onChangeText={setEcoCashPhone}
+              keyboardType="phone-pad"
+              placeholder="0771234567"
+              className="rounded-2xl border border-border bg-card px-4 py-3 text-base text-ink"
+              accessibilityLabel="EcoCash number"
+            />
+            <Text className="mt-2 text-sm text-muted">Check your phone to approve payment.</Text>
+          </View>
+        ) : (
+          <Text className="mt-3 text-sm text-muted">Pay when your order arrives.</Text>
+        )}
+
+        {error ? <Text className="mt-4 text-sm text-danger">{error}</Text> : null}
+      </ScrollView>
+      <View className="border-t border-border bg-background px-5 pb-5 pt-3">
         <AppButton
-          label={checkoutMut.isPending ? "Placing order…" : "Place order"}
-          onPress={() => checkoutMut.mutate()}
-          disabled={
-            checkoutMut.isPending ||
-            !lines.length ||
-            (method === "ECOCASH" && !ecoCashPhone.trim())
-          }
-          loading={checkoutMut.isPending}
+          label={placeLabel}
+          onPress={() => {
+            if (!ready || placing) return;
+            checkoutMut.mutate();
+          }}
+          disabled={!ready || !lines.length || (method === "ECOCASH" && !ecoCashPhone.trim())}
+          loading={placing}
         />
       </View>
-    </ScrollView>
+    </View>
   );
 }

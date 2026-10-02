@@ -13,6 +13,7 @@ import {
   getShopCatalog,
   listBrowseCategories,
   listCustomerCommerceOrders,
+  prepareCheckout,
   quoteCart,
   quoteTextBasket,
   type BrowseGeo
@@ -172,6 +173,28 @@ const quoteSchema = z
 customerCommerceRouter.post("/cart/quote", validateBody(quoteSchema), async (req, res, next) => {
   try {
     res.json(await quoteCart(req.body));
+  } catch (err) {
+    next(err);
+  }
+});
+
+const prepareSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  lines: z
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        quantity: z.number().int().min(1).max(99)
+      })
+    )
+    .min(1)
+    .max(40)
+});
+
+customerCommerceRouter.post("/cart/prepare", validateBody(prepareSchema), async (req, res, next) => {
+  try {
+    res.json(await prepareCheckout(req.body));
   } catch (err) {
     next(err);
   }
