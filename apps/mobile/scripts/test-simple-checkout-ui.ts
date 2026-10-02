@@ -70,7 +70,7 @@ assert.ok(routes.includes("/cart/prepare"), "P prepare route");
 assert.ok(service.includes("Tell us where to deliver."), "Q location missing error");
 assert.ok(service.includes("Some items are no longer available."), "R product unavailable");
 assert.ok(service.includes("This shop isn't taking orders right now."), "S shop closed");
-assert.ok(service.includes("We can't deliver there yet."), "T delivery too far");
+assert.ok(service.includes("We can't deliver this order to this location yet."), "T delivery too far");
 assert.ok(service.includes("Your delivery already includes 3 shops."), "U three-shop cap copy");
 assert.ok(service.includes("That's too many items for one order."), "V too many items");
 assert.ok(checkout.includes("Getting your order ready…"), "W loading copy");

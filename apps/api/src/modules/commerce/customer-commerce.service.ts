@@ -605,7 +605,7 @@ export async function quoteCart(input: {
   const nearby = await findNearbyMerchants(input.lat, input.lng);
   const dist = nearby.find((n) => n.merchant.id === merchantId);
   if (!dist) {
-    throw new AppError("We can't deliver from this shop to that location yet.", 409, "SHOP_NOT_NEARBY");
+    throw new AppError("We can't deliver this order to this location yet.", 409, "SHOP_NOT_NEARBY");
   }
 
   const totals = await quoteBasketTotals({
@@ -633,7 +633,7 @@ const CHECKOUT_PREP_COPY: Record<string, string> = {
   LOCATION_REQUIRED: "Tell us where to deliver.",
   PRODUCT_UNAVAILABLE: "Some items are no longer available.",
   MERCHANT_CLOSED: "This shop isn't taking orders right now.",
-  SHOP_NOT_NEARBY: "We can't deliver there yet.",
+  SHOP_NOT_NEARBY: "We can't deliver this order to this location yet.",
   SHOP_LIMIT_REACHED: "Your delivery already includes 3 shops.",
   TOO_MANY_ITEMS: "That's too many items for one order.",
   EMPTY_BASKET: "Your cart is empty.",

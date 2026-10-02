@@ -8,7 +8,7 @@
  *
  * Historical CommerceOrders are unchanged (checkoutId null). Order #2 is not migrated.
  *
- * V1 delivery fee: ONE fee from existing calculateDeliveryPrice(combinedRouteKm).
+ * V1 delivery fee: ONE fee from calculatePilotDeliveryPrice(combinedRouteKm, packageClass).
  * combinedRouteKm = shortest haversine permutation of pickups then the customer.
  * Not fee × shop count. No hidden surcharge.
  *

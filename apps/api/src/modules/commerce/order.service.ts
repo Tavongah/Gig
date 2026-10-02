@@ -13,6 +13,7 @@ import type { Server } from "socket.io";
 import {
   canPurchaseStorefrontCategory,
   commerceCustomerStatusCopy,
+  distanceKmBetween,
   FULFILLMENT_NOTE,
   addFulfillmentNote,
   hasFulfillmentNote,
@@ -25,8 +26,8 @@ import { AppError } from "../../lib/errors.js";
 import { logDutsFlow } from "../../lib/flow-log.js";
 import { getSocketServer } from "../../lib/socket.js";
 import { createDelivery } from "../gigs/delivery.service.js";
-import { estimateDeliveryFee } from "../gigs/delivery-pricing.service.js";
 import { getMarketplaceSettings, type BasketLine } from "./merchant.service.js";
+import { quotePilotCommerceDelivery } from "./pilot-delivery.service.js";
 import { normalizePhoneNumber } from "../auth/access.service.js";
 import { normalizeMerchantPhone } from "./merchant.service.js";
 import { broadcastGigOffer } from "../realtime/realtime.service.js";
@@ -165,17 +166,15 @@ export async function quoteBasketTotals(input: {
 }) {
   const settings = await getMarketplaceSettings();
   const subtotalCents = input.lines.reduce((s, l) => s + l.lineTotalCents, 0);
-  const delivery = await estimateDeliveryFee({
-    pickup: {
-      latitude: input.merchantLat,
-      longitude: input.merchantLng
-    },
-    dropoff: {
-      latitude: input.customerLat,
-      longitude: input.customerLng
-    }
+  const routeDistanceKm = distanceKmBetween(
+    { latitude: input.merchantLat, longitude: input.merchantLng },
+    { latitude: input.customerLat, longitude: input.customerLng }
+  );
+  const delivery = await quotePilotCommerceDelivery({
+    routeDistanceKm,
+    lines: input.lines
   });
-  const deliveryFeeCents = delivery.totalCents;
+  const deliveryFeeCents = delivery.deliveryFeeCents;
   const serviceFeeCents = settings.serviceFeeCents;
   const totalCents = subtotalCents + deliveryFeeCents + serviceFeeCents;
   return { subtotalCents, deliveryFeeCents, serviceFeeCents, totalCents, currency: "usd" as const };

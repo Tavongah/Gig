@@ -430,7 +430,7 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       EMPTY_BASKET: "Your cart is empty.",
       LOCATION_REQUIRED: "Tell us where to deliver.",
       PRODUCT_UNAVAILABLE: "Some items are no longer available.",
-      SHOP_NOT_NEARBY: "We can't deliver there yet.",
+      SHOP_NOT_NEARBY: "We can't deliver this order to this location yet.",
       TOO_MANY_ITEMS: "That's too many items for one order.",
       FEATURE_DISABLED: "This shopping option isn't available right now.",
       BASKET_NO_MATCH: "This shop can't fulfill these items right now."

@@ -72,7 +72,7 @@ function pass(name: string) {
   assert.ok(quote.includes("canPurchaseStorefrontCategory"), "quoteCart uses alcohol restriction helper");
   assert.ok(quote.includes("ALCOHOL_DISABLED"), "quoteCart blocks alcohol server-side");
   assert.ok(quote.includes("Alcohol ordering isn't available yet."), "alcohol quote copy");
-  assert.ok(quote.includes("We can't deliver from this shop to that location yet."), "shop not nearby copy");
+  assert.ok(quote.includes("We can't deliver this order to this location yet."), "shop not nearby copy");
   pass("quoteCart alcohol and location copy");
 }
 

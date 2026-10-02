@@ -16,7 +16,7 @@ assert.ok(service.includes("export async function prepareCheckout"), "prepareChe
 assert.ok(service.includes("Tell us where to deliver."), "location missing");
 assert.ok(service.includes("Some items are no longer available."), "product unavailable");
 assert.ok(service.includes("This shop isn't taking orders right now."), "shop closed");
-assert.ok(service.includes("We can't deliver there yet."), "too far");
+assert.ok(service.includes("We can't deliver this order to this location yet."), "too far");
 assert.ok(service.includes("Your delivery already includes 3 shops."), "shop cap");
 assert.ok(service.includes("That's too many items for one order."), "too many items");
 assert.ok(service.includes("checkoutCart") && service.includes("prepareCheckout"), "checkout uses prep errors");

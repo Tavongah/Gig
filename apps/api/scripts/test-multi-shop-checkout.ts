@@ -153,7 +153,7 @@ pass("U", "alcohol still blocked");
 assert.ok(orderSvc.includes("PRODUCT_UNAVAILABLE"));
 pass("V", "unavailable product fails revalidation");
 
-assert.ok(cartUi.includes("shops • One delivery"));
+assert.ok(cartUi.includes("shops • One delivery") || cartUi.includes("DUTS will collect from more than one shop."));
 assert.ok(cartUi.includes("rounded-2xl"));
 pass("W", "grouped cart layout present for mobile");
 

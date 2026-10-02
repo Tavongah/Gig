@@ -126,6 +126,7 @@ export function ShopHomeScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
         <StorePage>
           <Text className="mt-4 text-sm text-muted">Need it? DUTS it. Shop local. Get it delivered.</Text>
+          <Text className="mt-1 text-sm text-muted">Delivery from $0.50</Text>
 
           {shopBy.length > 0 ? (
             <View className="mt-5">

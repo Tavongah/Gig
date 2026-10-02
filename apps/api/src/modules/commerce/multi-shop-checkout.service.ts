@@ -34,11 +34,9 @@ import {
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { logDutsFlow } from "../../lib/flow-log.js";
-import {
-  estimateDeliveryFeeForDistance,
-  getDeliveryPricingConfig
-} from "../gigs/delivery-pricing.service.js";
+import { getDeliveryPricingConfig } from "../gigs/delivery-pricing.service.js";
 import { findNearbyMerchants, getMarketplaceSettings, type BasketLine } from "./merchant.service.js";
+import { quotePilotCommerceDelivery } from "./pilot-delivery.service.js";
 import { createConfirmedCommerceOrder, openMarketplaceDeliveryForCouriers } from "./order.service.js";
 import { resolveDeliveryClientUserId } from "./commerce-customer.service.js";
 import { isMultiShopCheckoutEnabled } from "./payment-mode.js";
@@ -227,8 +225,11 @@ export async function quoteCombinedCart(input: {
     });
 
   const subtotalCents = input.lines.reduce((s, l) => s + l.lineTotalCents, 0);
-  const delivery = await estimateDeliveryFeeForDistance(route.routeKm);
-  const deliveryFeeCents = delivery.totalCents;
+  const delivery = await quotePilotCommerceDelivery({
+    routeDistanceKm: route.routeKm,
+    lines: input.lines
+  });
+  const deliveryFeeCents = delivery.deliveryFeeCents;
   const serviceFeeCents = settings.serviceFeeCents;
   const totalCents = subtotalCents + deliveryFeeCents + serviceFeeCents;
   const first = shops[0]!;
