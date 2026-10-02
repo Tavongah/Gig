@@ -83,7 +83,7 @@ assert.ok(api.includes("/commerce/shopping-areas"), "shopping areas API");
 assert.ok(api.includes("deferDelivery"), "deferred quote payload");
 
 const checkout = read("screens/commerce/CommerceCheckoutScreen.tsx");
-assert.ok(checkout.includes("Review order"), "one review screen");
+assert.ok(checkout.includes("YOUR DUTS ORDER"), "one review screen");
 assert.ok(checkout.includes("commerceCheckoutPrepare"), "one checkout-prep call");
 assert.ok(checkout.includes("PLACE ORDER"), "place order CTA");
 assert.ok(checkout.includes("Deliver to"), "shows delivery address");

@@ -417,8 +417,10 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       USE_SOCIAL_LOGIN: "This account uses social sign-in instead of a password.",
       FIREBASE_NOT_CONFIGURED: "Social sign-in is not configured on the server yet.",
       DEV_PAYMENT_DISABLED: "Payment bypass is disabled in production. Configure Stripe on the server.",
-      GPS_REQUIRED: "Location is required for this action.",
-      GPS_VERIFICATION_FAILED: "Move closer to the customer's address before continuing.",
+      GPS_REQUIRED: "We couldn't confirm your location. Make sure location is enabled and try again.",
+      GPS_VERIFICATION_FAILED: "You're still too far from the pickup location. Move closer and try again.",
+      GPS_TOO_FAR: "You're still too far from the pickup location. Move closer and try again.",
+      GPS_ARRIVAL_UNCERTAIN: "We couldn't confirm you're at the location. If you are there, tap I'm at the shop.",
       DELIVERY_DISTANCE_EXCEEDED:
         "That delivery is outside our current service area. Try a closer drop-off.",
       INVALID_PICKUP_PIN: "That pickup code is incorrect. Ask the sender for the current code.",
@@ -873,7 +875,11 @@ export const api = {
       token
     ),
 
-  arriveAtPickup: (gigId: string, token: string, location: { latitude: number; longitude: number }) =>
+  arriveAtPickup: (
+    gigId: string,
+    token: string,
+    location: { latitude: number; longitude: number; accuracyMeters?: number | null; confirmNearby?: boolean }
+  ) =>
     request<{ success?: boolean; gig: GigDetail }>(
       `/gigs/${gigId}/delivery/arrive-at-pickup`,
       { method: "POST", body: JSON.stringify(location) },
@@ -901,7 +907,11 @@ export const api = {
       token
     ),
 
-  arriveAtDropoff: (gigId: string, token: string, location: { latitude: number; longitude: number }) =>
+  arriveAtDropoff: (
+    gigId: string,
+    token: string,
+    location: { latitude: number; longitude: number; accuracyMeters?: number | null; confirmNearby?: boolean }
+  ) =>
     request<{ success?: boolean; gig: GigDetail }>(
       `/gigs/${gigId}/delivery/arrive-at-dropoff`,
       { method: "POST", body: JSON.stringify(location) },

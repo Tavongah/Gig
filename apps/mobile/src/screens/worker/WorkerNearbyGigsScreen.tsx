@@ -8,6 +8,8 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../../lib/api";
 import { openGigForRole } from "../../lib/open-gig";
 import { showAlert, showConfirm } from "../../lib/confirm";
+import { shouldSilenceWorkerNotification } from "../../lib/commerce-notifications";
+import { DutsInlineBanner } from "../../components/DutsInlineBanner";
 import { ACTIVE_WORKER_STATUSES, COMPLETED_STATUSES } from "../../lib/gig-status";
 import { TabScreen } from "../../components/TabScreen";
 import { HeroBanner } from "../../components/HeroBanner";
@@ -35,6 +37,7 @@ export function WorkerNearbyGigsScreen() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [showAcceptAnimation, setShowAcceptAnimation] = useState(false);
   const [acceptedGigId, setAcceptedGigId] = useState<string | null>(null);
+  const [inlineError, setInlineError] = useState<string | null>(null);
 
   const nearbyQuery = useQuery({
     queryKey: ["nearby-gigs"],
@@ -60,7 +63,11 @@ export function WorkerNearbyGigsScreen() {
         "gig:offer": () => {
           void nearbyQuery.refetch();
         },
-        notification: (payload: { title: string; body: string }) => {
+        notification: (payload: { title: string; body: string; type?: string }) => {
+          if (shouldSilenceWorkerNotification(payload)) {
+            void nearbyQuery.refetch();
+            return;
+          }
           showAlert(payload.title, payload.body);
         }
       }),
@@ -76,7 +83,7 @@ export function WorkerNearbyGigsScreen() {
       setAcceptedGigId(gigId);
       setShowAcceptAnimation(true);
     },
-    onError: (error: Error) => showAlert("Could not accept", error.message),
+    onError: (error: Error) => setInlineError(error.message),
     onSettled: () => setAcceptingId(null)
   });
 
@@ -94,7 +101,13 @@ export function WorkerNearbyGigsScreen() {
     COMPLETED_STATUSES.includes(gig.status as (typeof COMPLETED_STATUSES)[number])
   );
 
-  function confirmAccept(gigId: string, title: string): void {
+  function confirmAccept(gigId: string, title: string, fulfillmentType?: string): void {
+    setInlineError(null);
+    if (fulfillmentType === "DELIVERY") {
+      setAcceptingId(gigId);
+      acceptMutation.mutate(gigId);
+      return;
+    }
     showConfirm("Accept this delivery?", `Accept "${title}"?`, () => {
       setAcceptingId(gigId);
       acceptMutation.mutate(gigId);
@@ -150,6 +163,8 @@ export function WorkerNearbyGigsScreen() {
           subtitle="New deliveries stay visible even while you have an active job."
         />
 
+        {inlineError ? <DutsInlineBanner title="We couldn't continue" body={inlineError} /> : null}
+
         <SegmentedTabs
           tabs={[
             { value: "available" as const, label: "Available" },
@@ -174,7 +189,8 @@ export function WorkerNearbyGigsScreen() {
                   onAccept={() =>
                     confirmAccept(
                       gig.id,
-                      gig.fulfillmentType === "DELIVERY" ? "this delivery" : gig.title
+                      gig.fulfillmentType === "DELIVERY" ? "this delivery" : gig.title,
+                      gig.fulfillmentType
                     )
                   }
                   acceptDisabled={acceptMutation.isPending && acceptingId === gig.id}

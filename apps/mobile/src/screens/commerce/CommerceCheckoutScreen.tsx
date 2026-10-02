@@ -103,7 +103,13 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
   return (
     <View className="flex-1 bg-background">
       <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 24, paddingTop: 12 }}>
-        <Text className="text-2xl font-black text-ink">Review order</Text>
+        <Text className="text-2xl font-black text-ink">YOUR DUTS ORDER</Text>
+        {quote ? (
+          <Text className="mt-1 text-sm font-semibold text-muted">
+            {quote.lines.reduce((n, l) => n + l.quantity, 0)} items
+            {(quote.shopCount ?? 1) > 1 ? ` • ${quote.shopCount} shops` : ""}
+          </Text>
+        ) : null}
         {prepQuery.isFetching && !quote ? (
           <Text className="mt-4 text-base text-muted">Getting your order ready…</Text>
         ) : null}
@@ -154,9 +160,6 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
               <Text className="text-sm text-muted">Service        {moneyLabel(quote.serviceFeeCents)}</Text>
             ) : null}
             <Text className="mt-2 text-lg font-black text-ink">Total          {moneyLabel(quote.totalCents)}</Text>
-            {(quote.shopCount ?? 1) > 1 ? (
-              <Text className="mt-2 text-sm text-muted">DUTS will collect from more than one shop.</Text>
-            ) : null}
           </View>
         ) : null}
 

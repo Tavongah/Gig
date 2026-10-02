@@ -9,7 +9,7 @@ import {
   PricingType,
   UserRole
 } from "@prisma/client";
-import { calculatePriceEstimate, estimateResponseMinutes, haversineMiles, isWithinMatchingRadius, getGigMatchingRadiusMiles, workerCancelOutcome, billableSecondsFromWorkWindow, calculateTimeBasedAuthorization, isTimeBasedPricing, resolveHourlyRateCents, DEFAULT_HOURLY_RATE_CENTS, roundBillableMinutes, calculateApplicableTaxCents } from "@gigflow/shared";
+import { calculatePriceEstimate, estimateResponseMinutes, haversineMiles, isWithinMatchingRadius, getGigMatchingRadiusMiles, workerCancelOutcome, billableSecondsFromWorkWindow, calculateTimeBasedAuthorization, isTimeBasedPricing, resolveHourlyRateCents, DEFAULT_HOURLY_RATE_CENTS, roundBillableMinutes, calculateApplicableTaxCents, evaluateCourierArrival, courierArrivalErrorCode } from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { logDutsFlow } from "../../lib/flow-log.js";
@@ -422,12 +422,20 @@ export async function selectWorkerForGig(gigId: string, clientId: string, worker
 
   if (io) {
     const isDelivery = gig.fulfillmentType === "DELIVERY";
+    const { isCommerceLinkedGig } = await import("../commerce/commerce-gig.js");
+    const commerceDelivery = isDelivery && (await isCommerceLinkedGig(gigId));
     notifyUser(io, workerId, {
       type: "WORKER_SELECTED",
-      title: isDelivery ? "Customer selected you for this delivery" : "You have been selected for this gig.",
-      body: isDelivery
-        ? "Complete payment confirmation to unlock pickup details."
-        : `The customer selected you for "${gig.title}". Complete payment to start.`,
+      title: commerceDelivery
+        ? "Delivery accepted"
+        : isDelivery
+          ? "Delivery assigned"
+          : "You have been selected for this gig.",
+      body: commerceDelivery
+        ? "Head to the shop when you're ready."
+        : isDelivery
+          ? "Open the delivery to continue."
+          : `The customer selected you for "${gig.title}". Complete payment to start.`,
       gigId
     });
     io.to(`user:${workerId}`).emit("worker_selected", {
@@ -804,9 +812,36 @@ export async function assertWorkerNearGig(
   gigId: string,
   workerLat: number,
   workerLng: number,
-  action: "arrive" | "start"
+  action: "arrive" | "start",
+  accuracyMeters?: number | null,
+  confirmNearby?: boolean
 ): Promise<void> {
   const gig = await prisma.gig.findUniqueOrThrow({ where: { id: gigId } });
+  if (gig.fulfillmentType === "DELIVERY") {
+    const decision = evaluateCourierArrival({
+      courierLat: workerLat,
+      courierLng: workerLng,
+      targetLat: Number(gig.latitude),
+      targetLng: Number(gig.longitude),
+      accuracyMeters,
+      confirmNearby
+    });
+    if (decision.ok) return;
+    const code = courierArrivalErrorCode(decision.reason);
+    const tooFar = code === "GPS_TOO_FAR";
+    throw new AppError(
+      tooFar
+        ? "You're still too far from the pickup location."
+        : "We couldn't confirm your location.",
+      400,
+      code,
+      {
+        location: tooFar
+          ? "Move closer and try again."
+          : "Make sure location is enabled and try again."
+      }
+    );
+  }
   if (
     !isNearGigLocation(workerLat, workerLng, Number(gig.latitude), Number(gig.longitude), GPS_ARRIVAL_RADIUS_MILES)
   ) {

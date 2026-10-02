@@ -122,13 +122,13 @@ export function commerceShopUiStatusLabel(
 ): string {
   if (deliveryGigStatus) {
     const d = deliveryGigStatus.toUpperCase();
-    if (d.includes("ARRIVED") || d === "WORKER_ARRIVED") return "Courier arrived";
-    if (d === "IN_TRANSIT" || d === "OUT_FOR_DELIVERY" || d.includes("EN_ROUTE_DROP")) return "On the way";
-    if (d.includes("PICKED") || d === "PACKAGE_PICKED_UP") return "Order picked up";
-    if (d.includes("EN_ROUTE_PICKUP") || d.includes("GOING_TO_SHOP")) return "Courier going to shop";
-    if (d === "ASSIGNED" || d === "WORKER_ASSIGNED" || d === "ACCEPTED") return "Courier assigned";
-    if (d === "SEARCHING_FOR_WORKER" || d === "POSTED" || d.includes("SEARCHING")) return "Finding courier";
     if (d === "COMPLETED" || d === "DELIVERED") return "Delivered";
+    if (d === "EN_ROUTE_TO_DROPOFF" || d === "ARRIVED_AT_DROPOFF" || d === "PACKAGE_COLLECTED") return "On the way";
+    if (d === "WORKER_EN_ROUTE" || d === "WORKER_ARRIVED" || d.includes("EN_ROUTE_PICKUP") || d.includes("GOING_TO_SHOP")) {
+      return "Courier picking up your order";
+    }
+    if (d === "WORKER_ASSIGNED" || d === "ACCEPTED") return "Courier assigned";
+    if (d === "SEARCHING_FOR_WORKER" || d === "POSTED") return "Finding courier";
   }
 
   switch (status) {
@@ -138,7 +138,7 @@ export function commerceShopUiStatusLabel(
     case "MERCHANT_PENDING":
       return "Order confirmed";
     case "MERCHANT_ACCEPTED":
-      return "Shop preparing order";
+      return "Preparing your order";
     case "READY_FOR_PICKUP":
       return "Finding courier";
     case "COURIER_ASSIGNED":

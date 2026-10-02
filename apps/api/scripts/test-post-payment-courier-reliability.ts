@@ -138,9 +138,9 @@ pass("S");
 
 // T–X courier UI
 assert.match(jobScreen, /Items confirmed — continue/);
-assert.match(jobScreen, /SHOP HAS NOT|commercePickup\?\.warning|Do not collect payment/);
-assert.match(jobScreen, /Do not collect payment/);
-assert.match(jobScreen, /Cash on delivery/);
+assert.match(jobScreen, /SHOP HAS NOT|commercePickup\?\.warning|Do not collect cash/);
+assert.match(jobScreen, /Do not collect cash/);
+assert.match(jobScreen, /Collect /);
 assert.doesNotMatch(nearbyCard.slice(nearbyCard.indexOf("DUTS DELIVERY"), nearbyCard.indexOf("Local help")), /Earnings/);
 assert.match(nearbyCard, /Accept delivery|DUTS DELIVERY/);
 pass("T");

@@ -23,11 +23,11 @@ import {
 import { formatCents } from "../../lib/format";
 import { getCurrentCoordinates, friendlyLocationError } from "../../lib/location";
 import { openExternalNavigation } from "../../lib/open-maps";
-import { showAlert, showConfirm } from "../../lib/confirm";
 import { gigNeedsPayment } from "../../lib/gig-payment";
 import { useStripeCheckout } from "../../hooks/useStripeCheckout";
 import { ClientCancelBookingButton } from "../../components/ClientCancelBookingButton";
 import { DutsCard } from "../../components/DutsCard";
+import { DutsInlineBanner } from "../../components/DutsInlineBanner";
 import { LoadingButton } from "../../components/LoadingButton";
 import { StatusBadge } from "../../components/StatusBadge";
 import { DUTS } from "../../lib/theme";
@@ -36,6 +36,7 @@ import type { RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 import { isSearching } from "../../lib/gig-status";
 import { openSupportCall, openSupportSms, SUPPORT_EMAIL } from "../../lib/support";
+import { shouldSilenceWorkerNotification } from "../../lib/commerce-notifications";
 
 export function DeliveryJobScreen() {
   const session = useSessionStore((state) => state.session)!;
@@ -53,6 +54,12 @@ export function DeliveryJobScreen() {
   const [problemReason, setProblemReason] = useState<
     "SHOP_CLOSED" | "SHOP_CANNOT_FULFILL" | "ITEM_UNAVAILABLE" | "CANNOT_FIND_SHOP" | "CUSTOMER_UNREACHABLE" | "OTHER"
   >("SHOP_CLOSED");
+  const [inlineError, setInlineError] = useState<{
+    title: string;
+    body: string;
+    kind: "generic" | "location" | "too_far" | "uncertain";
+  } | null>(null);
+  const [inlineNotice, setInlineNotice] = useState<string | null>(null);
 
   const gigQuery = useQuery({
     queryKey: ["gig", route.params.gigId],
@@ -92,7 +99,11 @@ export function DeliveryJobScreen() {
         "gig:status": invalidate,
         notification: (payload: { title: string; body: string; type?: string }) => {
           if (payload.type === "NEW_MESSAGE") return;
-          showAlert(payload.title, payload.body);
+          if (shouldSilenceWorkerNotification(payload)) {
+            invalidate();
+            return;
+          }
+          invalidate();
         }
       }),
       [invalidate]
@@ -102,10 +113,12 @@ export function DeliveryJobScreen() {
   const acceptMutation = useMutation({
     mutationFn: () => api.acceptGig(route.params.gigId, session.token),
     onSuccess: () => {
+      setInlineError(null);
+      setInlineNotice("Delivery accepted");
       invalidate();
-      showAlert("Interest sent", "Waiting for the customer to select you.");
     },
-    onError: (error: Error) => showAlert("Could not accept", friendlyDeliveryError(error))
+    onError: (error: Error) =>
+      setInlineError({ title: "We couldn't continue", body: friendlyDeliveryError(error), kind: "generic" })
   });
 
   const actionMutation = useMutation({
@@ -141,16 +154,52 @@ export function DeliveryJobScreen() {
     onSuccess: () => {
       setPin("");
       setPinLocked(false);
+      setInlineError(null);
       invalidate();
     },
-    onError: (error: Error & { code?: string }) => {
+    onError: async (error: Error & { code?: string }) => {
       if (error.code === "PICKUP_PIN_LOCKED" || error.code === "DELIVERY_PIN_LOCKED") {
         setPinLocked(true);
       }
-      const locationMsg = /location|gps|permission|geolocation/i.test(error.message)
-        ? friendlyLocationError(error)
-        : friendlyDeliveryError(error);
-      showAlert("Couldn't continue", locationMsg);
+      if (
+        error.code === "INVALID_STATUS_TRANSITION" ||
+        /INVALID_STATUS_TRANSITION/i.test(error.message)
+      ) {
+        setInlineError(null);
+        await invalidate();
+        return;
+      }
+      const code = error.code ?? "";
+      const locationFail = /location|gps|permission|geolocation/i.test(error.message) || code.startsWith("GPS_");
+      if (code === "GPS_TOO_FAR") {
+        setInlineError({
+          title: "You're still too far from the pickup location.",
+          body: "Move closer and try again.",
+          kind: "too_far"
+        });
+        return;
+      }
+      if (code === "GPS_ARRIVAL_UNCERTAIN") {
+        setInlineError({
+          title: "We couldn't confirm your location.",
+          body: "If you are at the shop, you can confirm you're there.",
+          kind: "uncertain"
+        });
+        return;
+      }
+      if (locationFail) {
+        setInlineError({
+          title: "We couldn't confirm your location.",
+          body: friendlyLocationError(error),
+          kind: "location"
+        });
+        return;
+      }
+      setInlineError({
+        title: "We couldn't continue",
+        body: friendlyDeliveryError(error),
+        kind: "generic"
+      });
     }
   });
 
@@ -167,7 +216,7 @@ export function DeliveryJobScreen() {
     },
     onSuccess: () => invalidate(),
     onError: (error: Error) => {
-      showAlert("Couldn't start directions", friendlyDeliveryError(error));
+      setInlineError({ title: "We couldn't continue", body: friendlyDeliveryError(error), kind: "generic" });
     }
   });
 
@@ -181,7 +230,8 @@ export function DeliveryJobScreen() {
         replay: false
       });
     },
-    onError: (error: Error) => showAlert("Couldn't regenerate codes", friendlyDeliveryError(error))
+    onError: (error: Error) =>
+      setInlineError({ title: "We couldn't continue", body: friendlyDeliveryError(error), kind: "generic" })
   });
 
   const assistedPickupMutation = useMutation({
@@ -190,10 +240,11 @@ export function DeliveryJobScreen() {
     onSuccess: (_data, outcome) => {
       invalidate();
       if (outcome === "PROBLEM") {
-        showAlert("Problem reported", "DUTS is checking this order. Do not collect it.");
+        setInlineNotice("DUTS is checking this order. Do not collect it.");
       }
     },
-    onError: (error: Error) => showAlert("Couldn't update pickup", friendlyDeliveryError(error))
+    onError: (error: Error) =>
+      setInlineError({ title: "We couldn't continue", body: friendlyDeliveryError(error), kind: "generic" })
   });
 
   const releaseMutation = useMutation({
@@ -203,14 +254,18 @@ export function DeliveryJobScreen() {
       setReleasePanel("none");
       invalidate();
       if (result.needsAttention) {
-        showAlert("DUTS will help", "You already collected this order. DUTS needs to help complete the delivery.");
+        setInlineNotice("You already collected this order. DUTS needs to help complete the delivery.");
         return;
       }
-      showAlert("Delivery released", "DUTS will find another courier. The customer order stays confirmed.");
+      setInlineNotice("DUTS will find another courier. The customer order stays confirmed.");
       navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
     },
     onError: (error: Error) => {
-      showAlert("We couldn't update this delivery.", friendlyDeliveryError(error) || "Please try again.");
+      setInlineError({
+        title: "We couldn't update this delivery.",
+        body: friendlyDeliveryError(error) || "Please try again.",
+        kind: "generic"
+      });
     }
   });
 
@@ -220,14 +275,15 @@ export function DeliveryJobScreen() {
     onSuccess: () => {
       setProblemPanel(false);
       invalidate();
-      showAlert("Problem reported", "DUTS is checking this delivery.");
+      setInlineNotice("DUTS is checking this delivery.");
     },
-    onError: (error: Error) => showAlert("Couldn't report problem", friendlyDeliveryError(error))
+    onError: (error: Error) =>
+      setInlineError({ title: "We couldn't continue", body: friendlyDeliveryError(error), kind: "generic" })
   });
 
   function openMaps(lat?: string | number | null, lng?: string | number | null, label?: string): void {
     void openExternalNavigation(lat, lng, label).catch(() => {
-      showAlert("Couldn't open maps", "Please try again.");
+      setInlineError({ title: "We couldn't continue", body: "Couldn't open maps. Please try again.", kind: "generic" });
     });
   }
 
@@ -237,7 +293,7 @@ export function DeliveryJobScreen() {
       try {
         await ensureTravelMutation.mutateAsync("pickup");
       } catch {
-        /* alerted in onError */
+        /* inline error in onError */
       }
     }
     const label = gig.locationSummary || `${gig.city}, ${gig.region}`;
@@ -250,13 +306,48 @@ export function DeliveryJobScreen() {
       try {
         await ensureTravelMutation.mutateAsync("dropoff");
       } catch {
-        /* alerted in onError */
+        /* inline error in onError */
       }
     }
     const label =
       gig.dropoffFormattedAddress ||
       (gig.dropoffCity ? `${gig.dropoffCity}${gig.dropoffRegion ? `, ${gig.dropoffRegion}` : ""}` : "Drop-off");
     openMaps(gig.dropoffLatitude, gig.dropoffLongitude, label);
+  }
+
+  async function confirmNearbyArrival(): Promise<void> {
+    if (!gig || !action) return;
+    setInlineError(null);
+    try {
+      const location = await getCurrentCoordinates();
+      if (action.kind === "arrive_pickup") {
+        if (action.ensurePickupTravel || gig.status === "WORKER_ASSIGNED") {
+          await api.startTravelToPickup(route.params.gigId, session.token);
+        }
+        await api.arriveAtPickup(route.params.gigId, session.token, { ...location, confirmNearby: true });
+      } else if (action.kind === "arrive_dropoff") {
+        if (action.ensureDropoffTravel || gig.status === "PACKAGE_COLLECTED") {
+          await api.startTravelToDropoff(route.params.gigId, session.token);
+        }
+        await api.arriveAtDropoff(route.params.gigId, session.token, { ...location, confirmNearby: true });
+      }
+      invalidate();
+    } catch (error) {
+      const code = (error as Error & { code?: string }).code ?? "";
+      if (code === "GPS_TOO_FAR") {
+        setInlineError({
+          title: "You're still too far from the pickup location.",
+          body: "Move closer and try again.",
+          kind: "too_far"
+        });
+        return;
+      }
+      setInlineError({
+        title: "We couldn't confirm your location.",
+        body: friendlyLocationError(error),
+        kind: "location"
+      });
+    }
   }
 
   if (!gig) {
@@ -314,6 +405,44 @@ export function DeliveryJobScreen() {
         <StatusBadge status={gig.status} fulfillmentType="DELIVERY" />
       </View>
 
+      {inlineError ? (
+        <DutsInlineBanner
+          title={inlineError.title}
+          body={inlineError.body}
+          tone="error"
+          actions={[
+            {
+              label: "Try again",
+              onPress: () => {
+                setInlineError(null);
+                if (action) actionMutation.mutate();
+              },
+              variant: "primary",
+              loading: actionMutation.isPending
+            },
+            ...(inlineError.kind === "uncertain"
+              ? [
+                  {
+                    label: isDropoffPhase(gig.status) ? "I'm at the customer" : "I'm at the shop",
+                    onPress: () => void confirmNearbyArrival()
+                  }
+                ]
+              : []),
+            ...(inlineError.kind === "location" || inlineError.kind === "uncertain" || inlineError.kind === "too_far"
+              ? [
+                  {
+                    label: "Get directions",
+                    onPress: () =>
+                      void (isDropoffPhase(gig.status) ? openDropoffDirections() : openPickupDirections())
+                  }
+                ]
+              : [])
+          ]}
+        />
+      ) : null}
+
+      {inlineNotice ? <DutsInlineBanner title={inlineNotice} tone="success" /> : null}
+
       <DutsCard className="gap-3 p-5">
         <Row label="Pickup" value={pickupArea} />
         <Row label="Drop-off" value={dropoffArea} />
@@ -325,9 +454,11 @@ export function DeliveryJobScreen() {
           <>
             <Row label="Payment" value={commercePickup.paymentLabel} />
             {commercePickup.paid ? (
-              <Text className="text-sm font-semibold text-ink">Do not collect payment.</Text>
+              <Text className="text-sm font-semibold text-ink">Do not collect cash.</Text>
             ) : (
-              <Text className="text-sm font-semibold text-ink">Cash on delivery — collect the amount shown.</Text>
+              <Text className="text-sm font-semibold text-ink">
+                Collect {formatCents(commercePickup.collectCents ?? gig.totalCents)}
+              </Text>
             )}
           </>
         ) : null}
@@ -359,7 +490,7 @@ export function DeliveryJobScreen() {
         </DutsCard>
       ) : null}
 
-      {activeRole === "CLIENT" && isSearching(gig.status) ? (
+      {activeRole === "CLIENT" && isSearching(gig.status) && !commercePickup ? (
         <DutsCard className="gap-3 border border-dashed border-slate-200 p-5">
           <Text className="text-center font-semibold text-ink">Finding a courier near your pickup…</Text>
           <Text className="text-center text-sm text-muted">Keep your pickup and delivery codes ready.</Text>
@@ -388,12 +519,14 @@ export function DeliveryJobScreen() {
                 <Text className="text-base font-black text-ink">{commercePickup.currentLabel}</Text>
               ) : null}
               {commercePickup?.stops?.length ? (
-                commercePickup.stops.map((s) => (
-                  <Text key={`${s.sequence}-${s.shopName}`} className="text-sm text-ink">
-                    {s.status === "COLLECTED" ? "✓" : s.current ? "→" : "•"} Pickup {s.sequence + 1} of{" "}
-                    {commercePickup.pickupCount} · {s.shopName}
-                  </Text>
-                ))
+                <>
+                  {commercePickup.stops.map((s) => (
+                    <Text key={`${s.sequence}-${s.shopName}`} className="text-sm text-ink">
+                      {s.status === "COLLECTED" ? "✓" : s.current ? "→" : "○"} {s.shopName}
+                    </Text>
+                  ))}
+                  <Text className="text-sm text-ink">○ Customer</Text>
+                </>
               ) : (
                 <Text className="text-xl font-black text-ink">{pickupArea}</Text>
               )}
@@ -418,6 +551,16 @@ export function DeliveryJobScreen() {
           {isDropoffPhase(gig.status) ? (
             <>
               <Text className="text-xs font-bold uppercase text-brand">Drop-off</Text>
+              {commercePickup?.stops?.length ? (
+                <>
+                  {commercePickup.stops.map((s) => (
+                    <Text key={`done-${s.sequence}-${s.shopName}`} className="text-sm text-ink">
+                      ✓ {s.shopName}
+                    </Text>
+                  ))}
+                  <Text className="text-base font-black text-ink">→ Customer</Text>
+                </>
+              ) : null}
               <Text className="text-xl font-black text-ink">{dropoffArea}</Text>
               {gig.dropoffContactName ? <Row label="Customer" value={gig.dropoffContactName} /> : null}
               {gig.dropoffInstructions ? <Row label="Notes" value={gig.dropoffInstructions} /> : null}
@@ -531,13 +674,10 @@ export function DeliveryJobScreen() {
 
         {activeRole === "WORKER" && isSearching(gig.status) ? (
           <LoadingButton
-            label="Accept"
-            onPress={() =>
-              showConfirm("Accept this delivery?", "You'll be assigned if selected.", () =>
-                acceptMutation.mutate()
-              )
-            }
+            label="Accept delivery"
+            onPress={() => acceptMutation.mutate()}
             loading={acceptMutation.isPending}
+            loadingLabel="Accepting…"
           />
         ) : null}
 
@@ -550,8 +690,11 @@ export function DeliveryJobScreen() {
           <LoadingButton
             label={action.label}
             loading={actionMutation.isPending}
-            loadingLabel={"requiresGps" in action && action.requiresGps ? "Getting location…" : "Updating…"}
-            onPress={() => actionMutation.mutate()}
+            loadingLabel={"requiresGps" in action && action.requiresGps ? "Confirming location…" : "Updating…"}
+            onPress={() => {
+              setInlineError(null);
+              actionMutation.mutate();
+            }}
           />
         ) : null}
 

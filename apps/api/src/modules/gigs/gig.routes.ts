@@ -171,7 +171,9 @@ export function createGigRouter(io: Server): Router {
 
   const deliveryLocationSchema = z.object({
     latitude: z.number().min(-90).max(90).optional(),
-    longitude: z.number().min(-180).max(180).optional()
+    longitude: z.number().min(-180).max(180).optional(),
+    accuracyMeters: z.number().min(0).max(50000).optional(),
+    confirmNearby: z.boolean().optional()
   });
 
   router.post(
@@ -254,7 +256,12 @@ export function createGigRouter(io: Server): Router {
     validateBody(deliveryLocationSchema),
     async (req, res, next) => {
       try {
-        const { latitude, longitude } = req.body as { latitude?: number; longitude?: number };
+        const { latitude, longitude, accuracyMeters, confirmNearby } = req.body as {
+          latitude?: number;
+          longitude?: number;
+          accuracyMeters?: number;
+          confirmNearby?: boolean;
+        };
         if (latitude == null || longitude == null) {
           res.status(400).json({ error: "GPS_REQUIRED", code: "GPS_REQUIRED" });
           return;
@@ -262,7 +269,7 @@ export function createGigRouter(io: Server): Router {
         const gig = await arriveAtPickup(
           String(req.params.gigId),
           req.auth!.userId,
-          { latitude, longitude },
+          { latitude, longitude, accuracyMeters, confirmNearby },
           io
         );
         res.json({ success: true, gig });
@@ -398,7 +405,12 @@ export function createGigRouter(io: Server): Router {
     validateBody(deliveryLocationSchema),
     async (req, res, next) => {
       try {
-        const { latitude, longitude } = req.body as { latitude?: number; longitude?: number };
+        const { latitude, longitude, accuracyMeters, confirmNearby } = req.body as {
+          latitude?: number;
+          longitude?: number;
+          accuracyMeters?: number;
+          confirmNearby?: boolean;
+        };
         if (latitude == null || longitude == null) {
           res.status(400).json({ error: "GPS_REQUIRED", code: "GPS_REQUIRED" });
           return;
@@ -406,7 +418,7 @@ export function createGigRouter(io: Server): Router {
         const gig = await arriveAtDropoff(
           String(req.params.gigId),
           req.auth!.userId,
-          { latitude, longitude },
+          { latitude, longitude, accuracyMeters, confirmNearby },
           io
         );
         res.json({ success: true, gig });

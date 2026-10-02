@@ -9,6 +9,7 @@ import type { WorkerAvailabilityInput, WorkerPreferencesInput } from "@gigflow/s
 import { AccountStatus, AvailabilityStatus, GigStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { getWorkerConnectStatus } from "../payments/payment.service.js";
+import { commerceLinkedGigIdSet } from "../commerce/commerce-gig.js";
 import { resolveGeocodedLocation, reverseGeocodeCoordinates } from "../location/geocoding.service.js";
 import { assertWorkerCanGoOnline } from "../auth/access.service.js";
 
@@ -209,8 +210,12 @@ export async function getWorkerEarnings(userId: string) {
 
   const completed = assignments.filter((assignment) => assignment.gig.status === GigStatus.COMPLETED);
   const pending = assignments.filter((assignment) => IN_PROGRESS_GIG_STATUSES.includes(assignment.gig.status));
+  const commerceGigIds = await commerceLinkedGigIdSet(pending.map((assignment) => assignment.gig.id));
 
-  const pendingEarningsCents = pending.reduce((sum, assignment) => sum + assignment.gig.workerPayoutCents, 0);
+  const pendingEarningsCents = pending.reduce((sum, assignment) => {
+    if (commerceGigIds.has(assignment.gig.id)) return sum;
+    return sum + assignment.gig.workerPayoutCents;
+  }, 0);
   const platformFeesCents = completed.reduce((sum, assignment) => sum + assignment.gig.platformFeeCents, 0);
 
   const availableBalanceCents = profile?.availableBalanceCents ?? 0;

@@ -369,6 +369,9 @@ export function configureRealtime(io: Server): void {
 export async function broadcastGigOffer(io: Server, payload: GigOfferPayload): Promise<void> {
   const gigRadiusMiles = getGigMatchingRadiusMiles(payload.urgency as GigUrgency, payload.size);
   const locationSummary = `${payload.city}, ${payload.region}`;
+  const { isCommerceLinkedGig } = await import("../commerce/commerce-gig.js");
+  const commerceDelivery =
+    payload.fulfillmentType === "DELIVERY" && (await isCommerceLinkedGig(payload.gigId));
 
   const workers = await prisma.workerProfile.findMany({
     where: {
@@ -409,8 +412,11 @@ export async function broadcastGigOffer(io: Server, payload: GigOfferPayload): P
     const roundedDistance = Math.round(distanceMiles * 10) / 10;
     const isDelivery = payload.fulfillmentType === "DELIVERY";
     const distanceKm = (roundedDistance * 1.60934).toFixed(1);
+    const hideCommerceEarnings = commerceDelivery || (isDelivery && payload.workerPayoutCents <= 0);
     const notificationBody = isDelivery
-      ? `You earn $${(payload.workerPayoutCents / 100).toFixed(2)} · ${distanceKm} km to pickup · ${locationSummary}`
+      ? hideCommerceEarnings
+        ? `New delivery · ${distanceKm} km to pickup · ${locationSummary}`
+        : `You earn $${(payload.workerPayoutCents / 100).toFixed(2)} · ${distanceKm} km to pickup · ${locationSummary}`
       : `$${(payload.workerPayoutCents / 100).toFixed(0)} • ${roundedDistance} miles away • ${locationSummary}`;
     const offer = {
       gigId: payload.gigId,

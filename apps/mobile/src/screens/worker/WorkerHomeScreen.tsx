@@ -8,6 +8,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../../lib/api";
 import { formatCents } from "../../lib/format";
 import { showAlert, showConfirm } from "../../lib/confirm";
+import { shouldSilenceWorkerNotification } from "../../lib/commerce-notifications";
 import { TabScreen } from "../../components/TabScreen";
 import { DutsCard } from "../../components/DutsCard";
 import { AppButton } from "../../components/AppButton";
@@ -15,6 +16,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { AcceptGigAnimation } from "../../components/AcceptGigAnimation";
 import { NearbyGigCard } from "../../components/NearbyGigCard";
 import { BrandLogo } from "../../components/BrandLogo";
+import { DutsInlineBanner } from "../../components/DutsInlineBanner";
 import { openGigForRole } from "../../lib/open-gig";
 import { useWorkerOnline } from "../../hooks/useWorkerOnline";
 import { useSocketEvents } from "../../hooks/useSocket";
@@ -40,6 +42,7 @@ export function WorkerHomeScreen() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [showAcceptAnimation, setShowAcceptAnimation] = useState(false);
   const [acceptedGigId, setAcceptedGigId] = useState<string | null>(null);
+  const [inlineError, setInlineError] = useState<string | null>(null);
 
   const invalidateEarnings = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["worker-earnings"] });
@@ -74,7 +77,11 @@ export function WorkerHomeScreen() {
           void queryClient.invalidateQueries({ queryKey: ["worker-matching-list"] });
           void queryClient.invalidateQueries({ queryKey: ["my-gigs"] });
         },
-        notification: (payload: { title: string; body: string }) => {
+        notification: (payload: { title: string; body: string; type?: string }) => {
+          if (shouldSilenceWorkerNotification(payload)) {
+            if (isOnline) void nearbyQuery.refetch();
+            return;
+          }
           if (isOnline) {
             showAlert(payload.title, payload.body);
           }
@@ -93,7 +100,7 @@ export function WorkerHomeScreen() {
       setAcceptedGigId(gigId);
       setShowAcceptAnimation(true);
     },
-    onError: (error: Error) => showAlert("Could not accept", error.message),
+    onError: (error: Error) => setInlineError(error.message),
     onSettled: () => setAcceptingId(null)
   });
 
@@ -108,7 +115,13 @@ export function WorkerHomeScreen() {
     { label: "Profile photo (optional)", done: Boolean(profile?.avatarUrl) }
   ];
 
-  function confirmAccept(gigId: string, title: string): void {
+  function confirmAccept(gigId: string, title: string, fulfillmentType?: string): void {
+    setInlineError(null);
+    if (fulfillmentType === "DELIVERY") {
+      setAcceptingId(gigId);
+      acceptMutation.mutate(gigId);
+      return;
+    }
     showConfirm("Accept this offer?", `Accept "${title}"?`, () => {
       setAcceptingId(gigId);
       acceptMutation.mutate(gigId);
@@ -223,6 +236,8 @@ export function WorkerHomeScreen() {
           </View>
         </DutsCard>
 
+        {inlineError ? <DutsInlineBanner title="We couldn't continue" body={inlineError} /> : null}
+
         {isOnline ? (
           <View className="gap-3">
             <View className="flex-row items-center justify-between px-1">
@@ -249,7 +264,8 @@ export function WorkerHomeScreen() {
                   onAccept={() =>
                     confirmAccept(
                       gig.id,
-                      gig.fulfillmentType === "DELIVERY" ? "this delivery" : gig.title
+                      gig.fulfillmentType === "DELIVERY" ? "this delivery" : gig.title,
+                      gig.fulfillmentType
                     )
                   }
                   onDecline={() => declineOffer(gig.id)}

@@ -22,7 +22,7 @@ function run(): void {
   assert.ok(!deliveryCustomerStatusLabel("WORKER_EN_ROUTE").includes("WORKER_EN_ROUTE"));
 
   assert.equal(nextCourierDeliveryAction("WORKER_ASSIGNED")?.kind, "arrive_pickup");
-  assert.equal(nextCourierDeliveryAction("WORKER_ASSIGNED")?.label, "Arrived");
+  assert.equal(nextCourierDeliveryAction("WORKER_ASSIGNED")?.label, "Arrived at shop");
   assert.equal(
     (nextCourierDeliveryAction("WORKER_ASSIGNED") as { ensurePickupTravel?: boolean })?.ensurePickupTravel,
     true

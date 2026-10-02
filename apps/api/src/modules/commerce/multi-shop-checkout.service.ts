@@ -522,9 +522,9 @@ function customerMultiShopStatusLabel(
 ): string {
   if (status === "DELIVERED" || gigStatus === "COMPLETED") return "Delivered";
   if (gigStatus === "EN_ROUTE_TO_DROPOFF" || gigStatus === "ARRIVED_AT_DROPOFF" || gigStatus === "PACKAGE_COLLECTED") {
-    return "On the way to you";
+    return "On the way";
   }
-  if (hasCourier && pickups.some((p) => !p.collected)) return "Picking up your order";
+  if (hasCourier && pickups.some((p) => !p.collected)) return "Courier picking up your order";
   if (hasCourier) return "Courier assigned";
   if (status === "PAYMENT_PENDING") return "Waiting for payment";
   return "Order confirmed";

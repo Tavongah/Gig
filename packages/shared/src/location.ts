@@ -41,6 +41,17 @@ export function haversineMiles(
   return earthRadiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+const METERS_PER_MILE = 1609.344;
+
+export function haversineMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  return haversineMiles(lat1, lon1, lat2, lon2) * METERS_PER_MILE;
+}
+
 export function estimateResponseMinutes(distanceMiles: number): number {
   return Math.max(5, Math.round(distanceMiles * 4 + 8));
 }

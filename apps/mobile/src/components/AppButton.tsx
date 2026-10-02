@@ -50,7 +50,12 @@ export function AppButton({
       >
         <DutsGradient style={{ borderRadius: radius, minHeight: 48, justifyContent: "center" }} className={padding}>
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <>
+              <ActivityIndicator color="#FFFFFF" />
+              {label ? (
+                <Text className={`mt-2 text-center font-black text-white ${textSize}`}>{label}</Text>
+              ) : null}
+            </>
           ) : (
             <Text className={`text-center font-black text-white ${textSize}`}>{label}</Text>
           )}

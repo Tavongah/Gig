@@ -643,7 +643,7 @@ export async function updateGigStatus(
   userId: string,
   nextStatus: GigStatus,
   io?: Server,
-  location?: { latitude: number; longitude: number },
+  location?: { latitude: number; longitude: number; accuracyMeters?: number | null; confirmNearby?: boolean },
   options?: { cancellationReason?: string | null }
 ) {
 
@@ -697,7 +697,7 @@ export async function updateGigStatus(
 
     if (expected !== nextStatus) {
 
-      throw new Error("INVALID_STATUS_TRANSITION");
+      throw new AppError("This step is not available for the current delivery state.", 409, "INVALID_STATUS_TRANSITION");
 
     }
 
@@ -709,7 +709,14 @@ export async function updateGigStatus(
       if (!location) {
         throw new AppError("GPS_REQUIRED", 400, "GPS_REQUIRED", { location: "Location is required for this action." });
       }
-      await assertWorkerNearGig(gigId, location.latitude, location.longitude, nextStatus === GigStatus.WORKER_ARRIVED ? "arrive" : "start");
+      await assertWorkerNearGig(
+        gigId,
+        location.latitude,
+        location.longitude,
+        nextStatus === GigStatus.WORKER_ARRIVED ? "arrive" : "start",
+        location.accuracyMeters,
+        location.confirmNearby
+      );
     }
 
   } else if (nextStatus === GigStatus.CANCELLED) {
@@ -738,7 +745,7 @@ export async function updateGigStatus(
 
   } else {
 
-    throw new Error("INVALID_STATUS_TRANSITION");
+    throw new AppError("This step is not available for the current delivery state.", 409, "INVALID_STATUS_TRANSITION");
 
   }
 
@@ -769,7 +776,19 @@ export async function updateGigStatus(
   if (assignment && nextStatus === GigStatus.WORKER_ARRIVED) {
     await prisma.gigAssignment.update({
       where: { id: assignment.id },
-      data: { arrivedAt: new Date() }
+      data: {
+        arrivedAt: new Date(),
+        startLatitude: location?.latitude,
+        startLongitude: location?.longitude
+      }
+    });
+    logDutsFlow("COURIER_ARRIVAL", {
+      gigId,
+      userId,
+      userRole: "WORKER",
+      fulfillmentType: gig.fulfillmentType,
+      stop: "pickup",
+      accuracyMeters: location?.accuracyMeters ?? null
     });
   }
 
@@ -1203,7 +1222,7 @@ function commerceCourierPayment(order: {
     paid,
     collectCash: !paid,
     collectCents: paid ? 0 : order.totalCents,
-    paymentLabel: paid ? "PAID ✓" : `COLLECT $${(order.totalCents / 100).toFixed(2)}`
+    paymentLabel: paid ? "PAID ✓" : "CASH ON DELIVERY"
   };
 }
 
@@ -1250,6 +1269,10 @@ async function attachCommercePickupContext<T extends { id: string; status?: stri
       });
     const pickupCount = stops.length;
     const pickupIndex = (stops.find((s) => s.current)?.sequence ?? 0) + 1;
+    const itemCount = checkout.orders.reduce(
+      (n, o) => n + o.items.reduce((m, i) => m + i.quantity, 0),
+      0
+    );
     return {
       ...gig,
       commercePickup: {
@@ -1261,7 +1284,7 @@ async function attachCommercePickupContext<T extends { id: string; status?: stri
         problemReported,
         pickupIndex,
         pickupCount,
-        headline: `${pickupCount} pickups · 1 delivery`,
+        headline: `${pickupCount} pickup${pickupCount === 1 ? "" : "s"} · ${itemCount} item${itemCount === 1 ? "" : "s"}`,
         currentLabel: `Pickup ${pickupIndex} of ${pickupCount}`,
         stops,
         warning: commerceCourierWarning(order),
@@ -1293,6 +1316,9 @@ async function attachCommercePickupContext<T extends { id: string; status?: stri
       confirmationRequired,
       itemsConfirmed: hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.PICKUP_CONFIRMED),
       problemReported,
+      pickupIndex: 1,
+      pickupCount: 1,
+      headline: `${order.items.reduce((n, i) => n + i.quantity, 0)} items`,
       warning: commerceCourierWarning(order),
       ...commerceCourierPayment(order)
     }

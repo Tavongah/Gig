@@ -47,6 +47,8 @@ import {
   isAssistedPickupConfirmationRequired,
   isPhase1TransportMode,
   packageCategoryLabels,
+  evaluateCourierArrival,
+  courierArrivalErrorCode,
   type CreateDeliveryInput
 } from "@gigflow/shared";
 import { createHash, timingSafeEqual } from "node:crypto";
@@ -269,6 +271,12 @@ export async function createDelivery(
   const pickupPinPlain = generateDeliveryPin(4);
   const deliveryPinPlain = generateDeliveryPin(4);
   const title = `Delivery · ${packageCategoryLabels[parsed.package.category]}`;
+  const commerceFulfillment = Boolean(
+    options?.marketplaceCommerceOrderId ||
+      (idempotencyKey && idempotencyKey.startsWith("commerce-"))
+  );
+  const workerPayoutCents = commerceFulfillment ? 0 : breakdown.workerPayoutCents;
+  const platformFeeCents = commerceFulfillment ? breakdown.totalCents : breakdown.platformFeeCents;
 
   const orderSource =
     parsed.orderSource === "WHATSAPP"
@@ -334,8 +342,8 @@ export async function createDelivery(
         idempotencyKey,
         taxCents: 0,
         totalCents: breakdown.totalCents,
-        platformFeeCents: breakdown.platformFeeCents,
-        workerPayoutCents: breakdown.workerPayoutCents,
+        platformFeeCents,
+        workerPayoutCents,
         authorizationBufferCents: 0,
         maximumAuthorizedAmountCents: breakdown.totalCents,
         priceBreakdown: {
@@ -352,8 +360,8 @@ export async function createDelivery(
         payment: {
           create: {
             amountCents: breakdown.totalCents,
-            platformFeeCents: breakdown.platformFeeCents,
-            workerPayoutCents: breakdown.workerPayoutCents,
+            platformFeeCents,
+            workerPayoutCents,
             maximumAuthorizedAmountCents: breakdown.totalCents,
             currency: "usd"
           }
@@ -535,6 +543,9 @@ type CourierCommerceOffer = {
 
 export async function startTravelToPickup(gigId: string, courierUserId: string, io?: Server) {
   const { gig } = await loadAssignedDelivery(gigId, courierUserId);
+  if (gig.status === GigStatus.WORKER_EN_ROUTE || gig.status === GigStatus.WORKER_ARRIVED) {
+    return stripPinsForCourierSafe(gig as unknown as Record<string, unknown>);
+  }
   if (gig.status !== GigStatus.WORKER_ASSIGNED) {
     throw new AppError("Invalid delivery status for start travel.", 409, "INVALID_STATUS_TRANSITION");
   }
@@ -542,13 +553,23 @@ export async function startTravelToPickup(gigId: string, courierUserId: string, 
   return updateGigStatus(gigId, courierUserId, GigStatus.WORKER_EN_ROUTE, io);
 }
 
+type CourierGpsLocation = {
+  latitude: number;
+  longitude: number;
+  accuracyMeters?: number | null;
+  confirmNearby?: boolean;
+};
+
 export async function arriveAtPickup(
   gigId: string,
   courierUserId: string,
-  location: { latitude: number; longitude: number },
+  location: CourierGpsLocation,
   io?: Server
 ) {
   const { gig } = await loadAssignedDelivery(gigId, courierUserId);
+  if (gig.status === GigStatus.WORKER_ARRIVED) {
+    return stripPinsForCourierSafe(gig as unknown as Record<string, unknown>);
+  }
   if (gig.status !== GigStatus.WORKER_EN_ROUTE) {
     throw new AppError("Invalid delivery status for arrive at pickup.", 409, "INVALID_STATUS_TRANSITION");
   }
@@ -811,6 +832,9 @@ export async function reportAssistedPickupProblem(gigId: string, courierUserId: 
 
 export async function startTravelToDropoff(gigId: string, courierUserId: string, io?: Server) {
   const { gig, assignment } = await loadAssignedDelivery(gigId, courierUserId);
+  if (gig.status === GigStatus.EN_ROUTE_TO_DROPOFF || gig.status === GigStatus.ARRIVED_AT_DROPOFF) {
+    return stripPinsForCourierSafe(gig as unknown as Record<string, unknown>);
+  }
   if (gig.status !== GigStatus.PACKAGE_COLLECTED) {
     throw new AppError("Start drop-off travel only after package collection.", 409, "INVALID_STATUS_TRANSITION");
   }
@@ -844,16 +868,19 @@ export async function startTravelToDropoff(gigId: string, courierUserId: string,
 }
 
 /**
- * Drop-off arrival requires GPS and records coordinates.
- * Proximity is soft (no hard geofence fail) to tolerate poor accuracy.
+ * Drop-off arrival uses the same GPS assistance model as pickup.
+ * PIN remains the completion proof — GPS only confirms sensible proximity.
  */
 export async function arriveAtDropoff(
   gigId: string,
   courierUserId: string,
-  location: { latitude: number; longitude: number },
+  location: CourierGpsLocation,
   io?: Server
 ) {
   const { gig, assignment } = await loadAssignedDelivery(gigId, courierUserId);
+  if (gig.status === GigStatus.ARRIVED_AT_DROPOFF) {
+    return stripPinsForCourierSafe(gig as unknown as Record<string, unknown>);
+  }
   if (gig.status !== GigStatus.EN_ROUTE_TO_DROPOFF) {
     throw new AppError("Arrive at drop-off only while en route to drop-off.", 409, "INVALID_STATUS_TRANSITION");
   }
@@ -861,6 +888,43 @@ export async function arriveAtDropoff(
     throw new AppError("GPS_REQUIRED", 400, "GPS_REQUIRED", {
       location: "Share your location when arriving at drop-off."
     });
+  }
+
+  const dropLat = gig.dropoffLatitude != null ? Number(gig.dropoffLatitude) : NaN;
+  const dropLng = gig.dropoffLongitude != null ? Number(gig.dropoffLongitude) : NaN;
+  if (Number.isFinite(dropLat) && Number.isFinite(dropLng)) {
+    const decision = evaluateCourierArrival({
+      courierLat: location.latitude,
+      courierLng: location.longitude,
+      targetLat: dropLat,
+      targetLng: dropLng,
+      accuracyMeters: location.accuracyMeters,
+      confirmNearby: location.confirmNearby
+    });
+    logDutsFlow("COURIER_ARRIVAL", {
+      gigId,
+      userId: courierUserId,
+      userRole: "WORKER",
+      fulfillmentType: "DELIVERY",
+      stop: "dropoff",
+      reason: decision.reason
+    });
+    if (!decision.ok) {
+      const code = courierArrivalErrorCode(decision.reason);
+      const tooFar = code === "GPS_TOO_FAR";
+      throw new AppError(
+        tooFar
+          ? "You're still too far from the delivery location."
+          : "We couldn't confirm your location.",
+        400,
+        code,
+        {
+          location: tooFar
+            ? "Move closer and try again."
+            : "Make sure location is enabled and try again."
+        }
+      );
+    }
   }
 
   const updated = await prisma.gig.update({

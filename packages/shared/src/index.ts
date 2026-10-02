@@ -97,7 +97,8 @@ export type WorkerPreferencesInput = z.infer<typeof workerPreferencesSchema>;
 import type { GigEstimateInput } from "./gig-validation.js";
 import {
   estimateResponseMinutes as locationEstimateResponseMinutes,
-  haversineMiles as locationHaversineMiles
+  haversineMiles as locationHaversineMiles,
+  haversineMeters as locationHaversineMeters
 } from "./location.js";
 import { resolveHourlyRateCents } from "./pricing-constants.js";
 
@@ -481,9 +482,14 @@ export function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: n
   return locationHaversineMiles(lat1, lon1, lat2, lon2);
 }
 
+export function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  return locationHaversineMeters(lat1, lon1, lat2, lon2);
+}
+
 export function estimateResponseMinutes(distanceMiles: number): number {
   return locationEstimateResponseMinutes(distanceMiles);
 }
 
 export * from "./delivery.js";
 export * from "./pilot-delivery-pricing.js";
+export * from "./courier-arrival.js";

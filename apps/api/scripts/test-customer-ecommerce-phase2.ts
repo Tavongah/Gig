@@ -22,13 +22,13 @@ const statuses: CommerceOrderStatus[] = [
 ];
 
 assert.equal(commerceShopUiStatusLabel("MERCHANT_PENDING"), "Order confirmed");
-assert.equal(commerceShopUiStatusLabel("MERCHANT_ACCEPTED"), "Shop preparing order");
+assert.equal(commerceShopUiStatusLabel("MERCHANT_ACCEPTED"), "Preparing your order");
 assert.equal(commerceShopUiStatusLabel("READY_FOR_PICKUP"), "Finding courier");
 assert.equal(commerceShopUiStatusLabel("COURIER_ASSIGNED"), "Courier assigned");
 assert.equal(commerceShopUiStatusLabel("PICKED_UP"), "Order picked up");
 assert.equal(commerceShopUiStatusLabel("OUT_FOR_DELIVERY"), "On the way");
 assert.equal(commerceShopUiStatusLabel("DELIVERED"), "Delivered");
-assert.equal(commerceShopUiStatusLabel("COURIER_ASSIGNED", "EN_ROUTE_PICKUP"), "Courier going to shop");
+assert.equal(commerceShopUiStatusLabel("COURIER_ASSIGNED", "EN_ROUTE_PICKUP"), "Courier picking up your order");
 
 for (const s of statuses) {
   const wa = commerceCustomerStatusCopy(s);

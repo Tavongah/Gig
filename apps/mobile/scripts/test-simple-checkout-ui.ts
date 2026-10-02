@@ -55,7 +55,7 @@ assert.ok(location.includes("USE MY CURRENT LOCATION"), "H GPS is a button, not 
 assert.ok(location.includes("onPress={() => void chooseGps()}"), "H GPS is a button, not automatic");
 assert.ok(location.includes("ENTER DELIVERY ADDRESS"), "I typed address available");
 assert.ok(location.includes("We couldn't use your current location"), "J GPS fail falls back to address");
-assert.ok(checkout.includes("Review order"), "K one review screen");
+assert.ok(checkout.includes("YOUR DUTS ORDER"), "K one review screen");
 assert.ok(checkout.includes("Deliver to"), "L delivery shown");
 assert.ok(checkout.includes("Change"), "L change location from review");
 assert.ok(checkout.includes("PLACE ORDER"), "M place order CTA");
@@ -75,11 +75,12 @@ assert.ok(service.includes("Your delivery already includes 3 shops."), "U three-
 assert.ok(service.includes("That's too many items for one order."), "V too many items");
 assert.ok(checkout.includes("Getting your order ready…"), "W loading copy");
 assert.ok(checkout.includes("if (!ready || placing) return"), "X no double-tap place");
-assert.ok(orderDetail.includes("Thank you"), "Y thank you");
-assert.ok(orderDetail.includes("Order confirmed"), "Y order confirmed");
+assert.ok(orderDetail.includes("YOUR DUTS ORDER"), "Y one customer order heading");
+assert.ok(orderDetail.includes("statusLabel"), "Y order status");
 assert.ok(orderDetail.includes("DUTS is arranging your delivery."), "Y arranging delivery");
 assert.ok(copy.includes("formatLocationAsk"), "Z WhatsApp location ask shared");
-assert.ok(copy.includes("Send your location or type your address."), "Z short location copy");
+assert.ok(copy.includes("Send your location"), "Z short location copy");
+assert.ok(copy.includes("or type your address."), "Z short location copy");
 assert.ok(wa.includes("formatLocationAsk()"), "Z WhatsApp uses short location ask");
 assert.ok(copy.includes("Your DUTS order"), "AA short order review heading");
 assert.ok(copy.includes("1. EcoCash USD"), "AB payment choice");

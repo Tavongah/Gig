@@ -4,6 +4,7 @@ import type { AddressSuggestion, GeoPointInput } from "@gigflow/shared";
 export interface Coordinates {
   latitude: number;
   longitude: number;
+  accuracyMeters?: number | null;
 }
 
 export class LocationAccessError extends Error {
@@ -19,8 +20,7 @@ export class LocationAccessError extends Error {
   }
 }
 
-/** Reject GPS fixes that are too coarse for arrival confirmation (meters). */
-const MAX_ACCEPTABLE_ACCURACY_M = 150;
+/** GPS accuracy is forwarded to the server; poor accuracy is not a client hard-fail. */
 
 /** Friendly copy for location failures (courier arrival + “use my location”). */
 export function friendlyLocationError(error: unknown): string {
@@ -33,9 +33,9 @@ export function friendlyLocationError(error: unknown): string {
       case "GPS_DISABLED":
         return "Turn on Location / GPS in your phone settings, then try again.";
       case "TIMEOUT":
-        return "We couldn’t get a GPS fix in time. Move outdoors or near a window, then try again.";
+        return "We couldn't confirm your location. Make sure location is enabled and try again.";
       case "POOR_ACCURACY":
-        return "GPS accuracy is too low right now. Move outdoors or near a window, wait a few seconds, then try again.";
+        return "We couldn't confirm your location. Make sure location is enabled and try again.";
       default:
         return error.message;
     }
@@ -63,7 +63,9 @@ export async function getCurrentCoordinates(): Promise<Coordinates> {
         (position) => {
           resolve({
             latitude: position.coords.latitude,
-            longitude: position.coords.longitude
+            longitude: position.coords.longitude,
+            accuracyMeters:
+              typeof position.coords.accuracy === "number" ? position.coords.accuracy : null
           });
         },
         (error) => {
@@ -112,15 +114,10 @@ export async function getCurrentCoordinates(): Promise<Coordinates> {
       accuracy: Location.Accuracy.High
     });
     const accuracy = position.coords.accuracy;
-    if (typeof accuracy === "number" && accuracy > MAX_ACCEPTABLE_ACCURACY_M) {
-      throw new LocationAccessError(
-        "POOR_ACCURACY",
-        `GPS accuracy is about ${Math.round(accuracy)}m. Move to a clearer spot and try again.`
-      );
-    }
     return {
       latitude: position.coords.latitude,
-      longitude: position.coords.longitude
+      longitude: position.coords.longitude,
+      accuracyMeters: typeof accuracy === "number" ? accuracy : null
     };
   } catch (error) {
     if (error instanceof LocationAccessError) throw error;

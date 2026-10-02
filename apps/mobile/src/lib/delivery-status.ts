@@ -114,20 +114,20 @@ export type CourierDeliveryAction =
 export function nextCourierDeliveryAction(status: string): CourierDeliveryAction | null {
   switch (status) {
     case "WORKER_ASSIGNED":
-      return { kind: "arrive_pickup", label: "Arrived", requiresGps: true, ensurePickupTravel: true };
+      return { kind: "arrive_pickup", label: "Arrived at shop", requiresGps: true, ensurePickupTravel: true };
     case "WORKER_EN_ROUTE":
-      return { kind: "arrive_pickup", label: "Arrived", requiresGps: true };
+      return { kind: "arrive_pickup", label: "Arrived at shop", requiresGps: true };
     case "WORKER_ARRIVED":
       return { kind: "verify_pickup", label: "Picked up" };
     case "PACKAGE_COLLECTED":
       return {
         kind: "arrive_dropoff",
-        label: "Arrived",
+        label: "Arrived at customer",
         requiresGps: true,
         ensureDropoffTravel: true
       };
     case "EN_ROUTE_TO_DROPOFF":
-      return { kind: "arrive_dropoff", label: "Arrived", requiresGps: true };
+      return { kind: "arrive_dropoff", label: "Arrived at customer", requiresGps: true };
     case "ARRIVED_AT_DROPOFF":
       return { kind: "verify_delivery", label: "Complete delivery" };
     default:

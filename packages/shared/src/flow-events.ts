@@ -74,7 +74,8 @@ export const DUTS_FLOW_EVENTS = [
   "BASKET_MATCH_STARTED",
   "BASKET_MATCH_COMPLETE",
   "BASKET_MATCH_PARTIAL",
-  "BASKET_MATCH_SELECTED"
+  "BASKET_MATCH_SELECTED",
+  "COURIER_ARRIVAL"
 ] as const;
 
 export type DutsFlowEvent = (typeof DUTS_FLOW_EVENTS)[number];
