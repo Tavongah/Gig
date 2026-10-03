@@ -52,6 +52,17 @@ export type ConversationContext = {
   deliveryLat?: number;
   deliveryLng?: number;
   deliveryLabel?: string;
+  /** Customer-entered house/street/landmark text, even when geocode is area-level. */
+  deliveryInstructions?: string;
+  deliveryPrecision?: "EXACT" | "STREET" | "LANDMARK" | "AREA" | "GPS";
+  pendingAreaMatch?: {
+    label: string;
+    suburb?: string;
+    city?: string;
+    latitude: number;
+    longitude: number;
+    originalText: string;
+  };
   pendingChoices?: Array<{
     query: string;
     options: Array<{ productId: string; name: string; priceCents: number }>;

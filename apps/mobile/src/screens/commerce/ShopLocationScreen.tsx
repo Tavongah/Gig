@@ -69,10 +69,15 @@ export function ShopLocationScreen({ navigation, route }: Props) {
       setError("");
       try {
         const result = await api.geocodeAddress({ query: typed, allowIncomplete: true }, session?.token);
+        const areaLabel = result.areaLabel || result.location.formattedAddress;
+        const label =
+          result.precision === "area"
+            ? `${areaLabel} · ${typed}`
+            : typed;
         await setLocation({
           latitude: result.location.latitude,
           longitude: result.location.longitude,
-          label: typed
+          label
         });
         finish();
       } catch {

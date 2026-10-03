@@ -1,5 +1,7 @@
 import { haversineMeters } from "@gigflow/shared";
 
+export type GeocodePrecision = "exact" | "street" | "landmark" | "area" | "city" | "coarse";
+
 export type GeocodeCandidate = {
   label: string;
   formattedAddress: string;
@@ -7,6 +9,7 @@ export type GeocodeCandidate = {
   longitude: number;
   placeId?: string;
   coarse: boolean;
+  precision: GeocodePrecision;
 };
 
 export type GeocodeClassification =
@@ -16,6 +19,14 @@ export type GeocodeClassification =
   | { kind: "ambiguous"; options: GeocodeCandidate[] };
 
 const LOCATION_AMBIGUITY_METERS = 400;
+
+function precisionOf(candidate: GeocodeCandidate): GeocodePrecision {
+  return candidate.precision ?? (candidate.coarse ? "coarse" : "area");
+}
+
+function isStrongPrecision(precision: GeocodePrecision): boolean {
+  return precision === "exact" || precision === "street" || precision === "landmark";
+}
 
 function dedupeCandidates(candidates: GeocodeCandidate[]): GeocodeCandidate[] {
   const seen = new Set<string>();
@@ -30,11 +41,16 @@ function dedupeCandidates(candidates: GeocodeCandidate[]): GeocodeCandidate[] {
 }
 
 export function classifyGeocodeCandidates(candidates: GeocodeCandidate[]): GeocodeClassification {
-  const unique = dedupeCandidates(candidates);
+  const unique = dedupeCandidates(candidates).map((c) => ({
+    ...c,
+    precision: precisionOf(c),
+    coarse: c.coarse || precisionOf(c) === "city" || precisionOf(c) === "coarse"
+  }));
   if (!unique.length) return { kind: "none" };
-  const precise = unique.filter((c) => !c.coarse);
-  const pool = precise.length ? precise : unique;
-  if (!precise.length) return { kind: "coarse" };
+  const strong = unique.filter((c) => isStrongPrecision(c.precision));
+  const area = unique.filter((c) => c.precision === "area");
+  if (!strong.length && !area.length) return { kind: "coarse" };
+  const pool = strong.length ? strong : area;
   if (pool.length === 1) return { kind: "single", pick: pool[0]! };
   const origin = pool[0]!;
   const spread = pool.some(

@@ -1,10 +1,14 @@
 import { z } from "zod";
 import { Router } from "express";
+import { AppError } from "../../lib/errors.js";
 import { validateBody } from "../../middleware/validate.js";
 import {
+  candidateToGeocodedAddress,
   geocodeAddressQuery,
   geocodePlaceId,
+  originalDeliveryInstructions,
   resolveGeocodedLocation,
+  resolveTypedDeliveryLocation,
   reverseGeocodeCoordinates,
   searchAddressSuggestions
 } from "./geocoding.service.js";
@@ -35,6 +39,35 @@ locationRouter.get("/autocomplete", async (req, res, next) => {
 
 locationRouter.post("/geocode", validateBody(geocodeBodySchema), async (req, res, next) => {
   try {
+    const body = req.body as {
+      query?: string;
+      placeId?: string;
+      latitude?: number;
+      longitude?: number;
+      allowIncomplete?: boolean;
+    };
+    if (body.query && body.allowIncomplete && !body.placeId && body.latitude == null) {
+      const typed = await resolveTypedDeliveryLocation(body.query);
+      if (typed.kind === "exact" || typed.kind === "landmark" || typed.kind === "area") {
+        const address = candidateToGeocodedAddress(typed.pick);
+        res.json({
+          address,
+          location: toGeoPointInput(address),
+          precision: typed.kind,
+          deliveryInstructions: originalDeliveryInstructions(typed.parsed),
+          areaLabel: typed.kind === "area" ? typed.areaLabel : undefined
+        });
+        return;
+      }
+      throw new AppError("INVALID_ADDRESS", 422, "INVALID_ADDRESS", {
+        location:
+          typed.kind === "need_city"
+            ? "Which city should we deliver to?"
+            : typed.kind === "need_area"
+              ? "Which area or suburb should we deliver to?"
+              : "I found the area, but not the exact address. Add a nearby landmark."
+      });
+    }
     const address = await resolveGeocodedLocation(req.body);
     res.json({ address, location: toGeoPointInput(address) });
   } catch (error) {

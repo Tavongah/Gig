@@ -54,10 +54,13 @@ import {
   formatCompactMutation,
   formatDisambiguation,
   formatLocationAmbiguous,
+  formatLocationAreaFound,
   formatLocationAsk,
   formatLocationConfirm,
   formatLocationFailed,
-  formatLocationNeedLandmark,
+  formatLocationNeedArea,
+  formatLocationNeedCity,
+  formatLocationNeedLandmarkForArea,
   formatMobileMoneyPending,
   formatMobileMoneyPhonePrompt,
   formatMissingItems,
@@ -78,6 +81,7 @@ import {
   cancelCheckoutDraft,
   clearPendingClarification,
   completeCheckoutSession,
+  composeDeliveryLabel,
   conversationStateForExpected,
   customerFacingDeliveryLabel,
   humanDeliveryLabel,
@@ -667,6 +671,9 @@ async function handleChangeWhat(phone: string, convId: string, ctx: Conversation
     ctx.deliveryLat = undefined;
     ctx.deliveryLng = undefined;
     ctx.deliveryLabel = undefined;
+    ctx.deliveryInstructions = undefined;
+    ctx.deliveryPrecision = undefined;
+    ctx.pendingAreaMatch = undefined;
     setExpected(ctx, "LOCATION");
     await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
     await wa.sendText(phone, formatLocationAsk());
@@ -698,15 +705,30 @@ async function applyResolvedCoordinates(
   phone: string,
   convId: string,
   ctx: ConversationContext,
-  input: { latitude: number; longitude: number; label: string }
+  input: {
+    latitude: number;
+    longitude: number;
+    label: string;
+    instructions?: string;
+    precision?: ConversationContext["deliveryPrecision"];
+  }
 ) {
   ctx.deliveryLat = input.latitude;
   ctx.deliveryLng = input.longitude;
-  ctx.deliveryLabel = customerFacingDeliveryLabel(humanDeliveryLabel({ typed: input.label }));
+  ctx.deliveryInstructions = input.instructions?.trim() || ctx.deliveryInstructions;
+  ctx.deliveryPrecision = input.precision ?? "EXACT";
+  ctx.deliveryLabel = customerFacingDeliveryLabel(
+    composeDeliveryLabel({
+      resolvedLabel: humanDeliveryLabel({ typed: input.label }),
+      instructions: ctx.deliveryInstructions,
+      precision: ctx.deliveryPrecision
+    })
+  );
   ctx.lastDeliveryLat = ctx.deliveryLat;
   ctx.lastDeliveryLng = ctx.deliveryLng;
   ctx.lastDeliveryLabel = ctx.deliveryLabel;
   ctx.pendingLocationChoices = undefined;
+  ctx.pendingAreaMatch = undefined;
   clearPendingClarification(ctx);
   return continueAfterLocation(phone, convId, ctx);
 }
@@ -734,7 +756,8 @@ async function applyNativeLocation(
   return applyResolvedCoordinates(phone, convId, ctx, {
     latitude: location.latitude,
     longitude: location.longitude,
-    label
+    label,
+    precision: "GPS"
   });
 }
 
@@ -771,6 +794,34 @@ async function applyLocationClarification(
   text: string
 ) {
   const wa = getWhatsAppProvider();
+  const area = ctx.pendingAreaMatch;
+  if (area) {
+    const n = parseNumericChoice(text);
+    const yes = n === 1 || /^(yes|yep|yeah|ok|okay)$/i.test(text.trim());
+    const no = n === 2 || /^(no|nope)$/i.test(text.trim());
+    if (yes) {
+      return applyResolvedCoordinates(phone, convId, ctx, {
+        latitude: area.latitude,
+        longitude: area.longitude,
+        label: area.label,
+        instructions: ctx.deliveryInstructions || area.originalText,
+        precision: "AREA"
+      });
+    }
+    if (no) {
+      ctx.pendingAreaMatch = undefined;
+      ctx.pendingLocationChoices = undefined;
+      setExpected(ctx, "LOCATION");
+      await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
+      await wa.sendText(phone, formatLocationNeedLandmarkForArea({ areaLabel: area.label, city: area.city }));
+      return { handled: true };
+    }
+    if (!text) {
+      await wa.sendText(phone, formatLocationAreaFound({ areaLabel: area.label, suburb: area.suburb }));
+      return { handled: true };
+    }
+    return applyTypedLocation(phone, convId, ctx, text);
+  }
   const options = ctx.pendingLocationChoices ?? [];
   const n = parseNumericChoice(text);
   if (n != null) {
@@ -782,7 +833,8 @@ async function applyLocationClarification(
     return applyResolvedCoordinates(phone, convId, ctx, {
       latitude: pick.latitude,
       longitude: pick.longitude,
-      label: pick.label
+      label: pick.label,
+      precision: "EXACT"
     });
   }
   if (!text) {
@@ -798,40 +850,95 @@ async function applyTypedLocation(phone: string, convId: string, ctx: Conversati
     await wa.sendText(phone, formatLocationAsk());
     return { handled: true };
   }
-  const { classifyGeocodeCandidates, geocodeAddressCandidates } = await import(
-    "../location/geocoding.service.js"
-  );
-  const classified = classifyGeocodeCandidates(await geocodeAddressCandidates(text));
-  if (classified.kind === "none") {
-    await updateConversation(convId, {
-      state: WhatsAppConversationState.AWAITING_LOCATION,
-      context: ctx
-    });
-    await wa.sendText(phone, formatLocationFailed());
-    return { handled: true };
+  const {
+    originalDeliveryInstructions,
+    resolveTypedDeliveryLocation
+  } = await import("../location/geocoding.service.js");
+  const resolution = await resolveTypedDeliveryLocation(text);
+  const instructions = originalDeliveryInstructions(resolution.parsed);
+  if (!ctx.deliveryInstructions || resolution.parsed.house || resolution.parsed.street) {
+    ctx.deliveryInstructions = instructions;
   }
-  if (classified.kind === "coarse") {
-    setExpected(ctx, "LOCATION");
+
+  if (resolution.kind === "exact" || resolution.kind === "landmark") {
+    ctx.pendingAreaMatch = undefined;
+    return applyResolvedCoordinates(phone, convId, ctx, {
+      latitude: resolution.pick.latitude,
+      longitude: resolution.pick.longitude,
+      label: resolution.kind === "landmark"
+        ? humanDeliveryLabel({
+            typed: text,
+            formattedAddress: resolution.pick.formattedAddress
+          })
+        : humanDeliveryLabel({
+            typed: text,
+            formattedAddress: resolution.pick.formattedAddress
+          }),
+      instructions,
+      precision: resolution.kind === "landmark" ? "LANDMARK" : resolution.resolutionLevel === "STREET" ? "STREET" : "EXACT"
+    });
+  }
+
+  if (resolution.kind === "area") {
+    const choiceId = crypto.randomUUID();
+    ctx.pendingChoices = undefined;
+    ctx.lastDisambiguationQuery = undefined;
     ctx.pendingLocationChoices = undefined;
+    ctx.pendingAreaMatch = {
+      label: resolution.areaLabel,
+      suburb: resolution.parsed.suburb,
+      city: resolution.parsed.city,
+      latitude: resolution.pick.latitude,
+      longitude: resolution.pick.longitude,
+      originalText: instructions
+    };
+    ctx.choiceId = choiceId;
+    setExpected(ctx, "LOCATION_CLARIFICATION");
     await updateConversation(convId, {
       state: WhatsAppConversationState.AWAITING_LOCATION,
       context: ctx
     });
-    await wa.sendText(phone, formatLocationNeedLandmark());
+    await wa.sendText(
+      phone,
+      formatLocationAreaFound({
+        areaLabel: resolution.areaLabel,
+        suburb: resolution.parsed.suburb
+      })
+    );
     return { handled: true };
   }
-  if (classified.kind === "ambiguous") {
-    return askLocationClarification(phone, convId, ctx, classified.options);
+
+  if (resolution.kind === "ambiguous") {
+    return askLocationClarification(phone, convId, ctx, resolution.options);
   }
-  const pick = classified.pick;
-  return applyResolvedCoordinates(phone, convId, ctx, {
-    latitude: pick.latitude,
-    longitude: pick.longitude,
-    label: humanDeliveryLabel({
-      typed: text,
-      formattedAddress: pick.formattedAddress
-    })
+
+  setExpected(ctx, "LOCATION");
+  ctx.pendingLocationChoices = undefined;
+  ctx.pendingAreaMatch = undefined;
+  await updateConversation(convId, {
+    state: WhatsAppConversationState.AWAITING_LOCATION,
+    context: ctx
   });
+  if (resolution.kind === "need_city") {
+    await wa.sendText(phone, formatLocationNeedCity());
+    return { handled: true };
+  }
+  if (resolution.kind === "need_area") {
+    await wa.sendText(phone, formatLocationNeedArea({ city: resolution.parsed.city }));
+    return { handled: true };
+  }
+  if (resolution.kind === "need_landmark") {
+    await wa.sendText(
+      phone,
+      formatLocationNeedLandmarkForArea({
+        areaLabel: resolution.areaLabel,
+        city: resolution.parsed.city
+      })
+    );
+    return { handled: true };
+  }
+  await wa.sendText(phone, formatLocationFailed());
+  return { handled: true };
 }
 
 async function resolveProductsThenContinue(phone: string, convId: string, ctx: ConversationContext) {

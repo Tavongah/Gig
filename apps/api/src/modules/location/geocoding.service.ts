@@ -2,13 +2,21 @@ import type { AddressSuggestion, GeocodedAddress } from "@gigflow/shared";
 import { coordinatesAreConsistent } from "@gigflow/shared";
 import { env } from "../../config/env.js";
 import { AppError } from "../../lib/errors.js";
+import { logDutsFlow } from "../../lib/flow-log.js";
 import {
-  classifyGeocodeCandidates,
-  type GeocodeCandidate
+  type GeocodeCandidate,
+  type GeocodePrecision
 } from "./geocode-candidates.js";
+import { resolveTypedDeliveryLocationWithLookup } from "./typed-delivery-resolve.js";
 
-export type { GeocodeCandidate, GeocodeClassification } from "./geocode-candidates.js";
+export type { GeocodeCandidate, GeocodeClassification, GeocodePrecision } from "./geocode-candidates.js";
 export { classifyGeocodeCandidates } from "./geocode-candidates.js";
+export type { TypedDeliveryResolution } from "./typed-delivery-resolve.js";
+export {
+  originalDeliveryInstructions,
+  queryCategoryFromParsed,
+  shortAreaLabel
+} from "./typed-delivery-resolve.js";
 
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org";
 const USER_AGENT = "DUTS/1.0 (local-dev)";
@@ -21,9 +29,12 @@ interface NominatimAddress {
   village?: string;
   hamlet?: string;
   suburb?: string;
+  neighbourhood?: string;
+  neighborhood?: string;
   state?: string;
   county?: string;
   postcode?: string;
+  country?: string;
   country_code?: string;
 }
 
@@ -32,6 +43,9 @@ interface NominatimResult {
   lat: string;
   lon: string;
   display_name: string;
+  class?: string;
+  type?: string;
+  addresstype?: string;
   address?: NominatimAddress;
 }
 
@@ -272,11 +286,71 @@ async function reverseGeocodeWithNominatim(latitude: number, longitude: number):
   return mapNominatimResult(result, { allowIncomplete: true });
 }
 
+function looksLikeUnitedStatesQuery(query: string): boolean {
+  return /\b(united states|\busa\b|, us\b|meriden|, ct\b)\b/i.test(query);
+}
+
+function looksLikeZimbabweQuery(query: string): boolean {
+  return /\b(zimbabwe|harare|gweru|bulawayo|mutare|masvingo|kwekwe|chitungwiza|epworth|senga)\b/i.test(query);
+}
+
 function biasLocalQuery(query: string): string {
-  if (/\b(zimbabwe|harare|gweru|bulawayo|mutare|masvingo|kwekwe|chitungwiza|epworth)\b/i.test(query)) {
+  if (looksLikeUnitedStatesQuery(query) || looksLikeZimbabweQuery(query)) {
     return query;
   }
   return `${query}, Zimbabwe`;
+}
+
+function nominatimCountryCodes(query: string): string {
+  if (looksLikeUnitedStatesQuery(query)) return "us";
+  return "zw";
+}
+
+function googleCountryComponents(query: string): string {
+  if (looksLikeUnitedStatesQuery(query)) return "country:US";
+  return "country:ZW";
+}
+
+function nominatimPrecision(result: NominatimResult): GeocodePrecision {
+  const address = result.address ?? {};
+  const kind = String(result.addresstype || result.type || "").toLowerCase();
+  const cls = String(result.class || "").toLowerCase();
+  if (address.house_number) return "exact";
+  if (cls === "amenity" || cls === "shop" || cls === "tourism" || cls === "leisure") return "landmark";
+  if (["gate", "university", "college", "mall", "retail", "supermarket", "marketplace"].includes(kind)) return "landmark";
+  if (cls === "building" || kind === "building" || kind === "house" || kind === "residential") return "street";
+  if (address.road || kind === "road" || kind === "street") return "street";
+  if (
+    address.suburb ||
+    address.neighbourhood ||
+    address.neighborhood ||
+    ["suburb", "neighbourhood", "neighborhood", "quarter", "hamlet", "village"].includes(kind)
+  ) {
+    return "area";
+  }
+  if (["city", "town", "municipality", "county", "state", "country"].includes(kind)) {
+    return kind === "country" || kind === "state" ? "coarse" : "city";
+  }
+  if (address.city || address.town) return "city";
+  return "coarse";
+}
+
+function googlePrecision(types: string[] | undefined): GeocodePrecision {
+  const t = types ?? [];
+  if (t.includes("street_address") || t.includes("premise") || t.includes("subpremise")) return "exact";
+  if (t.includes("route") || t.includes("intersection")) return "street";
+  if (t.includes("point_of_interest") || t.includes("establishment") || t.includes("plus_code")) return "landmark";
+  if (
+    t.includes("neighborhood") ||
+    t.includes("sublocality") ||
+    t.includes("sublocality_level_1") ||
+    t.includes("sublocality_level_2")
+  ) {
+    return "area";
+  }
+  if (t.includes("locality") || t.includes("postal_town") || t.includes("administrative_area_level_2")) return "city";
+  if (t.includes("country") || t.includes("administrative_area_level_1")) return "coarse";
+  return "coarse";
 }
 
 function isCoarseGoogleTypes(types: string[] | undefined): boolean {
@@ -300,13 +374,8 @@ function isCoarseGoogleTypes(types: string[] | undefined): boolean {
 }
 
 function isCoarseNominatim(result: NominatimResult): boolean {
-  const address = result.address ?? {};
-  if (address.road || address.house_number || address.suburb || address.hamlet || address.village) return false;
-  const parts = String(result.display_name ?? "")
-    .split(",")
-    .map((p) => p.trim())
-    .filter(Boolean);
-  return parts.length <= 2;
+  const precision = nominatimPrecision(result);
+  return precision === "city" || precision === "coarse";
 }
 
 function candidateLabel(formattedAddress: string, query: string): string {
@@ -320,19 +389,23 @@ async function geocodeCandidatesWithGoogle(query: string): Promise<GeocodeCandid
   const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
   url.searchParams.set("address", biasLocalQuery(query));
   url.searchParams.set("key", env.GOOGLE_MAPS_API_KEY!);
-  url.searchParams.set("components", "country:ZW|country:US");
+  url.searchParams.set("components", googleCountryComponents(query));
 
   const data = await fetchJson<GoogleGeocodeResult>(url.toString());
   if (data.status === "ZERO_RESULTS" || !data.results.length) return [];
   if (data.status !== "OK") return [];
-  return data.results.slice(0, 5).map((top) => ({
-    label: candidateLabel(top.formatted_address, query),
-    formattedAddress: top.formatted_address,
-    latitude: top.geometry.location.lat,
-    longitude: top.geometry.location.lng,
-    placeId: top.place_id,
-    coarse: isCoarseGoogleTypes(top.types)
-  }));
+  return data.results.slice(0, 5).map((top) => {
+    const precision = googlePrecision(top.types);
+    return {
+      label: candidateLabel(top.formatted_address, query),
+      formattedAddress: top.formatted_address,
+      latitude: top.geometry.location.lat,
+      longitude: top.geometry.location.lng,
+      placeId: top.place_id,
+      coarse: isCoarseGoogleTypes(top.types) || precision === "city" || precision === "coarse",
+      precision
+    };
+  });
 }
 
 async function geocodeCandidatesWithNominatim(query: string): Promise<GeocodeCandidate[]> {
@@ -341,18 +414,32 @@ async function geocodeCandidatesWithNominatim(query: string): Promise<GeocodeCan
   url.searchParams.set("format", "json");
   url.searchParams.set("addressdetails", "1");
   url.searchParams.set("limit", "5");
-  url.searchParams.set("countrycodes", "zw,us");
+  url.searchParams.set("countrycodes", nominatimCountryCodes(query));
 
-  const results = await fetchJson<NominatimResult[]>(url.toString(), { "User-Agent": USER_AGENT });
+  const response = await fetch(url.toString(), { headers: { "User-Agent": USER_AGENT } });
+  if (!response.ok) {
+    logDutsFlow("GEOCODE_TYPED_ADDRESS", {
+      queryCategory: "provider_http",
+      providerResultCount: 0,
+      resolutionLevel: "NONE",
+      candidateRejectionReason: `http_${response.status}`
+    });
+    return [];
+  }
+  const results = (await response.json()) as NominatimResult[];
   if (!Array.isArray(results) || results.length === 0) return [];
-  return results.slice(0, 5).map((result) => ({
-    label: candidateLabel(result.display_name, query),
-    formattedAddress: result.display_name,
-    latitude: Number(result.lat),
-    longitude: Number(result.lon),
-    placeId: String(result.place_id),
-    coarse: isCoarseNominatim(result)
-  }));
+  return results.slice(0, 5).map((result) => {
+    const precision = nominatimPrecision(result);
+    return {
+      label: candidateLabel(result.display_name, query),
+      formattedAddress: result.display_name,
+      latitude: Number(result.lat),
+      longitude: Number(result.lon),
+      placeId: String(result.place_id),
+      coarse: isCoarseNominatim(result),
+      precision
+    };
+  });
 }
 
 export async function geocodeAddressCandidates(query: string): Promise<GeocodeCandidate[]> {
@@ -365,6 +452,44 @@ export async function geocodeAddressCandidates(query: string): Promise<GeocodeCa
   } catch {
     return [];
   }
+}
+
+export async function resolveTypedDeliveryLocation(raw: string) {
+  let lastAt = 0;
+  const resolution = await resolveTypedDeliveryLocationWithLookup(raw, async (query) => {
+    const wait = 1100 - (Date.now() - lastAt);
+    if (lastAt && wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    lastAt = Date.now();
+    const candidates = await geocodeAddressCandidates(query);
+    logDutsFlow("GEOCODE_TYPED_ADDRESS", {
+      queryCategory: "provider_lookup",
+      providerResultCount: candidates.length,
+      resolutionLevel: candidates[0]?.precision?.toUpperCase() ?? "NONE",
+      candidateRejectionReason: candidates.length ? null : "provider_zero_results"
+    });
+    return candidates;
+  });
+  logDutsFlow("GEOCODE_TYPED_ADDRESS", {
+    queryCategory: resolution.queryCategory,
+    providerResultCount: resolution.providerResultCount,
+    resolutionLevel: resolution.resolutionLevel,
+    candidateRejectionReason: resolution.rejectionReason ?? null
+  });
+  return resolution;
+}
+
+export function candidateToGeocodedAddress(pick: GeocodeCandidate): GeocodedAddress {
+  const parts = pick.formattedAddress.split(",").map((p) => p.trim()).filter(Boolean);
+  return {
+    addressLine1: pick.label || parts[0] || "Delivery location",
+    city: parts[1] || parts[0] || "Unknown",
+    region: parts[2] || "Unknown",
+    postalCode: "0000",
+    country: "ZW",
+    formattedAddress: pick.formattedAddress,
+    latitude: pick.latitude,
+    longitude: pick.longitude
+  };
 }
 
 export async function geocodeAddressQuery(
@@ -481,7 +606,23 @@ export async function resolveGeocodedLocation(input: {
       resolved = await geocodeAddressQuery(input.formattedAddress ?? input.query ?? "", incomplete);
     }
   } else if (input.query) {
-    resolved = await geocodeAddressQuery(input.query, incomplete);
+    if (incomplete.allowIncomplete) {
+      const typed = await resolveTypedDeliveryLocation(input.query);
+      if (typed.kind === "exact" || typed.kind === "landmark" || typed.kind === "area") {
+        resolved = candidateToGeocodedAddress(typed.pick);
+      } else {
+        throw new AppError("INVALID_ADDRESS", 422, "INVALID_ADDRESS", {
+          location:
+            typed.kind === "need_city"
+              ? "Which city should we deliver to?"
+              : typed.kind === "need_area"
+                ? "Which area or suburb should we deliver to?"
+                : "I found the area, but not the exact address. Add a nearby landmark."
+        });
+      }
+    } else {
+      resolved = await geocodeAddressQuery(input.query, incomplete);
+    }
   } else if (input.latitude !== undefined && input.longitude !== undefined) {
     resolved = await reverseGeocodeCoordinates(input.latitude, input.longitude);
   } else if (

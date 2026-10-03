@@ -90,6 +90,50 @@ export function formatLocationFailed(): string {
   ].join("\n");
 }
 
+export function formatLocationNeedCity(): string {
+  return [
+    "Which city should we deliver to?",
+    "",
+    "Example: Gweru"
+  ].join("\n");
+}
+
+export function formatLocationNeedArea(input: { city?: string }): string {
+  const city = input.city?.trim();
+  return [
+    city ? `Which area in ${city}?` : "Which area or suburb should we deliver to?",
+    "",
+    "Example: Senga"
+  ].join("\n");
+}
+
+export function formatLocationAreaFound(input: { areaLabel: string; suburb?: string }): string {
+  const suburb = input.suburb?.trim() || input.areaLabel.split(",")[0]?.trim() || "this area";
+  return [
+    `I found ${input.areaLabel}, but not the exact address.`,
+    "",
+    `Is this delivery in ${suburb}?`,
+    "",
+    "1. Yes",
+    "2. No"
+  ].join("\n");
+}
+
+export function formatLocationNeedLandmarkForArea(input: { areaLabel?: string; city?: string }): string {
+  const where = input.areaLabel?.trim() || (input.city ? `in ${input.city}` : "");
+  return [
+    where
+      ? `I found ${input.areaLabel ?? input.city}, but I couldn't find the exact address.`
+      : "I couldn't find the exact address.",
+    "",
+    "What's a nearby landmark?",
+    "",
+    "Example:",
+    "MSU Main Campus",
+    "Senga Shopping Centre"
+  ].join("\n");
+}
+
 export function formatLocationNeedLandmark(): string {
   return [
     "I couldn't find the exact delivery point.",

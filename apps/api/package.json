@@ -49,6 +49,7 @@
     "test:checkout-prep": "tsx scripts/test-checkout-prep.ts",
     "test:pilot-delivery-pricing": "tsx scripts/test-pilot-delivery-pricing.ts",
     "test:whatsapp-checkout-isolation": "tsx scripts/test-whatsapp-checkout-isolation.ts",
+    "test:low-data-address-fallback": "tsx scripts/test-low-data-address-fallback.ts",
     "test:commerce-courier-ux": "tsx scripts/test-commerce-courier-ux.ts",
     "migrate:products-to-catalog": "tsx scripts/migrate-products-to-catalog.ts",
     "seed:pilot-merchant": "tsx scripts/seed-pilot-merchant.ts",

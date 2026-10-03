@@ -72,6 +72,25 @@ export function humanDeliveryLabel(input: {
   return "Pinned location ✓";
 }
 
+/** Area-level pin plus original house/street text. Do not pretend the centroid is the house. */
+export function composeDeliveryLabel(input: {
+  resolvedLabel: string;
+  instructions?: string | null;
+  precision?: string | null;
+}): string {
+  const resolved = customerFacingDeliveryLabel(input.resolvedLabel);
+  const instructions = String(input.instructions ?? "").trim();
+  if (input.precision === "AREA" && instructions) {
+    const instrFold = instructions.toLowerCase();
+    const resolvedFold = resolved.toLowerCase();
+    if (instrFold !== resolvedFold && !resolvedFold.includes(instrFold) && !instrFold.includes(resolvedFold)) {
+      const combined = `${resolved} · ${instructions}`;
+      return combined.length > 96 ? `${combined.slice(0, 93)}…` : combined;
+    }
+  }
+  return resolved;
+}
+
 export function conversationStateForExpected(expected: CheckoutExpectedInput): WhatsAppConversationState {
   switch (expected) {
     case "LOCATION":
@@ -105,7 +124,7 @@ export function expectedFromLegacyState(
     case WhatsAppConversationState.AWAITING_PRODUCT_CHOICE:
       return "PRODUCT_DISAMBIGUATION";
     case WhatsAppConversationState.AWAITING_LOCATION:
-      return ctx.pendingLocationChoices?.length ? "LOCATION_CLARIFICATION" : "LOCATION";
+      return ctx.pendingLocationChoices?.length || ctx.pendingAreaMatch ? "LOCATION_CLARIFICATION" : "LOCATION";
     case WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION:
       return "ORDER_CONFIRMATION";
     case WhatsAppConversationState.AWAITING_PAYMENT:
@@ -203,6 +222,7 @@ export function clearPendingClarification(ctx: ConversationContext): void {
   ctx.lastDisambiguationQuery = undefined;
   ctx.choiceId = undefined;
   ctx.pendingLocationChoices = undefined;
+  ctx.pendingAreaMatch = undefined;
   if (ctx.expectedInput === "PRODUCT_DISAMBIGUATION") {
     ctx.expectedInput = ctx.requestedItems?.length ? "READY_TO_ORDER" : "PRODUCT_TEXT";
     ctx.choiceType = ctx.expectedInput;
@@ -298,7 +318,8 @@ export function sanitizeCheckoutContext(
 
   if (ctx.expectedInput !== "LOCATION_CLARIFICATION") {
     ctx.pendingLocationChoices = undefined;
-  } else if (!ctx.choiceId && ctx.pendingLocationChoices?.[0]) {
+    ctx.pendingAreaMatch = undefined;
+  } else if (!ctx.choiceId && (ctx.pendingLocationChoices?.[0] || ctx.pendingAreaMatch)) {
     ctx.choiceId = newCheckoutSessionId();
   }
 

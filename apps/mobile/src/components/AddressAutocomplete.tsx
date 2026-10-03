@@ -83,7 +83,11 @@ export function AddressAutocomplete({
     setResolveError(null);
     try {
       const result = await api.geocodeAddress({ query, allowIncomplete: true }, token);
-      onLocationResolved(result.location);
+      onLocationResolved(
+        result.precision === "area" && result.areaLabel
+          ? { ...result.location, formattedAddress: `${result.areaLabel} · ${query}` }
+          : result.location
+      );
       setSuggestions([]);
     } catch {
       setResolveError("I couldn't find that address. Add your area and a nearby landmark.");
