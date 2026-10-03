@@ -20,7 +20,6 @@ export function ShopLocationScreen({ navigation, route }: Props) {
   const [resolved, setResolved] = useState<GeoPointInput | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [showAddress, setShowAddress] = useState(false);
   const [saved, setSaved] = useState<Awaited<ReturnType<typeof listAddresses>>>([]);
   const nextCheckout = route.params?.next === "checkout";
 
@@ -53,7 +52,6 @@ export function ShopLocationScreen({ navigation, route }: Props) {
       }
       finish();
     } catch {
-      setShowAddress(true);
       setError("We couldn't use your current location. Enter your delivery address instead.");
     } finally {
       setBusy(false);
@@ -62,13 +60,32 @@ export function ShopLocationScreen({ navigation, route }: Props) {
 
   async function saveEntered() {
     if (!resolved) {
-      setError("Enter a delivery address, then tap Use this address.");
+      const typed = query.trim();
+      if (typed.length < 3) {
+        setError("Enter your area and a nearby landmark.");
+        return;
+      }
+      setBusy(true);
+      setError("");
+      try {
+        const result = await api.geocodeAddress({ query: typed, allowIncomplete: true }, session?.token);
+        await setLocation({
+          latitude: result.location.latitude,
+          longitude: result.location.longitude,
+          label: typed
+        });
+        finish();
+      } catch {
+        setError("I couldn't find that address. Add your area and a nearby landmark.");
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     await setLocation({
       latitude: resolved.latitude,
       longitude: resolved.longitude,
-      label: resolved.formattedAddress || query || "Delivery address"
+      label: query.trim() || resolved.formattedAddress || "Delivery address"
     });
     finish();
   }
@@ -76,7 +93,7 @@ export function ShopLocationScreen({ navigation, route }: Props) {
   return (
     <ScrollView className="flex-1 bg-background px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>
       <Text className="text-2xl font-black text-ink">Where should we deliver?</Text>
-      <Text className="mt-2 text-base text-muted">We only need this to complete your order.</Text>
+      <Text className="mt-2 text-base text-muted">Use your current location, or type an address. You do not need a map.</Text>
 
       <View className="mt-5">
         <AppButton
@@ -86,40 +103,25 @@ export function ShopLocationScreen({ navigation, route }: Props) {
         />
       </View>
 
-      <View className="mt-3">
-        <AppButton
-          label="ENTER DELIVERY ADDRESS"
-          variant="secondary"
-          onPress={() => {
-            setShowAddress(true);
+      <View className="mt-6">
+        <Text className="mb-2 text-sm font-semibold uppercase text-muted">ENTER DELIVERY ADDRESS</Text>
+        <AddressAutocomplete
+          token={session?.token}
+          label="Street, suburb, or landmark"
+          value={query}
+          onChangeText={(v) => {
+            setQuery(v);
             setError("");
           }}
+          selectedLocation={resolved}
+          onLocationResolved={setResolved}
+          onLocationCleared={() => setResolved(null)}
+          error={error}
         />
-      </View>
-
-      {showAddress ? (
-        <View className="mt-6">
-          <Text className="mb-2 text-sm font-semibold uppercase text-muted">Delivery address</Text>
-          <AddressAutocomplete
-            token={session?.token}
-            label="Street, suburb, or city"
-            value={query}
-            onChangeText={(v) => {
-              setQuery(v);
-              setError("");
-            }}
-            selectedLocation={resolved}
-            onLocationResolved={setResolved}
-            onLocationCleared={() => setResolved(null)}
-            error={error}
-          />
-          <View className="mt-4">
-            <AppButton label="Use this address" onPress={() => void saveEntered()} variant="secondary" />
-          </View>
+        <View className="mt-4">
+          <AppButton label="Use this address" onPress={() => void saveEntered()} variant="secondary" disabled={busy} />
         </View>
-      ) : error ? (
-        <Text className="mt-4 text-sm text-danger">{error}</Text>
-      ) : null}
+      </View>
 
       {session && saved.length > 0 ? (
         <View className="mt-8">

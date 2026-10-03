@@ -60,6 +60,7 @@ assert.match(notifySvc, /applyPaidOrderToConversation/);
 assert.match(convo, /expireStaleCheckoutConversations/);
 assert.match(convo, /claimInboundMessage/);
 assert.match(handler, /ACTIVE_ORDER_STATUS/);
+assert.match(handler, /LOCATION_CLARIFICATION/);
 assert.match(copy, /formatStatusChoices/);
 assert.doesNotMatch(zb, /PIN|OTP/);
 pass("AA");
@@ -226,6 +227,21 @@ const {
   assert.equal(failedLive.updateCurrent, true);
   assert.equal(failedLive.ctx.expectedInput, "PAYMENT_RETRY");
   pass("J-model");
+}
+
+{
+  const { ctx } = sanitizeCheckoutContext(WhatsAppConversationState.AWAITING_LOCATION, {
+    expectedInput: "LOCATION_CLARIFICATION",
+    pendingLocationChoices: [
+      { label: "Senga 2", latitude: -19.5, longitude: 29.84 },
+      { label: "MSU", latitude: -19.52, longitude: 29.84 }
+    ],
+    pendingChoices: [{ query: "bread", options: [{ productId: "p1", name: "Bread", priceCents: 100 }] }]
+  });
+  assert.equal(ctx.expectedInput, "LOCATION_CLARIFICATION");
+  assert.equal(ctx.pendingLocationChoices?.length, 2);
+  assert.equal(ctx.pendingChoices, undefined);
+  pass("location-clarification-isolation");
 }
 
 {

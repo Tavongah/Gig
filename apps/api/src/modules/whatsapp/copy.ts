@@ -59,7 +59,50 @@ export function formatGuestHandoffAwaitingLocation(input: {
 }
 
 export function formatLocationAsk(): string {
-  return ["Where should we deliver?", "", "📍 Send your location", "or type your address."].join("\n");
+  return [
+    "Where should we deliver?",
+    "",
+    "📍 Send your current location",
+    "",
+    "or",
+    "",
+    "✍️ Type your delivery address",
+    "",
+    "Example:",
+    "House 24, Senga 2, near MSU Main Campus, Gweru"
+  ].join("\n");
+}
+
+export function formatLocationConfirm(label: string): string {
+  const clean = formatCustomerDeliveryLabel(label) ?? "Pinned location ✓";
+  const withMark = /✓\s*$/.test(clean) ? clean : `${clean} ✓`;
+  return `Deliver to:\n${withMark}`;
+}
+
+export function formatLocationFailed(): string {
+  return [
+    "I couldn't find that address.",
+    "",
+    "Please add your area and a nearby landmark.",
+    "",
+    "Example:",
+    "Senga 2, near MSU Main Campus"
+  ].join("\n");
+}
+
+export function formatLocationNeedLandmark(): string {
+  return [
+    "I couldn't find the exact delivery point.",
+    "",
+    "Please send:",
+    "1. Area/suburb",
+    "2. Nearest landmark"
+  ].join("\n");
+}
+
+export function formatLocationAmbiguous(options: Array<{ label: string }>): string {
+  const list = options.map((o, i) => `${i + 1}. ${formatCustomerDeliveryLabel(o.label) ?? o.label}`).join("\n");
+  return ["I found more than one location.", "", "Which one do you mean?", "", list].join("\n");
 }
 
 const COORD_RE = /^-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+$/;
@@ -493,6 +536,8 @@ export function formatCheckoutHelp(expected?: string): string {
       return "Reply 1 to continue, or 2 to add more items.";
     case "LOCATION":
       return formatLocationAsk();
+    case "LOCATION_CLARIFICATION":
+      return "Reply 1 or 2 to pick a delivery location, or type a clearer address.";
     case "ORDER_CONFIRMATION":
       return ["Confirm order?", "", "1. Confirm", "2. Change", "3. Cancel"].join("\n");
     case "PAYMENT_METHOD":

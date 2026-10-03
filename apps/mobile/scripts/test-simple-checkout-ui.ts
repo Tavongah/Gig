@@ -79,8 +79,8 @@ assert.ok(orderDetail.includes("YOUR DUTS ORDER"), "Y one customer order heading
 assert.ok(orderDetail.includes("statusLabel"), "Y order status");
 assert.ok(orderDetail.includes("DUTS is arranging your delivery."), "Y arranging delivery");
 assert.ok(copy.includes("formatLocationAsk"), "Z WhatsApp location ask shared");
-assert.ok(copy.includes("Send your location"), "Z short location copy");
-assert.ok(copy.includes("or type your address."), "Z short location copy");
+assert.ok(copy.includes("Send your current location"), "Z short location copy");
+assert.ok(copy.includes("Type your delivery address"), "Z short location copy");
 assert.ok(wa.includes("formatLocationAsk()"), "Z WhatsApp uses short location ask");
 assert.ok(copy.includes("Your DUTS order"), "AA short order review heading");
 assert.ok(copy.includes("1. EcoCash USD"), "AB payment choice");

@@ -812,7 +812,7 @@ export const api = {
       token
     ),
   geocodeAddress: (
-    payload: { query?: string; placeId?: string; latitude?: number; longitude?: number },
+    payload: { query?: string; placeId?: string; latitude?: number; longitude?: number; allowIncomplete?: boolean },
     token?: string
   ) => request<{ location: import("@gigflow/shared").GeoPointInput }>("/location/geocode", { method: "POST", body: JSON.stringify(payload) }, token),
   reverseGeocode: (latitude: number, longitude: number, token?: string) =>

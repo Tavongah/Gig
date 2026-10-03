@@ -17,6 +17,7 @@ export type ConversationContext = {
     | "PRODUCT_DISAMBIGUATION"
     | "READY_TO_ORDER"
     | "LOCATION"
+    | "LOCATION_CLARIFICATION"
     | "ORDER_CONFIRMATION"
     | "PAYMENT_METHOD"
     | "ECOCASH_NUMBER"
@@ -55,6 +56,12 @@ export type ConversationContext = {
     query: string;
     options: Array<{ productId: string; name: string; priceCents: number }>;
     choiceId?: string;
+  }>;
+  pendingLocationChoices?: Array<{
+    label: string;
+    formattedAddress?: string;
+    latitude: number;
+    longitude: number;
   }>;
   /** Merchant product ambiguity (price update / OOS). */
   pendingMerchantProductChoices?: Array<{ productId: string; name: string; priceCents: number }>;

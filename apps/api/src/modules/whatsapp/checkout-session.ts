@@ -9,6 +9,7 @@ export type CheckoutExpectedInput =
   | "PRODUCT_DISAMBIGUATION"
   | "READY_TO_ORDER"
   | "LOCATION"
+  | "LOCATION_CLARIFICATION"
   | "ORDER_CONFIRMATION"
   | "PAYMENT_METHOD"
   | "ECOCASH_NUMBER"
@@ -51,9 +52,30 @@ export function customerFacingDeliveryLabel(label: string | null | undefined): s
   return trimmed;
 }
 
+/** Prefer the customer's typed landmark/address. Never surface raw coordinates. */
+export function humanDeliveryLabel(input: {
+  typed?: string | null;
+  formattedAddress?: string | null;
+  city?: string | null;
+  region?: string | null;
+}): string {
+  const typed = String(input.typed ?? "").trim();
+  if (typed && !looksLikeRawCoordinates(typed)) {
+    return typed.length > 80 ? `${typed.slice(0, 77)}…` : typed;
+  }
+  const formatted = String(input.formattedAddress ?? "").trim();
+  if (formatted && !looksLikeRawCoordinates(formatted)) {
+    return formatted.length > 80 ? `${formatted.slice(0, 77)}…` : formatted;
+  }
+  const pretty = [input.city, input.region].filter(Boolean).join(", ");
+  if (pretty && !looksLikeRawCoordinates(pretty)) return pretty;
+  return "Pinned location ✓";
+}
+
 export function conversationStateForExpected(expected: CheckoutExpectedInput): WhatsAppConversationState {
   switch (expected) {
     case "LOCATION":
+    case "LOCATION_CLARIFICATION":
       return WhatsAppConversationState.AWAITING_LOCATION;
     case "PRODUCT_DISAMBIGUATION":
       return WhatsAppConversationState.AWAITING_PRODUCT_CHOICE;
@@ -83,7 +105,7 @@ export function expectedFromLegacyState(
     case WhatsAppConversationState.AWAITING_PRODUCT_CHOICE:
       return "PRODUCT_DISAMBIGUATION";
     case WhatsAppConversationState.AWAITING_LOCATION:
-      return "LOCATION";
+      return ctx.pendingLocationChoices?.length ? "LOCATION_CLARIFICATION" : "LOCATION";
     case WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION:
       return "ORDER_CONFIRMATION";
     case WhatsAppConversationState.AWAITING_PAYMENT:
@@ -180,9 +202,14 @@ export function clearPendingClarification(ctx: ConversationContext): void {
   ctx.pendingChoices = undefined;
   ctx.lastDisambiguationQuery = undefined;
   ctx.choiceId = undefined;
+  ctx.pendingLocationChoices = undefined;
   if (ctx.expectedInput === "PRODUCT_DISAMBIGUATION") {
     ctx.expectedInput = ctx.requestedItems?.length ? "READY_TO_ORDER" : "PRODUCT_TEXT";
     ctx.choiceType = ctx.expectedInput;
+  }
+  if (ctx.expectedInput === "LOCATION_CLARIFICATION") {
+    ctx.expectedInput = "LOCATION";
+    ctx.choiceType = "LOCATION";
   }
 }
 
@@ -264,8 +291,14 @@ export function sanitizeCheckoutContext(
   if (ctx.expectedInput !== "PRODUCT_DISAMBIGUATION") {
     ctx.pendingChoices = undefined;
     ctx.lastDisambiguationQuery = undefined;
-    ctx.choiceId = undefined;
+    if (ctx.expectedInput !== "LOCATION_CLARIFICATION") ctx.choiceId = undefined;
   } else if (!ctx.choiceId && ctx.pendingChoices?.[0]) {
+    ctx.choiceId = newCheckoutSessionId();
+  }
+
+  if (ctx.expectedInput !== "LOCATION_CLARIFICATION") {
+    ctx.pendingLocationChoices = undefined;
+  } else if (!ctx.choiceId && ctx.pendingLocationChoices?.[0]) {
     ctx.choiceId = newCheckoutSessionId();
   }
 

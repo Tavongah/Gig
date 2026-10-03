@@ -53,7 +53,11 @@ import {
   formatClaimPaidIgnored,
   formatCompactMutation,
   formatDisambiguation,
+  formatLocationAmbiguous,
   formatLocationAsk,
+  formatLocationConfirm,
+  formatLocationFailed,
+  formatLocationNeedLandmark,
   formatMobileMoneyPending,
   formatMobileMoneyPhonePrompt,
   formatMissingItems,
@@ -76,6 +80,7 @@ import {
   completeCheckoutSession,
   conversationStateForExpected,
   customerFacingDeliveryLabel,
+  humanDeliveryLabel,
   isCartCommand,
   isLivePendingPayment,
   parseNumericChoice,
@@ -252,6 +257,7 @@ export async function handleCustomerWhatsAppMessage(
   if (msg.location) {
     const locationAllowed =
       expect === "LOCATION" ||
+      expect === "LOCATION_CLARIFICATION" ||
       expect === "NONE" ||
       expect === "PRODUCT_TEXT" ||
       expect === "READY_TO_ORDER";
@@ -298,6 +304,10 @@ export async function handleCustomerWhatsAppMessage(
       await wa.sendText(phone, "What should I add?");
       return { handled: true };
     }
+  }
+
+  if (expect === "LOCATION_CLARIFICATION") {
+    return applyLocationClarification(phone, conv.id, ctx, text);
   }
 
   if (expect === "LOCATION") {
@@ -673,38 +683,113 @@ async function handleChangeWhat(phone: string, convId: string, ctx: Conversation
   return { handled: true };
 }
 
-async function applyNativeLocation(
-  phone: string,
-  convId: string,
-  ctx: ConversationContext,
-  location: { latitude: number; longitude: number; name?: string; address?: string }
-) {
-  ctx.deliveryLat = location.latitude;
-  ctx.deliveryLng = location.longitude;
-  const pinName = location.name || location.address;
-  ctx.deliveryLabel = customerFacingDeliveryLabel(pinName);
-  if (ctx.deliveryLabel === "Pinned location ✓") {
-    try {
-      const { reverseGeocodeCoordinates } = await import("../location/geocoding.service.js");
-      const geo = await reverseGeocodeCoordinates(location.latitude, location.longitude);
-      const pretty = [geo.city, geo.region].filter(Boolean).join(", ");
-      ctx.deliveryLabel = customerFacingDeliveryLabel(pretty || geo.formattedAddress || pinName);
-    } catch {
-      ctx.deliveryLabel = "Pinned location ✓";
-    }
-  }
-  ctx.lastDeliveryLat = ctx.deliveryLat;
-  ctx.lastDeliveryLng = ctx.deliveryLng;
-  ctx.lastDeliveryLabel = ctx.deliveryLabel;
-  clearPendingClarification(ctx);
+async function continueAfterLocation(phone: string, convId: string, ctx: ConversationContext) {
   if (ctx.lockedProductLines?.length || ctx.requestedItems?.length) {
     return buildAndPresentQuote(phone, convId, ctx);
   }
   setExpected(ctx, "PRODUCT_TEXT");
   await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
   const wa = getWhatsAppProvider();
-  await wa.sendText(phone, `Deliver to:\n${ctx.deliveryLabel}\n\nWhat would you like?`);
+  await wa.sendText(phone, `${formatLocationConfirm(ctx.deliveryLabel ?? "")}\n\nWhat would you like?`);
   return { handled: true };
+}
+
+async function applyResolvedCoordinates(
+  phone: string,
+  convId: string,
+  ctx: ConversationContext,
+  input: { latitude: number; longitude: number; label: string }
+) {
+  ctx.deliveryLat = input.latitude;
+  ctx.deliveryLng = input.longitude;
+  ctx.deliveryLabel = customerFacingDeliveryLabel(humanDeliveryLabel({ typed: input.label }));
+  ctx.lastDeliveryLat = ctx.deliveryLat;
+  ctx.lastDeliveryLng = ctx.deliveryLng;
+  ctx.lastDeliveryLabel = ctx.deliveryLabel;
+  ctx.pendingLocationChoices = undefined;
+  clearPendingClarification(ctx);
+  return continueAfterLocation(phone, convId, ctx);
+}
+
+async function applyNativeLocation(
+  phone: string,
+  convId: string,
+  ctx: ConversationContext,
+  location: { latitude: number; longitude: number; name?: string; address?: string }
+) {
+  let label = humanDeliveryLabel({ typed: location.name || location.address });
+  if (label === "Pinned location ✓") {
+    try {
+      const { reverseGeocodeCoordinates } = await import("../location/geocoding.service.js");
+      const geo = await reverseGeocodeCoordinates(location.latitude, location.longitude);
+      label = humanDeliveryLabel({
+        formattedAddress: geo.formattedAddress,
+        city: geo.city,
+        region: geo.region
+      });
+    } catch {
+      label = "Pinned location ✓";
+    }
+  }
+  return applyResolvedCoordinates(phone, convId, ctx, {
+    latitude: location.latitude,
+    longitude: location.longitude,
+    label
+  });
+}
+
+async function askLocationClarification(
+  phone: string,
+  convId: string,
+  ctx: ConversationContext,
+  options: Array<{ label: string; formattedAddress: string; latitude: number; longitude: number }>
+) {
+  const wa = getWhatsAppProvider();
+  const choiceId = crypto.randomUUID();
+  ctx.pendingChoices = undefined;
+  ctx.lastDisambiguationQuery = undefined;
+  ctx.pendingLocationChoices = options.map((o) => ({
+    label: o.label,
+    formattedAddress: o.formattedAddress,
+    latitude: o.latitude,
+    longitude: o.longitude
+  }));
+  ctx.choiceId = choiceId;
+  setExpected(ctx, "LOCATION_CLARIFICATION");
+  await updateConversation(convId, {
+    state: WhatsAppConversationState.AWAITING_LOCATION,
+    context: ctx
+  });
+  await wa.sendText(phone, formatLocationAmbiguous(options));
+  return { handled: true };
+}
+
+async function applyLocationClarification(
+  phone: string,
+  convId: string,
+  ctx: ConversationContext,
+  text: string
+) {
+  const wa = getWhatsAppProvider();
+  const options = ctx.pendingLocationChoices ?? [];
+  const n = parseNumericChoice(text);
+  if (n != null) {
+    const pick = options[n - 1];
+    if (!pick) {
+      await wa.sendText(phone, formatLocationAmbiguous(options));
+      return { handled: true };
+    }
+    return applyResolvedCoordinates(phone, convId, ctx, {
+      latitude: pick.latitude,
+      longitude: pick.longitude,
+      label: pick.label
+    });
+  }
+  if (!text) {
+    await wa.sendText(phone, formatLocationAmbiguous(options.length ? options : [{ label: "your area" }]));
+    return { handled: true };
+  }
+  return applyTypedLocation(phone, convId, ctx, text);
 }
 
 async function applyTypedLocation(phone: string, convId: string, ctx: ConversationContext, text: string) {
@@ -713,28 +798,40 @@ async function applyTypedLocation(phone: string, convId: string, ctx: Conversati
     await wa.sendText(phone, formatLocationAsk());
     return { handled: true };
   }
-  try {
-    const { geocodeAddressQuery } = await import("../location/geocoding.service.js");
-    const geo = await geocodeAddressQuery(text, { allowIncomplete: true });
-    ctx.deliveryLat = geo.latitude;
-    ctx.deliveryLng = geo.longitude;
-    const pretty = [geo.city, geo.region].filter(Boolean).join(", ");
-    ctx.deliveryLabel = customerFacingDeliveryLabel(pretty || geo.formattedAddress);
-    ctx.lastDeliveryLat = ctx.deliveryLat;
-    ctx.lastDeliveryLng = ctx.deliveryLng;
-    ctx.lastDeliveryLabel = ctx.deliveryLabel;
-    clearPendingClarification(ctx);
-    if (ctx.lockedProductLines?.length || ctx.requestedItems?.length) {
-      return buildAndPresentQuote(phone, convId, ctx);
-    }
-    setExpected(ctx, "PRODUCT_TEXT");
-    await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
-    await wa.sendText(phone, `Deliver to:\n${ctx.deliveryLabel}\n\nWhat would you like?`);
-    return { handled: true };
-  } catch {
-    await wa.sendText(phone, "I couldn't find that address.\n\nSend your location pin or try another address.");
+  const { classifyGeocodeCandidates, geocodeAddressCandidates } = await import(
+    "../location/geocoding.service.js"
+  );
+  const classified = classifyGeocodeCandidates(await geocodeAddressCandidates(text));
+  if (classified.kind === "none") {
+    await updateConversation(convId, {
+      state: WhatsAppConversationState.AWAITING_LOCATION,
+      context: ctx
+    });
+    await wa.sendText(phone, formatLocationFailed());
     return { handled: true };
   }
+  if (classified.kind === "coarse") {
+    setExpected(ctx, "LOCATION");
+    ctx.pendingLocationChoices = undefined;
+    await updateConversation(convId, {
+      state: WhatsAppConversationState.AWAITING_LOCATION,
+      context: ctx
+    });
+    await wa.sendText(phone, formatLocationNeedLandmark());
+    return { handled: true };
+  }
+  if (classified.kind === "ambiguous") {
+    return askLocationClarification(phone, convId, ctx, classified.options);
+  }
+  const pick = classified.pick;
+  return applyResolvedCoordinates(phone, convId, ctx, {
+    latitude: pick.latitude,
+    longitude: pick.longitude,
+    label: humanDeliveryLabel({
+      typed: text,
+      formattedAddress: pick.formattedAddress
+    })
+  });
 }
 
 async function resolveProductsThenContinue(phone: string, convId: string, ctx: ConversationContext) {

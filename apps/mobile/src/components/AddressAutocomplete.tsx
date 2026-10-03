@@ -73,8 +73,8 @@ export function AddressAutocomplete({
 
   async function verifyTypedAddress(): Promise<void> {
     const query = value.trim();
-    if (query.length < 8) {
-      setResolveError("Enter a complete street address with city, state, and ZIP.");
+    if (query.length < 3) {
+      setResolveError("Enter your area and a nearby landmark.");
       onLocationCleared();
       return;
     }
@@ -82,12 +82,11 @@ export function AddressAutocomplete({
     setIsResolving(true);
     setResolveError(null);
     try {
-      const result = await api.geocodeAddress({ query }, token);
-      onChangeText(result.location.formattedAddress);
+      const result = await api.geocodeAddress({ query, allowIncomplete: true }, token);
       onLocationResolved(result.location);
       setSuggestions([]);
-    } catch (error) {
-      setResolveError(error instanceof Error ? error.message : "Could not verify this address.");
+    } catch {
+      setResolveError("I couldn't find that address. Add your area and a nearby landmark.");
       onLocationCleared();
     } finally {
       setIsResolving(false);
@@ -106,7 +105,7 @@ export function AddressAutocomplete({
           }
           setResolveError(null);
         }}
-        placeholder="Start typing a street address"
+        placeholder="Suburb, landmark, or street"
         maxLength={240}
         error={error ?? resolveError ?? undefined}
       />
@@ -135,7 +134,7 @@ export function AddressAutocomplete({
       ) : null}
 
       {!selectedLocation ? (
-        <AppButton label="Verify address" variant="secondary" size="md" onPress={() => void verifyTypedAddress()} />
+          <AppButton label="Find this address" variant="secondary" size="md" onPress={() => void verifyTypedAddress()} />
       ) : (
         <View className="rounded-2xl border border-success/30 bg-success/5 px-4 py-3">
           <Text className="text-xs font-bold uppercase tracking-wider text-success">Verified address</Text>
