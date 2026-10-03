@@ -137,3 +137,100 @@ export function recoveryKind(parsed: ParsedDeliveryText): "need_city" | "need_ar
   if (!parsed.suburb && !parsed.landmark) return "need_area";
   return "need_landmark";
 }
+
+export type LocationClarificationType = "CITY" | "AREA" | "LANDMARK" | "ADDRESS_CHOICE" | "CONFIRM_AREA";
+
+export type DeliveryLocationDraft = {
+  originalText?: string;
+  house?: string;
+  street?: string;
+  suburb?: string;
+  city?: string;
+  country?: string;
+  landmark?: string;
+};
+
+export function draftFromParsed(parsed: ParsedDeliveryText): DeliveryLocationDraft {
+  return {
+    originalText: parsed.original,
+    house: parsed.house,
+    street: parsed.street,
+    suburb: parsed.suburb,
+    city: parsed.city,
+    country: parsed.country ?? (parsed.city ? "Zimbabwe" : undefined),
+    landmark: parsed.landmark
+  };
+}
+
+export function houseOrInstructions(draft: DeliveryLocationDraft): string {
+  if (draft.house && draft.street) return `${draft.house} ${draft.street}`;
+  if (draft.house) return draft.house;
+  if (draft.street) return draft.street;
+  return "";
+}
+
+export function composeQueryFromDraft(draft: DeliveryLocationDraft): string {
+  const parts = [
+    houseOrInstructions(draft) || undefined,
+    draft.suburb,
+    draft.landmark ? `near ${draft.landmark}` : undefined,
+    draft.city,
+    draft.country || (draft.city ? "Zimbabwe" : undefined)
+  ].filter(Boolean);
+  return normalizeDeliveryQuery(parts.join(", "));
+}
+
+export function parsedFromDraft(draft: DeliveryLocationDraft): ParsedDeliveryText {
+  const composed = composeQueryFromDraft(draft);
+  return {
+    original: draft.originalText || composed,
+    normalized: composed,
+    house: draft.house,
+    street: draft.street,
+    suburb: draft.suburb,
+    city: draft.city,
+    landmark: draft.landmark,
+    country: draft.country ?? (draft.city ? "Zimbabwe" : undefined)
+  };
+}
+
+export function nextMissingClarification(draft: DeliveryLocationDraft): LocationClarificationType | null {
+  if (!String(draft.city ?? "").trim()) return "CITY";
+  if (!String(draft.suburb ?? "").trim() && !String(draft.landmark ?? "").trim()) return "AREA";
+  if (!String(draft.landmark ?? "").trim()) return "LANDMARK";
+  return null;
+}
+
+export function mergeClarificationReply(
+  draft: DeliveryLocationDraft,
+  reply: string,
+  expected: LocationClarificationType
+): DeliveryLocationDraft {
+  const trimmed = normalizeDeliveryQuery(reply);
+  if (!trimmed) return { ...draft };
+  const parsed = parseZimbabweDeliveryText(trimmed);
+  const next: DeliveryLocationDraft = { ...draft };
+  if (expected === "CITY") {
+    next.city = parsed.city || titlePlace(trimmed);
+    if (parsed.suburb) next.suburb = parsed.suburb;
+    if (parsed.landmark) next.landmark = parsed.landmark;
+  } else if (expected === "AREA") {
+    if (parsed.city) next.city = parsed.city;
+    next.suburb = parsed.suburb || titlePlace(trimmed.replace(new RegExp(`\\b${next.city ?? ""}\\b`, "ig"), "").replace(/[,\s]+/g, " ").trim() || trimmed);
+    if (parsed.landmark) next.landmark = parsed.landmark;
+    if (parsed.house) next.house = parsed.house;
+    if (parsed.street && !parsed.house) next.street = next.street || parsed.street;
+  } else if (expected === "LANDMARK") {
+    next.landmark = parsed.landmark || titlePlace(trimmed.replace(/^(near|close to|opposite|next to)\s+/i, ""));
+    if (parsed.city) next.city = parsed.city;
+    if (parsed.city && parsed.suburb) next.suburb = parsed.suburb;
+  } else if (parsed.city || parsed.suburb || parsed.landmark || parsed.house) {
+    if (parsed.city) next.city = parsed.city;
+    if (parsed.suburb) next.suburb = parsed.suburb;
+    if (parsed.landmark) next.landmark = parsed.landmark;
+    if (parsed.house) next.house = parsed.house;
+    if (parsed.street) next.street = parsed.street;
+  }
+  if (!next.country && next.city) next.country = "Zimbabwe";
+  return next;
+}

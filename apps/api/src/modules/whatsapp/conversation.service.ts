@@ -55,6 +55,16 @@ export type ConversationContext = {
   /** Customer-entered house/street/landmark text, even when geocode is area-level. */
   deliveryInstructions?: string;
   deliveryPrecision?: "EXACT" | "STREET" | "LANDMARK" | "AREA" | "GPS";
+  deliveryLocationDraft?: {
+    originalText?: string;
+    house?: string;
+    street?: string;
+    suburb?: string;
+    city?: string;
+    country?: string;
+    landmark?: string;
+  };
+  locationClarificationType?: "CITY" | "AREA" | "LANDMARK" | "ADDRESS_CHOICE" | "CONFIRM_AREA";
   pendingAreaMatch?: {
     label: string;
     suburb?: string;

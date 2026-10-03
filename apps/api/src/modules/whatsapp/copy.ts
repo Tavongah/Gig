@@ -134,6 +134,26 @@ export function formatLocationNeedLandmarkForArea(input: { areaLabel?: string; c
   ].join("\n");
 }
 
+export function formatLocationUseThisArea(input: { label: string }): string {
+  return [
+    `I found ${input.label}.`,
+    "",
+    "Use this delivery area?",
+    "",
+    "1. Yes",
+    "2. Change address"
+  ].join("\n");
+}
+
+export function formatLocationStillUnpinned(input: { areaLabel?: string; landmark?: string }): string {
+  const where = [input.landmark, input.areaLabel].filter(Boolean).join(" in ");
+  return [
+    where ? `I still couldn't pin ${where}.` : "I still couldn't pin that delivery point.",
+    "",
+    "Send your current location, or another nearby landmark."
+  ].join("\n");
+}
+
 export function formatLocationNeedLandmark(): string {
   return [
     "I couldn't find the exact delivery point.",

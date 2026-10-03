@@ -454,7 +454,10 @@ export async function geocodeAddressCandidates(query: string): Promise<GeocodeCa
   }
 }
 
-export async function resolveTypedDeliveryLocation(raw: string) {
+export async function resolveTypedDeliveryLocation(
+  raw: string,
+  options?: { parsed?: import("./zimbabwe-delivery-text.js").ParsedDeliveryText }
+) {
   let lastAt = 0;
   const resolution = await resolveTypedDeliveryLocationWithLookup(raw, async (query) => {
     const wait = 1100 - (Date.now() - lastAt);
@@ -468,7 +471,7 @@ export async function resolveTypedDeliveryLocation(raw: string) {
       candidateRejectionReason: candidates.length ? null : "provider_zero_results"
     });
     return candidates;
-  });
+  }, options?.parsed);
   logDutsFlow("GEOCODE_TYPED_ADDRESS", {
     queryCategory: resolution.queryCategory,
     providerResultCount: resolution.providerResultCount,

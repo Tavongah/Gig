@@ -16,6 +16,17 @@ import { quoteCart } from "../commerce/customer-commerce.service.js";
 import { ensureWhatsAppCommerceCustomer } from "../commerce/commerce-customer.service.js";
 import { applyGuestHandoffToConversation, extractGuestBasketRef } from "../commerce/guest-handoff.service.js";
 import {
+  composeQueryFromDraft,
+  draftFromParsed,
+  houseOrInstructions,
+  mergeClarificationReply,
+  nextMissingClarification,
+  parsedFromDraft,
+  parseZimbabweDeliveryText,
+  type DeliveryLocationDraft,
+  type LocationClarificationType
+} from "../location/zimbabwe-delivery-text.js";
+import {
   claimInboundMessage,
   getOrCreateConversation,
   readContext,
@@ -54,13 +65,13 @@ import {
   formatCompactMutation,
   formatDisambiguation,
   formatLocationAmbiguous,
-  formatLocationAreaFound,
   formatLocationAsk,
   formatLocationConfirm,
-  formatLocationFailed,
   formatLocationNeedArea,
   formatLocationNeedCity,
   formatLocationNeedLandmarkForArea,
+  formatLocationStillUnpinned,
+  formatLocationUseThisArea,
   formatMobileMoneyPending,
   formatMobileMoneyPhonePrompt,
   formatMissingItems,
@@ -674,6 +685,8 @@ async function handleChangeWhat(phone: string, convId: string, ctx: Conversation
     ctx.deliveryInstructions = undefined;
     ctx.deliveryPrecision = undefined;
     ctx.pendingAreaMatch = undefined;
+    ctx.deliveryLocationDraft = undefined;
+    ctx.locationClarificationType = undefined;
     setExpected(ctx, "LOCATION");
     await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
     await wa.sendText(phone, formatLocationAsk());
@@ -729,6 +742,7 @@ async function applyResolvedCoordinates(
   ctx.lastDeliveryLabel = ctx.deliveryLabel;
   ctx.pendingLocationChoices = undefined;
   ctx.pendingAreaMatch = undefined;
+  ctx.locationClarificationType = undefined;
   clearPendingClarification(ctx);
   return continueAfterLocation(phone, convId, ctx);
 }
@@ -778,12 +792,40 @@ async function askLocationClarification(
     longitude: o.longitude
   }));
   ctx.choiceId = choiceId;
+  ctx.locationClarificationType = "ADDRESS_CHOICE";
   setExpected(ctx, "LOCATION_CLARIFICATION");
   await updateConversation(convId, {
     state: WhatsAppConversationState.AWAITING_LOCATION,
     context: ctx
   });
   await wa.sendText(phone, formatLocationAmbiguous(options));
+  return { handled: true };
+}
+
+function areaLabelFromDraft(draft: DeliveryLocationDraft): string {
+  if (draft.suburb && draft.city && draft.landmark) return `${draft.suburb} near ${draft.landmark}, ${draft.city}`;
+  if (draft.suburb && draft.city) return `${draft.suburb}, ${draft.city}`;
+  if (draft.landmark && draft.city) return `${draft.landmark}, ${draft.city}`;
+  return draft.suburb || draft.city || "your area";
+}
+
+async function askLocationComponent(
+  phone: string,
+  convId: string,
+  ctx: ConversationContext,
+  type: LocationClarificationType,
+  message: string
+) {
+  const wa = getWhatsAppProvider();
+  ctx.pendingChoices = undefined;
+  ctx.lastDisambiguationQuery = undefined;
+  ctx.locationClarificationType = type;
+  setExpected(ctx, "LOCATION_CLARIFICATION");
+  await updateConversation(convId, {
+    state: WhatsAppConversationState.AWAITING_LOCATION,
+    context: ctx
+  });
+  await wa.sendText(phone, message);
   return { handled: true };
 }
 
@@ -794,52 +836,66 @@ async function applyLocationClarification(
   text: string
 ) {
   const wa = getWhatsAppProvider();
+  const type = ctx.locationClarificationType;
   const area = ctx.pendingAreaMatch;
-  if (area) {
+  if (type === "CONFIRM_AREA" || area) {
     const n = parseNumericChoice(text);
     const yes = n === 1 || /^(yes|yep|yeah|ok|okay)$/i.test(text.trim());
-    const no = n === 2 || /^(no|nope)$/i.test(text.trim());
-    if (yes) {
+    const change =
+      n === 2 ||
+      /^(no|nope|change( address)?)$/i.test(text.trim());
+    if (yes && area) {
       return applyResolvedCoordinates(phone, convId, ctx, {
         latitude: area.latitude,
         longitude: area.longitude,
         label: area.label,
-        instructions: ctx.deliveryInstructions || area.originalText,
+        instructions: houseOrInstructions(ctx.deliveryLocationDraft ?? {}) || ctx.deliveryInstructions || area.originalText,
         precision: "AREA"
       });
     }
-    if (no) {
+    if (change) {
       ctx.pendingAreaMatch = undefined;
       ctx.pendingLocationChoices = undefined;
+      ctx.deliveryLocationDraft = undefined;
+      ctx.locationClarificationType = undefined;
+      ctx.deliveryLat = undefined;
+      ctx.deliveryLng = undefined;
+      ctx.deliveryLabel = undefined;
       setExpected(ctx, "LOCATION");
       await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
-      await wa.sendText(phone, formatLocationNeedLandmarkForArea({ areaLabel: area.label, city: area.city }));
+      await wa.sendText(phone, formatLocationAsk());
       return { handled: true };
     }
     if (!text) {
-      await wa.sendText(phone, formatLocationAreaFound({ areaLabel: area.label, suburb: area.suburb }));
+      await wa.sendText(
+        phone,
+        formatLocationUseThisArea({ label: area?.label || areaLabelFromDraft(ctx.deliveryLocationDraft ?? {}) })
+      );
       return { handled: true };
     }
     return applyTypedLocation(phone, convId, ctx, text);
   }
   const options = ctx.pendingLocationChoices ?? [];
-  const n = parseNumericChoice(text);
-  if (n != null) {
-    const pick = options[n - 1];
-    if (!pick) {
-      await wa.sendText(phone, formatLocationAmbiguous(options));
+  if (type === "ADDRESS_CHOICE" || options.length) {
+    const n = parseNumericChoice(text);
+    if (n != null) {
+      const pick = options[n - 1];
+      if (!pick) {
+        await wa.sendText(phone, formatLocationAmbiguous(options));
+        return { handled: true };
+      }
+      return applyResolvedCoordinates(phone, convId, ctx, {
+        latitude: pick.latitude,
+        longitude: pick.longitude,
+        label: pick.label,
+        instructions: houseOrInstructions(ctx.deliveryLocationDraft ?? {}) || ctx.deliveryInstructions,
+        precision: "EXACT"
+      });
+    }
+    if (!text) {
+      await wa.sendText(phone, formatLocationAmbiguous(options.length ? options : [{ label: "your area" }]));
       return { handled: true };
     }
-    return applyResolvedCoordinates(phone, convId, ctx, {
-      latitude: pick.latitude,
-      longitude: pick.longitude,
-      label: pick.label,
-      precision: "EXACT"
-    });
-  }
-  if (!text) {
-    await wa.sendText(phone, formatLocationAmbiguous(options.length ? options : [{ label: "your area" }]));
-    return { handled: true };
   }
   return applyTypedLocation(phone, convId, ctx, text);
 }
@@ -850,30 +906,43 @@ async function applyTypedLocation(phone: string, convId: string, ctx: Conversati
     await wa.sendText(phone, formatLocationAsk());
     return { handled: true };
   }
-  const {
-    originalDeliveryInstructions,
-    resolveTypedDeliveryLocation
-  } = await import("../location/geocoding.service.js");
-  const resolution = await resolveTypedDeliveryLocation(text);
-  const instructions = originalDeliveryInstructions(resolution.parsed);
-  if (!ctx.deliveryInstructions || resolution.parsed.house || resolution.parsed.street) {
+  const incoming = parseZimbabweDeliveryText(text);
+  const prior = ctx.deliveryLocationDraft ?? {};
+  const clarifyingType = ctx.locationClarificationType;
+  const isComponentAsk = clarifyingType === "CITY" || clarifyingType === "AREA" || clarifyingType === "LANDMARK";
+  const looksLikeFragment = !incoming.city && Boolean(prior.city || prior.suburb);
+  const shouldMerge = isComponentAsk || looksLikeFragment;
+
+  let draft: DeliveryLocationDraft;
+  if (shouldMerge) {
+    const expected: LocationClarificationType =
+      clarifyingType === "CITY" || clarifyingType === "AREA" || clarifyingType === "LANDMARK"
+        ? clarifyingType
+        : nextMissingClarification(prior) ?? "LANDMARK";
+    draft = mergeClarificationReply(prior, text, expected);
+  } else {
+    draft = draftFromParsed(incoming);
+  }
+  ctx.deliveryLocationDraft = draft;
+  const instructions = houseOrInstructions(draft) || draft.originalText || text;
+  if (!ctx.deliveryInstructions || draft.house || draft.street) {
     ctx.deliveryInstructions = instructions;
   }
+
+  const { resolveTypedDeliveryLocation } = await import("../location/geocoding.service.js");
+  const parsed = parsedFromDraft(draft);
+  const query = composeQueryFromDraft(draft) || text;
+  const resolution = await resolveTypedDeliveryLocation(query, { parsed });
 
   if (resolution.kind === "exact" || resolution.kind === "landmark") {
     ctx.pendingAreaMatch = undefined;
     return applyResolvedCoordinates(phone, convId, ctx, {
       latitude: resolution.pick.latitude,
       longitude: resolution.pick.longitude,
-      label: resolution.kind === "landmark"
-        ? humanDeliveryLabel({
-            typed: text,
-            formattedAddress: resolution.pick.formattedAddress
-          })
-        : humanDeliveryLabel({
-            typed: text,
-            formattedAddress: resolution.pick.formattedAddress
-          }),
+      label: humanDeliveryLabel({
+        typed: query,
+        formattedAddress: resolution.pick.formattedAddress
+      }),
       instructions,
       precision: resolution.kind === "landmark" ? "LANDMARK" : resolution.resolutionLevel === "STREET" ? "STREET" : "EXACT"
     });
@@ -885,26 +954,21 @@ async function applyTypedLocation(phone: string, convId: string, ctx: Conversati
     ctx.lastDisambiguationQuery = undefined;
     ctx.pendingLocationChoices = undefined;
     ctx.pendingAreaMatch = {
-      label: resolution.areaLabel,
-      suburb: resolution.parsed.suburb,
-      city: resolution.parsed.city,
+      label: areaLabelFromDraft(draft),
+      suburb: draft.suburb,
+      city: draft.city,
       latitude: resolution.pick.latitude,
       longitude: resolution.pick.longitude,
       originalText: instructions
     };
     ctx.choiceId = choiceId;
+    ctx.locationClarificationType = "CONFIRM_AREA";
     setExpected(ctx, "LOCATION_CLARIFICATION");
     await updateConversation(convId, {
       state: WhatsAppConversationState.AWAITING_LOCATION,
       context: ctx
     });
-    await wa.sendText(
-      phone,
-      formatLocationAreaFound({
-        areaLabel: resolution.areaLabel,
-        suburb: resolution.parsed.suburb
-      })
-    );
+    await wa.sendText(phone, formatLocationUseThisArea({ label: areaLabelFromDraft(draft) }));
     return { handled: true };
   }
 
@@ -912,33 +976,40 @@ async function applyTypedLocation(phone: string, convId: string, ctx: Conversati
     return askLocationClarification(phone, convId, ctx, resolution.options);
   }
 
-  setExpected(ctx, "LOCATION");
-  ctx.pendingLocationChoices = undefined;
-  ctx.pendingAreaMatch = undefined;
-  await updateConversation(convId, {
-    state: WhatsAppConversationState.AWAITING_LOCATION,
-    context: ctx
-  });
-  if (resolution.kind === "need_city") {
-    await wa.sendText(phone, formatLocationNeedCity());
-    return { handled: true };
+  const missing = nextMissingClarification(draft);
+  if (missing === "CITY") {
+    return askLocationComponent(phone, convId, ctx, "CITY", formatLocationNeedCity());
   }
-  if (resolution.kind === "need_area") {
-    await wa.sendText(phone, formatLocationNeedArea({ city: resolution.parsed.city }));
-    return { handled: true };
+  if (missing === "AREA") {
+    return askLocationComponent(phone, convId, ctx, "AREA", formatLocationNeedArea({ city: draft.city }));
   }
-  if (resolution.kind === "need_landmark") {
-    await wa.sendText(
+  const justMergedLandmark =
+    shouldMerge &&
+    (clarifyingType === "LANDMARK" ||
+      (looksLikeFragment && clarifyingType !== "CITY" && clarifyingType !== "AREA"));
+  if (!justMergedLandmark && (missing === "LANDMARK" || Boolean(draft.city))) {
+    return askLocationComponent(
       phone,
+      convId,
+      ctx,
+      "LANDMARK",
       formatLocationNeedLandmarkForArea({
-        areaLabel: resolution.areaLabel,
-        city: resolution.parsed.city
+        areaLabel: draft.suburb && draft.city ? `${draft.suburb}, ${draft.city}` : draft.suburb,
+        city: draft.city
       })
     );
-    return { handled: true };
   }
-  await wa.sendText(phone, formatLocationFailed());
-  return { handled: true };
+
+  return askLocationComponent(
+    phone,
+    convId,
+    ctx,
+    "LANDMARK",
+    formatLocationStillUnpinned({
+      areaLabel: draft.suburb && draft.city ? `${draft.suburb}, ${draft.city}` : draft.city,
+      landmark: draft.landmark
+    })
+  );
 }
 
 async function resolveProductsThenContinue(phone: string, convId: string, ctx: ConversationContext) {

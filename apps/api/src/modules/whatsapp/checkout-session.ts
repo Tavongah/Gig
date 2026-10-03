@@ -124,7 +124,13 @@ export function expectedFromLegacyState(
     case WhatsAppConversationState.AWAITING_PRODUCT_CHOICE:
       return "PRODUCT_DISAMBIGUATION";
     case WhatsAppConversationState.AWAITING_LOCATION:
-      return ctx.pendingLocationChoices?.length || ctx.pendingAreaMatch ? "LOCATION_CLARIFICATION" : "LOCATION";
+      return ctx.pendingLocationChoices?.length ||
+        ctx.pendingAreaMatch ||
+        ctx.locationClarificationType ||
+        ctx.deliveryLocationDraft?.city ||
+        ctx.deliveryLocationDraft?.suburb
+        ? "LOCATION_CLARIFICATION"
+        : "LOCATION";
     case WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION:
       return "ORDER_CONFIRMATION";
     case WhatsAppConversationState.AWAITING_PAYMENT:
@@ -223,6 +229,7 @@ export function clearPendingClarification(ctx: ConversationContext): void {
   ctx.choiceId = undefined;
   ctx.pendingLocationChoices = undefined;
   ctx.pendingAreaMatch = undefined;
+  ctx.locationClarificationType = undefined;
   if (ctx.expectedInput === "PRODUCT_DISAMBIGUATION") {
     ctx.expectedInput = ctx.requestedItems?.length ? "READY_TO_ORDER" : "PRODUCT_TEXT";
     ctx.choiceType = ctx.expectedInput;
@@ -306,6 +313,13 @@ export function sanitizeCheckoutContext(
   const ctx: ConversationContext = { ...raw };
   if (!ctx.checkoutSessionId) ctx.checkoutSessionId = newCheckoutSessionId();
   if (!ctx.expectedInput) ctx.expectedInput = expectedFromLegacyState(state, ctx);
+  if (
+    state === WhatsAppConversationState.AWAITING_LOCATION &&
+    ctx.expectedInput === "LOCATION" &&
+    (ctx.locationClarificationType || ctx.deliveryLocationDraft?.city || ctx.deliveryLocationDraft?.suburb)
+  ) {
+    ctx.expectedInput = "LOCATION_CLARIFICATION";
+  }
   ctx.choiceType = ctx.expectedInput;
 
   if (ctx.expectedInput !== "PRODUCT_DISAMBIGUATION") {
@@ -319,7 +333,8 @@ export function sanitizeCheckoutContext(
   if (ctx.expectedInput !== "LOCATION_CLARIFICATION") {
     ctx.pendingLocationChoices = undefined;
     ctx.pendingAreaMatch = undefined;
-  } else if (!ctx.choiceId && (ctx.pendingLocationChoices?.[0] || ctx.pendingAreaMatch)) {
+    ctx.locationClarificationType = undefined;
+  } else if (!ctx.choiceId && (ctx.pendingLocationChoices?.[0] || ctx.pendingAreaMatch || ctx.deliveryLocationDraft)) {
     ctx.choiceId = newCheckoutSessionId();
   }
 

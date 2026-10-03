@@ -53,6 +53,7 @@ export function queryCategoryFromParsed(parsed: ParsedDeliveryText): string {
 export function originalDeliveryInstructions(parsed: ParsedDeliveryText): string {
   if (parsed.house && parsed.street) return `${parsed.house} ${parsed.street}`;
   if (parsed.house) return parsed.house;
+  if (parsed.street) return parsed.street;
   if (parsed.landmark && parsed.suburb) return `${parsed.suburb} near ${parsed.landmark}`;
   if (parsed.landmark) return parsed.landmark;
   return parsed.normalized || parsed.original;
@@ -84,9 +85,10 @@ function isStrong(precision: GeocodePrecision): boolean {
 
 export async function resolveTypedDeliveryLocationWithLookup(
   raw: string,
-  lookup: GeocodeLookup
+  lookup: GeocodeLookup,
+  parsedOverride?: ParsedDeliveryText
 ): Promise<TypedDeliveryResolution> {
-  const parsed = parseZimbabweDeliveryText(raw);
+  const parsed = parsedOverride ?? parseZimbabweDeliveryText(raw);
   const queriesAttempted = progressiveDeliveryQueries(parsed);
   const queryCategory = queryCategoryFromParsed(parsed);
   const base = { parsed, queriesAttempted, queryCategory, providerResultCount: 0 };
