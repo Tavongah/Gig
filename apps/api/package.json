@@ -51,6 +51,7 @@
     "test:whatsapp-checkout-isolation": "tsx scripts/test-whatsapp-checkout-isolation.ts",
     "test:low-data-address-fallback": "tsx scripts/test-low-data-address-fallback.ts",
     "test:location-clarification-context": "tsx scripts/test-location-clarification-context.ts",
+    "test:whatsapp-interactive-ux": "tsx scripts/test-whatsapp-interactive-ux.ts",
     "test:commerce-courier-ux": "tsx scripts/test-commerce-courier-ux.ts",
     "migrate:products-to-catalog": "tsx scripts/migrate-products-to-catalog.ts",
     "seed:pilot-merchant": "tsx scripts/seed-pilot-merchant.ts",

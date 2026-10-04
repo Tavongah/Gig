@@ -64,6 +64,16 @@ function asStringMap(body: TwilioWhatsAppForm | Record<string, unknown>): Record
   return out;
 }
 
+function parseInteractivePayloadId(raw: string | undefined): string | undefined {
+  if (!raw?.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as { ButtonPayload?: string; ListId?: string; id?: string };
+    return parsed.ButtonPayload?.trim() || parsed.ListId?.trim() || parsed.id?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function extractMedia(params: Record<string, string>): InboundWhatsAppMedia[] | undefined {
   const n = Number(params.NumMedia ?? "0");
   if (!Number.isFinite(n) || n <= 0) return undefined;
@@ -93,10 +103,10 @@ export function extractTwilioMessage(
   const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
 
   const text = params.Body?.trim() || undefined;
-  // Twilio Content / interactive reply payloads (optional; Body usually carries the label)
   const buttonId =
     params.ButtonPayload?.trim() ||
     params.ListId?.trim() ||
+    parseInteractivePayloadId(params.InteractiveData) ||
     undefined;
 
   return {

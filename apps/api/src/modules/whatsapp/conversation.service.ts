@@ -5,6 +5,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { normalizePhoneNumber } from "../auth/access.service.js";
+import type { InteractiveActionRecord } from "./interactive-actions.js";
 
 export type ConversationContext = {
   /** One active unfinished checkout per phone. Placed orders stay independent. */
@@ -122,6 +123,12 @@ export type ConversationContext = {
   payerPhoneDisplay?: string;
   /** EcoCash vs OneMoney selection for the pending mobile-money attempt. */
   selectedPaymentMethod?: "ECOCASH" | "ONEMONEY";
+  /** Idempotent welcome — set after the first idle welcome/menu. */
+  welcomeSentAt?: string;
+  /** Opaque WhatsApp button/list tokens bound to this conversation. */
+  interactiveActions?: InteractiveActionRecord[];
+  /** Restore checkout expectedInput after a track-order pick. */
+  statusResumeExpected?: ConversationContext["expectedInput"];
 };
 
 export async function getOrCreateConversation(

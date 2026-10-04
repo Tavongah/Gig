@@ -20,6 +20,44 @@ export const CUSTOMER_HELP_FULL = [
   "You can also: add · remove · show cart · checkout"
 ].join("\n");
 
+export function formatCustomerWelcome(): string {
+  return [
+    "👋 Welcome to DUTS",
+    "",
+    "Shop from local stores and get your order delivered to you.",
+    "",
+    "What would you like to do?"
+  ].join("\n");
+}
+
+export function formatMainMenu(): string {
+  return "What would you like to do?";
+}
+
+export function formatShopPrompt(): string {
+  return [
+    "What do you need?",
+    "",
+    "You can type something like:",
+    "",
+    "bread, milk and eggs"
+  ].join("\n");
+}
+
+export function formatCustomerHelpMenu(): string {
+  return [
+    "DUTS can help you shop from local stores and get your order delivered.",
+    "",
+    "You can:",
+    "",
+    "🛒 Shop",
+    "📦 Track an order",
+    "📍 Send or type your delivery location",
+    "",
+    "Need help with an order?"
+  ].join("\n");
+}
+
 export const MERCHANT_HELP = [
   "I didn't quite get that. Try:",
   "• orders",

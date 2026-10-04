@@ -1,7 +1,7 @@
 ﻿import { createHmac, timingSafeEqual } from "node:crypto";
 import { validateTwilioRequest } from "./twilio-payload.js";
 
-export type WhatsAppButton = { id: string; title: string };
+export type WhatsAppButton = { id: string; title: string; description?: string };
 
 export type OutboundWhatsAppMessage = {
   to: string;
@@ -31,6 +31,7 @@ export interface WhatsAppProvider {
   readonly name: string;
   sendText(to: string, body: string): Promise<void>;
   sendButtons(to: string, body: string, buttons: WhatsAppButton[]): Promise<void>;
+  sendList?(to: string, body: string, buttonText: string, items: WhatsAppButton[]): Promise<void>;
   sendOutbound?(to: string, opts: WhatsAppOutboundOptions): Promise<WhatsAppSendResult>;
   verifyWebhookSignature?(rawBody: Buffer, signatureHeader: string | undefined): boolean;
   /** Twilio uses form params + full URL (not raw JSON HMAC). */
@@ -60,6 +61,11 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
 
   async sendButtons(to: string, body: string, buttons: WhatsAppButton[]): Promise<void> {
     const result = await this.sendOutbound(to, { body, buttons });
+    if (!result.ok) throw new Error("WhatsApp send failed");
+  }
+
+  async sendList(to: string, body: string, _buttonText: string, items: WhatsAppButton[]): Promise<void> {
+    const result = await this.sendOutbound(to, { body, buttons: items });
     if (!result.ok) throw new Error("WhatsApp send failed");
   }
 
@@ -137,6 +143,28 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
     });
   }
 
+  async sendList(to: string, body: string, buttonText: string, items: WhatsAppButton[]): Promise<void> {
+    const toDigits = to.replace(/\D/g, "");
+    const rows = items.slice(0, 10).map((b) => ({
+      id: b.id.slice(0, 200),
+      title: b.title.slice(0, 24),
+      description: (b.description ?? "").slice(0, 72)
+    }));
+    await this.graph(`${this.phoneNumberId}/messages`, {
+      messaging_product: "whatsapp",
+      to: toDigits,
+      type: "interactive",
+      interactive: {
+        type: "list",
+        body: { text: body.slice(0, 1024) },
+        action: {
+          button: buttonText.slice(0, 20) || "View options",
+          sections: [{ title: "Options", rows }]
+        }
+      }
+    });
+  }
+
   verifyWebhookSignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
     if (!this.appSecret) return process.env.NODE_ENV !== "production";
     if (!signatureHeader?.startsWith("sha256=")) return false;
@@ -166,6 +194,7 @@ export type TwilioWhatsAppProviderOptions = {
 export class TwilioWhatsAppProvider implements WhatsAppProvider {
   readonly name = "twilio";
   readonly sent: OutboundWhatsAppMessage[] = [];
+  private contentApiDisabledUntil = 0;
 
   constructor(private readonly opts: TwilioWhatsAppProviderOptions) {}
 
@@ -252,8 +281,85 @@ export class TwilioWhatsAppProvider implements WhatsAppProvider {
     if (!result.ok) throw new Error("WhatsApp send failed");
   }
 
+  private async createTwilioContent(
+    kind: "quick-reply" | "list-picker",
+    body: string,
+    buttons: WhatsAppButton[],
+    listButton?: string
+  ): Promise<string | null> {
+    if (!buttons.length) return null;
+    if (Date.now() < this.contentApiDisabledUntil) return null;
+    const fetchImpl = this.opts.fetchImpl ?? fetch;
+    const auth = Buffer.from(`${this.opts.accountSid}:${this.opts.authToken}`).toString("base64");
+    const types =
+      kind === "list-picker"
+        ? {
+            "twilio/list-picker": {
+              body: body.slice(0, 1024),
+              button: (listButton || "View options").slice(0, 20),
+              items: buttons.slice(0, 10).map((b) => ({
+                id: b.id.slice(0, 200),
+                item: b.title.slice(0, 24),
+                description: (b.description ?? "").slice(0, 72)
+              }))
+            }
+          }
+        : {
+            "twilio/quick-reply": {
+              body: body.slice(0, 1024),
+              actions: buttons.slice(0, 3).map((b) => ({
+                type: "QUICK_REPLY",
+                title: b.title.slice(0, 20),
+                id: b.id.slice(0, 200)
+              }))
+            }
+          };
+    try {
+      const res = await fetchImpl("https://content.twilio.com/v1/Content", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          friendly_name: `duts_${kind.replace("-", "")}_${Date.now().toString(36)}_${Math.random()
+            .toString(36)
+            .slice(2, 8)}`,
+          language: "en",
+          types
+        })
+      });
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          this.contentApiDisabledUntil = Date.now() + 60_000;
+        }
+        console.error("[whatsapp:twilio] content create failed", res.status);
+        return null;
+      }
+      const json = (await res.json()) as { sid?: string };
+      return json.sid ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async sendButtons(to: string, body: string, buttons: WhatsAppButton[]): Promise<void> {
+    const contentSid = await this.createTwilioContent("quick-reply", body, buttons);
+    if (contentSid) {
+      const interactive = await this.sendOutbound(to, { contentSid, buttons, body });
+      if (interactive.ok) return;
+    }
     const result = await this.sendOutbound(to, { body, buttons });
+    if (!result.ok) throw new Error("WhatsApp send failed");
+  }
+
+  async sendList(to: string, body: string, buttonText: string, items: WhatsAppButton[]): Promise<void> {
+    const contentSid = await this.createTwilioContent("list-picker", body, items, buttonText);
+    if (contentSid) {
+      const interactive = await this.sendOutbound(to, { contentSid, buttons: items, body });
+      if (interactive.ok) return;
+    }
+    const result = await this.sendOutbound(to, { body, buttons: items });
     if (!result.ok) throw new Error("WhatsApp send failed");
   }
 

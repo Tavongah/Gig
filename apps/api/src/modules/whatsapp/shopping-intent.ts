@@ -95,7 +95,31 @@ function normalizeShoppingText(text: string): string {
 }
 
 function isPureGreeting(cleaned: string): boolean {
-  return /^(hi|hello|hey|menu|help|shop|wait|hello\?|hi\?)$/i.test(cleaned);
+  return /^(hi|hello|hey|menu|help|shop|wait|hello\?|hi\?|start|yo|howdy)$/i.test(cleaned);
+}
+
+const GREETING_RE =
+  /^(hi|hello|hey|yo|howdy|hiya|start|menu|good\s+(morning|afternoon|evening))([!. ]*)?$/i;
+
+export function isGreetingOrMenuIntent(text: string): boolean {
+  const t = text.trim().replace(/[?.!]+$/g, "").replace(/\s+/g, " ").trim();
+  return GREETING_RE.test(t);
+}
+
+export function classifyCustomerMenuTap(
+  text: string
+): "SHOP" | "TRACK" | "HELP" | "MENU" | null {
+  const t = text
+    .trim()
+    .toLowerCase()
+    .replace(/^[^\p{L}\p{N}]+/u, "")
+    .replace(/[?.!]+$/g, "")
+    .trim();
+  if (/^(shop|start shopping)$/i.test(t)) return "SHOP";
+  if (/^(track( order)?|my orders?)$/i.test(t)) return "TRACK";
+  if (/^help$/i.test(t)) return "HELP";
+  if (/^(menu|main menu|start)$/i.test(t)) return "MENU";
+  return null;
 }
 
 function parseQtyQuery(part: string): RequestedShoppingItem | null {

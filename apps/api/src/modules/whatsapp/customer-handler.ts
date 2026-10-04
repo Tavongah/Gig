@@ -36,12 +36,14 @@ import {
 import { getWhatsAppProvider } from "./provider.js";
 import {
   classifyShoppingIntent,
+  classifyCustomerMenuTap,
   extractShoppingItemsWithOptionalAi,
   isSameAgainIntent,
   isCancelIntent,
   isChangeIntent,
   isClaimPaidIntent,
   isConfirmIntent,
+  isGreetingOrMenuIntent,
   isHelpIntent,
   isRetryPaymentIntent,
   isSelectCashIntent,
@@ -88,6 +90,26 @@ import {
   parsePriceChangeDetail
 } from "./copy.js";
 import {
+  formatStaleChoiceNotice,
+  sendCartActions,
+  sendChangeWhat,
+  sendHelpMenu,
+  sendLocationAsk,
+  sendLocationCandidates,
+  sendMainMenu,
+  sendOrderReview,
+  sendPaymentChoices,
+  sendProductChoices,
+  sendShopPrompt,
+  sendTrackChoices,
+  sendUseThisArea
+} from "./customer-interactive.js";
+import {
+  isReturningWhatsAppCustomer,
+  resolveInteractiveAction,
+  type InteractiveActionRecord
+} from "./interactive-actions.js";
+import {
   beginCheckoutSession,
   cancelCheckoutDraft,
   clearPendingClarification,
@@ -98,6 +120,7 @@ import {
   humanDeliveryLabel,
   isCartCommand,
   isLivePendingPayment,
+  isUnfinishedCheckout,
   parseNumericChoice,
   sanitizeCheckoutContext,
   setExpected,
@@ -166,6 +189,36 @@ export async function handleCustomerWhatsAppMessage(
     return { handled: true };
   }
 
+  const interactiveHandled = await tryHandleInteractiveAction(
+    phone,
+    customerId,
+    conv.id,
+    conv.state,
+    ctx,
+    msg.buttonId
+  );
+  if (interactiveHandled) return interactiveHandled;
+
+  const menuTap = classifyCustomerMenuTap(text);
+  if (menuTap === "SHOP" || menuTap === "MENU" || isGreetingOrMenuIntent(text)) {
+    if (isUnfinishedCheckout(ctx, conv.state) || isLivePendingPayment(ctx)) {
+      await promptCurrentCheckoutStep(phone, conv.id, ctx);
+      return { handled: true };
+    }
+    if (menuTap === "SHOP") {
+      setExpected(ctx, "PRODUCT_TEXT");
+      await sendShopPrompt(phone, ctx);
+      await updateConversation(conv.id, {
+        state: WhatsAppConversationState.BUILDING_CART,
+        context: ctx
+      });
+      return { handled: true };
+    }
+    await sendMainMenu(phone, ctx, !isReturningWhatsAppCustomer(ctx));
+    await updateConversation(conv.id, { context: ctx });
+    return { handled: true };
+  }
+
   if (ctx.expectedInput === "PENDING_PAYMENT_HANDOFF") {
     const n = parseNumericChoice(text);
     if (n === 1 || /check|previous|status/i.test(text)) {
@@ -194,11 +247,11 @@ export async function handleCustomerWhatsAppMessage(
         return { handled: true };
       }
       ctx = beginCheckoutSession(ctx, "WHATSAPP", "PRODUCT_TEXT");
+      await sendShopPrompt(phone, ctx);
       await updateConversation(conv.id, {
         state: WhatsAppConversationState.BUILDING_CART,
         context: ctx
       });
-      await wa.sendText(phone, "What would you like?");
       return { handled: true };
     }
     await wa.sendText(phone, formatPendingPaymentHandoff());
@@ -208,47 +261,22 @@ export async function handleCustomerWhatsAppMessage(
   if (ctx.expectedInput === "ACTIVE_ORDER_STATUS" && ctx.statusOrderIds?.length) {
     const n = parseNumericChoice(text);
     if (n && ctx.statusOrderIds[n - 1]) {
-      const { prisma } = await import("../../config/prisma.js");
-      const order = await prisma.commerceOrder.findUnique({
-        where: { id: ctx.statusOrderIds[n - 1] },
-        include: {
-          items: true,
-          merchant: true,
-          linkedDeliveryGig: { include: { assignments: { include: { worker: true } } } }
-        }
-      });
-      ctx.statusOrderIds = undefined;
-      setExpected(ctx, ctx.draftLines?.length ? "ORDER_CONFIRMATION" : "NONE");
-      await updateConversation(conv.id, { context: ctx });
-      await wa.sendText(phone, formatOrderTrackMessage(order));
-      return { handled: true };
+      return presentTrackedOrder(phone, conv.id, ctx, ctx.statusOrderIds[n - 1]!);
     }
   }
 
-  if (isHelpIntent(text) || text.toLowerCase() === "help") {
-    await wa.sendText(phone, formatCheckoutHelp(ctx.expectedInput));
+  if (isHelpIntent(text) || text.toLowerCase() === "help" || menuTap === "HELP") {
+    if (isUnfinishedCheckout(ctx, conv.state) || isLivePendingPayment(ctx)) {
+      await wa.sendText(phone, formatCheckoutHelp(ctx.expectedInput));
+      return { handled: true };
+    }
+    await sendHelpMenu(phone, ctx);
+    await updateConversation(conv.id, { context: ctx });
     return { handled: true };
   }
 
-  if (isTrackIntent(text)) {
-    const orders = await getCustomerActiveOrders(commerceCustomer.id);
-    if (orders.length > 1) {
-      ctx.statusOrderIds = orders.map((o) => o.id);
-      setExpected(ctx, "ACTIVE_ORDER_STATUS");
-      await updateConversation(conv.id, { context: ctx });
-      await wa.sendText(
-        phone,
-        formatStatusChoices(
-          orders.map((o) => ({
-            orderNumber: o.orderNumber,
-            label: commerceCustomerStatusCopy(o.status as never)
-          }))
-        )
-      );
-      return { handled: true };
-    }
-    await wa.sendText(phone, formatOrderTrackMessage(orders[0] ?? null));
-    return { handled: true };
+  if (isTrackIntent(text) || menuTap === "TRACK") {
+    return presentCustomerTracking(phone, conv.id, conv.state, ctx, commerceCustomer.id);
   }
 
   if (isCartCommand(text) || classifyShoppingIntent(text).kind === "SHOW_CART") {
@@ -307,7 +335,7 @@ export async function handleCustomerWhatsAppMessage(
         state: WhatsAppConversationState.AWAITING_LOCATION,
         context: ctx
       });
-      await wa.sendText(phone, formatLocationAsk());
+      await sendLocationAsk(phone);
       return { handled: true };
     }
     if (n === 2) {
@@ -316,7 +344,7 @@ export async function handleCustomerWhatsAppMessage(
         state: WhatsAppConversationState.BUILDING_CART,
         context: ctx
       });
-      await wa.sendText(phone, "What should I add?");
+      await sendShopPrompt(phone, ctx);
       return { handled: true };
     }
   }
@@ -351,13 +379,13 @@ export async function handleCustomerWhatsAppMessage(
     if (choiceHandled) return choiceHandled;
     const pending = ctx.pendingChoices?.[0];
     if (pending?.options?.length) {
-      await wa.sendText(
+      await sendProductChoices(
         phone,
-        formatDisambiguation(
-          pending.options.length === 2 ? `Which ${pending.query}?` : "Which one do you want?",
-          pending.options
-        )
+        ctx,
+        pending.options.length === 2 ? `Which ${pending.query}?` : "Which one do you want?",
+        pending.options
       );
+      await updateConversation(conv.id, { context: ctx });
       return { handled: true };
     }
   }
@@ -383,10 +411,7 @@ export async function handleCustomerWhatsAppMessage(
     (ctx.deliveryLat == null || ctx.deliveryLng == null)
   ) {
     await updateConversation(conv.id, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
-    await wa.sendText(
-      phone,
-      formatLocationAsk()
-    );
+    await sendLocationAsk(phone);
     return { handled: true };
   }
 
@@ -407,10 +432,7 @@ export async function handleCustomerWhatsAppMessage(
         state: WhatsAppConversationState.AWAITING_LOCATION,
         context: ctx
       });
-      await wa.sendText(
-        phone,
-        formatLocationAsk()
-      );
+      await sendLocationAsk(phone);
       return { handled: true };
     }
     await wa.sendText(phone, "What would you like again? Tell me the items.");
@@ -517,7 +539,7 @@ export async function handleCustomerWhatsAppMessage(
     if (ctx.deliveryLat == null || ctx.deliveryLng == null) {
       setExpected(ctx, "LOCATION");
       await updateConversation(conv.id, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
-      await wa.sendText(phone, formatLocationAsk());
+      await sendLocationAsk(phone);
       return { handled: true };
     }
     return buildAndPresentQuote(phone, conv.id, {
@@ -665,7 +687,9 @@ async function presentCurrentCart(phone: string, convId: string, ctx: Conversati
   if (ctx.deliveryLat != null && ctx.deliveryLng != null && (ctx.draftLines?.length || ctx.lockedProductLines?.length)) {
     return buildAndPresentQuote(phone, convId, ctx);
   }
-  await wa.sendText(phone, formatReadyToOrder({ lines, subtotalCents: subtotal || lines.length }));
+  setExpected(ctx, "READY_TO_ORDER");
+  await sendCartActions(phone, ctx, { lines, subtotalCents: subtotal || lines.length });
+  await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
   return { handled: true };
 }
 
@@ -689,17 +713,18 @@ async function handleChangeWhat(phone: string, convId: string, ctx: Conversation
     ctx.locationClarificationType = undefined;
     setExpected(ctx, "LOCATION");
     await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
-    await wa.sendText(phone, formatLocationAsk());
+    await sendLocationAsk(phone);
     return { handled: true };
   }
   if (n === 3 || /pay/i.test(text)) {
     ctx.paymentPhase = "SELECT_METHOD";
     setExpected(ctx, "PAYMENT_METHOD");
+    await sendPaymentChoices(phone, ctx);
     await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_PAYMENT, context: ctx });
-    await wa.sendText(phone, formatPaymentMethodChoice());
     return { handled: true };
   }
-  await wa.sendText(phone, formatChangeWhat(Boolean(ctx.paymentPhase)));
+  await sendChangeWhat(phone, ctx, Boolean(ctx.paymentPhase));
+  await updateConversation(convId, { context: ctx });
   return { handled: true };
 }
 
@@ -794,11 +819,11 @@ async function askLocationClarification(
   ctx.choiceId = choiceId;
   ctx.locationClarificationType = "ADDRESS_CHOICE";
   setExpected(ctx, "LOCATION_CLARIFICATION");
+  await sendLocationCandidates(phone, ctx, options);
   await updateConversation(convId, {
     state: WhatsAppConversationState.AWAITING_LOCATION,
     context: ctx
   });
-  await wa.sendText(phone, formatLocationAmbiguous(options));
   return { handled: true };
 }
 
@@ -863,14 +888,12 @@ async function applyLocationClarification(
       ctx.deliveryLabel = undefined;
       setExpected(ctx, "LOCATION");
       await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
-      await wa.sendText(phone, formatLocationAsk());
+      await sendLocationAsk(phone);
       return { handled: true };
     }
     if (!text) {
-      await wa.sendText(
-        phone,
-        formatLocationUseThisArea({ label: area?.label || areaLabelFromDraft(ctx.deliveryLocationDraft ?? {}) })
-      );
+      await sendUseThisArea(phone, ctx, area?.label || areaLabelFromDraft(ctx.deliveryLocationDraft ?? {}));
+      await updateConversation(convId, { context: ctx });
       return { handled: true };
     }
     return applyTypedLocation(phone, convId, ctx, text);
@@ -881,7 +904,8 @@ async function applyLocationClarification(
     if (n != null) {
       const pick = options[n - 1];
       if (!pick) {
-        await wa.sendText(phone, formatLocationAmbiguous(options));
+        await sendLocationCandidates(phone, ctx, options);
+        await updateConversation(convId, { context: ctx });
         return { handled: true };
       }
       return applyResolvedCoordinates(phone, convId, ctx, {
@@ -893,7 +917,8 @@ async function applyLocationClarification(
       });
     }
     if (!text) {
-      await wa.sendText(phone, formatLocationAmbiguous(options.length ? options : [{ label: "your area" }]));
+      await sendLocationCandidates(phone, ctx, options.length ? options : [{ label: "your area" }]);
+      await updateConversation(convId, { context: ctx });
       return { handled: true };
     }
   }
@@ -903,7 +928,7 @@ async function applyLocationClarification(
 async function applyTypedLocation(phone: string, convId: string, ctx: ConversationContext, text: string) {
   const wa = getWhatsAppProvider();
   if (!text) {
-    await wa.sendText(phone, formatLocationAsk());
+    await sendLocationAsk(phone);
     return { handled: true };
   }
   const incoming = parseZimbabweDeliveryText(text);
@@ -964,11 +989,11 @@ async function applyTypedLocation(phone: string, convId: string, ctx: Conversati
     ctx.choiceId = choiceId;
     ctx.locationClarificationType = "CONFIRM_AREA";
     setExpected(ctx, "LOCATION_CLARIFICATION");
+    await sendUseThisArea(phone, ctx, areaLabelFromDraft(draft));
     await updateConversation(convId, {
       state: WhatsAppConversationState.AWAITING_LOCATION,
       context: ctx
     });
-    await wa.sendText(phone, formatLocationUseThisArea({ label: areaLabelFromDraft(draft) }));
     return { handled: true };
   }
 
@@ -1026,7 +1051,7 @@ async function resolveProductsThenContinue(phone: string, convId: string, ctx: C
     }
     setExpected(ctx, "LOCATION");
     await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
-    await wa.sendText(phone, formatLocationAsk());
+    await sendLocationAsk(phone);
     return { handled: true };
   }
 
@@ -1047,14 +1072,12 @@ async function resolveProductsThenContinue(phone: string, convId: string, ctx: C
       ctx.lastDisambiguationQuery = item.query;
       ctx.choiceId = choiceId;
       setExpected(ctx, "PRODUCT_DISAMBIGUATION");
+      const title = options.length === 2 ? `Which ${item.query}?` : "Which one do you want?";
+      await sendProductChoices(phone, ctx, title, options);
       await updateConversation(convId, {
         state: WhatsAppConversationState.AWAITING_PRODUCT_CHOICE,
         context: ctx
       });
-      await wa.sendText(
-        phone,
-        formatDisambiguation(options.length === 2 ? `Which ${item.query}?` : "Which one do you want?", options)
-      );
       return { handled: true };
     }
     if (matches[0]) {
@@ -1079,10 +1102,10 @@ async function resolveProductsThenContinue(phone: string, convId: string, ctx: C
     return buildAndPresentQuote(phone, convId, ctx);
   }
   setExpected(ctx, "READY_TO_ORDER");
-  await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
   const lines = cartLinesForDisplay(ctx);
   const subtotal = lines.reduce((s, l) => s + l.lineTotalCents, 0);
-  await wa.sendText(phone, formatReadyToOrder({ lines, subtotalCents: subtotal }));
+  await sendCartActions(phone, ctx, { lines, subtotalCents: subtotal });
+  await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
   return { handled: true };
 }
 
@@ -1210,7 +1233,7 @@ async function buildAndPresentQuote(
     if (hasProducts) {
       setExpected(ctx, "LOCATION");
       await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
-      await wa.sendText(phone, formatLocationAsk());
+      await sendLocationAsk(phone);
       return { handled: true };
     }
     setExpected(ctx, "PRODUCT_TEXT");
@@ -1294,13 +1317,13 @@ async function buildAndPresentQuote(
         ctx.lastDisambiguationQuery = item.query;
         ctx.choiceId = choiceId;
         setExpected(ctx, "PRODUCT_DISAMBIGUATION");
+        const title =
+          options.length === 2 ? `Which ${item.query}?` : "Which one do you want?";
+        await sendProductChoices(phone, ctx, title, options);
         await updateConversation(convId, {
           state: WhatsAppConversationState.AWAITING_PRODUCT_CHOICE,
           context: ctx
         });
-        const title =
-          options.length === 2 ? `Which ${item.query}?` : "Which one do you want?";
-        await wa.sendText(phone, formatDisambiguation(title, options));
         return { handled: true };
       }
     }
@@ -1377,12 +1400,12 @@ async function buildAndPresentQuote(
 
   ctx.previousMerchantId = basket.merchant.id;
   setExpected(ctx, "ORDER_CONFIRMATION");
-  await updateConversation(convId, {
-    state: WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION,
-    context: ctx
-  });
 
   if (opts?.compact && !basket.switchedFromPreferred) {
+    await updateConversation(convId, {
+      state: WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION,
+      context: ctx
+    });
     await wa.sendText(
       phone,
       formatCompactMutation({
@@ -1414,7 +1437,11 @@ async function buildAndPresentQuote(
     deliveryLabel: ctx.deliveryLabel ?? undefined,
     includeConfirmChoices: true
   });
-  await wa.sendText(phone, switchNote + textBody);
+  await sendOrderReview(phone, ctx, switchNote + textBody);
+  await updateConversation(convId, {
+    state: WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION,
+    context: ctx
+  });
   return { handled: true };
 }
 
@@ -1462,10 +1489,10 @@ async function applyProductChoice(
     return buildAndPresentQuote(phone, convId, ctx);
   }
   setExpected(ctx, "READY_TO_ORDER");
-  await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
   const lines = cartLinesForDisplay(ctx);
   const subtotal = lines.reduce((s, l) => s + l.lineTotalCents, 0);
-  await wa.sendText(phone, formatReadyToOrder({ lines, subtotalCents: subtotal }));
+  await sendCartActions(phone, ctx, { lines, subtotalCents: subtotal });
+  await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
   return { handled: true };
 }
 
@@ -1514,11 +1541,11 @@ async function handleOrderReviewDecision(
 
   if (isChange) {
     setExpected(ctx, "CHANGE_WHAT");
+    await sendChangeWhat(phone, ctx, Boolean(ctx.paymentPhase));
     await updateConversation(convId, {
       state: WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION,
       context: ctx
     });
-    await wa.sendText(phone, formatChangeWhat(Boolean(ctx.paymentPhase)));
     return { handled: true };
   }
 
@@ -1563,10 +1590,12 @@ async function handleOrderReviewDecision(
     return { handled: false };
   }
 
-  await wa.sendText(
+  await sendOrderReview(
     phone,
+    ctx,
     ["Confirm order?", "", "1. Confirm", "2. Change", "3. Cancel"].join("\n")
   );
+  await updateConversation(convId, { context: ctx });
   return { handled: true };
 }
 
@@ -1612,11 +1641,11 @@ async function confirmDraftOrder(
   ctx.payerPhoneDisplay = undefined;
   ctx.selectedPaymentMethod = undefined;
   setExpected(ctx, "PAYMENT_METHOD");
+  await sendPaymentChoices(phone, ctx, totals.totalCents);
   await updateConversation(convId, {
     state: WhatsAppConversationState.AWAITING_PAYMENT,
     context: ctx
   });
-  await wa.sendText(phone, formatPaymentMethodChoice(totals.totalCents));
   return { handled: true };
 }
 
@@ -1663,7 +1692,8 @@ async function handlePaymentConversation(
     isSelectOneMoneyIntent(text)
   ) {
     if (resolveCommercePaymentProviderName() !== "paynow") {
-      await wa.sendText(phone, formatPaymentMethodChoice());
+      await sendPaymentChoices(phone, ctx);
+      await updateConversation(convId, { context: ctx });
       return { handled: true };
     }
     if (phase === "PENDING_PROVIDER") {
@@ -1730,7 +1760,8 @@ async function handlePaymentConversation(
   }
 
   const totals = await quoteBasketTotalsFromContext(ctx);
-  await wa.sendText(phone, formatPaymentMethodChoice(totals?.totalCents ?? 0));
+  await sendPaymentChoices(phone, ctx, totals?.totalCents ?? 0);
+  await updateConversation(convId, { context: ctx });
   return { handled: true };
 }
 
@@ -1955,15 +1986,12 @@ async function handleOrderCreateError(
                 : [{ name: "Item", oldCents: 0, newCents: totals?.totalCents ?? 0 }],
               totalCents: totals?.totalCents ?? 0
             });
-      try {
-        await wa.sendButtons(phone, body.replace(/\n1\. Confirm[\s\S]*$/, "\n\nConfirm order?"), [
-          { id: "confirm_order", title: "Confirm" },
-          { id: "change_order", title: "Change" },
-          { id: "cancel_order", title: "Cancel" }
-        ]);
-      } catch {
-        await wa.sendText(phone, body);
-      }
+      setExpected(ctx, "ORDER_CONFIRMATION");
+      await sendOrderReview(phone, ctx, body);
+      await updateConversation(convId, {
+        state: WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION,
+        context: ctx
+      });
       return { handled: true };
     }
   }
@@ -2000,4 +2028,323 @@ async function quoteBasketTotalsFromContext(ctx: ConversationContext) {
     customerLng: ctx.deliveryLng,
     lines: ctx.draftLines
   });
+}
+
+async function tryHandleInteractiveAction(
+  phone: string,
+  customerId: string,
+  convId: string,
+  state: WhatsAppConversationState,
+  ctx: ConversationContext,
+  buttonId?: string
+): Promise<{ handled: boolean } | null> {
+  if (!buttonId) return null;
+  const resolved = resolveInteractiveAction(ctx, buttonId);
+  if (resolved.ok === false && resolved.reason === "unknown") return null;
+  if (resolved.ok === false) {
+    const wa = getWhatsAppProvider();
+    await wa.sendText(phone, formatStaleChoiceNotice());
+    if (isUnfinishedCheckout(ctx, state) || isLivePendingPayment(ctx)) {
+      await promptCurrentCheckoutStep(phone, convId, ctx);
+    } else {
+      await sendMainMenu(phone, ctx, false);
+      await updateConversation(convId, { context: ctx });
+    }
+    return { handled: true };
+  }
+  return applyInteractiveAction(phone, customerId, convId, state, ctx, resolved.action);
+}
+
+async function applyInteractiveAction(
+  phone: string,
+  customerId: string,
+  convId: string,
+  state: WhatsAppConversationState,
+  ctx: ConversationContext,
+  action: InteractiveActionRecord
+): Promise<{ handled: boolean }> {
+  switch (action.kind) {
+    case "MENU_SHOP":
+      if (isUnfinishedCheckout(ctx, state) || isLivePendingPayment(ctx)) {
+        const expect = ctx.expectedInput ?? "NONE";
+        if (expect === "PRODUCT_TEXT" || expect === "NONE" || expect === "READY_TO_ORDER") {
+          setExpected(ctx, "PRODUCT_TEXT");
+          await sendShopPrompt(phone, ctx);
+          await updateConversation(convId, {
+            state: WhatsAppConversationState.BUILDING_CART,
+            context: ctx
+          });
+          return { handled: true };
+        }
+        await promptCurrentCheckoutStep(phone, convId, ctx);
+        return { handled: true };
+      }
+      setExpected(ctx, "PRODUCT_TEXT");
+      await sendShopPrompt(phone, ctx);
+      await updateConversation(convId, {
+        state: WhatsAppConversationState.BUILDING_CART,
+        context: ctx
+      });
+      return { handled: true };
+    case "MENU_TRACK":
+      return presentCustomerTracking(phone, convId, state, ctx, customerId);
+    case "MENU_HELP":
+      if (isUnfinishedCheckout(ctx, state) || isLivePendingPayment(ctx)) {
+        await getWhatsAppProvider().sendText(phone, formatCheckoutHelp(ctx.expectedInput));
+        return { handled: true };
+      }
+      await sendHelpMenu(phone, ctx);
+      await updateConversation(convId, { context: ctx });
+      return { handled: true };
+    case "MENU_MAIN":
+      if (isUnfinishedCheckout(ctx, state) || isLivePendingPayment(ctx)) {
+        await promptCurrentCheckoutStep(phone, convId, ctx);
+        return { handled: true };
+      }
+      await sendMainMenu(phone, ctx, false);
+      await updateConversation(convId, { context: ctx });
+      return { handled: true };
+    case "SELECT_PRODUCT": {
+      const pending = ctx.pendingChoices?.[0];
+      const idx = pending?.options.findIndex((o) => o.productId === action.productId) ?? -1;
+      if (idx < 0) {
+        await getWhatsAppProvider().sendText(phone, formatStaleChoiceNotice());
+        await promptCurrentCheckoutStep(phone, convId, ctx);
+        return { handled: true };
+      }
+      return applyProductChoice(phone, convId, ctx, idx + 1);
+    }
+    case "CART_CONTINUE":
+      if (ctx.deliveryLat != null && ctx.deliveryLng != null) {
+        return buildAndPresentQuote(phone, convId, ctx);
+      }
+      setExpected(ctx, "LOCATION");
+      await updateConversation(convId, {
+        state: WhatsAppConversationState.AWAITING_LOCATION,
+        context: ctx
+      });
+      await sendLocationAsk(phone);
+      return { handled: true };
+    case "CART_ADD_MORE":
+      setExpected(ctx, "PRODUCT_TEXT");
+      await sendShopPrompt(phone, ctx);
+      await updateConversation(convId, {
+        state: WhatsAppConversationState.BUILDING_CART,
+        context: ctx
+      });
+      return { handled: true };
+    case "CART_VIEW":
+      return presentCurrentCart(phone, convId, ctx);
+    case "CART_CANCEL":
+    case "REVIEW_CANCEL":
+      if (isLivePendingPayment(ctx)) {
+        await getWhatsAppProvider().sendText(phone, formatPaymentStillPending());
+        return { handled: true };
+      }
+      ctx = cancelCheckoutDraft(ctx);
+      await updateConversation(convId, { state: WhatsAppConversationState.IDLE, context: ctx });
+      {
+        const { formatOrderCancelled } = await import("./copy.js");
+        await getWhatsAppProvider().sendText(phone, formatOrderCancelled());
+      }
+      return { handled: true };
+    case "LOC_USE_AREA":
+      return applyLocationClarification(phone, convId, ctx, "1");
+    case "LOC_CHANGE":
+      return applyLocationClarification(phone, convId, ctx, "2");
+    case "LOC_NONE":
+      ctx.pendingLocationChoices = undefined;
+      ctx.pendingAreaMatch = undefined;
+      ctx.locationClarificationType = undefined;
+      setExpected(ctx, "LOCATION");
+      await updateConversation(convId, {
+        state: WhatsAppConversationState.AWAITING_LOCATION,
+        context: ctx
+      });
+      await sendLocationAsk(phone);
+      return { handled: true };
+    case "LOC_PICK":
+      return applyLocationClarification(phone, convId, ctx, String(action.choiceIndex ?? 0));
+    case "REVIEW_PLACE":
+      return confirmDraftOrder(phone, customerId, convId, ctx);
+    case "REVIEW_CHANGE_ADDRESS":
+      return handleChangeWhat(phone, convId, ctx, "2");
+    case "REVIEW_CHANGE_ITEMS":
+      return handleChangeWhat(phone, convId, ctx, "1");
+    case "CHANGE_ITEMS":
+      return handleChangeWhat(phone, convId, ctx, "1");
+    case "CHANGE_LOCATION":
+      return handleChangeWhat(phone, convId, ctx, "2");
+    case "CHANGE_PAYMENT":
+      return handleChangeWhat(phone, convId, ctx, "3");
+    case "PAYMENT_ECOCASH":
+      if (ctx.expectedInput === "PAYMENT_RETRY") {
+        return handlePaymentConversation(phone, customerId, convId, ctx, "RETRY");
+      }
+      return handlePaymentConversation(phone, customerId, convId, ctx, "EcoCash", "pay_ecocash");
+    case "PAYMENT_COD":
+      return handlePaymentConversation(phone, customerId, convId, ctx, "Cash", "pay_cash");
+    case "TRACK_ORDER":
+      if (!action.orderId) {
+        return presentCustomerTracking(phone, convId, state, ctx, customerId);
+      }
+      return presentTrackedOrder(phone, convId, ctx, action.orderId, customerId);
+    default:
+      await promptCurrentCheckoutStep(phone, convId, ctx);
+      return { handled: true };
+  }
+}
+
+async function promptCurrentCheckoutStep(
+  phone: string,
+  convId: string,
+  ctx: ConversationContext
+): Promise<void> {
+  const expect = ctx.expectedInput ?? "NONE";
+  switch (expect) {
+    case "PAYMENT_PENDING":
+      await getWhatsAppProvider().sendText(phone, formatPaymentStillPending());
+      return;
+    case "PENDING_PAYMENT_HANDOFF":
+      await getWhatsAppProvider().sendText(phone, formatPendingPaymentHandoff());
+      return;
+    case "PAYMENT_METHOD":
+    case "PAYMENT_RETRY": {
+      const totals = await quoteBasketTotalsFromContext(ctx);
+      await sendPaymentChoices(phone, ctx, totals?.totalCents);
+      await updateConversation(convId, { context: ctx });
+      return;
+    }
+    case "ECOCASH_NUMBER":
+      await getWhatsAppProvider().sendText(
+        phone,
+        formatMobileMoneyPhonePrompt(ctx.selectedPaymentMethod === "ONEMONEY" ? "ONEMONEY" : "ECOCASH")
+      );
+      return;
+    case "LOCATION":
+      await sendLocationAsk(phone);
+      return;
+    case "LOCATION_CLARIFICATION":
+      if (ctx.locationClarificationType === "CONFIRM_AREA" || ctx.pendingAreaMatch) {
+        await sendUseThisArea(
+          phone,
+          ctx,
+          ctx.pendingAreaMatch?.label || areaLabelFromDraft(ctx.deliveryLocationDraft ?? {})
+        );
+        await updateConversation(convId, { context: ctx });
+        return;
+      }
+      if (ctx.pendingLocationChoices?.length) {
+        await sendLocationCandidates(phone, ctx, ctx.pendingLocationChoices);
+        await updateConversation(convId, { context: ctx });
+        return;
+      }
+      await getWhatsAppProvider().sendText(phone, formatCheckoutHelp(expect));
+      return;
+    case "PRODUCT_DISAMBIGUATION": {
+      const pending = ctx.pendingChoices?.[0];
+      if (pending?.options?.length) {
+        await sendProductChoices(
+          phone,
+          ctx,
+          pending.options.length === 2 ? `Which ${pending.query}?` : "Which one do you want?",
+          pending.options
+        );
+        await updateConversation(convId, { context: ctx });
+        return;
+      }
+      await getWhatsAppProvider().sendText(phone, formatCheckoutHelp(expect));
+      return;
+    }
+    case "READY_TO_ORDER": {
+      const lines = cartLinesForDisplay(ctx);
+      const subtotal = lines.reduce((s, l) => s + l.lineTotalCents, 0);
+      await sendCartActions(phone, ctx, { lines, subtotalCents: subtotal });
+      await updateConversation(convId, { context: ctx });
+      return;
+    }
+    case "ORDER_CONFIRMATION":
+      await sendOrderReview(phone, ctx, formatCheckoutHelp(expect));
+      await updateConversation(convId, { context: ctx });
+      return;
+    case "CHANGE_WHAT":
+      await sendChangeWhat(phone, ctx, Boolean(ctx.paymentPhase));
+      await updateConversation(convId, { context: ctx });
+      return;
+    case "PRODUCT_TEXT":
+      await sendShopPrompt(phone, ctx);
+      return;
+    default:
+      await getWhatsAppProvider().sendText(phone, formatCheckoutHelp(expect));
+  }
+}
+
+async function presentCustomerTracking(
+  phone: string,
+  convId: string,
+  state: WhatsAppConversationState,
+  ctx: ConversationContext,
+  commerceCustomerId: string
+): Promise<{ handled: boolean }> {
+  const wa = getWhatsAppProvider();
+  const orders = await getCustomerActiveOrders(commerceCustomerId);
+  if (orders.length > 1) {
+    if (isUnfinishedCheckout(ctx, state) || isLivePendingPayment(ctx)) {
+      ctx.statusResumeExpected = ctx.expectedInput;
+    }
+    ctx.statusOrderIds = orders.map((o) => o.id);
+    setExpected(ctx, "ACTIVE_ORDER_STATUS");
+    await sendTrackChoices(
+      phone,
+      ctx,
+      orders.map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        label: commerceCustomerStatusCopy(o.status as never)
+      }))
+    );
+    await updateConversation(convId, { context: ctx });
+    return { handled: true };
+  }
+  await wa.sendText(phone, formatOrderTrackMessage(orders[0] ?? null));
+  return { handled: true };
+}
+
+async function presentTrackedOrder(
+  phone: string,
+  convId: string,
+  ctx: ConversationContext,
+  orderId: string,
+  commerceCustomerId?: string
+): Promise<{ handled: boolean }> {
+  const wa = getWhatsAppProvider();
+  if (commerceCustomerId) {
+    const owned = await getCustomerActiveOrders(commerceCustomerId);
+    if (!owned.some((o) => o.id === orderId) && !(ctx.statusOrderIds ?? []).includes(orderId)) {
+      await wa.sendText(phone, formatStaleChoiceNotice());
+      await sendMainMenu(phone, ctx, false);
+      await updateConversation(convId, { context: ctx });
+      return { handled: true };
+    }
+  }
+  const { prisma } = await import("../../config/prisma.js");
+  const order = await prisma.commerceOrder.findUnique({
+    where: { id: orderId },
+    include: {
+      items: true,
+      merchant: true,
+      linkedDeliveryGig: { include: { assignments: { include: { worker: true } } } }
+    }
+  });
+  ctx.statusOrderIds = undefined;
+  const resume = ctx.statusResumeExpected;
+  ctx.statusResumeExpected = undefined;
+  if (resume) {
+    setExpected(ctx, resume);
+  } else {
+    setExpected(ctx, ctx.draftLines?.length ? "ORDER_CONFIRMATION" : "NONE");
+  }
+  await updateConversation(convId, { context: ctx });
+  await wa.sendText(phone, formatOrderTrackMessage(order));
+  return { handled: true };
 }

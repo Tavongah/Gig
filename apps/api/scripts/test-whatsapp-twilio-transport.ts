@@ -248,7 +248,10 @@ async function main() {
   });
   assert(conversationOutbound.length >= 1, "customer got Twilio outbound");
   assert(
-    conversationOutbound.some((b) => /location|shop|cart|buy|deliver/i.test(decodeURIComponent(b))),
+    conversationOutbound.some(
+      (b) =>
+        /ContentSid=/.test(b) || /location|shop|cart|buy|deliver|welcome|duts/i.test(decodeURIComponent(b))
+    ),
     `conversation reply missing: ${conversationOutbound[0]?.slice(0, 160)}`
   );
 
