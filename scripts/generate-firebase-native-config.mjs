@@ -99,7 +99,7 @@ function upsertEnv(path, updates) {
 
 const webApiKey = web?.apiKey || ios.apiKey;
 const webAppId = web?.appId || "";
-const authDomain = web?.authDomain || `${projectId}.firebaseapp.com`;
+const authDomain = web?.authDomain || "app.duts.tech";
 
 upsertEnv(mobileEnvPath, {
   EXPO_PUBLIC_FIREBASE_API_KEY: webApiKey,

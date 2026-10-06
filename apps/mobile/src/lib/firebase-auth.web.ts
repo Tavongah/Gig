@@ -7,12 +7,18 @@ type FirebaseExtras = {
   firebaseAppId?: string;
 };
 
+type FirebaseUser = { getIdToken: () => Promise<string> };
+
+type FirebaseAuthInstance = {
+  signInWithPopup: (provider: unknown) => Promise<{ user: FirebaseUser; providerId?: string }>;
+  signInWithRedirect: (provider: unknown) => Promise<void>;
+  getRedirectResult: () => Promise<{ user?: FirebaseUser; providerId?: string; credential?: { providerId?: string } } | null>;
+};
+
 type FirebaseCompat = {
   initializeApp: (config: Record<string, string | undefined>) => unknown;
   auth: {
-    (): {
-      signInWithPopup: (provider: unknown) => Promise<{ user: { getIdToken: () => Promise<string> } }>;
-    };
+    (): FirebaseAuthInstance;
     GoogleAuthProvider: new () => {
       setCustomParameters: (params: Record<string, string>) => void;
     };
@@ -27,8 +33,12 @@ declare global {
 }
 
 const extra = Constants.expoConfig?.extra as FirebaseExtras | undefined;
+const PENDING_SOCIAL_AUTH_KEY = "duts.pendingSocialAuth";
+
 let initialized = false;
-let initPromise: Promise<ReturnType<FirebaseCompat["auth"]> | null> | null = null;
+let initPromise: Promise<FirebaseAuthInstance | null> | null = null;
+
+export type SocialAuthProvider = "google" | "apple";
 
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -45,7 +55,7 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
-async function getFirebaseAuth(): Promise<ReturnType<FirebaseCompat["auth"]> | null> {
+async function getFirebaseAuth(): Promise<FirebaseAuthInstance | null> {
   if (
     !extra?.firebaseApiKey ||
     !extra.firebaseAuthDomain ||
@@ -91,11 +101,69 @@ export function useFirebaseConfigured(): boolean {
   return isFirebaseClientConfigured();
 }
 
-function mapFirebaseAuthError(error: unknown, providerLabel: string): Error {
+function shouldUseRedirectFlow(): boolean {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  const iOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const standalone =
+    window.matchMedia?.("(display-mode: standalone)")?.matches === true ||
+    (navigator as { standalone?: boolean }).standalone === true;
+  return iOS || standalone;
+}
+
+function persistPendingSocialAuth(provider: SocialAuthProvider, intendedRole?: "CLIENT" | "WORKER"): void {
+  try {
+    sessionStorage.setItem(
+      PENDING_SOCIAL_AUTH_KEY,
+      JSON.stringify({ provider, intendedRole: intendedRole ?? "CLIENT" })
+    );
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+export function readPendingSocialAuth(): { provider: SocialAuthProvider; intendedRole: "CLIENT" | "WORKER" } | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_SOCIAL_AUTH_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { provider?: string; intendedRole?: string };
+    const provider = parsed.provider === "apple" ? "apple" : parsed.provider === "google" ? "google" : null;
+    if (!provider) return null;
+    return {
+      provider,
+      intendedRole: parsed.intendedRole === "WORKER" ? "WORKER" : "CLIENT"
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingSocialAuth(): void {
+  try {
+    sessionStorage.removeItem(PENDING_SOCIAL_AUTH_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function providerFromRedirect(result: { providerId?: string; credential?: { providerId?: string } } | null): SocialAuthProvider {
+  const id = `${result?.providerId ?? ""} ${result?.credential?.providerId ?? ""}`.toLowerCase();
+  if (id.includes("apple")) return "apple";
+  return "google";
+}
+
+export function mapFirebaseAuthError(error: unknown, providerLabel: string): Error {
   const code =
     typeof error === "object" && error && "code" in error ? String((error as { code: string }).code) : "";
 
-  if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+  if (
+    code === "auth/popup-closed-by-user" ||
+    code === "auth/cancelled-popup-request" ||
+    code === "auth/user-cancelled" ||
+    code === "auth/redirect-cancelled-by-user"
+  ) {
     return new Error(`${providerLabel} sign-in was canceled.`);
   }
   if (code === "auth/popup-blocked") {
@@ -116,10 +184,41 @@ function mapFirebaseAuthError(error: unknown, providerLabel: string): Error {
   if (error instanceof Error && error.message) {
     return error;
   }
-  return new Error(`${providerLabel} sign-in failed.`);
+  return new Error(`${providerLabel} sign-in failed. Try again.`);
 }
 
-async function signIn(provider: "google" | "apple"): Promise<string> {
+function createProvider(provider: SocialAuthProvider): unknown {
+  if (!window.firebase) throw new Error("Firebase is not configured for social sign-in.");
+  if (provider === "google") {
+    const google = new window.firebase.auth.GoogleAuthProvider();
+    google.setCustomParameters({ prompt: "select_account" });
+    return google;
+  }
+  const apple = new window.firebase.auth.OAuthProvider("apple.com");
+  apple.addScope("email");
+  apple.addScope("name");
+  return apple;
+}
+
+export async function completePendingRedirectSignIn(): Promise<{
+  idToken: string;
+  provider: SocialAuthProvider;
+} | null> {
+  try {
+    const auth = await getFirebaseAuth();
+    if (!auth) return null;
+    const result = await auth.getRedirectResult();
+    if (!result?.user) return null;
+    const token = await result.user.getIdToken();
+    if (!token) return null;
+    return { idToken: token, provider: providerFromRedirect(result) };
+  } catch (error) {
+    clearPendingSocialAuth();
+    throw mapFirebaseAuthError(error, "Sign-in");
+  }
+}
+
+async function signIn(provider: SocialAuthProvider, intendedRole?: "CLIENT" | "WORKER"): Promise<string> {
   const providerLabel = provider === "google" ? "Google" : "Apple";
   try {
     const auth = await getFirebaseAuth();
@@ -127,33 +226,39 @@ async function signIn(provider: "google" | "apple"): Promise<string> {
       throw new Error("Firebase is not configured for social sign-in.");
     }
 
-    const providerInstance =
-      provider === "google"
-        ? (() => {
-            const google = new window.firebase.auth.GoogleAuthProvider();
-            google.setCustomParameters({ prompt: "select_account" });
-            return google;
-          })()
-        : (() => {
-            const apple = new window.firebase.auth.OAuthProvider("apple.com");
-            apple.addScope("email");
-            apple.addScope("name");
-            return apple;
-          })();
+    const providerInstance = createProvider(provider);
+    if (shouldUseRedirectFlow()) {
+      persistPendingSocialAuth(provider, intendedRole);
+      await auth.signInWithRedirect(providerInstance);
+      return new Promise(() => undefined);
+    }
 
-    const result = await auth.signInWithPopup(providerInstance);
-    const token = await result.user.getIdToken();
-    if (!token) throw new Error("Could not read a sign-in token.");
-    return token;
+    try {
+      const result = await auth.signInWithPopup(providerInstance);
+      const token = await result.user.getIdToken();
+      if (!token) throw new Error("Could not read a sign-in token.");
+      return token;
+    } catch (popupError) {
+      const code =
+        typeof popupError === "object" && popupError && "code" in popupError
+          ? String((popupError as { code: string }).code)
+          : "";
+      if (code !== "auth/popup-blocked" && code !== "auth/operation-not-supported-in-this-environment") {
+        throw popupError;
+      }
+      persistPendingSocialAuth(provider, intendedRole);
+      await auth.signInWithRedirect(providerInstance);
+      return new Promise(() => undefined);
+    }
   } catch (error) {
     throw mapFirebaseAuthError(error, providerLabel);
   }
 }
 
-export async function signInWithGooglePopup(): Promise<string> {
-  return signIn("google");
+export async function signInWithGooglePopup(intendedRole?: "CLIENT" | "WORKER"): Promise<string> {
+  return signIn("google", intendedRole);
 }
 
-export async function signInWithApplePopup(): Promise<string> {
-  return signIn("apple");
+export async function signInWithApplePopup(intendedRole?: "CLIENT" | "WORKER"): Promise<string> {
+  return signIn("apple", intendedRole);
 }

@@ -36,6 +36,21 @@ export function useFirebaseConfigured(): boolean {
   return isFirebaseClientConfigured();
 }
 
+export async function completePendingRedirectSignIn(): Promise<{
+  idToken: string;
+  provider: "google" | "apple";
+} | null> {
+  return null;
+}
+
+export function readPendingSocialAuth(): { provider: "google" | "apple"; intendedRole: "CLIENT" | "WORKER" } | null {
+  return null;
+}
+
+export function clearPendingSocialAuth(): void {
+  /* native apps do not use the web redirect helper */
+}
+
 function getFirebaseAuth() {
   const extra = getExtras();
   if (!isFirebaseClientConfigured()) {
@@ -83,7 +98,7 @@ async function signInWithWebPopup(provider: GoogleAuthProvider | OAuthProvider, 
   }
 }
 
-export async function signInWithApplePopup(): Promise<string> {
+export async function signInWithApplePopup(_intendedRole?: "CLIENT" | "WORKER"): Promise<string> {
   if (Platform.OS === "web") {
     const provider = new OAuthProvider("apple.com");
     provider.addScope("email");
@@ -134,7 +149,7 @@ export async function signInWithApplePopup(): Promise<string> {
   return result.user.getIdToken();
 }
 
-export async function signInWithGooglePopup(): Promise<string> {
+export async function signInWithGooglePopup(_intendedRole?: "CLIENT" | "WORKER"): Promise<string> {
   if (Platform.OS === "web") {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });

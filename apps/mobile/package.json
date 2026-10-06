@@ -21,6 +21,7 @@
     "test:commerce-courier-ux-ui": "npx tsx scripts/test-commerce-courier-ux-ui.ts",
     "test:courier-start-trip-ui": "npx tsx scripts/test-courier-start-trip-ui.ts",
     "test:courier-logout-ui": "npx tsx scripts/test-courier-logout-ui.ts",
+    "test:firebase-auth-domain": "npx tsx scripts/test-firebase-auth-domain.ts",
     "test:delivery-ux-simplification": "npx tsx scripts/test-delivery-ux-simplification.ts",
     "eas:login": "npx eas-cli login",
     "eas:build:android": "npx eas-cli build --platform android --profile production",

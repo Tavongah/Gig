@@ -1,9 +1,17 @@
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { defaultActiveRole } from "../lib/auth";
-import { isFirebaseClientConfigured, signInWithApplePopup, signInWithGooglePopup } from "../lib/firebase-auth";
+import {
+  clearPendingSocialAuth,
+  completePendingRedirectSignIn,
+  isFirebaseClientConfigured,
+  readPendingSocialAuth,
+  signInWithApplePopup,
+  signInWithGooglePopup
+} from "../lib/firebase-auth";
 import { DUTS } from "../lib/theme";
 import { useSessionStore } from "../stores/session.store";
 import { AppleIcon, GoogleIcon } from "./SocialProviderIcons";
@@ -64,6 +72,8 @@ export function SocialAuthButtons({
 }: SocialAuthButtonsProps) {
   const setSession = useSessionStore((state) => state.setSession);
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
+  const [redirectError, setRedirectError] = useState<string | null>(null);
+  const [completingRedirect, setCompletingRedirect] = useState(Platform.OS === "web");
   const configQuery = useQuery({
     queryKey: ["auth-config"],
     queryFn: () => api.getAuthConfig()
@@ -71,20 +81,60 @@ export function SocialAuthButtons({
 
   const socialMutation = useMutation({
     mutationFn: async (provider: "google" | "apple") => {
-      const idToken = provider === "google" ? await signInWithGooglePopup() : await signInWithApplePopup();
+      const idToken =
+        provider === "google"
+          ? await signInWithGooglePopup(intendedRole)
+          : await signInWithApplePopup(intendedRole);
       return api.socialLogin({ provider, idToken, intendedRole });
     },
     onSuccess: (session) => {
+      clearPendingSocialAuth();
       setSession(session);
       setActiveRole(defaultActiveRole(session.user));
     }
   });
 
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+      setCompletingRedirect(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const pending = await completePendingRedirectSignIn();
+        if (!pending || cancelled) return;
+        const stored = readPendingSocialAuth();
+        clearPendingSocialAuth();
+        const session = await api.socialLogin({
+          provider: pending.provider,
+          idToken: pending.idToken,
+          intendedRole: stored?.intendedRole ?? intendedRole
+        });
+        if (cancelled) return;
+        setSession(session);
+        setActiveRole(defaultActiveRole(session.user));
+      } catch (error) {
+        if (!cancelled) {
+          setRedirectError(error instanceof Error ? error.message : "Sign-in failed. Try again.");
+        }
+      } finally {
+        if (!cancelled) setCompletingRedirect(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Complete a Firebase redirect exactly once when this screen mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const clientReady = isFirebaseClientConfigured();
   const serverReady = Boolean(configQuery.data?.firebaseConfigured);
   const firebaseReady = clientReady && serverReady;
-  const isPending = socialMutation.isPending;
+  const isPending = socialMutation.isPending || completingRedirect;
   const pendingProvider = socialMutation.variables;
+  const authError = redirectError ?? socialMutation.error?.message ?? null;
   const showGoogle = Platform.OS === "web";
   const showApple = Platform.OS === "web" || Platform.OS === "ios";
 
@@ -99,9 +149,12 @@ export function SocialAuthButtons({
           compact={layout === "row"}
           label="Continue with Google"
           icon={<GoogleIcon size={20} />}
-          onPress={() => socialMutation.mutate("google")}
-          disabled={disabled || !firebaseReady || (isPending && pendingProvider !== "google")}
-          loading={isPending && pendingProvider === "google"}
+          onPress={() => {
+            setRedirectError(null);
+            socialMutation.mutate("google");
+          }}
+          disabled={disabled || !firebaseReady || isPending}
+          loading={completingRedirect || (isPending && pendingProvider === "google")}
         />
       ) : null}
       {showApple ? (
@@ -109,9 +162,12 @@ export function SocialAuthButtons({
           compact={layout === "row"}
           label="Continue with Apple"
           icon={<AppleIcon size={20} />}
-          onPress={() => socialMutation.mutate("apple")}
-          disabled={disabled || !firebaseReady || (isPending && pendingProvider !== "apple")}
-          loading={isPending && pendingProvider === "apple"}
+          onPress={() => {
+            setRedirectError(null);
+            socialMutation.mutate("apple");
+          }}
+          disabled={disabled || !firebaseReady || isPending}
+          loading={completingRedirect || (isPending && pendingProvider === "apple")}
         />
       ) : null}
     </>
@@ -129,7 +185,7 @@ export function SocialAuthButtons({
               : "Add FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY to apps/api/.env and restart the API."}
         </Text>
       ) : null}
-      {socialMutation.error ? <Text className="text-sm text-danger">{socialMutation.error.message}</Text> : null}
+      {authError ? <Text className="text-sm text-danger">{authError}</Text> : null}
     </View>
   );
 }
