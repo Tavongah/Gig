@@ -400,6 +400,19 @@ export {
 } from "./multi-shop-checkout.js";
 
 export {
+  parseUnlistedItemCodEnabled,
+  parseUnlistedItemRequestEnabled,
+  parseUnlistedRequestText,
+  UNLISTED_POST_PURCHASE_STATUSES,
+  UNLISTED_PRE_PURCHASE_RELEASE_STATUSES,
+  unlistedItemMaxPriceCents,
+  unlistedItemMinPriceCents,
+  unlistedItemSearchTtlSeconds,
+  validateUnlistedFoundPriceCents,
+  type ParsedUnlistedRequest
+} from "./unlisted-item-request.js";
+
+export {
   compareSmartBasketMatches,
   coverageRatio,
   evaluateMerchantCoverage,

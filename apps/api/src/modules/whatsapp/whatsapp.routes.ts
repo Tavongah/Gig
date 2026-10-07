@@ -537,4 +537,13 @@ commerceAdminRouter.post("/orders/:id/retry-whatsapp", async (req, res, next) =>
   }
 });
 
+commerceAdminRouter.get("/unlisted-requests", async (_req, res, next) => {
+  try {
+    const { listUnlistedRequestsForAdmin } = await import("../commerce/unlisted-item.service.js");
+    res.json(await listUnlistedRequestsForAdmin());
+  } catch (e) {
+    next(e);
+  }
+});
+
 export type { MetaWebhookPayload };

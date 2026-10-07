@@ -630,6 +630,94 @@ export function formatStatusChoices(
   ].join("\n");
 }
 
+export function formatUnlistedNotFoundOffer(itemName: string): string {
+  const name = itemName.trim() || "that item";
+  return [
+    `I couldn't find ${name} in DUTS.`,
+    "",
+    "Would you like us to look for it?",
+    "",
+    "1. Request this item",
+    "2. Try another search"
+  ].join("\n");
+}
+
+export function formatUnlistedSearching(itemName: string): string {
+  return [
+    `We're looking for ${itemName}.`,
+    "",
+    "We'll message you when a courier finds it — with the actual price — so you can decide before paying."
+  ].join("\n");
+}
+
+export function formatUnlistedQuote(input: {
+  productName: string;
+  itemCents: number;
+  deliveryCents: number;
+  totalCents: number;
+  merchantName?: string | null;
+  quantity: number;
+  maxBudgetCents?: number | null;
+  foundPriceCents?: number | null;
+  photoUrl?: string | null;
+}): string {
+  const overBudget =
+    input.maxBudgetCents != null &&
+    input.foundPriceCents != null &&
+    input.foundPriceCents > input.maxBudgetCents;
+  const lines = [
+    "We found it 🎉",
+    "",
+    input.productName,
+    input.quantity > 1 ? `Quantity: ${input.quantity}` : null,
+    "",
+    `Item: ${money(input.itemCents)}`,
+    `Delivery: ${money(input.deliveryCents)}`,
+    `Total: ${money(input.totalCents)}`,
+    input.merchantName ? `\nFound at:\n${input.merchantName}` : null,
+    overBudget
+      ? `\nYour maximum was ${money(input.maxBudgetCents!)}.\nFound price is ${money(input.foundPriceCents!)}.`
+      : null,
+    input.photoUrl ? `\nPhoto: ${input.photoUrl}` : null,
+    "",
+    "1. Buy it",
+    "2. No thanks"
+  ];
+  return lines.filter((l) => l != null).join("\n");
+}
+
+export function formatUnlistedDeclined(): string {
+  return "No problem. You haven't been charged.\n\nTell me if you want to look for something else.";
+}
+
+export function formatUnlistedNotFoundCustomer(): string {
+  return ["We couldn't find this item nearby.", "", "You haven't been charged."].join("\n");
+}
+
+export function formatUnlistedExpired(): string {
+  return ["We couldn't find this item in time.", "", "You haven't been charged."].join("\n");
+}
+
+export function formatUnlistedNeedsAttention(): string {
+  return "This request needs DUTS help. You won't be charged extra automatically.";
+}
+
+export function formatUnlistedPaymentChoice(totalCents: number): string {
+  return [
+    `Total ${money(totalCents)}.`,
+    "",
+    "Pay with EcoCash to confirm. We'll tell the courier to buy it only after payment is confirmed.",
+    "",
+    "Cash on delivery is not available for unlisted items yet.",
+    "",
+    "1. EcoCash"
+  ].join("\n");
+}
+
+export function formatUnlistedPaid(): string {
+  return "Payment confirmed. A courier is buying the item and will deliver it to you.";
+}
+
 export function formatCheckoutHelp(expected?: string): string {
   switch (expected) {
     case "PRODUCT_DISAMBIGUATION":
@@ -654,6 +742,13 @@ export function formatCheckoutHelp(expected?: string): string {
       return formatChangeWhat(true);
     case "PENDING_PAYMENT_HANDOFF":
       return formatPendingPaymentHandoff();
+    case "UNLISTED_OFFER":
+      return "Reply 1 to request this item, or 2 to try another search.";
+    case "UNLISTED_QUOTE":
+      return "Reply 1 to buy it, or 2 to decline. You will not be charged unless you approve.";
+    case "UNLISTED_PAYMENT":
+    case "UNLISTED_ECOCASH":
+      return formatEcoCashPrompt();
     default:
       return CUSTOMER_HELP_FULL;
   }

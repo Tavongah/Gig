@@ -92,6 +92,11 @@ async function bootstrap(): Promise<void> {
     );
   }, 5 * 60 * 1000);
   setInterval(() => {
+    void import("./modules/commerce/unlisted-item.service.js").then(({ expireStaleUnlistedRequests }) =>
+      expireStaleUnlistedRequests().catch(() => undefined)
+    );
+  }, 60 * 1000);
+  setInterval(() => {
     void import("./modules/gigs/gig-workflow.service.js").then(async ({ checkTimerThreshold }) => {
       const { prisma } = await import("./config/prisma.js");
       const { GigStatus } = await import("@prisma/client");

@@ -956,6 +956,8 @@ export const api = {
       smartBasketEnabled: boolean;
       multiShopCheckoutEnabled: boolean;
       maxShopsPerCheckout: number;
+      unlistedItemRequestEnabled?: boolean;
+      unlistedItemCodEnabled?: boolean;
     }>("/commerce/public-config"),
 
   commerceCartCanJoin: (
@@ -1294,7 +1296,129 @@ export const api = {
         merchantId: string;
         merchantName: string;
       }>;
-    }>("/commerce/basket/select", { method: "POST", body: JSON.stringify(payload) })
+    }>("/commerce/basket/select", { method: "POST", body: JSON.stringify(payload) }),
+
+  unlistedSearches: (token: string) =>
+    request<{ searches: UnlistedItemRequestDto[] }>("/workers/unlisted-searches", {}, token),
+
+  acceptUnlistedSearch: (id: string, token: string) =>
+    request<{ search: UnlistedItemRequestDto }>(
+      `/workers/unlisted-searches/${id}/accept`,
+      { method: "POST", body: JSON.stringify({}) },
+      token
+    ),
+
+  submitUnlistedQuote: (
+    id: string,
+    payload: {
+      foundProductName: string;
+      foundPriceCents: number;
+      foundMerchantName: string;
+      foundNote?: string;
+      foundPhotoBase64?: string;
+    },
+    token: string
+  ) =>
+    request<{ search: UnlistedItemRequestDto }>(
+      `/workers/unlisted-searches/${id}/quote`,
+      { method: "POST", body: JSON.stringify(payload) },
+      token
+    ),
+
+  reportUnlistedNotFound: (id: string, token: string) =>
+    request<{ search: UnlistedItemRequestDto }>(
+      `/workers/unlisted-searches/${id}/not-found`,
+      { method: "POST", body: JSON.stringify({}) },
+      token
+    ),
+
+  releaseUnlistedSearch: (id: string, token: string) =>
+    request<{ search: UnlistedItemRequestDto }>(
+      `/workers/unlisted-searches/${id}/release`,
+      { method: "POST", body: JSON.stringify({}) },
+      token
+    ),
+
+  markUnlistedPurchased: (id: string, token: string) =>
+    request<{ search: UnlistedItemRequestDto }>(
+      `/workers/unlisted-searches/${id}/purchased`,
+      { method: "POST", body: JSON.stringify({}) },
+      token
+    ),
+
+  reportUnlistedPriceChange: (id: string, payload: { foundPriceCents: number; foundNote?: string }, token: string) =>
+    request<{ search: UnlistedItemRequestDto }>(
+      `/workers/unlisted-searches/${id}/price-change`,
+      { method: "POST", body: JSON.stringify(payload) },
+      token
+    ),
+
+  createUnlistedRequest: (
+    payload: {
+      originalRequestText: string;
+      quantity?: number;
+      optionalMaxBudgetCents?: number | null;
+      lat?: number;
+      lng?: number;
+      areaId?: string;
+      deliveryLabel?: string;
+    },
+    token?: string
+  ) =>
+    request<{ request: UnlistedItemRequestDto }>(
+      "/commerce/unlisted-requests",
+      { method: "POST", body: JSON.stringify(payload) },
+      token
+    ),
+
+  getUnlistedRequest: (id: string, token?: string) =>
+    request<{ request: UnlistedItemRequestDto }>(`/commerce/unlisted-requests/${id}`, {}, token),
+
+  approveUnlistedQuote: (id: string, approvalId: string, token?: string) =>
+    request<{ request: UnlistedItemRequestDto }>(
+      `/commerce/unlisted-requests/${id}/approve`,
+      { method: "POST", body: JSON.stringify({ approvalId }) },
+      token
+    ),
+
+  declineUnlistedQuote: (id: string, approvalId: string, token?: string) =>
+    request<{ request: UnlistedItemRequestDto }>(
+      `/commerce/unlisted-requests/${id}/decline`,
+      { method: "POST", body: JSON.stringify({ approvalId }) },
+      token
+    ),
+
+  payUnlistedEcoCash: (id: string, payerPhone: string, token?: string) =>
+    request<{ attemptId: string; displayLocal: string; expiresAt: string | null }>(
+      `/commerce/unlisted-requests/${id}/pay-ecocash`,
+      { method: "POST", body: JSON.stringify({ payerPhone }) },
+      token
+    )
+};
+
+export type UnlistedItemRequestDto = {
+  id: string;
+  requestNumber: number;
+  status: string;
+  originalRequestText: string;
+  parsedItemName: string;
+  quantity: number;
+  optionalNotes: string | null;
+  optionalMaxBudgetCents: number | null;
+  foundProductName: string | null;
+  foundPriceCents: number | null;
+  foundPhotoUrl: string | null;
+  foundMerchantName: string | null;
+  foundNote: string | null;
+  customerDecision: string;
+  approvalId: string | null;
+  quoteVersion: number;
+  deliveryFeeCents: number | null;
+  totalCents: number | null;
+  deliveryLabel: string | null;
+  assignedCourierId: string | null;
+  linkedDeliveryGigId: string | null;
+  expiresAt: string;
 };
 
 export type SmartBasketMatchDto = {

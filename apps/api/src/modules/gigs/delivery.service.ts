@@ -219,6 +219,8 @@ export async function createDelivery(
     /** Marketplace WhatsApp orders create lightweight customers without app onboarding. */
     bypassClientPostGate?: boolean;
     marketplaceCommerceOrderId?: string;
+    /** Unlisted-item: do not broadcast as a normal marketplace pickup. */
+    skipMarketplaceBroadcast?: boolean;
   }
 ) {
   assertDeliveryProductEnabled();
@@ -400,7 +402,9 @@ export async function createDelivery(
     include: { serviceCategory: true, payment: true }
   });
 
-  await publishPostedGig(gig.id);
+  if (!options?.skipMarketplaceBroadcast) {
+    await publishPostedGig(gig.id);
+  }
   logDutsFlow("GIG_CREATED", {
     gigId: gig.id,
     userId: clientId,
@@ -1037,6 +1041,12 @@ export async function verifyDeliveryPinAndComplete(
   try {
     const { syncCommerceOrderFromGig } = await import("../commerce/order.service.js");
     await syncCommerceOrderFromGig(gigId, GigStatus.WAITING_CUSTOMER_CONFIRMATION);
+  } catch {
+    /* non-blocking */
+  }
+  try {
+    const { markUnlistedCompletedByGig } = await import("../commerce/unlisted-item.service.js");
+    await markUnlistedCompletedByGig(gigId);
   } catch {
     /* non-blocking */
   }

@@ -733,6 +733,12 @@ export async function approveGigCompletion(gigId: string, clientId: string, io?:
   } catch {
     /* non-blocking */
   }
+  try {
+    const { markUnlistedCompletedByGig } = await import("../commerce/unlisted-item.service.js");
+    await markUnlistedCompletedByGig(gigId);
+  } catch {
+    /* non-blocking */
+  }
 
   await prisma.gigAssignment.update({
     where: { id: gig.assignments[0].id },

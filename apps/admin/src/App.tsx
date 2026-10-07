@@ -65,7 +65,7 @@ interface AdminGig {
 }
 
 type AdminTab = "overview" | "pending" | "users" | "gigs" | "commerce";
-type CommerceSubTab = "merchants" | "orders" | "catalog" | "deliveries";
+type CommerceSubTab = "merchants" | "orders" | "catalog" | "deliveries" | "unlisted";
 
 function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -391,6 +391,35 @@ export function App() {
     enabled: authenticated && activeTab === "commerce"
   });
 
+  const unlistedQuery = useQuery({
+    queryKey: ["admin-unlisted-requests"],
+    queryFn: () =>
+      apiRequest<{
+        requests: Array<{
+          id: string;
+          requestNumber: number;
+          status: string;
+          originalRequestText: string;
+          parsedItemName: string;
+          quantity: number;
+          optionalMaxBudgetCents: number | null;
+          foundProductName: string | null;
+          foundPriceCents: number | null;
+          foundMerchantName: string | null;
+          deliveryLabel: string | null;
+          totalCents: number | null;
+          customer: { displayName: string | null; whatsappPhone: string | null } | null;
+          courier: { id: string; fullName: string } | null;
+          linkedDeliveryGigId: string | null;
+          events: Array<{ type: string; createdAt: string }>;
+          paymentAttempts: Array<{ status: string; amountCents: number; provider: string }>;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+      }>("/admin/commerce/unlisted-requests"),
+    enabled: authenticated && activeTab === "commerce" && commerceSubTab === "unlisted"
+  });
+
   const approveMutation = useMutation({
     mutationFn: (workerId: string) => apiRequest(`/admin/workers/${workerId}/approve`, { method: "POST" }),
     onSuccess: () => {
@@ -691,7 +720,8 @@ export function App() {
                   ["Merchants", "merchants", "Shops and product catalogs"],
                   ["Orders", "orders", "Customer shop orders"],
                   ["DUTS Catalog", "catalog", "Shared product photos & details"],
-                  ["Deliveries", "deliveries", "Courier-linked shop orders"]
+                  ["Deliveries", "deliveries", "Courier-linked shop orders"],
+                  ["Unlisted items", "unlisted", "Catalog-missing search requests"]
                 ] as const
               ).map(([label, id, hint]) => (
                 <button
@@ -785,6 +815,47 @@ export function App() {
                 {commerceSubTab === "deliveries" &&
                 !(commerceOrdersQuery.data?.orders ?? []).some((o) => o.linkedDeliveryGig) ? (
                   <p className="muted">No deliveries linked yet.</p>
+                ) : null}
+              </section>
+            ) : null}
+            {commerceSubTab === "unlisted" ? (
+              <section className="panel commerce-panel">
+                <h2>Unlisted item requests</h2>
+                {unlistedQuery.error ? <p className="notice">{unlistedQuery.error.message}</p> : null}
+                <div className="order-card-list">
+                  {(unlistedQuery.data?.requests ?? []).map((r) => (
+                    <article key={r.id} className="order-card">
+                      <div className="order-card-top">
+                        <strong>
+                          #{r.requestNumber} · {r.status.replace(/_/g, " ")}
+                        </strong>
+                        <span>{r.totalCents != null ? `$${(r.totalCents / 100).toFixed(2)}` : "—"}</span>
+                      </div>
+                      <p>{r.parsedItemName} × {r.quantity}</p>
+                      <p className="muted">{r.originalRequestText}</p>
+                      {r.foundProductName ? (
+                        <p>
+                          Found: {r.foundProductName}
+                          {r.foundPriceCents != null ? ` · $${(r.foundPriceCents / 100).toFixed(2)}` : ""}
+                          {r.foundMerchantName ? ` · ${r.foundMerchantName}` : ""}
+                        </p>
+                      ) : null}
+                      <p className="muted">
+                        {r.customer?.displayName ?? r.customer?.whatsappPhone ?? "Customer"}
+                        {r.courier ? ` · Courier ${r.courier.fullName}` : ""}
+                      </p>
+                      {r.optionalMaxBudgetCents != null ? (
+                        <p className="muted">Max budget ${(r.optionalMaxBudgetCents / 100).toFixed(2)}</p>
+                      ) : null}
+                      {r.linkedDeliveryGigId ? <p className="muted">Delivery gig {r.linkedDeliveryGigId}</p> : null}
+                      <p className="muted">
+                        {new Date(r.createdAt).toLocaleString()} · events: {r.events.map((e) => e.type).join(" → ")}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+                {(unlistedQuery.data?.requests ?? []).length === 0 ? (
+                  <p className="muted">No unlisted-item requests yet.</p>
                 ) : null}
               </section>
             ) : null}

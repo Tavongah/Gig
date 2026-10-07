@@ -17,8 +17,12 @@ import {
   formatPaymentMethodChoice,
   formatReadyToOrder,
   formatShopPrompt,
-  formatStatusChoices
+  formatStatusChoices,
+  formatUnlistedNotFoundOffer,
+  formatUnlistedPaymentChoice,
+  formatUnlistedQuote
 } from "./copy.js";
+import type { UnlistedPublicRequest } from "../commerce/unlisted-item.service.js";
 
 export type CustomerChoice = {
   title: string;
@@ -242,4 +246,70 @@ export async function sendTrackChoices(
 
 export function formatStaleChoiceNotice(): string {
   return "That option is no longer active.";
+}
+
+export async function sendUnlistedOffer(phone: string, ctx: ConversationContext, itemName: string): Promise<void> {
+  await sendCustomerChoices(phone, ctx, formatUnlistedNotFoundOffer(itemName), [
+    {
+      title: "Request this item",
+      action: sessionBound(ctx, "UNLISTED_REQUEST", { expectedInput: "UNLISTED_OFFER" })
+    },
+    {
+      title: "Try another search",
+      action: sessionBound(ctx, "UNLISTED_TRY_AGAIN", { expectedInput: "UNLISTED_OFFER" })
+    }
+  ]);
+}
+
+export async function sendUnlistedQuoteMessage(
+  phone: string,
+  ctx: ConversationContext,
+  request: UnlistedPublicRequest
+): Promise<void> {
+  const itemCents = (request.foundPriceCents ?? 0) * request.quantity;
+  const body = formatUnlistedQuote({
+    productName: request.foundProductName ?? request.parsedItemName,
+    itemCents,
+    deliveryCents: request.deliveryFeeCents ?? 0,
+    totalCents: request.totalCents ?? itemCents,
+    merchantName: request.foundMerchantName,
+    quantity: request.quantity,
+    maxBudgetCents: request.optionalMaxBudgetCents,
+    foundPriceCents: request.foundPriceCents,
+    photoUrl: request.foundPhotoUrl
+  });
+  await sendCustomerChoices(phone, ctx, body, [
+    {
+      title: "Buy it",
+      action: sessionBound(ctx, "UNLISTED_BUY", {
+        expectedInput: "UNLISTED_QUOTE",
+        unlistedRequestId: request.id,
+        approvalId: request.approvalId ?? undefined
+      })
+    },
+    {
+      title: "No thanks",
+      action: sessionBound(ctx, "UNLISTED_DECLINE", {
+        expectedInput: "UNLISTED_QUOTE",
+        unlistedRequestId: request.id,
+        approvalId: request.approvalId ?? undefined
+      })
+    }
+  ]);
+}
+
+export async function sendUnlistedPaymentChoice(
+  phone: string,
+  ctx: ConversationContext,
+  totalCents: number
+): Promise<void> {
+  await sendCustomerChoices(phone, ctx, formatUnlistedPaymentChoice(totalCents), [
+    {
+      title: "EcoCash",
+      action: sessionBound(ctx, "UNLISTED_PAY_ECOCASH", {
+        expectedInput: ctx.expectedInput ?? "UNLISTED_PAYMENT",
+        unlistedRequestId: ctx.unlistedRequestId
+      })
+    }
+  ]);
 }

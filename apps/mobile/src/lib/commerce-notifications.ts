@@ -4,7 +4,9 @@ const DELIVERY_LIFECYCLE_TYPES = new Set([
   "PACKAGE_COLLECTED",
   "EN_ROUTE_TO_DROPOFF",
   "ARRIVED_AT_DROPOFF",
-  "DELIVERY_COMPLETED"
+  "DELIVERY_COMPLETED",
+  "UNLISTED_SEARCH_OFFER",
+  "UNLISTED_PAYMENT_CONFIRMED"
 ]);
 
 export function shouldSilenceWorkerNotification(payload: { type?: string; title?: string; body?: string }): boolean {

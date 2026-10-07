@@ -66,6 +66,7 @@ import {
   formatClaimPaidIgnored,
   formatCompactMutation,
   formatDisambiguation,
+  formatEcoCashPrompt,
   formatLocationAmbiguous,
   formatLocationAsk,
   formatLocationConfirm,
@@ -102,8 +103,18 @@ import {
   sendProductChoices,
   sendShopPrompt,
   sendTrackChoices,
+  sendUnlistedOffer,
+  sendUnlistedPaymentChoice,
+  sendUnlistedQuoteMessage,
   sendUseThisArea
 } from "./customer-interactive.js";
+import {
+  applyUnlistedInteractive,
+  continueUnlistedAfterLocation,
+  handleUnlistedText,
+  isUnlistedExpected,
+  offerUnlistedItemIfEnabled
+} from "./unlisted-whatsapp.js";
 import {
   isReturningWhatsAppCustomer,
   resolveInteractiveAction,
@@ -297,13 +308,19 @@ export async function handleCustomerWhatsAppMessage(
 
   const expect = ctx.expectedInput ?? "NONE";
 
+  if (isUnlistedExpected(expect)) {
+    const unlisted = await handleUnlistedText(phone, customerId, conv.id, ctx, text);
+    if (unlisted) return unlisted;
+  }
+
   if (msg.location) {
     const locationAllowed =
       expect === "LOCATION" ||
       expect === "LOCATION_CLARIFICATION" ||
       expect === "NONE" ||
       expect === "PRODUCT_TEXT" ||
-      expect === "READY_TO_ORDER";
+      expect === "READY_TO_ORDER" ||
+      Boolean(ctx.pendingUnlistedQuery);
     if (!locationAllowed) {
       await wa.sendText(phone, formatCheckoutHelp(expect));
       return { handled: true };
@@ -369,7 +386,7 @@ export async function handleCustomerWhatsAppMessage(
     expect === "ECOCASH_NUMBER" ||
     expect === "PAYMENT_PENDING" ||
     expect === "PAYMENT_RETRY" ||
-    conv.state === WhatsAppConversationState.AWAITING_PAYMENT
+    (conv.state === WhatsAppConversationState.AWAITING_PAYMENT && !isUnlistedExpected(expect))
   ) {
     return handlePaymentConversation(phone, customerId, conv.id, ctx, text, msg.buttonId);
   }
@@ -729,6 +746,8 @@ async function handleChangeWhat(phone: string, convId: string, ctx: Conversation
 }
 
 async function continueAfterLocation(phone: string, convId: string, ctx: ConversationContext) {
+  const unlisted = await continueUnlistedAfterLocation(phone, convId, ctx);
+  if (unlisted) return unlisted;
   if (ctx.lockedProductLines?.length || ctx.requestedItems?.length) {
     return buildAndPresentQuote(phone, convId, ctx);
   }
@@ -1095,6 +1114,9 @@ async function resolveProductsThenContinue(phone: string, convId: string, ctx: C
       ctx.requestedItems = (ctx.requestedItems ?? []).map((r) =>
         r.query === item.query ? { query: m.product.name, quantity: r.quantity } : r
       );
+    } else if (items.length === 1) {
+      const offered = await offerUnlistedItemIfEnabled(phone, convId, ctx, item.query);
+      if (offered) return offered;
     }
   }
 
@@ -1122,6 +1144,8 @@ async function answerPriceQuestion(phone: string, ctx: ConversationContext, inte
   });
   if (matches.length === 0) {
     await logUnmatchedSearch(intent.targetQuery!, ctx.deliveryLat!, ctx.deliveryLng!);
+    const offered = await offerUnlistedItemIfEnabled(phone, "", ctx, intent.targetQuery!);
+    if (offered) return offered;
     await wa.sendText(
       phone,
       `I couldn't find "${intent.targetQuery}" at nearby shops right now.`
@@ -1153,6 +1177,8 @@ async function answerAvailability(phone: string, ctx: ConversationContext, inten
   });
   if (matches.length === 0) {
     await logUnmatchedSearch(intent.targetQuery!, ctx.deliveryLat!, ctx.deliveryLng!);
+    const offered = await offerUnlistedItemIfEnabled(phone, "", ctx, intent.targetQuery!);
+    if (offered) return offered;
     await wa.sendText(phone, `No nearby shop has "${intent.targetQuery}" available right now.`);
     return { handled: true };
   }
@@ -1291,6 +1317,10 @@ async function buildAndPresentQuote(
 
   if (!basket.ok) {
     const missing = basket.missing.join(", ") || "some items";
+    if ((ctx.requestedItems?.length ?? 0) === 1) {
+      const offered = await offerUnlistedItemIfEnabled(phone, convId, ctx, ctx.requestedItems?.[0]?.query ?? missing);
+      if (offered) return offered;
+    }
     await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
     const partial = basket.partialByMerchant[0];
     const hint = partial
@@ -2189,6 +2219,16 @@ async function applyInteractiveAction(
         return presentCustomerTracking(phone, convId, state, ctx, customerId);
       }
       return presentTrackedOrder(phone, convId, ctx, action.orderId, customerId);
+    case "UNLISTED_REQUEST":
+    case "UNLISTED_TRY_AGAIN":
+    case "UNLISTED_BUY":
+    case "UNLISTED_DECLINE":
+    case "UNLISTED_PAY_ECOCASH": {
+      const unlisted = await applyUnlistedInteractive(phone, customerId, convId, ctx, action);
+      if (unlisted) return unlisted;
+      await promptCurrentCheckoutStep(phone, convId, ctx);
+      return { handled: true };
+    }
     default:
       await promptCurrentCheckoutStep(phone, convId, ctx);
       return { handled: true };
@@ -2221,9 +2261,32 @@ async function promptCurrentCheckoutStep(
         formatMobileMoneyPhonePrompt(ctx.selectedPaymentMethod === "ONEMONEY" ? "ONEMONEY" : "ECOCASH")
       );
       return;
-    case "LOCATION":
-      await sendLocationAsk(phone);
+    case "UNLISTED_OFFER":
+      await sendUnlistedOffer(phone, ctx, ctx.pendingUnlistedQuery ?? "that item");
+      await updateConversation(convId, { context: ctx });
       return;
+    case "UNLISTED_QUOTE":
+      if (ctx.unlistedRequestId) {
+        const { getUnlistedRequest } = await import("../commerce/unlisted-item.service.js");
+        const request = await getUnlistedRequest(ctx.unlistedRequestId);
+        await sendUnlistedQuoteMessage(phone, ctx, request);
+        await updateConversation(convId, { context: ctx });
+      }
+      return;
+    case "UNLISTED_PAYMENT":
+    case "UNLISTED_ECOCASH": {
+      if (ctx.unlistedRequestId) {
+        const { getUnlistedRequest } = await import("../commerce/unlisted-item.service.js");
+        const request = await getUnlistedRequest(ctx.unlistedRequestId);
+        if (expect === "UNLISTED_ECOCASH") {
+          await getWhatsAppProvider().sendText(phone, formatEcoCashPrompt());
+        } else {
+          await sendUnlistedPaymentChoice(phone, ctx, request.totalCents ?? 0);
+        }
+        await updateConversation(convId, { context: ctx });
+      }
+      return;
+    }
     case "LOCATION_CLARIFICATION":
       if (ctx.locationClarificationType === "CONFIRM_AREA" || ctx.pendingAreaMatch) {
         await sendUseThisArea(

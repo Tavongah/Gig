@@ -108,6 +108,22 @@ async function notifyAfterProviderResult(result: {
                 : formatEcoCashFailed();
           await notifyCustomerStatus(order.customerWhatsAppPhone, msg);
         }
+      } else {
+        const { prisma: db } = await import("../../../config/prisma.js");
+        const unlisted = await db.unlistedItemRequest.findUnique({ where: { id: result.orderId } });
+        if (unlisted?.whatsappPhone) {
+          const { notifyCustomerStatus } = await import("../../whatsapp/merchant-handler.js");
+          const { formatEcoCashExpired, formatEcoCashFailed, formatMobileMoneyCancelled } = await import(
+            "../../whatsapp/copy.js"
+          );
+          const msg =
+            result.status === "EXPIRED"
+              ? formatEcoCashExpired()
+              : result.status === "CANCELLED"
+                ? formatMobileMoneyCancelled()
+                : formatEcoCashFailed();
+          await notifyCustomerStatus(unlisted.whatsappPhone, msg);
+        }
       }
     } catch {
       /* customer WhatsApp is not a payment-state gate */

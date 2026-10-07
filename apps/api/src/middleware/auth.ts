@@ -40,6 +40,26 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
 }
 
+export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
+  const token = parseBearerToken(req.header("authorization"));
+  if (!token) {
+    next();
+    return;
+  }
+  try {
+    const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    req.auth = {
+      userId: payload.sub,
+      roles: payload.roles ?? [],
+      accountStatus: payload.accountStatus ?? AccountStatus.ACTIVE,
+      defaultRole: payload.defaultRole ?? UserRole.CLIENT
+    };
+  } catch {
+    /* guest continues without session */
+  }
+  next();
+}
+
 export function requireRole(...roles: UserRole[]) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (!req.auth) {

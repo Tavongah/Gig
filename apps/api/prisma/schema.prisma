@@ -212,6 +212,8 @@ model User {
   commerceOrders       CommerceOrder[]             @relation("CommerceOrderUser")
   commerceCheckouts    CommerceCheckout[]          @relation("CommerceCheckoutUser")
   commerceCustomers    CommerceCustomer[]          @relation("CommerceCustomerUser")
+  unlistedItemRequests UnlistedItemRequest[]       @relation("UnlistedItemCustomer")
+  assignedUnlistedSearches UnlistedItemRequest[]   @relation("UnlistedItemCourier")
 }
 
 model DevicePushToken {
@@ -416,6 +418,7 @@ model Gig {
   notifications         Notification[]
   commerceOrder         CommerceOrder?
   commerceCheckout      CommerceCheckout?
+  unlistedItemRequest   UnlistedItemRequest?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
@@ -908,6 +911,7 @@ model CommerceCustomer {
   orders         CommerceOrder[]
   checkouts      CommerceCheckout[]
   conversations  WhatsAppConversation[]
+  unlistedItemRequests UnlistedItemRequest[]
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
 
@@ -1206,3 +1210,117 @@ model GuestCommerceHandoff {
   @@index([expiresAt])
   @@index([merchantId])
 }
+
+enum UnlistedItemRequestStatus {
+  REQUESTED
+  SEARCHING
+  FOUND_AWAITING_CUSTOMER
+  CUSTOMER_APPROVED
+  CUSTOMER_DECLINED
+  NOT_FOUND
+  EXPIRED
+  PAYMENT_PENDING
+  PAID
+  PURCHASED
+  DELIVERING
+  COMPLETED
+  NEEDS_ATTENTION
+}
+
+enum UnlistedItemCustomerDecision {
+  NONE
+  APPROVED
+  DECLINED
+}
+
+/** Catalog-missing item search. Not a CatalogProduct until admin review. */
+model UnlistedItemRequest {
+  id                     String                       @id @default(uuid())
+  requestNumber          Int                          @unique @default(autoincrement())
+  commerceCustomerId     String?
+  commerceCustomer       CommerceCustomer?            @relation(fields: [commerceCustomerId], references: [id], onDelete: SetNull)
+  customerUserId         String?
+  customerUser           User?                        @relation("UnlistedItemCustomer", fields: [customerUserId], references: [id], onDelete: SetNull)
+  checkoutSessionId      String?
+  originalRequestText    String
+  parsedItemName         String
+  quantity               Int                          @default(1)
+  optionalNotes          String?
+  optionalMaxBudgetCents Int?
+  status                 UnlistedItemRequestStatus    @default(REQUESTED)
+  assignedCourierId      String?
+  assignedCourier        User?                        @relation("UnlistedItemCourier", fields: [assignedCourierId], references: [id], onDelete: SetNull)
+  foundProductName       String?
+  foundPriceCents        Int?
+  foundPhotoUrl          String?
+  foundMerchantName      String?
+  foundNote              String?
+  customerDecision       UnlistedItemCustomerDecision @default(NONE)
+  /** Bound to the current quote. Stale Buy buttons must not match a newer quote. */
+  approvalId             String?
+  quoteVersion           Int                          @default(0)
+  deliveryFeeCents       Int?
+  totalCents             Int?
+  deliveryLatitude       Decimal?                     @db.Decimal(9, 6)
+  deliveryLongitude      Decimal?                     @db.Decimal(9, 6)
+  deliveryLabel          String?
+  deliveryPrecision      String?
+  deliveryInstructions   String?
+  whatsappPhone          String?
+  orderSource            OrderSource                  @default(WHATSAPP)
+  linkedDeliveryGigId    String?                      @unique
+  linkedDeliveryGig      Gig?                         @relation(fields: [linkedDeliveryGigId], references: [id], onDelete: SetNull)
+  expiresAt              DateTime
+  paidAt                 DateTime?
+  purchasedAt            DateTime?
+  completedAt            DateTime?
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
+  events                 UnlistedItemRequestEvent[]
+  paymentAttempts        UnlistedItemPaymentAttempt[]
+
+  @@index([status, expiresAt])
+  @@index([assignedCourierId, status])
+  @@index([commerceCustomerId, status])
+  @@index([whatsappPhone, status])
+  @@index([status, createdAt])
+}
+
+model UnlistedItemRequestEvent {
+  id        String              @id @default(uuid())
+  requestId String
+  request   UnlistedItemRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  type      String
+  actorType String
+  actorId   String?
+  payload   Json?
+  createdAt DateTime            @default(now())
+
+  @@index([requestId, createdAt])
+}
+
+model UnlistedItemPaymentAttempt {
+  id                String                       @id @default(uuid())
+  requestId         String
+  request           UnlistedItemRequest          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  provider          String
+  providerPaymentId String?
+  merchantReference String?                      @unique
+  paynowReference   String?
+  pollUrl           String?
+  payerPhone        String
+  amountCents       Int
+  currency          String                       @default("usd")
+  status            CommercePaymentAttemptStatus @default(CREATED)
+  failureReason     String?
+  initiatedAt       DateTime                     @default(now())
+  expiresAt         DateTime?
+  confirmedAt       DateTime?
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  @@unique([provider, providerPaymentId])
+  @@index([requestId, status])
+  @@index([status, expiresAt])
+}
+

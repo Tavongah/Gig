@@ -86,7 +86,16 @@ const envSchema = z.object({
    * Merchant-silence fallback + persistent courier search.
    * Off unless GUARANTEED_ORDER_INTAKE_ENABLED=true.
    */
-  GUARANTEED_ORDER_INTAKE_ENABLED: z.string().optional()
+  GUARANTEED_ORDER_INTAKE_ENABLED: z.string().optional(),
+  /**
+   * Catalog-missing item search. Default OFF until physical E2E.
+   */
+  UNLISTED_ITEM_REQUEST_ENABLED: z.string().optional(),
+  /** COD for unlisted items. Default OFF — courier has no purchase float. */
+  UNLISTED_ITEM_COD_ENABLED: z.string().optional(),
+  UNLISTED_ITEM_MIN_PRICE_CENTS: z.string().optional(),
+  UNLISTED_ITEM_MAX_PRICE_CENTS: z.string().optional(),
+  UNLISTED_ITEM_SEARCH_TTL_SECONDS: z.string().optional()
 });
 
 export const env = envSchema.parse(process.env);

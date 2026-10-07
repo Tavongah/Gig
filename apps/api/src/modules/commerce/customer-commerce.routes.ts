@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { UserRole } from "@prisma/client";
-import { requireAuth, requireRole } from "../../middleware/auth.js";
+import { requireAuth, requireRole, optionalAuth } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
 import {
   browseNearbyProducts,
@@ -22,7 +22,7 @@ import { createGuestHandoff, publicWhatsAppDigits } from "./guest-handoff.servic
 import { listShoppingAreas } from "./shopping-areas.js";
 import { logDutsFlow } from "../../lib/flow-log.js";
 import { matchSmartBasket, selectSmartBasket } from "./smart-basket.service.js";
-import { parseSmartBasketEnabled, parseMultiShopCheckoutEnabled, parseMaxShopsPerCheckout } from "@gigflow/shared";
+import { parseSmartBasketEnabled, parseMultiShopCheckoutEnabled, parseMaxShopsPerCheckout, parseUnlistedItemRequestEnabled, parseUnlistedItemCodEnabled } from "@gigflow/shared";
 
 const geoQuery = z
   .object({
@@ -72,7 +72,9 @@ customerCommerceRouter.get("/public-config", (_req, res) => {
     multiShopCheckoutEnabled: parseMultiShopCheckoutEnabled(process.env.MULTI_SHOP_CHECKOUT_ENABLED),
     maxShopsPerCheckout: parseMaxShopsPerCheckout(
       process.env.MAX_SHOPS_PER_CHECKOUT ?? process.env.MULTI_SHOP_MAX_SHOPS
-    )
+    ),
+    unlistedItemRequestEnabled: parseUnlistedItemRequestEnabled(process.env.UNLISTED_ITEM_REQUEST_ENABLED),
+    unlistedItemCodEnabled: parseUnlistedItemCodEnabled(process.env.UNLISTED_ITEM_COD_ENABLED)
   });
 });
 
@@ -406,3 +408,138 @@ customerCommerceRouter.post("/basket/select", validateBody(basketSelectSchema), 
     next(err);
   }
 });
+
+const unlistedCreateBody = z.object({
+  originalRequestText: z.string().min(2).max(500),
+  quantity: z.number().int().min(1).max(20).optional(),
+  optionalNotes: z.string().max(400).optional(),
+  optionalMaxBudgetCents: z.number().int().positive().max(50_000).nullable().optional(),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+  areaId: z.string().min(1).max(80).optional(),
+  deliveryLabel: z.string().min(2).max(240).optional(),
+  deliveryInstructions: z.string().max(240).optional()
+});
+
+async function resolveUnlistedGeo(input: {
+  lat?: number;
+  lng?: number;
+  areaId?: string;
+  deliveryLabel?: string;
+}) {
+  if (input.lat != null && input.lng != null) {
+    return { lat: input.lat, lng: input.lng, label: input.deliveryLabel ?? "Delivery location" };
+  }
+  if (input.areaId) {
+    const { DUTS_CITY_SEEDS, listShoppingAreas } = await import("./shopping-areas.js");
+    const seed = DUTS_CITY_SEEDS.find((s) => s.id === input.areaId);
+    if (seed) return { lat: seed.lat, lng: seed.lng, label: input.deliveryLabel ?? seed.name };
+    const { areas } = await listShoppingAreas();
+    const area = areas.find((a) => a.id === input.areaId);
+    if (area) return { lat: area.lat, lng: area.lng, label: input.deliveryLabel ?? area.name };
+  }
+  throw new (await import("../../lib/errors.js")).AppError(
+    "Delivery location is required.",
+    400,
+    "LOCATION_REQUIRED"
+  );
+}
+
+customerCommerceRouter.post(
+  "/unlisted-requests",
+  optionalAuth,
+  validateBody(unlistedCreateBody), async (req, res, next) => {
+  try {
+    const geo = await resolveUnlistedGeo(req.body);
+    const { createUnlistedItemRequest } = await import("./unlisted-item.service.js");
+    const { OrderSource } = await import("@prisma/client");
+    let commerceCustomerId: string | null = null;
+    let customerUserId: string | null = null;
+    if (req.auth?.userId) {
+      const { ensureAppCommerceCustomer } = await import("./commerce-customer.service.js");
+      const cc = await ensureAppCommerceCustomer(req.auth.userId);
+      commerceCustomerId = cc.id;
+      customerUserId = req.auth.userId;
+    }
+    const request = await createUnlistedItemRequest({
+      originalRequestText: req.body.originalRequestText,
+      quantity: req.body.quantity,
+      optionalNotes: req.body.optionalNotes,
+      optionalMaxBudgetCents: req.body.optionalMaxBudgetCents,
+      commerceCustomerId,
+      customerUserId,
+      orderSource: OrderSource.WEB,
+      deliveryLatitude: geo.lat,
+      deliveryLongitude: geo.lng,
+      deliveryLabel: geo.label,
+      deliveryInstructions: req.body.deliveryInstructions ?? null
+    });
+    res.json({ request });
+  } catch (err) {
+    next(err);
+  }
+});
+
+customerCommerceRouter.get("/unlisted-requests/:id", async (req, res, next) => {
+  try {
+    const { getUnlistedRequest } = await import("./unlisted-item.service.js");
+    res.json({ request: await getUnlistedRequest(String(req.params.id)) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+customerCommerceRouter.post(
+  "/unlisted-requests/:id/approve",
+  validateBody(z.object({ approvalId: z.string().min(8).max(64) })),
+  async (req, res, next) => {
+    try {
+      const { approveUnlistedQuote } = await import("./unlisted-item.service.js");
+      res.json({
+        request: await approveUnlistedQuote({
+          requestId: String(req.params.id),
+          approvalId: req.body.approvalId,
+          actorId: req.auth?.userId ?? null
+        })
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+customerCommerceRouter.post(
+  "/unlisted-requests/:id/decline",
+  validateBody(z.object({ approvalId: z.string().min(8).max(64) })),
+  async (req, res, next) => {
+    try {
+      const { declineUnlistedQuote } = await import("./unlisted-item.service.js");
+      res.json({
+        request: await declineUnlistedQuote({
+          requestId: String(req.params.id),
+          approvalId: req.body.approvalId,
+          actorId: req.auth?.userId ?? null
+        })
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+customerCommerceRouter.post(
+  "/unlisted-requests/:id/pay-ecocash",
+  validateBody(z.object({ payerPhone: z.string().min(7).max(24) })),
+  async (req, res, next) => {
+    try {
+      const { initiateUnlistedEcoCashPayment } = await import("./unlisted-item-payment.js");
+      const result = await initiateUnlistedEcoCashPayment({
+        requestId: String(req.params.id),
+        payerPhoneRaw: req.body.payerPhone
+      });
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);

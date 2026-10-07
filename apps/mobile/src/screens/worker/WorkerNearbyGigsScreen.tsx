@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View, Text } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
@@ -45,6 +45,12 @@ export function WorkerNearbyGigsScreen() {
     refetchInterval: 10_000
   });
 
+  const unlistedQuery = useQuery({
+    queryKey: ["unlisted-searches"],
+    queryFn: () => api.unlistedSearches(session.token),
+    refetchInterval: 10_000
+  });
+
   const matchingQuery = useQuery({
     queryKey: ["worker-matching-list"],
     queryFn: () => api.listWorkerMatchingInterests(session.token),
@@ -63,6 +69,12 @@ export function WorkerNearbyGigsScreen() {
         "gig:offer": () => {
           void nearbyQuery.refetch();
         },
+        "unlisted:offer": () => {
+          void unlistedQuery.refetch();
+        },
+        "unlisted:paid": () => {
+          void unlistedQuery.refetch();
+        },
         notification: (payload: { title: string; body: string; type?: string }) => {
           if (shouldSilenceWorkerNotification(payload)) {
             void nearbyQuery.refetch();
@@ -71,7 +83,7 @@ export function WorkerNearbyGigsScreen() {
           showAlert(payload.title, payload.body);
         }
       }),
-      [nearbyQuery]
+      [nearbyQuery, unlistedQuery]
     )
   );
 
@@ -88,6 +100,9 @@ export function WorkerNearbyGigsScreen() {
   });
 
   const availableGigs = nearbyQuery.data?.gigs ?? [];
+  const findItemSearches = (unlistedQuery.data?.searches ?? []).filter(
+    (s) => s.status === "REQUESTED" || s.assignedCourierId === session.user.id
+  );
   const myGigs = myGigsQuery.data?.gigs ?? [];
   const matchingOffers = (matchingQuery.data?.interests ?? []).filter(
     (row) =>
@@ -177,10 +192,29 @@ export function WorkerNearbyGigsScreen() {
         />
 
         {tab === "available" ? (
-          availableGigs.length === 0 ? (
+          availableGigs.length === 0 && findItemSearches.length === 0 ? (
             <EmptyState {...emptyCopy} />
           ) : (
             <View className="gap-4">
+              {findItemSearches.map((search) => (
+                <Pressable
+                  key={search.id}
+                  onPress={() => navigation.navigate("WorkerFindItem", { requestId: search.id })}
+                  className="rounded-2xl border-2 border-orange-400 bg-card p-4"
+                >
+                  <Text className="text-xs font-black uppercase tracking-widest text-orange-600">FIND ITEM</Text>
+                  <Text className="mt-1 text-lg font-black text-ink">{search.parsedItemName}</Text>
+                  <Text className="mt-1 text-sm text-muted">
+                    Qty {search.quantity} · {search.deliveryLabel ?? "Nearby"}
+                    {search.optionalMaxBudgetCents != null
+                      ? ` · max $${(search.optionalMaxBudgetCents / 100).toFixed(2)}`
+                      : ""}
+                  </Text>
+                  <Text className="mt-2 text-xs font-bold text-muted">
+                    {search.status === "REQUESTED" ? "Accept search — customer has not paid" : search.status.replace(/_/g, " ")}
+                  </Text>
+                </Pressable>
+              ))}
               {availableGigs.map((gig) => (
                 <NearbyGigCard
                   key={gig.id}

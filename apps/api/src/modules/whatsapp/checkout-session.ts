@@ -17,7 +17,11 @@ export type CheckoutExpectedInput =
   | "PAYMENT_RETRY"
   | "CHANGE_WHAT"
   | "ACTIVE_ORDER_STATUS"
-  | "PENDING_PAYMENT_HANDOFF";
+  | "PENDING_PAYMENT_HANDOFF"
+  | "UNLISTED_OFFER"
+  | "UNLISTED_QUOTE"
+  | "UNLISTED_PAYMENT"
+  | "UNLISTED_ECOCASH";
 
 export type CheckoutSource = "WHATSAPP" | "WEB_HANDOFF";
 
@@ -280,6 +284,7 @@ export function isUnfinishedCheckout(ctx: ConversationContext, state: WhatsAppCo
     return false;
   }
   if (isLivePendingPayment(ctx)) return true;
+  if (ctx.pendingUnlistedQuery || ctx.unlistedRequestId) return true;
   if (ctx.pendingChoices?.length) return true;
   if (ctx.requestedItems?.length || ctx.draftLines?.length || ctx.lockedProductLines?.length) return true;
   if (ctx.paymentPhase) return true;

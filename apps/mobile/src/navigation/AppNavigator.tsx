@@ -37,6 +37,9 @@ import { AboutDutsScreen } from "../screens/support/AboutDutsScreen";
 import { PrivacyPolicyScreen } from "../screens/support/PrivacyPolicyScreen";
 import { TermsOfServiceScreen } from "../screens/support/TermsOfServiceScreen";
 import { ProductSearchScreen } from "../screens/commerce/ProductSearchScreen";
+import { RequestUnlistedItemScreen } from "../screens/commerce/RequestUnlistedItemScreen";
+import { UnlistedItemQuoteScreen } from "../screens/commerce/UnlistedItemQuoteScreen";
+import { WorkerFindItemScreen } from "../screens/worker/WorkerFindItemScreen";
 import { MarketplaceCategoryScreen } from "../screens/commerce/MarketplaceCategoryScreen";
 import { AllCategoriesScreen } from "../screens/commerce/AllCategoriesScreen";
 import { ProductDetailScreen } from "../screens/commerce/ProductDetailScreen";
@@ -109,6 +112,9 @@ export function AppNavigator() {
       <Stack.Screen name="Chat" component={ChatScreen} options={({ route }) => ({ title: route.params.title })} />
       <Stack.Screen name="Review" component={ReviewScreen} options={{ title: "Leave a review" }} />
       <Stack.Screen name="ProductSearch" component={ProductSearchScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="RequestUnlistedItem" component={RequestUnlistedItemScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="UnlistedItemQuote" component={UnlistedItemQuoteScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="WorkerFindItem" component={WorkerFindItemScreen} options={{ title: "Find item" }} />
       <Stack.Screen name="MarketplaceCategory" component={MarketplaceCategoryScreen} options={{ headerShown: false }} />
       <Stack.Screen name="AllCategories" component={AllCategoriesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ headerShown: false }} />

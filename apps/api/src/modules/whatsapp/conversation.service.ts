@@ -26,7 +26,11 @@ export type ConversationContext = {
     | "PAYMENT_RETRY"
     | "CHANGE_WHAT"
     | "ACTIVE_ORDER_STATUS"
-    | "PENDING_PAYMENT_HANDOFF";
+    | "PENDING_PAYMENT_HANDOFF"
+    | "UNLISTED_OFFER"
+    | "UNLISTED_QUOTE"
+    | "UNLISTED_PAYMENT"
+    | "UNLISTED_ECOCASH";
   choiceType?: ConversationContext["expectedInput"];
   choiceId?: string;
   sessionStartedAt?: string;
@@ -129,6 +133,9 @@ export type ConversationContext = {
   interactiveActions?: InteractiveActionRecord[];
   /** Restore checkout expectedInput after a track-order pick. */
   statusResumeExpected?: ConversationContext["expectedInput"];
+  pendingUnlistedQuery?: string;
+  unlistedRequestId?: string;
+  unlistedApprovalId?: string;
 };
 
 export async function getOrCreateConversation(

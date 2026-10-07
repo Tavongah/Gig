@@ -55,6 +55,11 @@ export function ProductSearchScreen({ route, navigation }: Props) {
     enabled: browse.ready && !skipCatalogFetch
   });
 
+  const configQuery = useQuery({
+    queryKey: ["commerce-public-config"],
+    queryFn: () => api.commercePublicConfig()
+  });
+  const unlistedEnabled = configQuery.data?.unlistedItemRequestEnabled === true;
   const products = query.data?.pages.flatMap((page) => page.products) ?? [];
   const total = query.data?.pages[0]?.total;
   const title = category ?? (q.trim() ? `Results for “${q.trim()}”` : "Search");
@@ -79,8 +84,22 @@ export function ProductSearchScreen({ route, navigation }: Props) {
           ) : null}
           {products.length === 0 && !query.isLoading && !skipCatalogFetch ? (
             <View className="mt-10 items-center px-6">
-              <Text className="text-center text-base font-bold text-ink">No products found</Text>
-              <Text className="mt-1 text-center text-sm text-muted">Try another search.</Text>
+              <Text className="text-center text-base font-bold text-ink">
+                {unlistedEnabled ? "Can't find what you need?" : "No products found"}
+              </Text>
+              <Text className="mt-1 text-center text-sm text-muted">
+                {unlistedEnabled ? "Try another search, or ask DUTS to look for it." : "Try another search."}
+              </Text>
+              {unlistedEnabled ? (
+                <Pressable
+                  onPress={() => navigation.navigate("RequestUnlistedItem", { q: q.trim() || undefined })}
+                  accessibilityRole="button"
+                  accessibilityLabel="Request an item"
+                  className="mt-5 rounded-full bg-ink px-5 py-3"
+                >
+                  <Text className="text-center text-sm font-extrabold text-white">Request an item</Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : skipCatalogFetch ? null : (
             <View className="mt-4">

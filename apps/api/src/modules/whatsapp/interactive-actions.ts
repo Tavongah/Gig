@@ -25,7 +25,12 @@ export type InteractiveActionKind =
   | "CHANGE_PAYMENT"
   | "PAYMENT_ECOCASH"
   | "PAYMENT_COD"
-  | "TRACK_ORDER";
+  | "TRACK_ORDER"
+  | "UNLISTED_REQUEST"
+  | "UNLISTED_TRY_AGAIN"
+  | "UNLISTED_BUY"
+  | "UNLISTED_DECLINE"
+  | "UNLISTED_PAY_ECOCASH";
 
 export type InteractiveActionRecord = {
   token: string;
@@ -36,6 +41,8 @@ export type InteractiveActionRecord = {
   productId?: string;
   orderId?: string;
   choiceIndex?: number;
+  unlistedRequestId?: string;
+  approvalId?: string;
   createdAt: string;
 };
 
@@ -86,6 +93,7 @@ function expectedAllows(action: InteractiveActionRecord, ctx: ConversationContex
     return true;
   }
   if (action.kind === "PAYMENT_ECOCASH" && expected === "PAYMENT_RETRY") return true;
+  if (action.kind === "UNLISTED_PAY_ECOCASH" && expected === "UNLISTED_ECOCASH") return true;
   return false;
 }
 
@@ -120,6 +128,19 @@ export function resolveInteractiveAction(
   if (action.kind === "SELECT_PRODUCT" && action.productId) {
     const found = ctx.pendingChoices?.some((c) => c.options.some((o) => o.productId === action.productId));
     if (!found) return { ok: false, reason: "stale" };
+  }
+  if (action.unlistedRequestId && ctx.unlistedRequestId && action.unlistedRequestId !== ctx.unlistedRequestId) {
+    return { ok: false, reason: "stale" };
+  }
+  if (action.approvalId && ctx.unlistedApprovalId && action.approvalId !== ctx.unlistedApprovalId) {
+    return { ok: false, reason: "stale" };
+  }
+  if (
+    (action.kind === "UNLISTED_BUY" || action.kind === "UNLISTED_DECLINE") &&
+    action.approvalId &&
+    ctx.unlistedApprovalId !== action.approvalId
+  ) {
+    return { ok: false, reason: "stale" };
   }
   return { ok: true, action };
 }

@@ -164,3 +164,127 @@ workerRouter.post("/offline", requireAuth, requireRole(UserRole.WORKER), require
     next(error);
   }
 });
+
+const unlistedQuoteBody = z.object({
+  foundProductName: z.string().min(1).max(180),
+  foundPriceCents: z.number().int(),
+  foundMerchantName: z.string().min(1).max(120),
+  foundNote: z.string().max(240).optional(),
+  foundPhotoBase64: z.string().max(2_000_000).optional(),
+  shopLatitude: z.number().min(-90).max(90).optional(),
+  shopLongitude: z.number().min(-180).max(180).optional()
+});
+
+workerRouter.get(
+  "/unlisted-searches",
+  requireAuth,
+  requireRole(UserRole.WORKER),
+  requireApprovedWorker,
+  async (req, res, next) => {
+    try {
+      const { listOpenUnlistedSearchesForCourier } = await import("../commerce/unlisted-item.service.js");
+      res.json(await listOpenUnlistedSearchesForCourier(req.auth!.userId));
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+workerRouter.post(
+  "/unlisted-searches/:id/accept",
+  requireAuth,
+  requireRole(UserRole.WORKER),
+  requireApprovedWorker,
+  async (req, res, next) => {
+    try {
+      const { acceptUnlistedSearch } = await import("../commerce/unlisted-item.service.js");
+      res.json({ search: await acceptUnlistedSearch(String(req.params.id), req.auth!.userId) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+workerRouter.post(
+  "/unlisted-searches/:id/quote",
+  requireAuth,
+  requireRole(UserRole.WORKER),
+  requireApprovedWorker,
+  validateBody(unlistedQuoteBody),
+  async (req, res, next) => {
+    try {
+      const { submitUnlistedQuote } = await import("../commerce/unlisted-item.service.js");
+      res.json({ search: await submitUnlistedQuote(String(req.params.id), req.auth!.userId, req.body) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+workerRouter.post(
+  "/unlisted-searches/:id/not-found",
+  requireAuth,
+  requireRole(UserRole.WORKER),
+  requireApprovedWorker,
+  async (req, res, next) => {
+    try {
+      const { reportUnlistedNotFound } = await import("../commerce/unlisted-item.service.js");
+      res.json({ search: await reportUnlistedNotFound(String(req.params.id), req.auth!.userId) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+workerRouter.post(
+  "/unlisted-searches/:id/release",
+  requireAuth,
+  requireRole(UserRole.WORKER),
+  requireApprovedWorker,
+  async (req, res, next) => {
+    try {
+      const { releaseUnlistedSearch } = await import("../commerce/unlisted-item.service.js");
+      res.json({ search: await releaseUnlistedSearch(String(req.params.id), req.auth!.userId) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+workerRouter.post(
+  "/unlisted-searches/:id/purchased",
+  requireAuth,
+  requireRole(UserRole.WORKER),
+  requireApprovedWorker,
+  async (req, res, next) => {
+    try {
+      const { markUnlistedPurchased } = await import("../commerce/unlisted-item.service.js");
+      res.json({ search: await markUnlistedPurchased(String(req.params.id), req.auth!.userId) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+workerRouter.post(
+  "/unlisted-searches/:id/price-change",
+  requireAuth,
+  requireRole(UserRole.WORKER),
+  requireApprovedWorker,
+  validateBody(
+    z.object({
+      foundPriceCents: z.number().int(),
+      foundProductName: z.string().max(180).optional(),
+      foundMerchantName: z.string().max(120).optional(),
+      foundNote: z.string().max(240).optional()
+    })
+  ),
+  async (req, res, next) => {
+    try {
+      const { reportUnlistedPriceChange } = await import("../commerce/unlisted-item.service.js");
+      res.json({ search: await reportUnlistedPriceChange(String(req.params.id), req.auth!.userId, req.body) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
