@@ -25,6 +25,13 @@ type CatalogProduct = {
   unresolved?: boolean;
 };
 
+type CatalogFlavor = {
+  id: string;
+  name: string;
+  active: boolean;
+  sortOrder: number;
+};
+
 type CatalogView = "canonical" | "archived" | "unresolved" | "all";
 
 type CatalogListResponse = {
@@ -77,6 +84,7 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
   const [notice, setNotice] = useState("");
   const [uploading, setUploading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [newFlavor, setNewFlavor] = useState("");
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const pendingPhotoRef = useRef<File | null>(null);
@@ -94,7 +102,9 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
   const detailQuery = useQuery({
     queryKey: ["duts-catalog-detail", selectedId],
     queryFn: () =>
-      apiRequest<{ product: CatalogProduct }>(`/admin/commerce/catalog/products/${selectedId}`),
+      apiRequest<{ product: CatalogProduct; flavors?: CatalogFlavor[] }>(
+        `/admin/commerce/catalog/products/${selectedId}`
+      ),
     enabled: Boolean(selectedId) && (mode === "detail" || mode === "edit")
   });
 
@@ -167,6 +177,32 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
     },
     onError: (e: unknown) =>
       setNotice(friendlyApiError(e, "Couldn't update product status. Try again."))
+  });
+
+  const addFlavorMut = useMutation({
+    mutationFn: (name: string) =>
+      apiRequest<{ flavor: CatalogFlavor }>(`/admin/commerce/catalog/products/${selectedId}/flavors`, {
+        method: "POST",
+        body: JSON.stringify({ name })
+      }),
+    onSuccess: () => {
+      setNewFlavor("");
+      setNotice("Flavor added. Selection stays optional for customers.");
+      void queryClient.invalidateQueries({ queryKey: ["duts-catalog-detail"] });
+    },
+    onError: (e: unknown) => setNotice(friendlyApiError(e, "Couldn't add flavor."))
+  });
+
+  const flavorStatusMut = useMutation({
+    mutationFn: (input: { flavorId: string; active: boolean }) =>
+      apiRequest<{ flavor: CatalogFlavor }>(`/admin/commerce/catalog/flavors/${input.flavorId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ active: input.active })
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["duts-catalog-detail"] });
+    },
+    onError: (e: unknown) => setNotice(friendlyApiError(e, "Couldn't update flavor."))
   });
 
   const migrateMut = useMutation({
@@ -376,6 +412,45 @@ export function DutsCatalogPanel({ apiRequest }: { apiRequest: ApiRequest }) {
               </div>
               {!p.primaryImageUrl ? <p className="catalog-missing-image">No image</p> : null}
               {p.description ? <p className="product-desc">{p.description}</p> : null}
+
+              <div className="commerce-form" style={{ marginTop: 16 }}>
+                <p className="muted tiny">Flavors (optional)</p>
+                <p className="muted">
+                  Customers can skip this and order as Any flavor. Do not merge existing flavor-named SKUs.
+                </p>
+                {(detailQuery.data?.flavors ?? []).map((flavor) => (
+                  <div key={flavor.id} className="row-actions" style={{ marginTop: 8 }}>
+                    <span>
+                      {flavor.name}
+                      {flavor.active ? "" : " (inactive)"}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => flavorStatusMut.mutate({ flavorId: flavor.id, active: !flavor.active })}
+                    >
+                      {flavor.active ? "Deactivate" : "Reactivate"}
+                    </button>
+                  </div>
+                ))}
+                <label>
+                  Add flavor
+                  <input
+                    value={newFlavor}
+                    onChange={(e) => setNewFlavor(e.target.value)}
+                    placeholder="Orange, Raspberry…"
+                    autoComplete="off"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={!newFlavor.trim() || addFlavorMut.isPending}
+                  onClick={() => addFlavorMut.mutate(newFlavor.trim())}
+                >
+                  {addFlavorMut.isPending ? "Adding…" : "Add flavor"}
+                </button>
+              </div>
 
               <button type="button" className="btn-primary btn-block" onClick={() => setMode("edit")}>
                 Edit product

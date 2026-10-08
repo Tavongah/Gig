@@ -1,4 +1,5 @@
 import {
+  cartLineIdentity,
   coverageRatio,
   evaluateMerchantCoverage,
   isPublicStorefrontCatalogProduct,
@@ -18,6 +19,7 @@ import {
   quoteCart,
   type BrowseGeo
 } from "./customer-commerce.service.js";
+import { coverageFlavorMaps } from "./flavor.service.js";
 
 export function assertSmartBasketEnabled() {
   if (!parseSmartBasketEnabled(process.env.SMART_BASKET_ENABLED)) {
@@ -26,14 +28,28 @@ export function assertSmartBasketEnabled() {
 }
 
 export function normalizeDesiredItems(items: SmartBasketRequestedItem[]): SmartBasketRequestedItem[] {
-  const qtyById = new Map<string, number>();
+  const byKey = new Map<string, SmartBasketRequestedItem>();
   for (const item of items) {
     const id = item.catalogProductId?.trim();
     if (!id) continue;
     const qty = Math.max(1, Math.min(99, Math.floor(item.quantity || 1)));
-    qtyById.set(id, Math.min(99, (qtyById.get(id) ?? 0) + qty));
+    const flavorOptionId = item.flavorOptionId?.trim() || null;
+    const flavorPreference = item.flavorPreference ?? (flavorOptionId ? "SPECIFIC" : null);
+    const key = cartLineIdentity(id, flavorOptionId);
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.quantity = Math.min(99, existing.quantity + qty);
+      continue;
+    }
+    byKey.set(key, {
+      catalogProductId: id,
+      quantity: qty,
+      flavorOptionId,
+      flavorPreference,
+      flavorName: item.flavorName ?? null
+    });
   }
-  return [...qtyById.entries()].map(([catalogProductId, quantity]) => ({ catalogProductId, quantity }));
+  return [...byKey.values()];
 }
 
 function browseGeoFromInput(input: {
@@ -124,6 +140,8 @@ export async function matchSmartBasket(input: {
     });
   }
 
+  const flavorMaps = await coverageFlavorMaps(products.map((p) => p.id));
+
   const matches: SmartBasketMatch[] = [];
   for (const { merchant, distanceKm } of nearby) {
     if (!merchant.isActive || !merchant.acceptsOrders) continue;
@@ -136,7 +154,9 @@ export async function matchSmartBasket(input: {
         sizeLabel: product.catalogProduct?.sizeLabel ?? product.unit ?? null,
         priceCents: product.priceCents,
         quantityApprox: product.quantityApprox,
-        category: product.catalogProduct?.category ?? product.category ?? null
+        category: product.catalogProduct?.category ?? product.category ?? null,
+        unavailableFlavorIds: flavorMaps.unavailable.get(product.id),
+        activeFlavorIds: flavorMaps.active.get(product.id)
       });
     }
     const { available, missing } = evaluateMerchantCoverage({
@@ -200,6 +220,8 @@ export async function selectSmartBasket(input: {
         unitPriceCents: number;
         merchantId: string;
         merchantName: string;
+        flavorOptionId?: string | null;
+        flavorPreference?: "ANY" | "SPECIFIC" | null;
       }>
     };
   }
@@ -225,13 +247,17 @@ export async function selectSmartBasket(input: {
         unitPriceCents: number;
         merchantId: string;
         merchantName: string;
+        flavorOptionId?: string | null;
+        flavorPreference?: "ANY" | "SPECIFIC" | null;
       }>
     };
   }
 
   const lines = match.available.map((row) => ({
     productId: row.productId,
-    quantity: row.quantity
+    quantity: row.quantity,
+    flavorOptionId: row.flavorOptionId ?? null,
+    flavorPreference: row.flavorPreference ?? null
   }));
 
   try {
@@ -258,7 +284,10 @@ export async function selectSmartBasket(input: {
         quantity: line.quantity,
         unitPriceCents: line.unitPriceCents,
         merchantId: quote.merchant.id,
-        merchantName: quote.merchant.name
+        merchantName: quote.merchant.name,
+        flavorOptionId: line.flavorOptionId ?? mapped?.flavorOptionId ?? null,
+        flavorPreference: line.flavorPreference ?? mapped?.flavorPreference ?? null,
+        flavorName: line.flavorName ?? mapped?.flavorName ?? null
       };
     });
 

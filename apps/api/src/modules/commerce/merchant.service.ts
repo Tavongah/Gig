@@ -462,6 +462,9 @@ export type BasketLine = {
   unitPriceCents: number;
   lineTotalCents: number;
   merchantId: string;
+  flavorOptionId?: string | null;
+  flavorName?: string | null;
+  flavorPreference?: "ANY" | "SPECIFIC" | null;
 };
 
 /**

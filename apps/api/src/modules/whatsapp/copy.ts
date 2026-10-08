@@ -67,16 +67,26 @@ export const MERCHANT_HELP = [
   "• ready"
 ].join("\n");
 
-export function formatCartLines(
-  lines: Array<{ quantity: number; productName: string; lineTotalCents: number }>
-): string {
-  return lines.map((l) => `${l.quantity} × ${l.productName} — ${money(l.lineTotalCents)}`).join("\n");
+type CartDisplayLine = {
+  quantity: number;
+  productName: string;
+  lineTotalCents: number;
+  flavorLine?: string | null;
+};
+
+export function formatCartLines(lines: CartDisplayLine[]): string {
+  return lines
+    .map((l) => {
+      const flavor = l.flavorLine ? `\n${l.flavorLine}` : "";
+      return `${l.quantity} × ${l.productName}${flavor} — ${money(l.lineTotalCents)}`;
+    })
+    .join("\n");
 }
 
 /** Guest web basket restored — ask for WhatsApp location before any delivery quote. */
 export function formatGuestHandoffAwaitingLocation(input: {
   shopName?: string;
-  lines: Array<{ quantity: number; productName: string; lineTotalCents: number }>;
+  lines: CartDisplayLine[];
   subtotalCents: number;
   superseded?: boolean;
 }): string {
@@ -220,7 +230,7 @@ export function formatCustomerDeliveryLabel(label: string | null | undefined): s
 export function formatOrderCartSummary(input: {
   heading?: string;
   shopName?: string;
-  lines: Array<{ quantity: number; productName: string; lineTotalCents: number }>;
+  lines: CartDisplayLine[];
   subtotalCents: number;
   deliveryFeeCents: number;
   serviceFeeCents?: number;
@@ -574,7 +584,7 @@ export function formatPaymentStillPending(): string {
 }
 
 export function formatReadyToOrder(input: {
-  lines: Array<{ quantity: number; productName: string; lineTotalCents: number }>;
+  lines: CartDisplayLine[];
   subtotalCents: number;
 }): string {
   return [
@@ -722,6 +732,8 @@ export function formatCheckoutHelp(expected?: string): string {
   switch (expected) {
     case "PRODUCT_DISAMBIGUATION":
       return "Reply with 1, 2, or 3 to pick a product.";
+    case "PRODUCT_FLAVOR":
+      return "Reply with a flavor, or Any.";
     case "READY_TO_ORDER":
       return "Reply 1 to continue, or 2 to add more items.";
     case "LOCATION":

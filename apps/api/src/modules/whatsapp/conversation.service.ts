@@ -16,6 +16,7 @@ export type ConversationContext = {
     | "NONE"
     | "PRODUCT_TEXT"
     | "PRODUCT_DISAMBIGUATION"
+    | "PRODUCT_FLAVOR"
     | "READY_TO_ORDER"
     | "LOCATION"
     | "LOCATION_CLARIFICATION"
@@ -42,6 +43,15 @@ export type ConversationContext = {
     productName: string;
     unitPriceCents: number;
     merchantId: string;
+    flavorOptionId?: string | null;
+    flavorName?: string | null;
+    flavorPreference?: "ANY" | "SPECIFIC" | null;
+  }>;
+  pendingFlavorChoices?: Array<{
+    productId: string;
+    productName: string;
+    flavors: Array<{ id: string | null; name: string }>;
+    choiceId?: string;
   }>;
   parkedPayments?: Array<{
     checkoutSessionId: string;
@@ -60,6 +70,9 @@ export type ConversationContext = {
   /** Customer-entered house/street/landmark text, even when geocode is area-level. */
   deliveryInstructions?: string;
   deliveryPrecision?: "EXACT" | "STREET" | "LANDMARK" | "AREA" | "GPS";
+  /** Exact customer-typed address, never rewritten by geocoding. */
+  originalTypedAddress?: string;
+  pilotLocationMode?: "GPS" | "TYPED_PILOT";
   deliveryLocationDraft?: {
     originalText?: string;
     house?: string;
@@ -102,6 +115,9 @@ export type ConversationContext = {
     unitPriceCents: number;
     lineTotalCents: number;
     merchantId: string;
+    flavorOptionId?: string | null;
+    flavorName?: string | null;
+    flavorPreference?: "ANY" | "SPECIFIC" | null;
   }>;
   merchantId?: string;
   previousMerchantId?: string;

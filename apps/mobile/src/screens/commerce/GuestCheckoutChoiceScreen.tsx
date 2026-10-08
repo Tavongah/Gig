@@ -12,6 +12,7 @@ import { DUTS } from "../../lib/theme";
 import type { GuestStackParamList } from "../../navigation/types";
 import { useShopAreaStore } from "../../stores/shop-area.store";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
+import { toCheckoutLine } from "../../lib/storefront-cart";
 
 type Props = NativeStackScreenProps<GuestStackParamList, "GuestCheckoutChoice">;
 
@@ -26,7 +27,7 @@ export function GuestCheckoutChoiceScreen({ navigation }: Props) {
       if (!lines.length) throw new Error("Your cart is empty.");
       return api.commerceGuestHandoff({
         shoppingAreaId: area?.id,
-        lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
+        lines: lines.map(toCheckoutLine)
       });
     },
     onSuccess: async (result) => {

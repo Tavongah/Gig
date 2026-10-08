@@ -91,6 +91,8 @@ const envSchema = z.object({
    * Catalog-missing item search. Default OFF until physical E2E.
    */
   UNLISTED_ITEM_REQUEST_ENABLED: z.string().optional(),
+  /** Optional catalog flavor preferences. Default OFF until physical E2E. */
+  PRODUCT_FLAVOR_OPTIONS_ENABLED: z.string().optional(),
   /** COD for unlisted items. Default OFF — courier has no purchase float. */
   UNLISTED_ITEM_COD_ENABLED: z.string().optional(),
   UNLISTED_ITEM_MIN_PRICE_CENTS: z.string().optional(),

@@ -9,6 +9,7 @@ export type ShopLocation = {
   latitude: number;
   longitude: number;
   label: string;
+  locationMode?: "GPS" | "TYPED_PILOT";
 };
 
 type LocState = {
@@ -64,7 +65,8 @@ export const useShopLocationStore = create<LocState>((set, get) => ({
     const loc: ShopLocation = {
       latitude: coords.latitude,
       longitude: coords.longitude,
-      label: "Current location"
+      label: "Current location",
+      locationMode: "GPS"
     };
     await get().setLocation(loc);
     return loc;
@@ -78,7 +80,8 @@ export const useShopLocationStore = create<LocState>((set, get) => ({
     const loc: ShopLocation = {
       latitude: preferred.latitude,
       longitude: preferred.longitude,
-      label: preferred.label || preferred.formattedAddress || "Saved address"
+      label: preferred.label || preferred.formattedAddress || "Saved address",
+      locationMode: "GPS"
     };
     await get().setLocation(loc);
     return loc;

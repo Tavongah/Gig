@@ -8,6 +8,7 @@ export type InteractiveActionKind =
   | "MENU_HELP"
   | "MENU_MAIN"
   | "SELECT_PRODUCT"
+  | "SELECT_FLAVOR"
   | "CART_CONTINUE"
   | "CART_ADD_MORE"
   | "CART_VIEW"
@@ -39,6 +40,7 @@ export type InteractiveActionRecord = {
   expectedInput?: string;
   locationClarificationType?: string;
   productId?: string;
+  flavorOptionId?: string | null;
   orderId?: string;
   choiceIndex?: number;
   unlistedRequestId?: string;
@@ -128,6 +130,15 @@ export function resolveInteractiveAction(
   if (action.kind === "SELECT_PRODUCT" && action.productId) {
     const found = ctx.pendingChoices?.some((c) => c.options.some((o) => o.productId === action.productId));
     if (!found) return { ok: false, reason: "stale" };
+  }
+  if (action.kind === "SELECT_FLAVOR" && (ctx.expectedInput ?? "NONE") !== "PRODUCT_FLAVOR") {
+    return { ok: false, reason: "stale" };
+  }
+  if (action.kind === "SELECT_FLAVOR") {
+    const pending = ctx.pendingFlavorChoices?.[0];
+    if (!pending || pending.productId !== action.productId) return { ok: false, reason: "stale" };
+    const flavorOk = pending.flavors.some((f) => (f.id ?? null) === (action.flavorOptionId ?? null));
+    if (!flavorOk) return { ok: false, reason: "stale" };
   }
   if (action.unlistedRequestId && ctx.unlistedRequestId && action.unlistedRequestId !== ctx.unlistedRequestId) {
     return { ok: false, reason: "stale" };

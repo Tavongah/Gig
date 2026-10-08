@@ -5,7 +5,7 @@ import {
   WhatsAppParty,
   type CommerceOrder
 } from "@prisma/client";
-import { FULFILLMENT_NOTE, addFulfillmentNote, hasFulfillmentNote } from "@gigflow/shared";
+import { FULFILLMENT_NOTE, addFulfillmentNote, formatFlavorFulfillmentLine, hasFulfillmentNote } from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
 import { logDutsFlow } from "../../lib/flow-log.js";
 import { normalizePhoneNumber } from "../auth/access.service.js";
@@ -65,7 +65,13 @@ async function merchantSessionOpen(phone: string): Promise<boolean> {
 
 type OrderForNotify = CommerceOrder & {
   merchant: { whatsappPhone: string; name: string; id: string };
-  items: Array<{ quantity: number; productNameSnapshot: string; lineTotalCents: number }>;
+  items: Array<{
+    quantity: number;
+    productNameSnapshot: string;
+    lineTotalCents: number;
+    flavorPreference?: string | null;
+    flavorNameSnapshot?: string | null;
+  }>;
   checkout?: { checkoutNumber: number } | null;
   fulfillmentLabel?: string | null;
 };
@@ -85,7 +91,12 @@ function buildBody(order: OrderForNotify): string {
   return formatMerchantNewOrder({
     orderNumber: order.orderNumber,
     displayRef,
-    lines: order.items.map((i) => `${i.quantity} × ${i.productNameSnapshot}`),
+    lines: order.items.map((i) => {
+      const flavor = formatFlavorFulfillmentLine(i.flavorPreference, i.flavorNameSnapshot);
+      return flavor
+        ? `${i.quantity} × ${i.productNameSnapshot}\n${flavor}`
+        : `${i.quantity} × ${i.productNameSnapshot}`;
+    }),
     itemsTotalCents: order.subtotalCents,
     totalCents: order.totalCents
   });
@@ -93,7 +104,10 @@ function buildBody(order: OrderForNotify): string {
 
 function contentVariables(order: OrderForNotify): Record<string, string> {
   const itemSummary = order.items
-    .map((i) => `${i.quantity} × ${i.productNameSnapshot}`)
+    .map((i) => {
+      const flavor = formatFlavorFulfillmentLine(i.flavorPreference, i.flavorNameSnapshot);
+      return flavor ? `${i.quantity} × ${i.productNameSnapshot} (${flavor})` : `${i.quantity} × ${i.productNameSnapshot}`;
+    })
     .join("\n")
     .slice(0, 500);
   return {

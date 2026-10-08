@@ -5,6 +5,15 @@ import { isProductCardPurchasable, type ProductCardData } from "../components/Pr
 import { alcoholPurchaseAllowed, isSmartBasketEnabled } from "./storefront-categories";
 import type { CommerceBrowseGeo } from "./api";
 import { useCommerceCartStore, type CartLine } from "../stores/commerce-cart.store";
+
+export function toCheckoutLine(line: CartLine) {
+  return {
+    productId: line.productId,
+    quantity: line.quantity,
+    flavorOptionId: line.flavorOptionId ?? null,
+    flavorPreference: line.flavorPreference ?? null
+  };
+}
 import { useDesiredBasketStore } from "../stores/desired-basket.store";
 
 let publicConfigCache:
@@ -122,6 +131,7 @@ export function addStorefrontProduct(input: {
       const offer = detail.offers[0];
       if (!offer || !detail.purchasable) return;
       if (!alcoholPurchaseAllowed(detail.product.category)) return;
+      const flavors = detail.product.flavors ?? [];
       return tryAddOfferToCart(
         {
           productId: offer.productId,
@@ -131,7 +141,10 @@ export function addStorefrontProduct(input: {
           sizeLabel: detail.product.sizeLabel,
           unitPriceCents: offer.priceCents,
           merchantId: offer.merchantId,
-          merchantName: offer.merchantName
+          merchantName: offer.merchantName,
+          flavorOptionId: null,
+          flavorName: null,
+          flavorPreference: flavors.length ? "ANY" : null
         },
         geo,
         token

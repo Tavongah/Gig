@@ -30,6 +30,7 @@ import {
 } from "./conversation.service.js";
 import { getWhatsAppProvider } from "./provider.js";
 import type { InboundWhatsAppMessage } from "./customer-handler.js";
+import { formatFlavorFulfillmentLine } from "@gigflow/shared";
 import { formatMerchantAccepted, formatMerchantReady, formatMerchantReadyDeliveryFailed, formatCustomerMerchantAccepted, formatCustomerOrderReady, MERCHANT_HELP, money } from "./copy.js";
 
 function friendlyMerchantOrderStatus(status: string): string {
@@ -274,7 +275,14 @@ export async function handleMerchantWhatsAppMessage(
       const list = orders
         .map(
           (o) =>
-            `#${o.orderNumber} · ${friendlyMerchantOrderStatus(o.status)} · ${money(o.subtotalCents)} · ${o.items.map((i) => `${i.quantity}×${i.productNameSnapshot}`).join(", ")}`
+            `#${o.orderNumber} · ${friendlyMerchantOrderStatus(o.status)} · ${money(o.subtotalCents)} · ${o.items
+              .map((i) => {
+                const flavor = formatFlavorFulfillmentLine(i.flavorPreference, i.flavorNameSnapshot);
+                return flavor
+                  ? `${i.quantity}×${i.productNameSnapshot} (${flavor})`
+                  : `${i.quantity}×${i.productNameSnapshot}`;
+              })
+              .join(", ")}`
         )
         .join("\n");
       await wa.sendText(phone, `*Active orders*\n${list}`);

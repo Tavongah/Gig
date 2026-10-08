@@ -14,7 +14,9 @@ import {
 import { randomBytes } from "node:crypto";
 import {
   calculatePilotDeliveryPrice,
+  classifyPackage,
   distanceKmBetween,
+  resolvePilotLocationMode,
   haversineMiles,
   parseUnlistedItemCodEnabled,
   parseUnlistedItemRequestEnabled,
@@ -327,7 +329,20 @@ export async function submitUnlistedQuote(
     { latitude: shopLat, longitude: shopLng },
     { latitude: customerLat, longitude: customerLng }
   );
-  const delivery = calculatePilotDeliveryPrice({ routeDistanceKm: routeKm, packageClass: "SMALL" });
+  const locationMode = resolvePilotLocationMode({
+    deliveryPrecision: row.deliveryPrecision,
+    typedAddress: row.deliveryInstructions,
+    deliveryLabel: row.deliveryLabel
+  });
+  const packageClass =
+    locationMode === "TYPED_PILOT"
+      ? classifyPackage([{ quantity: row.quantity }])
+      : "SMALL";
+  const delivery = calculatePilotDeliveryPrice({
+    routeDistanceKm: routeKm,
+    packageClass,
+    locationMode
+  });
   if (!delivery.eligible || delivery.deliveryFeeCents == null) {
     throw new AppError("We can't deliver this to the customer location yet.", 409, "SHOP_NOT_NEARBY");
   }

@@ -25,6 +25,7 @@ export type StorefrontAcc = {
   merchantOfferCount: number;
   purchasable: boolean;
   score: number;
+  flavorCount?: number;
 };
 
 export function clampStorefrontPage(limit?: number, offset?: number) {
@@ -60,6 +61,7 @@ export function scoreStorefrontSearch(input: {
   sizeLabel: string | null;
   category: string | null;
   barcode?: string | null;
+  flavorNames?: string[] | null;
   terms: string[];
 }) {
   if (!input.terms.length) return 1;
@@ -68,7 +70,8 @@ export function scoreStorefrontSearch(input: {
     brand: input.brand,
     sizeLabel: input.sizeLabel,
     category: input.category,
-    barcode: input.barcode
+    barcode: input.barcode,
+    flavorNames: input.flavorNames
   });
   let score = 0;
   for (const t of input.terms) {
@@ -128,7 +131,8 @@ export function presentStorefrontCard(input: StorefrontAcc): StorefrontProductCa
     fromPriceCents: purchasable ? input.fromPriceCents : null,
     currency: purchasable ? input.currency ?? "usd" : null,
     merchantOfferCount: purchasable ? input.merchantOfferCount : 0,
-    offerCount: purchasable ? input.merchantOfferCount : 0
+    offerCount: purchasable ? input.merchantOfferCount : 0,
+    flavorCount: input.flavorCount ?? 0
   };
 }
 
@@ -141,6 +145,7 @@ export function catalogOnlyAcc(input: {
   description: string | null;
   primaryImageUrl: string | null;
   barcode?: string | null;
+  flavorNames?: string[] | null;
   terms: string[];
 }): StorefrontAcc | null {
   if (!isPublicStorefrontCatalogProduct({ id: input.id, status: "APPROVED" })) return null;
@@ -150,6 +155,7 @@ export function catalogOnlyAcc(input: {
     sizeLabel: input.sizeLabel,
     category: input.category,
     barcode: input.barcode,
+    flavorNames: input.flavorNames,
     terms: input.terms
   });
   if (input.terms.length && score <= 0) return null;
@@ -166,7 +172,8 @@ export function catalogOnlyAcc(input: {
     currency: null,
     merchantOfferCount: 0,
     purchasable: false,
-    score
+    score,
+    flavorCount: input.flavorNames?.length ?? 0
   };
 }
 

@@ -1,6 +1,8 @@
 /**
  * DUTS commerce pilot delivery pricing V1.
- * Distance band + package class → one customer Delivery fee ($0.50–$2.00).
+ *
+ * GPS / shared-location: distance band + package class → $0.50–$2.00 matrix.
+ * Typed MSU/Gweru pilot address: package class only → $1.00 / $1.30 / $1.70.
  *
  * Does NOT apply to legacy gig/P2P calculateDeliveryPrice.
  * Does NOT split courier payout from the customer fee.
@@ -28,6 +30,24 @@ export const PILOT_DELIVERY_FEE_CENTS = {
 export const MIN_DELIVERY_FEE_CENTS = 50;
 export const MAX_PILOT_DELIVERY_FEE_CENTS = 200;
 export const PILOT_DELIVERY_MAX_KM = 3;
+
+export const PILOT_LOCATION_MODES = ["GPS", "TYPED_PILOT"] as const;
+export type PilotLocationMode = (typeof PILOT_LOCATION_MODES)[number];
+
+/** Authoritative typed-address pilot zone. Do not duplicate these cents in WhatsApp/mobile. */
+export const PILOT_TYPED_ADDRESS_ZONE = "MSU_GWERU" as const;
+
+export const PILOT_TYPED_ADDRESS_FEE_CENTS: Record<PilotPackageClass, number> = {
+  SMALL: 100,
+  MEDIUM: 130,
+  LARGE: 170
+};
+
+/** Senga / MSU Gweru centroid used when a typed address is recognized without exact geocoding. */
+export const MSU_GWERU_TYPED_PILOT_CENTROID = {
+  latitude: -19.4970683,
+  longitude: 29.838108
+} as const;
 
 export const PILOT_DELIVERY_MATRIX_CENTS: Record<
   PilotDistanceBand,
@@ -63,9 +83,10 @@ export type PilotDeliveryPriceResult =
       eligible: true;
       currency: "USD";
       deliveryFeeCents: number;
-      distanceBand: PilotDistanceBand;
+      distanceBand: PilotDistanceBand | null;
       packageClass: PilotPackageClass;
       distanceKm: number;
+      locationMode: PilotLocationMode;
     }
   | {
       eligible: false;
@@ -74,7 +95,46 @@ export type PilotDeliveryPriceResult =
       distanceBand: null;
       packageClass: PilotPackageClass;
       distanceKm: number;
+      locationMode: PilotLocationMode;
     };
+
+function foldAddressText(value: string | null | undefined): string {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[，、]/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Recognized typed address inside the configured MSU/Gweru pilot zone. */
+export function isMsuGweruTypedPilotAddress(text: string | null | undefined): boolean {
+  const hay = foldAddressText(text);
+  if (!hay) return false;
+  const hasGweru = /\bgweru\b/.test(hay);
+  const hasMsu = /\bmsu\b/.test(hay) || /\bmidlands state\b/.test(hay);
+  const hasSenga = /\bsenga\b/.test(hay);
+  const hasNehosho = /\bnehosho\b/.test(hay);
+  return (hasGweru || hasMsu) && (hasSenga || hasNehosho || hasMsu);
+}
+
+export function resolvePilotLocationMode(input: {
+  locationMode?: string | null;
+  deliveryPrecision?: string | null;
+  typedAddress?: string | null;
+  deliveryLabel?: string | null;
+}): PilotLocationMode {
+  const explicit = String(input.locationMode ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  if (explicit === "GPS") return "GPS";
+  if (explicit === "TYPED_PILOT") return "TYPED_PILOT";
+  if (String(input.deliveryPrecision ?? "").trim().toUpperCase() === "GPS") return "GPS";
+  const text = String(input.typedAddress || input.deliveryLabel || "").trim();
+  if (isMsuGweruTypedPilotAddress(text)) return "TYPED_PILOT";
+  return "GPS";
+}
 
 /** Integer millimetres so 1.0000 vs 1.0001 never falls between bands. */
 export function distanceKmToMillimetres(km: number): number {
@@ -170,11 +230,24 @@ export function classifyPackage(items: PilotPackageItem[]): PilotPackageClass {
 export function calculatePilotDeliveryPrice(input: {
   routeDistanceKm: number;
   packageClass: PilotPackageClass;
+  locationMode?: PilotLocationMode | string | null;
 }): PilotDeliveryPriceResult {
-  const packageClass = PILOT_PACKAGE_CLASSES.includes(input.packageClass)
-    ? input.packageClass
+  const packageClass = PILOT_PACKAGE_CLASSES.includes(input.packageClass as PilotPackageClass)
+    ? (input.packageClass as PilotPackageClass)
     : "MEDIUM";
+  const locationMode: PilotLocationMode = input.locationMode === "TYPED_PILOT" ? "TYPED_PILOT" : "GPS";
   const distanceKm = Number.isFinite(input.routeDistanceKm) ? input.routeDistanceKm : Number.NaN;
+  if (locationMode === "TYPED_PILOT") {
+    return {
+      eligible: true,
+      currency: "USD",
+      deliveryFeeCents: PILOT_TYPED_ADDRESS_FEE_CENTS[packageClass],
+      distanceBand: null,
+      packageClass,
+      distanceKm: Number.isFinite(distanceKm) ? distanceKm : 0,
+      locationMode
+    };
+  }
   const distanceBand = distanceBandForKm(distanceKm);
   if (!distanceBand) {
     return {
@@ -183,7 +256,8 @@ export function calculatePilotDeliveryPrice(input: {
       deliveryFeeCents: null,
       distanceBand: null,
       packageClass,
-      distanceKm: Number.isFinite(distanceKm) ? distanceKm : -1
+      distanceKm: Number.isFinite(distanceKm) ? distanceKm : -1,
+      locationMode
     };
   }
   const deliveryFeeCents = PILOT_DELIVERY_MATRIX_CENTS[distanceBand][packageClass];
@@ -193,6 +267,7 @@ export function calculatePilotDeliveryPrice(input: {
     deliveryFeeCents,
     distanceBand,
     packageClass,
-    distanceKm
+    distanceKm,
+    locationMode
   };
 }

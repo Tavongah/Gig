@@ -400,6 +400,21 @@ export {
 } from "./multi-shop-checkout.js";
 
 export {
+  cartLineIdentity,
+  formatFlavorCustomerLine,
+  formatFlavorFulfillmentLine,
+  isFlavorInquiry,
+  matchFlavorFromText,
+  merchantCanFulfillFlavor,
+  normalizeFlavorName,
+  parseProductFlavorOptionsEnabled,
+  resolveFlavorPreference,
+  unmatchedFlavorMention,
+  type FlavorOptionPublic,
+  type FlavorPreference
+} from "./product-flavor.js";
+
+export {
   parseUnlistedItemCodEnabled,
   parseUnlistedItemRequestEnabled,
   parseUnlistedRequestText,

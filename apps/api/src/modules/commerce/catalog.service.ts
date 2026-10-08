@@ -346,10 +346,12 @@ export async function searchCatalogProducts(input: unknown) {
     return packCatalogSearch(rows.slice(0, limit).map(presentation), summary);
   }
 
+  const { flavorNamesByCatalogId } = await import("./flavor.service.js");
+  const flavorNames = await flavorNamesByCatalogId(rows.map((p) => p.id));
   const terms = expandSearchTerms(q);
   const scored = rows
     .map((p) => {
-      const hay = catalogSearchHaystack(p);
+      const hay = catalogSearchHaystack({ ...p, flavorNames: flavorNames.get(p.id) });
       let score = 0;
       for (const t of terms) {
         if (!t) continue;
@@ -369,12 +371,16 @@ export async function searchCatalogProducts(input: unknown) {
 export async function getCatalogProduct(id: string) {
   const product = await prisma.catalogProduct.findUnique({
     where: { id },
-    include: { images: { orderBy: { sortOrder: "asc" } } }
+    include: {
+      images: { orderBy: { sortOrder: "asc" } },
+      flavorOptions: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }
+    }
   });
   if (!product) throw new AppError("Catalog product not found.", 404, "CATALOG_PRODUCT_NOT_FOUND");
   return {
     product: presentation(product),
-    images: product.images
+    images: product.images,
+    flavors: product.flavorOptions
   };
 }
 

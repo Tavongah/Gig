@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { cartLineIdentity } from "@gigflow/shared";
 
 export type CartLine = {
   productId: string;
@@ -12,7 +13,14 @@ export type CartLine = {
   quantity: number;
   merchantId: string;
   merchantName: string;
+  flavorOptionId?: string | null;
+  flavorName?: string | null;
+  flavorPreference?: "ANY" | "SPECIFIC" | null;
 };
+
+export function cartLineKey(line: Pick<CartLine, "productId" | "flavorOptionId">): string {
+  return cartLineIdentity(line.productId, line.flavorOptionId);
+}
 
 export type PersistedCart = {
   lines: CartLine[];
@@ -32,8 +40,8 @@ type CartState = {
   addOffer: (line: Omit<CartLine, "quantity"> & { quantity?: number }, options?: { allowMulti?: boolean }) => boolean;
   notice: string | null;
   clearNotice: () => void;
-  setQuantity: (productId: string, quantity: number) => void;
-  remove: (productId: string) => void;
+  setQuantity: (lineKey: string, quantity: number) => void;
+  remove: (lineKey: string) => void;
   clear: () => void;
   replaceCart: (cart: PersistedCart) => void;
   setPendingCheckout: (value: boolean) => void;
@@ -117,11 +125,12 @@ export const useCommerceCartStore = create<CartState>((set, get) => ({
       const notice =
         shopCount > 1 ? `Added ✓  Your delivery now includes ${shopCount} nearby shops.` : null;
       const qty = input.quantity ?? 1;
-      const existing = state.lines.find((l) => l.productId === input.productId);
+      const key = cartLineKey(input);
+      const existing = state.lines.find((l) => cartLineKey(l) === key);
       if (existing) {
         set({
           lines: state.lines.map((l) =>
-            l.productId === input.productId
+            cartLineKey(l) === key
               ? { ...l, quantity: Math.min(99, l.quantity + qty), unitPriceCents: input.unitPriceCents }
               : l
           ),
@@ -137,11 +146,12 @@ export const useCommerceCartStore = create<CartState>((set, get) => ({
     }
 
     const qty = input.quantity ?? 1;
-    const existing = state.lines.find((l) => l.productId === input.productId);
+    const key = cartLineKey(input);
+    const existing = state.lines.find((l) => cartLineKey(l) === key);
     if (existing) {
       set({
         lines: state.lines.map((l) =>
-          l.productId === input.productId
+          cartLineKey(l) === key
             ? { ...l, quantity: Math.min(99, l.quantity + qty), unitPriceCents: input.unitPriceCents }
             : l
         ),
@@ -159,20 +169,20 @@ export const useCommerceCartStore = create<CartState>((set, get) => ({
     return true;
   },
 
-  setQuantity: (productId, quantity) => {
+  setQuantity: (lineKey, quantity) => {
     if (quantity <= 0) {
-      get().remove(productId);
+      get().remove(lineKey);
       return;
     }
     set({
       lines: get().lines.map((l) =>
-        l.productId === productId ? { ...l, quantity: Math.min(99, quantity) } : l
+        cartLineKey(l) === lineKey ? { ...l, quantity: Math.min(99, quantity) } : l
       )
     });
   },
 
-  remove: (productId) => {
-    const lines = get().lines.filter((l) => l.productId !== productId);
+  remove: (lineKey) => {
+    const lines = get().lines.filter((l) => cartLineKey(l) !== lineKey);
     set({
       lines,
       merchantId: lines[0]?.merchantId ?? null,

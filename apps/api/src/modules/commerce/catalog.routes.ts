@@ -22,6 +22,10 @@ import {
   uploadAcquisitionCandidate
 } from "./catalog-image-acquisition.service.js";
 import {
+  createFlavorOption,
+  updateFlavorOption
+} from "./flavor.service.js";
+import {
   createCatalogProduct,
   getCatalogProduct,
   linkCatalogProductToMerchant,
@@ -104,6 +108,28 @@ catalogAdminRouter.post("/catalog/products/:id/reject", async (req, res, next) =
   try {
     const product = await setCatalogProductStatus(String(req.params.id), "REJECTED", req.auth!.userId);
     res.json({ product });
+  } catch (err) {
+    next(err);
+  }
+});
+
+catalogAdminRouter.post("/catalog/products/:id/flavors", async (req, res, next) => {
+  try {
+    const flavor = await createFlavorOption(String(req.params.id), String(req.body?.name ?? ""));
+    res.status(201).json({ flavor });
+  } catch (err) {
+    next(err);
+  }
+});
+
+catalogAdminRouter.patch("/catalog/flavors/:flavorId", async (req, res, next) => {
+  try {
+    const flavor = await updateFlavorOption(String(req.params.flavorId), {
+      name: typeof req.body?.name === "string" ? req.body.name : undefined,
+      active: typeof req.body?.active === "boolean" ? req.body.active : undefined,
+      sortOrder: typeof req.body?.sortOrder === "number" ? req.body.sortOrder : undefined
+    });
+    res.json({ flavor });
   } catch (err) {
     next(err);
   }

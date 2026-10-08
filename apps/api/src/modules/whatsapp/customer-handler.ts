@@ -137,7 +137,19 @@ import {
   setExpected,
   supersedeCheckoutDraft
 } from "./checkout-session.js";
-import { commerceCustomerStatusCopy } from "@gigflow/shared";
+import {
+  commerceCustomerStatusCopy,
+  formatFlavorCustomerLine,
+  isMsuGweruTypedPilotAddress,
+  MSU_GWERU_TYPED_PILOT_CENTROID
+} from "@gigflow/shared";
+import {
+  applyPendingFlavorChoice,
+  attachFlavorToLock,
+  displayNameWithFlavor,
+  flavorInquiryFromText,
+  sendFlavorChoicesForProduct
+} from "./whatsapp-flavor.js";
 import { normalizePhoneNumber } from "../auth/access.service.js";
 import {
   cancelPendingPaymentAttempts,
@@ -339,6 +351,39 @@ export async function handleCustomerWhatsAppMessage(
 
   if (expect === "CHANGE_WHAT") {
     return handleChangeWhat(phone, conv.id, ctx, text);
+  }
+
+  if (expect === "PRODUCT_FLAVOR") {
+    const pending = ctx.pendingFlavorChoices?.[0];
+    if (pending) {
+      const n = parseNumericChoice(text);
+      const pick =
+        n != null
+          ? pending.flavors[n - 1]
+          : pending.flavors.find((f) => f.name.toLowerCase() === text.trim().toLowerCase()) ||
+            pending.flavors.find((f) => text.toLowerCase().includes(f.name.toLowerCase()));
+      const anyPick = /^(any|any flavor|no preference)$/i.test(text.trim())
+        ? pending.flavors.find((f) => f.id == null)
+        : null;
+      const skipToAny =
+        isConfirmIntent(text) ||
+        /^(done|continue|skip|add to cart|checkout|order)$/i.test(text.trim())
+          ? pending.flavors.find((f) => f.id == null)
+          : null;
+      const chosen = pick ?? anyPick ?? skipToAny;
+      if (chosen) {
+        applyPendingFlavorChoice(ctx, chosen);
+        setExpected(ctx, ctx.deliveryLat != null ? "ORDER_CONFIRMATION" : "READY_TO_ORDER");
+        if (ctx.deliveryLat != null && ctx.deliveryLng != null) {
+          return buildAndPresentQuote(phone, conv.id, ctx);
+        }
+        const lines = cartLinesForDisplay(ctx);
+        const subtotal = lines.reduce((s, l) => s + l.lineTotalCents, 0);
+        await sendCartActions(phone, ctx, { lines, subtotalCents: subtotal });
+        await updateConversation(conv.id, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
+        return { handled: true };
+      }
+    }
   }
 
   if (expect === "READY_TO_ORDER") {
@@ -608,6 +653,23 @@ export async function handleCustomerWhatsAppMessage(
     return { handled: true };
   }
 
+  if (flavorInquiryFromText(text)) {
+    const locked = ctx.lockedProductLines?.[ctx.lockedProductLines.length - 1];
+    if (locked) {
+      await sendFlavorChoicesForProduct(phone, ctx, {
+        id: locked.productId,
+        name: locked.productName
+      });
+      await updateConversation(conv.id, {
+        state: WhatsAppConversationState.BUILDING_CART,
+        context: ctx
+      });
+      return { handled: true };
+    }
+    await wa.sendText(phone, "Tell me which product, then I can show flavors.");
+    return { handled: true };
+  }
+
   if (ctx.deliveryLat == null || ctx.deliveryLng == null) {
     if (text && intent.kind === "UNKNOWN") {
       const items = await extractShoppingItemsWithOptionalAi(text);
@@ -675,14 +737,22 @@ function cartLinesForDisplay(ctx: ConversationContext) {
   if (ctx.lockedProductLines?.length) {
     return ctx.lockedProductLines.map((l) => ({
       quantity: l.quantity,
-      productName: l.productName,
+      ...displayNameWithFlavor({
+        productName: l.productName,
+        flavorPreference: l.flavorPreference,
+        flavorName: l.flavorName
+      }),
       lineTotalCents: l.quantity * l.unitPriceCents
     }));
   }
   if (ctx.draftLines?.length) {
     return ctx.draftLines.map((l) => ({
       quantity: l.quantity,
-      productName: l.productName,
+      ...displayNameWithFlavor({
+        productName: l.productName,
+        flavorPreference: l.flavorPreference,
+        flavorName: l.flavorName
+      }),
       lineTotalCents: l.lineTotalCents
     }));
   }
@@ -725,6 +795,8 @@ async function handleChangeWhat(phone: string, convId: string, ctx: Conversation
     ctx.deliveryLabel = undefined;
     ctx.deliveryInstructions = undefined;
     ctx.deliveryPrecision = undefined;
+    ctx.originalTypedAddress = undefined;
+    ctx.pilotLocationMode = undefined;
     ctx.pendingAreaMatch = undefined;
     ctx.deliveryLocationDraft = undefined;
     ctx.locationClarificationType = undefined;
@@ -774,13 +846,16 @@ async function applyResolvedCoordinates(
   ctx.deliveryLng = input.longitude;
   ctx.deliveryInstructions = input.instructions?.trim() || ctx.deliveryInstructions;
   ctx.deliveryPrecision = input.precision ?? "EXACT";
-  ctx.deliveryLabel = customerFacingDeliveryLabel(
-    composeDeliveryLabel({
-      resolvedLabel: humanDeliveryLabel({ typed: input.label }),
-      instructions: ctx.deliveryInstructions,
-      precision: ctx.deliveryPrecision
-    })
-  );
+  const originalTyped = ctx.originalTypedAddress?.trim();
+  ctx.deliveryLabel = originalTyped
+    ? originalTyped
+    : customerFacingDeliveryLabel(
+        composeDeliveryLabel({
+          resolvedLabel: humanDeliveryLabel({ typed: input.label }),
+          instructions: ctx.deliveryInstructions,
+          precision: ctx.deliveryPrecision
+        })
+      );
   ctx.lastDeliveryLat = ctx.deliveryLat;
   ctx.lastDeliveryLng = ctx.deliveryLng;
   ctx.lastDeliveryLabel = ctx.deliveryLabel;
@@ -811,6 +886,8 @@ async function applyNativeLocation(
       label = "Pinned location ✓";
     }
   }
+  ctx.originalTypedAddress = undefined;
+  ctx.pilotLocationMode = "GPS";
   return applyResolvedCoordinates(phone, convId, ctx, {
     latitude: location.latitude,
     longitude: location.longitude,
@@ -968,9 +1045,33 @@ async function applyTypedLocation(phone: string, convId: string, ctx: Conversati
     draft = draftFromParsed(incoming);
   }
   ctx.deliveryLocationDraft = draft;
+  const originalTyped = isMsuGweruTypedPilotAddress(text)
+    ? text.trim()
+    : shouldMerge
+      ? (draft.originalText || text).trim()
+      : text.trim();
   const instructions = houseOrInstructions(draft) || draft.originalText || text;
   if (!ctx.deliveryInstructions || draft.house || draft.street) {
     ctx.deliveryInstructions = instructions;
+  }
+
+  const recognizedPilot =
+    isMsuGweruTypedPilotAddress(originalTyped) ||
+    isMsuGweruTypedPilotAddress(text) ||
+    isMsuGweruTypedPilotAddress(composeQueryFromDraft(draft));
+  if (recognizedPilot) {
+    ctx.originalTypedAddress = originalTyped;
+    ctx.pilotLocationMode = "TYPED_PILOT";
+    ctx.pendingAreaMatch = undefined;
+    ctx.pendingLocationChoices = undefined;
+    ctx.locationClarificationType = undefined;
+    return applyResolvedCoordinates(phone, convId, ctx, {
+      latitude: MSU_GWERU_TYPED_PILOT_CENTROID.latitude,
+      longitude: MSU_GWERU_TYPED_PILOT_CENTROID.longitude,
+      label: originalTyped,
+      instructions: originalTyped,
+      precision: "STREET"
+    });
   }
 
   const { resolveTypedDeliveryLocation } = await import("../location/geocoding.service.js");
@@ -1101,6 +1202,32 @@ async function resolveProductsThenContinue(phone: string, convId: string, ctx: C
     }
     if (matches[0]) {
       const m = matches[0];
+      const flavor = await attachFlavorToLock(m.product, item.query);
+      if (flavor.unmatched) {
+        await getWhatsAppProvider().sendText(
+          phone,
+          `${flavor.unmatched} isn't an available flavor for ${m.product.name}. I won't substitute another flavor.`
+        );
+        const offered = await sendFlavorChoicesForProduct(phone, ctx, m.product);
+        ctx.lockedProductLines = [
+          ...(ctx.lockedProductLines ?? []).filter((l) => l.productId !== m.product.id),
+          {
+            productId: m.product.id,
+            quantity: item.quantity,
+            productName: m.product.name,
+            unitPriceCents: m.product.priceCents,
+            merchantId: m.merchant.id,
+            flavorOptionId: null,
+            flavorName: null,
+            flavorPreference: "ANY"
+          }
+        ];
+        await updateConversation(convId, {
+          state: WhatsAppConversationState.BUILDING_CART,
+          context: ctx
+        });
+        if (offered.asked) return { handled: true };
+      }
       ctx.lockedProductLines = [
         ...(ctx.lockedProductLines ?? []).filter((l) => l.productName.toLowerCase() !== item.query.toLowerCase()),
         {
@@ -1108,7 +1235,10 @@ async function resolveProductsThenContinue(phone: string, convId: string, ctx: C
           quantity: item.quantity,
           productName: m.product.name,
           unitPriceCents: m.product.priceCents,
-          merchantId: m.merchant.id
+          merchantId: m.merchant.id,
+          flavorOptionId: flavor.flavorOptionId,
+          flavorName: flavor.flavorName,
+          flavorPreference: flavor.flavorPreference
         }
       ];
       ctx.requestedItems = (ctx.requestedItems ?? []).map((r) =>
@@ -1286,7 +1416,12 @@ async function buildAndPresentQuote(
       const quoted = await quoteCart({
         lat: ctx.deliveryLat,
         lng: ctx.deliveryLng,
-        lines: ctx.lockedProductLines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+        lines: ctx.lockedProductLines.map((l) => ({
+          productId: l.productId,
+          quantity: l.quantity,
+          flavorOptionId: l.flavorOptionId ?? null,
+          flavorPreference: l.flavorPreference ?? null
+        })),
         preferredMerchantId: preferredId
       });
       basket = {
@@ -1381,7 +1516,11 @@ async function buildAndPresentQuote(
     merchantLng,
     customerLat: ctx.deliveryLat,
     customerLng: ctx.deliveryLng,
-    lines: basket.lines
+    lines: basket.lines,
+    locationMode: ctx.pilotLocationMode,
+    deliveryPrecision: ctx.deliveryPrecision,
+    typedAddress: ctx.originalTypedAddress,
+    deliveryLabel: ctx.originalTypedAddress || ctx.deliveryLabel
   });
 
   const { logDutsFlow } = await import("../../lib/flow-log.js");
@@ -1458,6 +1597,7 @@ async function buildAndPresentQuote(
     lines: basket.lines.map((l) => ({
       quantity: l.quantity,
       productName: l.productName,
+      flavorLine: formatFlavorCustomerLine(l.flavorPreference, l.flavorName),
       lineTotalCents: l.lineTotalCents
     })),
     subtotalCents: totals.subtotalCents,
@@ -1500,6 +1640,10 @@ async function applyProductChoice(
       ? { query: selected.name, quantity: r.quantity }
       : r
   );
+  const flavor = await attachFlavorToLock(
+    { id: selected.productId, name: selected.name },
+    pending.query
+  );
   ctx.lockedProductLines = [
     ...(ctx.lockedProductLines ?? []).filter((l) => l.productId !== selected.productId),
     {
@@ -1507,7 +1651,10 @@ async function applyProductChoice(
       quantity: qty,
       productName: selected.name,
       unitPriceCents: selected.priceCents,
-      merchantId: ctx.merchantId ?? ""
+      merchantId: ctx.merchantId ?? "",
+      flavorOptionId: flavor.flavorOptionId,
+      flavorName: flavor.flavorName,
+      flavorPreference: flavor.flavorPreference
     }
   ];
   const resolvedChoiceId = pending.choiceId ?? ctx.choiceId;
@@ -1850,9 +1997,12 @@ async function finalizeCashPayment(
       commerceCustomerId: customerId,
       merchantId: ctx.merchantId,
       lines: ctx.draftLines,
-      deliveryLabel: ctx.deliveryLabel || "Shared location",
+      deliveryLabel: ctx.originalTypedAddress || ctx.deliveryLabel || "Shared location",
       deliveryLatitude: ctx.deliveryLat,
       deliveryLongitude: ctx.deliveryLng,
+      locationMode: ctx.pilotLocationMode,
+      deliveryPrecision: ctx.deliveryPrecision,
+      typedAddress: ctx.originalTypedAddress,
       customerWhatsAppPhone: phone,
       paymentMethod: CommercePaymentMethod.CASH
     });
@@ -1912,9 +2062,12 @@ async function startMobileMoneyWithPayerPhone(
         commerceCustomerId: customerId,
         merchantId: ctx.merchantId,
         lines: ctx.draftLines,
-        deliveryLabel: ctx.deliveryLabel || "Shared location",
+        deliveryLabel: ctx.originalTypedAddress || ctx.deliveryLabel || "Shared location",
         deliveryLatitude: ctx.deliveryLat,
         deliveryLongitude: ctx.deliveryLng,
+        locationMode: ctx.pilotLocationMode,
+        deliveryPrecision: ctx.deliveryPrecision,
+        typedAddress: ctx.originalTypedAddress,
         customerWhatsAppPhone: phone,
         paymentMethod: method
       });
@@ -2056,7 +2209,11 @@ async function quoteBasketTotalsFromContext(ctx: ConversationContext) {
     merchantLng: Number(merchant.longitude),
     customerLat: ctx.deliveryLat,
     customerLng: ctx.deliveryLng,
-    lines: ctx.draftLines
+    lines: ctx.draftLines,
+    locationMode: ctx.pilotLocationMode,
+    deliveryPrecision: ctx.deliveryPrecision,
+    typedAddress: ctx.originalTypedAddress,
+    deliveryLabel: ctx.originalTypedAddress || ctx.deliveryLabel
   });
 }
 
@@ -2134,6 +2291,25 @@ async function applyInteractiveAction(
       await sendMainMenu(phone, ctx, false);
       await updateConversation(convId, { context: ctx });
       return { handled: true };
+    case "SELECT_FLAVOR": {
+      const pending = ctx.pendingFlavorChoices?.[0];
+      const pick = pending?.flavors.find((f) => (f.id ?? null) === (action.flavorOptionId ?? null));
+      if (!pending || pending.productId !== action.productId || !pick) {
+        await getWhatsAppProvider().sendText(phone, formatStaleChoiceNotice());
+        await promptCurrentCheckoutStep(phone, convId, ctx);
+        return { handled: true };
+      }
+      applyPendingFlavorChoice(ctx, pick);
+      if (ctx.deliveryLat != null && ctx.deliveryLng != null) {
+        return buildAndPresentQuote(phone, convId, ctx);
+      }
+      setExpected(ctx, "READY_TO_ORDER");
+      const lines = cartLinesForDisplay(ctx);
+      const subtotal = lines.reduce((s, l) => s + l.lineTotalCents, 0);
+      await sendCartActions(phone, ctx, { lines, subtotalCents: subtotal });
+      await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
+      return { handled: true };
+    }
     case "SELECT_PRODUCT": {
       const pending = ctx.pendingChoices?.[0];
       const idx = pending?.options.findIndex((o) => o.productId === action.productId) ?? -1;
@@ -2304,6 +2480,16 @@ async function promptCurrentCheckoutStep(
       }
       await getWhatsAppProvider().sendText(phone, formatCheckoutHelp(expect));
       return;
+    case "PRODUCT_FLAVOR": {
+      const pending = ctx.pendingFlavorChoices?.[0];
+      if (pending) {
+        await sendFlavorChoicesForProduct(phone, ctx, { id: pending.productId, name: pending.productName });
+        await updateConversation(convId, { context: ctx });
+        return;
+      }
+      await getWhatsAppProvider().sendText(phone, formatCheckoutHelp(expect));
+      return;
+    }
     case "PRODUCT_DISAMBIGUATION": {
       const pending = ctx.pendingChoices?.[0];
       if (pending?.options?.length) {

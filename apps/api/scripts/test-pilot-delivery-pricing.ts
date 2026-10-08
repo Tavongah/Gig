@@ -12,6 +12,7 @@ import {
   calculatePilotDeliveryPrice,
   classifyPackage,
   PILOT_DELIVERY_MATRIX_CENTS,
+  PILOT_TYPED_ADDRESS_FEE_CENTS,
   type PilotPackageClass
 } from "@gigflow/shared";
 
@@ -201,6 +202,16 @@ expectFee(3.0, "LARGE", 200, "O");
   assert.ok(engine.includes("PILOT_DELIVERY_MATRIX_CENTS"), "central matrix");
   assert.equal(PILOT_DELIVERY_MATRIX_CENTS["0_TO_1_KM"].SMALL, 50);
   assert.equal(PILOT_DELIVERY_MATRIX_CENTS["2_TO_3_KM"].LARGE, 200);
+  assert.ok(engine.includes("PILOT_TYPED_ADDRESS_FEE_CENTS"), "typed table is central");
+  assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.SMALL, 100);
+  assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.MEDIUM, 130);
+  assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.LARGE, 170);
+  const gpsSmall = calculatePilotDeliveryPrice({
+    routeDistanceKm: 0.5,
+    packageClass: "SMALL",
+    locationMode: "GPS"
+  });
+  assert.equal(gpsSmall.deliveryFeeCents, 50, "GPS SMALL is not forced to $1");
   const multi = src("../src/modules/commerce/multi-shop-checkout.service.ts");
   assert.ok(multi.includes("quotePilotCommerceDelivery"), "multi-shop uses same engine");
   assert.ok(multi.includes("input.lines"), "combined basket");

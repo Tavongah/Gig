@@ -107,7 +107,7 @@ export async function beginUnlistedRequestFromContext(
     orderSource: OrderSource.WHATSAPP,
     deliveryLatitude: ctx.deliveryLat,
     deliveryLongitude: ctx.deliveryLng,
-    deliveryLabel: ctx.deliveryLabel ?? "WhatsApp delivery",
+    deliveryLabel: ctx.originalTypedAddress || ctx.deliveryLabel || "WhatsApp delivery",
     deliveryPrecision: ctx.deliveryPrecision ?? null,
     deliveryInstructions: ctx.deliveryInstructions ?? null
   });

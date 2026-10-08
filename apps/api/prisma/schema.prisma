@@ -749,6 +749,7 @@ model CatalogProduct {
   approvedAt       DateTime?
   approvedByUserId String?
   images           CatalogProductImage[]
+  flavorOptions    CatalogProductFlavorOption[]
   merchantOffers   Product[]
   imageAcquisition CatalogImageAcquisition?
   createdAt        DateTime               @default(now())
@@ -770,6 +771,38 @@ model CatalogProductImage {
   createdAt        DateTime       @default(now())
 
   @@index([catalogProductId, sortOrder])
+}
+
+/** Optional flavor preference on a CatalogProduct. Not a priced variant SKU. */
+model CatalogProductFlavorOption {
+  id               String                      @id @default(uuid())
+  catalogProductId String
+  catalogProduct   CatalogProduct              @relation(fields: [catalogProductId], references: [id], onDelete: Cascade)
+  name             String
+  normalizedName   String
+  active           Boolean                     @default(true)
+  sortOrder        Int                         @default(0)
+  availability     ProductFlavorAvailability[]
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  @@unique([catalogProductId, normalizedName])
+  @@index([catalogProductId, sortOrder])
+}
+
+/** Merchant-level flavor stock. Missing row = available when the parent offer is available. */
+model ProductFlavorAvailability {
+  id             String                     @id @default(uuid())
+  productId      String
+  product        Product                    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  flavorOptionId String
+  flavorOption   CatalogProductFlavorOption @relation(fields: [flavorOptionId], references: [id], onDelete: Cascade)
+  available      Boolean                    @default(true)
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@unique([productId, flavorOptionId])
+  @@index([flavorOptionId])
 }
 
 enum CatalogProductStatus {
@@ -880,6 +913,7 @@ model Product {
   imageUrl         String?
   searchAliases    String[]        @default([])
   archived         Boolean         @default(false)
+  flavorAvailability ProductFlavorAvailability[]
   orderItems       CommerceOrderItem[]
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
@@ -1099,6 +1133,9 @@ model CommerceOrderItem {
   productId            String?
   product              Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
   productNameSnapshot  String
+  flavorOptionId       String?
+  flavorNameSnapshot   String?
+  flavorPreference     String?
   quantity             Int
   unitPriceCents       Int
   lineTotalCents       Int

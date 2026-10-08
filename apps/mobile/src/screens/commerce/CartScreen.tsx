@@ -12,8 +12,10 @@ import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import { isSmartBasketEnabled } from "../../lib/storefront-categories";
 import type { RootStackParamList } from "../../navigation/types";
-import { useCommerceCartStore } from "../../stores/commerce-cart.store";
-import { useDesiredBasketStore } from "../../stores/desired-basket.store";
+import { cartLineKey, useCommerceCartStore } from "../../stores/commerce-cart.store";
+import { desiredFlavorLabel, desiredLineKey, useDesiredBasketStore } from "../../stores/desired-basket.store";
+import { toCheckoutLine } from "../../lib/storefront-cart";
+import { formatFlavorCustomerLine } from "@gigflow/shared";
 
 export function CartScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -34,14 +36,14 @@ export function CartScreen() {
       if (browse.isGuest || !browse.exact) {
         return api.commerceCartQuote({
           deferDelivery: true,
-          lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
+          lines: lines.map(toCheckoutLine)
         });
       }
       return api.commerceCartQuote(
         {
           lat: browse.exact.latitude,
           lng: browse.exact.longitude,
-          lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
+          lines: lines.map(toCheckoutLine)
         },
         browse.token
       );
@@ -78,7 +80,7 @@ export function CartScreen() {
         <Text className="text-2xl font-black text-ink">Your shopping list</Text>
         <Text className="mt-1 text-sm text-muted">Add products, then find one shop that has them.</Text>
         {shoppingList.map((line) => (
-          <View key={line.catalogProductId} className="mt-4 flex-row gap-3 border-b border-border pb-4">
+          <View key={desiredLineKey(line)} className="mt-4 flex-row gap-3 border-b border-border pb-4">
             <View className="h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-surface">
               {line.imageUrl ? (
                 <Image
@@ -94,12 +96,15 @@ export function CartScreen() {
             <View className="flex-1">
               <Text className="text-base font-bold text-ink">{line.name}</Text>
               {line.sizeLabel ? <Text className="text-xs text-muted">{line.sizeLabel}</Text> : null}
+              {desiredFlavorLabel(line) ? (
+                <Text className="text-xs text-muted">{desiredFlavorLabel(line)}</Text>
+              ) : null}
               {line.fromPriceCents != null ? (
                 <Text className="mt-1 text-sm font-semibold text-muted">From ${(line.fromPriceCents / 100).toFixed(2)}</Text>
               ) : null}
               <View className="mt-2 flex-row items-center gap-3">
                 <Pressable
-                  onPress={() => setDesiredQty(line.catalogProductId, line.quantity - 1)}
+                  onPress={() => setDesiredQty(desiredLineKey(line), line.quantity - 1)}
                   accessibilityLabel="Decrease quantity"
                   className="h-11 w-11 items-center justify-center rounded-full border border-border"
                 >
@@ -107,13 +112,13 @@ export function CartScreen() {
                 </Pressable>
                 <Text className="min-w-[20px] text-center font-bold">{line.quantity}</Text>
                 <Pressable
-                  onPress={() => setDesiredQty(line.catalogProductId, line.quantity + 1)}
+                  onPress={() => setDesiredQty(desiredLineKey(line), line.quantity + 1)}
                   accessibilityLabel="Increase quantity"
                   className="h-11 w-11 items-center justify-center rounded-full border border-border"
                 >
                   <Text className="text-lg font-bold">+</Text>
                 </Pressable>
-                <Pressable onPress={() => removeDesired(line.catalogProductId)} accessibilityRole="button">
+                <Pressable onPress={() => removeDesired(desiredLineKey(line))} accessibilityRole="button">
                   <Text className="text-sm font-semibold text-muted">Remove</Text>
                 </Pressable>
               </View>
@@ -159,7 +164,10 @@ export function CartScreen() {
   }
 
   const quote = quoteMut.data;
-  const quotedLine = (productId: string) => quote?.lines.find((l) => l.productId === productId);
+  const quotedLine = (line: (typeof lines)[number]) =>
+    quote?.lines.find(
+      (l) => l.productId === line.productId && (l.flavorOptionId ?? null) === (line.flavorOptionId ?? null)
+    );
   const deferred = browse.isGuest || !browse.exact || quote?.deliveryQuoteStatus === "deferred";
   const shopGroups = (() => {
     const map = new Map<string, { merchantId: string; merchantName: string; lines: typeof lines }>();
@@ -174,10 +182,13 @@ export function CartScreen() {
   const canContinue = Boolean(quote) && !quoteMut.isPending && !quoteError;
 
   function renderLine(line: (typeof lines)[number]) {
-    const priced = quotedLine(line.productId);
+    const priced = quotedLine(line);
     const lineTotal = priced?.lineTotalCents ?? line.unitPriceCents * line.quantity;
+    const flavor =
+      formatFlavorCustomerLine(line.flavorPreference, line.flavorName) ??
+      formatFlavorCustomerLine(priced?.flavorPreference, priced?.flavorName);
     return (
-      <View key={line.productId} className="mt-3 flex-row gap-3">
+      <View key={cartLineKey(line)} className="mt-3 flex-row gap-3">
         <View className="h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-surface">
           {line.imageUrl ? (
             <Image
@@ -193,10 +204,11 @@ export function CartScreen() {
         <View className="flex-1">
           <Text className="text-base font-bold text-ink">{priced?.productName ?? line.name}</Text>
           {line.sizeLabel ? <Text className="text-xs text-muted">{line.sizeLabel}</Text> : null}
+          {flavor ? <Text className="text-xs text-muted">{flavor}</Text> : null}
           <Text className="mt-1 text-sm font-extrabold text-ink">${(lineTotal / 100).toFixed(2)}</Text>
           <View className="mt-2 flex-row items-center gap-3">
             <Pressable
-              onPress={() => setQuantity(line.productId, line.quantity - 1)}
+              onPress={() => setQuantity(cartLineKey(line), line.quantity - 1)}
               accessibilityLabel="Decrease quantity"
               className="h-11 w-11 items-center justify-center rounded-full border border-border"
             >
@@ -204,7 +216,7 @@ export function CartScreen() {
             </Pressable>
             <Text className="min-w-[20px] text-center font-bold">{line.quantity}</Text>
             <Pressable
-              onPress={() => setQuantity(line.productId, line.quantity + 1)}
+              onPress={() => setQuantity(cartLineKey(line), line.quantity + 1)}
               accessibilityLabel="Increase quantity"
               className="h-11 w-11 items-center justify-center rounded-full border border-border"
             >

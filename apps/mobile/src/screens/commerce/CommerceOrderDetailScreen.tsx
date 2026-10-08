@@ -56,9 +56,12 @@ export function CommerceOrderDetailScreen({ route }: Props) {
       <View className="mt-6 gap-2">
         {order.items.map((item, idx) => (
           <View key={`${item.name}-${idx}`} className="flex-row justify-between">
-            <Text className="flex-1 text-base text-ink">
-              {item.quantity}× {item.name}
-            </Text>
+            <View className="flex-1 pr-3">
+              <Text className="text-base text-ink">
+                {item.quantity}× {item.name}
+              </Text>
+              {item.flavorLine ? <Text className="text-xs text-muted">{item.flavorLine}</Text> : null}
+            </View>
             <Text className="text-base font-semibold text-ink">
               ${(item.lineTotalCents / 100).toFixed(2)}
             </Text>

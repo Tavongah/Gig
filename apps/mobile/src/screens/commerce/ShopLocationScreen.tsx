@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { GeoPointInput } from "@gigflow/shared";
+import {
+  isMsuGweruTypedPilotAddress,
+  MSU_GWERU_TYPED_PILOT_CENTROID,
+  type GeoPointInput
+} from "@gigflow/shared";
 import { AppButton } from "../../components/AppButton";
 import { AddressAutocomplete } from "../../components/AddressAutocomplete";
 import { listAddresses } from "../../lib/addresses-store";
@@ -45,7 +49,7 @@ export function ShopLocationScreen({ navigation, route }: Props) {
         const rev = await api.reverseGeocode(loc.latitude, loc.longitude, session?.token);
         const label = rev.location.formattedAddress || loc.label;
         if (label && label !== loc.label) {
-          await setLocation({ ...loc, label });
+          await setLocation({ ...loc, label, locationMode: "GPS" });
         }
       } catch {
         /* keep Current location */
@@ -70,27 +74,43 @@ export function ShopLocationScreen({ navigation, route }: Props) {
       try {
         const result = await api.geocodeAddress({ query: typed, allowIncomplete: true }, session?.token);
         const areaLabel = result.areaLabel || result.location.formattedAddress;
-        const label =
-          result.precision === "area"
+        const typedPilot = isMsuGweruTypedPilotAddress(typed);
+        const label = typedPilot
+          ? typed
+          : result.precision === "area"
             ? `${areaLabel} · ${typed}`
             : typed;
         await setLocation({
           latitude: result.location.latitude,
           longitude: result.location.longitude,
-          label
+          label,
+          locationMode: typedPilot ? "TYPED_PILOT" : "GPS"
         });
         finish();
       } catch {
-        setError("I couldn't find that address. Add your area and a nearby landmark.");
+        if (isMsuGweruTypedPilotAddress(typed)) {
+          await setLocation({
+            latitude: MSU_GWERU_TYPED_PILOT_CENTROID.latitude,
+            longitude: MSU_GWERU_TYPED_PILOT_CENTROID.longitude,
+            label: typed,
+            locationMode: "TYPED_PILOT"
+          });
+          finish();
+        } else {
+          setError("I couldn't find that address. Add your area and a nearby landmark.");
+        }
       } finally {
         setBusy(false);
       }
       return;
     }
+    const typed = query.trim();
+    const typedPilot = isMsuGweruTypedPilotAddress(typed);
     await setLocation({
       latitude: resolved.latitude,
       longitude: resolved.longitude,
-      label: query.trim() || resolved.formattedAddress || "Delivery address"
+      label: typedPilot ? typed : typed || resolved.formattedAddress || "Delivery address",
+      locationMode: typedPilot ? "TYPED_PILOT" : "GPS"
     });
     finish();
   }

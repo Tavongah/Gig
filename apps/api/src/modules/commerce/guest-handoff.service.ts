@@ -12,10 +12,16 @@ import {
   supersedeCheckoutDraft
 } from "../whatsapp/checkout-session.js";
 import { readContext, updateConversation, type ConversationContext } from "../whatsapp/conversation.service.js";
+import { formatFlavorCustomerLine } from "@gigflow/shared";
 import { quoteCart } from "./customer-commerce.service.js";
 
 export type GuestHandoffBasket = {
-  lines: Array<{ productId: string; quantity: number }>;
+  lines: Array<{
+    productId: string;
+    quantity: number;
+    flavorOptionId?: string | null;
+    flavorPreference?: "ANY" | "SPECIFIC" | null;
+  }>;
 };
 
 export function hashHandoffToken(token: string): string {
@@ -49,7 +55,12 @@ export function buildWhatsAppHandoffUrl(token: string): string | null {
 
 export async function createGuestHandoff(input: {
   shoppingAreaId?: string;
-  lines: Array<{ productId: string; quantity: number }>;
+  lines: Array<{
+    productId: string;
+    quantity: number;
+    flavorOptionId?: string | null;
+    flavorPreference?: "ANY" | "SPECIFIC" | null;
+  }>;
 }) {
   const quote = await quoteCart({
     deferDelivery: true,
@@ -65,7 +76,12 @@ export async function createGuestHandoff(input: {
       tokenHash,
       merchantId: quote.merchant.id,
       basketJson: {
-        lines: input.lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
+        lines: input.lines.map((l) => ({
+          productId: l.productId,
+          quantity: l.quantity,
+          flavorOptionId: l.flavorOptionId ?? null,
+          flavorPreference: l.flavorPreference ?? null
+        }))
       },
       shoppingAreaId: input.shoppingAreaId?.trim() || null,
       deliveryLabel: null,
@@ -172,7 +188,10 @@ export async function applyGuestHandoffToConversation(input: {
       quantity: l.quantity,
       productName: l.productName,
       unitPriceCents: l.unitPriceCents,
-      merchantId: l.merchantId
+      merchantId: l.merchantId,
+      flavorOptionId: l.flavorOptionId ?? null,
+      flavorName: l.flavorName ?? null,
+      flavorPreference: l.flavorPreference ?? null
     })),
     requestedItems: quote.lines.map((l) => ({ query: l.productName, quantity: l.quantity })),
     draftLines: undefined,
@@ -209,7 +228,8 @@ export async function applyGuestHandoffToConversation(input: {
     lines: quote.lines.map((l) => ({
       quantity: l.quantity,
       productName: l.productName,
-      lineTotalCents: l.lineTotalCents
+      lineTotalCents: l.lineTotalCents,
+      flavorLine: formatFlavorCustomerLine(l.flavorPreference, l.flavorName)
     })),
     subtotalCents: quote.subtotalCents,
     superseded

@@ -28,7 +28,14 @@ export function BasketMatchScreen({ navigation }: Props) {
   const [showOthers, setShowOthers] = useState(false);
 
   const items = useMemo(
-    () => desired.map((l) => ({ catalogProductId: l.catalogProductId, quantity: l.quantity })),
+    () =>
+      desired.map((l) => ({
+        catalogProductId: l.catalogProductId,
+        quantity: l.quantity,
+        flavorOptionId: l.flavorOptionId ?? null,
+        flavorPreference: l.flavorPreference ?? null,
+        flavorName: l.flavorName ?? null
+      })),
     [desired]
   );
 
@@ -92,7 +99,10 @@ export function BasketMatchScreen({ navigation }: Props) {
             unitPriceCents: line.unitPriceCents,
             quantity: line.quantity,
             merchantId: line.merchantId,
-            merchantName: line.merchantName
+            merchantName: line.merchantName,
+            flavorOptionId: line.flavorOptionId ?? null,
+            flavorPreference: line.flavorPreference ?? null,
+            flavorName: line.flavorName ?? null
           }))
         });
         removeMany(result.cartLines.map((l) => l.catalogProductId).filter(Boolean));

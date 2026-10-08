@@ -22,7 +22,7 @@ import { createGuestHandoff, publicWhatsAppDigits } from "./guest-handoff.servic
 import { listShoppingAreas } from "./shopping-areas.js";
 import { logDutsFlow } from "../../lib/flow-log.js";
 import { matchSmartBasket, selectSmartBasket } from "./smart-basket.service.js";
-import { parseSmartBasketEnabled, parseMultiShopCheckoutEnabled, parseMaxShopsPerCheckout, parseUnlistedItemRequestEnabled, parseUnlistedItemCodEnabled } from "@gigflow/shared";
+import { parseSmartBasketEnabled, parseMultiShopCheckoutEnabled, parseMaxShopsPerCheckout, parseUnlistedItemRequestEnabled, parseUnlistedItemCodEnabled, parseProductFlavorOptionsEnabled } from "@gigflow/shared";
 
 const geoQuery = z
   .object({
@@ -74,6 +74,7 @@ customerCommerceRouter.get("/public-config", (_req, res) => {
       process.env.MAX_SHOPS_PER_CHECKOUT ?? process.env.MULTI_SHOP_MAX_SHOPS
     ),
     unlistedItemRequestEnabled: parseUnlistedItemRequestEnabled(process.env.UNLISTED_ITEM_REQUEST_ENABLED),
+    productFlavorOptionsEnabled: parseProductFlavorOptionsEnabled(process.env.PRODUCT_FLAVOR_OPTIONS_ENABLED),
     unlistedItemCodEnabled: parseUnlistedItemCodEnabled(process.env.UNLISTED_ITEM_COD_ENABLED)
   });
 });
@@ -158,11 +159,16 @@ const quoteSchema = z
     lat: z.number().min(-90).max(90).optional(),
     lng: z.number().min(-180).max(180).optional(),
     deferDelivery: z.boolean().optional(),
+    deliveryLabel: z.string().min(1).max(240).optional(),
+    locationMode: z.enum(["GPS", "TYPED_PILOT"]).optional(),
+    deliveryPrecision: z.string().max(24).optional(),
     lines: z
       .array(
         z.object({
           productId: z.string().uuid(),
-          quantity: z.number().int().min(1).max(99)
+          quantity: z.number().int().min(1).max(99),
+          flavorOptionId: z.string().uuid().nullable().optional(),
+          flavorPreference: z.enum(["ANY", "SPECIFIC"]).nullable().optional()
         })
       )
       .min(1)
@@ -183,11 +189,16 @@ customerCommerceRouter.post("/cart/quote", validateBody(quoteSchema), async (req
 const prepareSchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
+  deliveryLabel: z.string().min(1).max(240).optional(),
+  locationMode: z.enum(["GPS", "TYPED_PILOT"]).optional(),
+  deliveryPrecision: z.string().max(24).optional(),
   lines: z
     .array(
       z.object({
         productId: z.string().uuid(),
-        quantity: z.number().int().min(1).max(99)
+        quantity: z.number().int().min(1).max(99),
+        flavorOptionId: z.string().uuid().nullable().optional(),
+        flavorPreference: z.enum(["ANY", "SPECIFIC"]).nullable().optional()
       })
     )
     .min(1)
@@ -224,7 +235,9 @@ const handoffSchema = z.object({
     .array(
       z.object({
         productId: z.string().uuid(),
-        quantity: z.number().int().min(1).max(99)
+        quantity: z.number().int().min(1).max(99),
+        flavorOptionId: z.string().uuid().nullable().optional(),
+        flavorPreference: z.enum(["ANY", "SPECIFIC"]).nullable().optional()
       })
     )
     .min(1)
@@ -245,13 +258,17 @@ const checkoutSchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   deliveryLabel: z.string().min(1).max(200),
+  locationMode: z.enum(["GPS", "TYPED_PILOT"]).optional(),
+  deliveryPrecision: z.string().max(24).optional(),
   paymentMethod: z.enum(["CASH", "ECOCASH", "ONEMONEY"]).optional(),
   customerPhone: z.string().min(7).max(24).optional(),
   lines: z
     .array(
       z.object({
         productId: z.string().uuid(),
-        quantity: z.number().int().min(1).max(99)
+        quantity: z.number().int().min(1).max(99),
+        flavorOptionId: z.string().uuid().nullable().optional(),
+        flavorPreference: z.enum(["ANY", "SPECIFIC"]).nullable().optional()
       })
     )
     .min(1)
@@ -333,7 +350,10 @@ customerCommerceRouter.post("/basket/quote-text", ...requireCustomer, validateBo
 
 const desiredItemSchema = z.object({
   catalogProductId: z.string().uuid(),
-  quantity: z.number().int().min(1).max(99)
+  quantity: z.number().int().min(1).max(99),
+  flavorOptionId: z.string().uuid().nullable().optional(),
+  flavorPreference: z.enum(["ANY", "SPECIFIC"]).nullable().optional(),
+  flavorName: z.string().max(80).nullable().optional()
 });
 
 const basketMatchSchema = z

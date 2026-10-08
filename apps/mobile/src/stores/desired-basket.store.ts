@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { cartLineIdentity, formatFlavorCustomerLine } from "@gigflow/shared";
 
 export type DesiredBasketLine = {
   catalogProductId: string;
@@ -9,7 +10,18 @@ export type DesiredBasketLine = {
   quantity: number;
   /** Discovery-only nearby offer price. Never used as a cart/checkout price. */
   fromPriceCents: number | null;
+  flavorOptionId?: string | null;
+  flavorName?: string | null;
+  flavorPreference?: "ANY" | "SPECIFIC" | null;
 };
+
+export function desiredLineKey(line: Pick<DesiredBasketLine, "catalogProductId" | "flavorOptionId">): string {
+  return cartLineIdentity(line.catalogProductId, line.flavorOptionId);
+}
+
+export function desiredFlavorLabel(line: DesiredBasketLine): string | null {
+  return formatFlavorCustomerLine(line.flavorPreference, line.flavorName);
+}
 
 const STORAGE_KEY = "duts.commerce.desired-basket";
 
@@ -17,8 +29,8 @@ type DesiredState = {
   lines: DesiredBasketLine[];
   hydrated: boolean;
   addItem: (line: Omit<DesiredBasketLine, "quantity"> & { quantity?: number }) => void;
-  setQuantity: (catalogProductId: string, quantity: number) => void;
-  remove: (catalogProductId: string) => void;
+  setQuantity: (lineKey: string, quantity: number) => void;
+  remove: (lineKey: string) => void;
   removeMany: (catalogProductIds: string[]) => void;
   clear: () => void;
   itemCount: () => number;
@@ -57,18 +69,22 @@ export const useDesiredBasketStore = create<DesiredState>((set, get) => ({
   addItem: (input) => {
     if (!input.catalogProductId) return;
     const qty = Math.max(1, Math.min(99, input.quantity ?? 1));
-    const existing = get().lines.find((l) => l.catalogProductId === input.catalogProductId);
+    const key = desiredLineKey(input);
+    const existing = get().lines.find((l) => desiredLineKey(l) === key);
     if (existing) {
       set({
         lines: get().lines.map((l) =>
-          l.catalogProductId === input.catalogProductId
+          desiredLineKey(l) === key
             ? {
                 ...l,
                 quantity: Math.min(99, l.quantity + qty),
                 name: input.name,
                 imageUrl: input.imageUrl,
                 sizeLabel: input.sizeLabel,
-                fromPriceCents: input.fromPriceCents
+                fromPriceCents: input.fromPriceCents,
+                flavorOptionId: input.flavorOptionId ?? l.flavorOptionId,
+                flavorName: input.flavorName ?? l.flavorName,
+                flavorPreference: input.flavorPreference ?? l.flavorPreference
               }
             : l
         )
@@ -84,26 +100,29 @@ export const useDesiredBasketStore = create<DesiredState>((set, get) => ({
           imageUrl: input.imageUrl,
           sizeLabel: input.sizeLabel,
           fromPriceCents: input.fromPriceCents,
+          flavorOptionId: input.flavorOptionId ?? null,
+          flavorName: input.flavorName ?? null,
+          flavorPreference: input.flavorPreference ?? null,
           quantity: qty
         }
       ]
     });
   },
 
-  setQuantity: (catalogProductId, quantity) => {
+  setQuantity: (lineKey, quantity) => {
     if (quantity <= 0) {
-      get().remove(catalogProductId);
+      get().remove(lineKey);
       return;
     }
     set({
       lines: get().lines.map((l) =>
-        l.catalogProductId === catalogProductId ? { ...l, quantity: Math.min(99, quantity) } : l
+        desiredLineKey(l) === lineKey ? { ...l, quantity: Math.min(99, quantity) } : l
       )
     });
   },
 
-  remove: (catalogProductId) => {
-    set({ lines: get().lines.filter((l) => l.catalogProductId !== catalogProductId) });
+  remove: (lineKey) => {
+    set({ lines: get().lines.filter((l) => desiredLineKey(l) !== lineKey) });
   },
 
   removeMany: (catalogProductIds) => {

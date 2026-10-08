@@ -22,6 +22,7 @@ import {
   fulfillmentLabelAt,
   FULFILLMENT_NOTE,
   addFulfillmentNote,
+  formatFlavorCustomerLine,
   generateDeliveryPin,
   merchantFulfillmentRef,
   parseMaxShopsPerCheckout,
@@ -56,7 +57,7 @@ export function checkoutIdempotencyKey(input: {
   lat: number;
   lng: number;
   paymentMethod: string;
-  lines: Array<{ productId: string; quantity: number }>;
+  lines: Array<{ productId: string; quantity: number; flavorOptionId?: string | null }>;
 }): string {
   const packed = [
     input.userId,
@@ -64,7 +65,7 @@ export function checkoutIdempotencyKey(input: {
     input.lng.toFixed(5),
     input.paymentMethod,
     [...input.lines]
-      .map((l) => `${l.productId}:${l.quantity}`)
+      .map((l) => `${l.productId}:${l.quantity}:${"flavorOptionId" in l && l.flavorOptionId ? l.flavorOptionId : "ANY"}`)
       .sort()
       .join(",")
   ].join("|");
@@ -201,6 +202,9 @@ export async function quoteCombinedCart(input: {
   lng: number;
   lines: BasketLine[];
   merchantIds: string[];
+  locationMode?: string | null;
+  deliveryPrecision?: string | null;
+  deliveryLabel?: string | null;
 }) {
   const { route, merchants } = await evaluateShopsForCombinedRoute({
     merchantIds: input.merchantIds,
@@ -227,7 +231,10 @@ export async function quoteCombinedCart(input: {
   const subtotalCents = input.lines.reduce((s, l) => s + l.lineTotalCents, 0);
   const delivery = await quotePilotCommerceDelivery({
     routeDistanceKm: route.routeKm,
-    lines: input.lines
+    lines: input.lines,
+    locationMode: input.locationMode,
+    deliveryPrecision: input.deliveryPrecision,
+    deliveryLabel: input.deliveryLabel
   });
   const deliveryFeeCents = delivery.deliveryFeeCents;
   const serviceFeeCents = settings.serviceFeeCents;
@@ -442,6 +449,8 @@ export function presentCustomerCheckout(checkout: {
       quantity: number;
       unitPriceCents: number;
       lineTotalCents: number;
+      flavorPreference?: string | null;
+      flavorNameSnapshot?: string | null;
     }>;
   }>;
   pickupStops?: Array<{
@@ -505,7 +514,8 @@ export function presentCustomerCheckout(checkout: {
         quantity: i.quantity,
         unitPriceCents: i.unitPriceCents,
         lineTotalCents: i.lineTotalCents,
-        shopName: o.merchant.name
+        shopName: o.merchant.name,
+        flavorLine: formatFlavorCustomerLine(i.flavorPreference, i.flavorNameSnapshot)
       }))
     ),
     deliveryStatus: gigStatus,

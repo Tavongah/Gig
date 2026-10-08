@@ -228,7 +228,7 @@ export interface GigDetail {
   packageSize?: string | null;
   commercePickup?: {
     shopName: string;
-    items: Array<{ name: string; quantity: number }>;
+    items: Array<{ name: string; quantity: number; flavorLine?: string | null }>;
     merchantConfirmed: boolean;
     confirmationRequired: boolean;
     itemsConfirmed: boolean;
@@ -1046,6 +1046,7 @@ export const api = {
         category: string | null;
         description: string | null;
         imageUrl: string | null;
+        flavors?: Array<{ id: string; name: string; sortOrder: number }>;
       };
       offers: Array<{
         productId: string;
@@ -1096,7 +1097,12 @@ export const api = {
       lat?: number;
       lng?: number;
       deferDelivery?: boolean;
-      lines: Array<{ productId: string; quantity: number }>;
+      lines: Array<{
+        productId: string;
+        quantity: number;
+        flavorOptionId?: string | null;
+        flavorPreference?: "ANY" | "SPECIFIC" | null;
+      }>;
     },
     token?: string
   ) =>
@@ -1109,6 +1115,9 @@ export const api = {
         unitPriceCents: number;
         lineTotalCents: number;
         merchantId: string;
+        flavorOptionId?: string | null;
+        flavorName?: string | null;
+        flavorPreference?: string | null;
       }>;
       subtotalCents: number;
       deliveryFeeCents: number;
@@ -1130,7 +1139,14 @@ export const api = {
     payload: {
       lat: number;
       lng: number;
-      lines: Array<{ productId: string; quantity: number }>;
+      deliveryLabel?: string;
+      locationMode?: "GPS" | "TYPED_PILOT";
+      lines: Array<{
+        productId: string;
+        quantity: number;
+        flavorOptionId?: string | null;
+        flavorPreference?: "ANY" | "SPECIFIC" | null;
+      }>;
     },
     token?: string
   ) =>
@@ -1143,6 +1159,9 @@ export const api = {
         unitPriceCents: number;
         lineTotalCents: number;
         merchantId: string;
+        flavorOptionId?: string | null;
+        flavorPreference?: string | null;
+        flavorName?: string | null;
       }>;
       subtotalCents: number;
       deliveryFeeCents: number;
@@ -1165,7 +1184,13 @@ export const api = {
       lat: number;
       lng: number;
       deliveryLabel: string;
-      lines: Array<{ productId: string; quantity: number }>;
+      locationMode?: "GPS" | "TYPED_PILOT";
+      lines: Array<{
+        productId: string;
+        quantity: number;
+        flavorOptionId?: string | null;
+        flavorPreference?: "ANY" | "SPECIFIC" | null;
+      }>;
       paymentMethod?: "CASH" | "ECOCASH" | "ONEMONEY";
       customerPhone?: string;
     },
@@ -1224,6 +1249,7 @@ export const api = {
           unitPriceCents: number;
           lineTotalCents: number;
           shopName?: string;
+          flavorLine?: string | null;
         }>;
         deliveryStatus: string | null;
         shopCount?: number;
@@ -1233,7 +1259,12 @@ export const api = {
 
   commerceGuestHandoff: (payload: {
     shoppingAreaId?: string;
-    lines: Array<{ productId: string; quantity: number }>;
+    lines: Array<{
+      productId: string;
+      quantity: number;
+      flavorOptionId?: string | null;
+      flavorPreference?: "ANY" | "SPECIFIC" | null;
+    }>;
   }) =>
     request<{
       token: string;
@@ -1247,7 +1278,12 @@ export const api = {
   commerceBasketMatch: (payload: {
     location?: { latitude: number; longitude: number };
     areaId?: string;
-    items: Array<{ catalogProductId: string; quantity: number }>;
+    items: Array<{
+      catalogProductId: string;
+      quantity: number;
+      flavorOptionId?: string | null;
+      flavorPreference?: "ANY" | "SPECIFIC" | null;
+    }>;
   }) =>
     request<{
       requestedLines: number;
@@ -1262,7 +1298,12 @@ export const api = {
     deferDelivery?: boolean;
     acceptPartial?: boolean;
     expectedFulfilledLines?: number;
-    items: Array<{ catalogProductId: string; quantity: number }>;
+    items: Array<{
+      catalogProductId: string;
+      quantity: number;
+      flavorOptionId?: string | null;
+      flavorPreference?: "ANY" | "SPECIFIC" | null;
+    }>;
   }) =>
     request<{
       changed: boolean;
@@ -1295,6 +1336,9 @@ export const api = {
         unitPriceCents: number;
         merchantId: string;
         merchantName: string;
+        flavorOptionId?: string | null;
+        flavorPreference?: "ANY" | "SPECIFIC" | null;
+        flavorName?: string | null;
       }>;
     }>("/commerce/basket/select", { method: "POST", body: JSON.stringify(payload) }),
 

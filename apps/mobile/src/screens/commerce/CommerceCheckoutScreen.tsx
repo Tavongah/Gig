@@ -9,7 +9,9 @@ import { DUTS } from "../../lib/theme";
 import type { RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 import { useShopLocationStore } from "../../stores/shop-location.store";
-import { useCommerceCartStore } from "../../stores/commerce-cart.store";
+import { cartLineKey, useCommerceCartStore } from "../../stores/commerce-cart.store";
+import { toCheckoutLine } from "../../lib/storefront-cart";
+import { formatFlavorCustomerLine } from "@gigflow/shared";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CommerceCheckout">;
 type PayMethod = "CASH" | "ECOCASH";
@@ -40,14 +42,18 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
       "checkout-prep",
       location?.latitude,
       location?.longitude,
-      lines.map((l) => `${l.productId}:${l.quantity}`).join(",")
+      location?.label,
+      location?.locationMode,
+      lines.map((l) => `${cartLineKey(l)}:${l.quantity}`).join(",")
     ],
     queryFn: () =>
       api.commerceCheckoutPrepare(
         {
           lat: location!.latitude,
           lng: location!.longitude,
-          lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
+          deliveryLabel: location!.label,
+          locationMode: location!.locationMode,
+          lines: lines.map(toCheckoutLine)
         },
         token
       ),
@@ -69,7 +75,8 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
           lat: location.latitude,
           lng: location.longitude,
           deliveryLabel: location.label,
-          lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+          locationMode: location.locationMode,
+          lines: lines.map(toCheckoutLine),
           paymentMethod: method,
           customerPhone: method === "ECOCASH" ? ecoCashPhone.trim() : user.phoneNumber ?? undefined
         },
@@ -132,19 +139,33 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
         <View className="mt-4 rounded-2xl border border-border bg-card p-4">
           <Text className="text-sm font-semibold uppercase text-muted">Items</Text>
           {quote
-            ? quote.lines.map((line) => (
-                <View key={line.productId} className="mt-3 flex-row justify-between">
-                  <Text className="flex-1 text-base text-ink">
-                    {line.quantity}× {line.productName}
-                  </Text>
+            ? quote.lines.map((line, idx) => (
+                <View key={`${line.productId}-${line.flavorOptionId ?? "ANY"}-${idx}`} className="mt-3 flex-row justify-between">
+                  <View className="flex-1 pr-3">
+                    <Text className="text-base text-ink">
+                      {line.quantity}× {line.productName}
+                    </Text>
+                    {formatFlavorCustomerLine(line.flavorPreference, line.flavorName) ? (
+                      <Text className="text-xs text-muted">
+                        {formatFlavorCustomerLine(line.flavorPreference, line.flavorName)}
+                      </Text>
+                    ) : null}
+                  </View>
                   <Text className="text-base font-semibold text-ink">{moneyLabel(line.lineTotalCents)}</Text>
                 </View>
               ))
             : lines.map((line) => (
-                <View key={line.productId} className="mt-3 flex-row justify-between">
-                  <Text className="flex-1 text-base text-ink">
-                    {line.quantity}× {line.name}
-                  </Text>
+                <View key={cartLineKey(line)} className="mt-3 flex-row justify-between">
+                  <View className="flex-1 pr-3">
+                    <Text className="text-base text-ink">
+                      {line.quantity}× {line.name}
+                    </Text>
+                    {formatFlavorCustomerLine(line.flavorPreference, line.flavorName) ? (
+                      <Text className="text-xs text-muted">
+                        {formatFlavorCustomerLine(line.flavorPreference, line.flavorName)}
+                      </Text>
+                    ) : null}
+                  </View>
                   <Text className="text-base font-semibold text-ink">
                     {moneyLabel(line.unitPriceCents * line.quantity)}
                   </Text>

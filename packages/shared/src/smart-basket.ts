@@ -4,6 +4,7 @@
  */
 
 import { canPurchaseStorefrontCategory } from "./storefront-categories.js";
+import { cartLineIdentity, merchantCanFulfillFlavor } from "./product-flavor.js";
 
 export function parseSmartBasketEnabled(value?: string | boolean | null) {
   if (value === false) return false;
@@ -17,6 +18,9 @@ export function parseSmartBasketEnabled(value?: string | boolean | null) {
 export type SmartBasketRequestedItem = {
   catalogProductId: string;
   quantity: number;
+  flavorOptionId?: string | null;
+  flavorPreference?: "ANY" | "SPECIFIC" | null;
+  flavorName?: string | null;
 };
 
 export type SmartBasketAvailableLine = {
@@ -26,6 +30,9 @@ export type SmartBasketAvailableLine = {
   sizeLabel: string | null;
   quantity: number;
   unitPriceCents: number;
+  flavorOptionId?: string | null;
+  flavorPreference?: "ANY" | "SPECIFIC" | null;
+  flavorName?: string | null;
 };
 
 export type SmartBasketMissingReason =
@@ -103,6 +110,8 @@ export type CoverageOffer = {
   priceCents: number;
   quantityApprox: number | null;
   category: string | null;
+  unavailableFlavorIds?: string[];
+  activeFlavorIds?: string[];
 };
 
 export type CoverageCatalog = {
@@ -149,6 +158,24 @@ export function evaluateMerchantCoverage(input: {
       continue;
     }
 
+    if (
+      !merchantCanFulfillFlavor({
+        flavorOptionId: line.flavorOptionId,
+        flavorPreference: line.flavorPreference,
+        unavailableFlavorIds: offer.unavailableFlavorIds,
+        activeFlavorIds: offer.activeFlavorIds
+      })
+    ) {
+      missing.push({
+        catalogProductId: line.catalogProductId,
+        name,
+        sizeLabel,
+        quantity: line.quantity,
+        reason: "UNAVAILABLE"
+      });
+      continue;
+    }
+
     if (!offerQuantitySatisfied(line.quantity, offer.quantityApprox)) {
       missing.push({
         catalogProductId: line.catalogProductId,
@@ -166,7 +193,10 @@ export function evaluateMerchantCoverage(input: {
       name: offer.name,
       sizeLabel: offer.sizeLabel ?? sizeLabel,
       quantity: line.quantity,
-      unitPriceCents: offer.priceCents
+      unitPriceCents: offer.priceCents,
+      flavorOptionId: line.flavorOptionId ?? null,
+      flavorPreference: line.flavorPreference ?? (line.flavorOptionId ? "SPECIFIC" : null),
+      flavorName: line.flavorName ?? null
     });
   }
 

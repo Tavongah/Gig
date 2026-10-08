@@ -6,6 +6,7 @@ import {
   catalogSearchHaystack,
   commerceShopUiStatusLabel,
   customerFulfillmentHint,
+  formatFlavorCustomerLine,
   expandSearchTerms,
   isPublicStorefrontCatalogProduct,
   normalizeProductSearchName,
@@ -104,7 +105,7 @@ async function collectNearbyOffers(input: {
       available: true
     },
     include: {
-      catalogProduct: true,
+      catalogProduct: { include: { flavorOptions: { where: { active: true } } } },
       merchant: { select: { id: true, name: true, isActive: true, acceptsOrders: true } }
     },
     take: 500
@@ -132,6 +133,7 @@ async function collectNearbyOffers(input: {
       sizeLabel,
       category,
       barcode: cat?.barcode,
+      flavorNames: cat?.flavorOptions?.map((f) => f.name),
       terms: input.terms
     });
     if (input.terms.length && score <= 0) continue;
@@ -149,7 +151,8 @@ async function collectNearbyOffers(input: {
       currency: product.currency,
       merchantOfferCount: 1,
       purchasable: true,
-      score
+      score,
+      flavorCount: cat?.flavorOptions?.length ?? 0
     };
 
     if (!cat?.id) {
@@ -204,6 +207,7 @@ export async function browseNearbyProducts(input: {
       status: "APPROVED",
       id: { notIn: unresolvedLegacyIds }
     },
+    include: { flavorOptions: { where: { active: true }, select: { name: true } } },
     take: CATALOG_PRODUCT_SCAN_LIMIT
   });
 
@@ -219,6 +223,7 @@ export async function browseNearbyProducts(input: {
       description: cat.description,
       primaryImageUrl: cat.primaryImageUrl,
       barcode: cat.barcode,
+      flavorNames: cat.flavorOptions.map((f) => f.name),
       terms
     });
     if (!catalogAcc) continue;
@@ -360,6 +365,11 @@ export async function getProductDetailNear(input: {
     .sort((a, b) => a.priceCents - b.priceCents || a.distanceKm - b.distanceKm);
 
   const publicCatalog = catalog && isPublicStorefrontCatalogProduct(catalog) ? catalog : null;
+  const { flavorOptionsEnabled, listFlavorOptions, presentFlavorOption } = await import("./flavor.service.js");
+  const flavorRows =
+    flavorOptionsEnabled() && (publicCatalog?.id || catalog?.id)
+      ? await listFlavorOptions(publicCatalog?.id ?? catalog!.id, true)
+      : [];
   const name = publicCatalog?.name ?? seedProduct?.name ?? "Product";
   const imageUrl = browserAccessibleMediaUrl(publicCatalog?.primaryImageUrl ?? seedProduct?.imageUrl ?? null);
   const category = publicCatalog?.category ?? seedProduct?.category ?? null;
@@ -377,7 +387,8 @@ export async function getProductDetailNear(input: {
       sizeLabel: publicCatalog?.sizeLabel ?? seedProduct?.unit ?? null,
       category,
       description: publicCatalog?.description ?? seedProduct?.description ?? null,
-      imageUrl
+      imageUrl,
+      flavors: flavorRows.map(presentFlavorOption)
     },
     offers: purchasable ? eligibleOffers : [],
     purchasable,
@@ -469,8 +480,11 @@ export async function quoteCart(input: {
   lat?: number;
   lng?: number;
   deferDelivery?: boolean;
-  lines: Array<{ productId: string; quantity: number }>;
+  lines: Array<{ productId: string; quantity: number; flavorOptionId?: string | null; flavorPreference?: string | null }>;
   preferredMerchantId?: string;
+  locationMode?: string | null;
+  deliveryPrecision?: string | null;
+  deliveryLabel?: string | null;
 }) {
   if (!input.lines.length) throw new AppError("Basket is empty.", 400, "EMPTY_BASKET");
 
@@ -496,13 +510,23 @@ export async function quoteCart(input: {
     }
     merchantIds.add(product.merchantId);
     const qty = Math.max(1, Math.min(99, Math.floor(line.quantity)));
+    const { resolveLineFlavor } = await import("./flavor.service.js");
+    const flavor = await resolveLineFlavor({
+      catalogProductId: product.catalogProductId,
+      productId: product.id,
+      flavorOptionId: line.flavorOptionId,
+      flavorPreference: line.flavorPreference
+    });
     basketLines.push({
       productId: product.id,
       productName: product.catalogProduct?.name ?? product.name,
       quantity: qty,
       unitPriceCents: product.priceCents,
       lineTotalCents: product.priceCents * qty,
-      merchantId: product.merchantId
+      merchantId: product.merchantId,
+      flavorOptionId: flavor.flavorOptionId,
+      flavorName: flavor.flavorName,
+      flavorPreference: flavor.flavorPreference
     });
   }
 
@@ -569,7 +593,10 @@ export async function quoteCart(input: {
       lat: input.lat,
       lng: input.lng,
       lines: basketLines,
-      merchantIds: [...merchantIds]
+      merchantIds: [...merchantIds],
+      locationMode: input.locationMode,
+      deliveryPrecision: input.deliveryPrecision,
+      deliveryLabel: input.deliveryLabel
     });
   }
 
@@ -613,7 +640,10 @@ export async function quoteCart(input: {
     merchantLng: Number(merchant.longitude),
     customerLat: input.lat,
     customerLng: input.lng,
-    lines: basketLines
+    lines: basketLines,
+    locationMode: input.locationMode,
+    deliveryPrecision: input.deliveryPrecision,
+    deliveryLabel: input.deliveryLabel
   });
 
   return {
@@ -655,7 +685,10 @@ function throwCheckoutPrepError(error: unknown): never {
 export async function prepareCheckout(input: {
   lat: number;
   lng: number;
-  lines: Array<{ productId: string; quantity: number }>;
+  lines: Array<{ productId: string; quantity: number; flavorOptionId?: string | null; flavorPreference?: string | null }>;
+  locationMode?: string | null;
+  deliveryPrecision?: string | null;
+  deliveryLabel?: string | null;
 }) {
   if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) {
     throw new AppError("Tell us where to deliver.", 400, "LOCATION_REQUIRED");
@@ -670,7 +703,10 @@ export async function prepareCheckout(input: {
     return await quoteCart({
       lat: input.lat,
       lng: input.lng,
-      lines: input.lines
+      lines: input.lines,
+      locationMode: input.locationMode,
+      deliveryPrecision: input.deliveryPrecision,
+      deliveryLabel: input.deliveryLabel
     });
   } catch (error) {
     throwCheckoutPrepError(error);
@@ -682,14 +718,19 @@ export async function checkoutCart(input: {
   lat: number;
   lng: number;
   deliveryLabel: string;
-  lines: Array<{ productId: string; quantity: number }>;
+  lines: Array<{ productId: string; quantity: number; flavorOptionId?: string | null; flavorPreference?: string | null }>;
   paymentMethod?: string;
   customerPhone?: string;
+  locationMode?: string | null;
+  deliveryPrecision?: string | null;
 }) {
   const quote = await prepareCheckout({
     lat: input.lat,
     lng: input.lng,
-    lines: input.lines
+    lines: input.lines,
+    locationMode: input.locationMode,
+    deliveryPrecision: input.deliveryPrecision,
+    deliveryLabel: input.deliveryLabel
   });
 
   const commerceCustomer = await ensureAppCommerceCustomer(input.userId);
@@ -804,6 +845,9 @@ export async function checkoutCart(input: {
     deliveryLabel: input.deliveryLabel.trim() || "Delivery location",
     deliveryLatitude: input.lat,
     deliveryLongitude: input.lng,
+    locationMode: input.locationMode,
+    deliveryPrecision: input.deliveryPrecision,
+    typedAddress: input.deliveryLabel,
     customerWhatsAppPhone: input.customerPhone,
     paymentMethod,
     orderSource: "APP" as OrderSource
@@ -991,7 +1035,8 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
         name: i.productNameSnapshot,
         quantity: i.quantity,
         unitPriceCents: i.unitPriceCents,
-        lineTotalCents: i.lineTotalCents
+        lineTotalCents: i.lineTotalCents,
+        flavorLine: formatFlavorCustomerLine(i.flavorPreference, i.flavorNameSnapshot)
       })),
       deliveryStatus: order.linkedDeliveryGig?.status ?? null
     }
@@ -1034,6 +1079,9 @@ export async function quoteTextBasket(input: {
   lng: number;
   items: Array<{ query: string; quantity: number }>;
   preferredMerchantId?: string;
+  locationMode?: string | null;
+  deliveryPrecision?: string | null;
+  deliveryLabel?: string | null;
 }) {
   const basket = await buildOneStoreBasket(input.lat, input.lng, input.items, {
     preferredMerchantId: input.preferredMerchantId
@@ -1046,7 +1094,10 @@ export async function quoteTextBasket(input: {
     merchantLng: Number(basket.merchant.longitude),
     customerLat: input.lat,
     customerLng: input.lng,
-    lines: basket.lines
+    lines: basket.lines,
+    locationMode: input.locationMode,
+    deliveryPrecision: input.deliveryPrecision,
+    deliveryLabel: input.deliveryLabel
   });
   return {
     ok: true as const,

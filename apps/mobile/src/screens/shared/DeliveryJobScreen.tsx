@@ -599,9 +599,12 @@ export function DeliveryJobScreen() {
           <Text className="text-xl font-black text-ink">{commercePickup.shopName}</Text>
           <Text className="text-xs font-bold uppercase text-brand">Shopping list</Text>
           {commercePickup.items.map((item) => (
-            <Text key={`${item.name}-${item.quantity}`} className="text-base text-ink">
-              {item.quantity}× {item.name}
-            </Text>
+            <View key={`${item.name}-${item.quantity}-${item.flavorLine ?? ""}`}>
+              <Text className="text-base text-ink">
+                {item.quantity}× {item.name}
+              </Text>
+              {item.flavorLine ? <Text className="text-xs font-bold text-ink">{item.flavorLine}</Text> : null}
+            </View>
           ))}
           {commercePickup.warning ? (
             <Text className="text-sm font-semibold text-ink">{commercePickup.warning}</Text>

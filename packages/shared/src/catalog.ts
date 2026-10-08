@@ -61,6 +61,7 @@ export type StorefrontProductCard = {
   currency: string | null;
   merchantOfferCount: number;
   offerCount: number;
+  flavorCount?: number;
 };
 
 export const adminCatalogViews = ["canonical", "archived", "unresolved", "all"] as const;
@@ -139,9 +140,12 @@ export function catalogSearchHaystack(input: {
   sizeLabel?: string | null;
   barcode?: string | null;
   category?: string | null;
+  flavorNames?: string[] | null;
 }): string {
   return normalizeProductSearchName(
-    [input.name, input.brand, input.sizeLabel, input.barcode, input.category].filter(Boolean).join(" ")
+    [input.name, input.brand, input.sizeLabel, input.barcode, input.category, ...(input.flavorNames ?? [])]
+      .filter(Boolean)
+      .join(" ")
   );
 }
 

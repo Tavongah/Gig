@@ -22,6 +22,7 @@ export function ProductDetailScreen({ route }: Props) {
   const smartBasket = isSmartBasketEnabled();
   const [imgFailed, setImgFailed] = useState(false);
   const [addedKey, setAddedKey] = useState<string | null>(null);
+  const [selectedFlavorId, setSelectedFlavorId] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
 
@@ -46,6 +47,7 @@ export function ProductDetailScreen({ route }: Props) {
 
   const product = detailQuery.data?.product;
   const offers = detailQuery.data?.offers ?? [];
+  const flavors = product?.flavors ?? [];
   const alcoholOk = alcoholPurchaseAllowed(product?.category);
   const purchasable = Boolean(detailQuery.data?.purchasable && offers.length && alcoholOk);
   const fromPriceCents = detailQuery.data?.fromPriceCents ?? null;
@@ -57,16 +59,31 @@ export function ProductDetailScreen({ route }: Props) {
     setTimeout(() => setAddedKey((cur) => (cur === key ? null : cur)), 1200);
   }
 
+  function selectedFlavor() {
+    if (!flavors.length) {
+      return { flavorOptionId: null as string | null, flavorName: null as string | null, flavorPreference: null as "ANY" | "SPECIFIC" | null };
+    }
+    const flavor = selectedFlavorId ? flavors.find((f) => f.id === selectedFlavorId) : null;
+    if (flavor) {
+      return { flavorOptionId: flavor.id, flavorName: flavor.name, flavorPreference: "SPECIFIC" as const };
+    }
+    return { flavorOptionId: null as string | null, flavorName: null as string | null, flavorPreference: "ANY" as const };
+  }
+
   function addToShoppingList() {
     if (!product?.catalogProductId || !purchasable) return;
     if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
     markAdded("list");
+    const flavor = selectedFlavor();
     addToShoppingListStore({
       catalogProductId: product.catalogProductId,
       name: product.name,
       imageUrl: product.imageUrl,
       sizeLabel: product.sizeLabel,
-      fromPriceCents
+      fromPriceCents,
+      flavorOptionId: flavor.flavorOptionId,
+      flavorName: flavor.flavorName,
+      flavorPreference: flavor.flavorPreference
     });
   }
 
@@ -74,6 +91,7 @@ export function ProductDetailScreen({ route }: Props) {
     if (!product) return;
     if (!alcoholPurchaseAllowed(product.category)) return;
     if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
+    const flavor = selectedFlavor();
     markAdded(offer.productId);
     void tryAddOfferToCart(
       {
@@ -84,7 +102,10 @@ export function ProductDetailScreen({ route }: Props) {
         sizeLabel: product.sizeLabel,
         unitPriceCents: offer.priceCents,
         merchantId: offer.merchantId,
-        merchantName: offer.merchantName
+        merchantName: offer.merchantName,
+        flavorOptionId: flavor.flavorOptionId,
+        flavorName: flavor.flavorName,
+        flavorPreference: flavor.flavorPreference
       },
       browse.geo,
       browse.token
@@ -139,6 +160,51 @@ export function ProductDetailScreen({ route }: Props) {
       ) : null}
       {product.description ? (
         <Text className="mt-3 text-base leading-6 text-label">{product.description}</Text>
+      ) : null}
+
+      {flavors.length ? (
+        <View className="mt-4 gap-2">
+          <Text className="text-sm font-bold text-ink">Flavor (optional)</Text>
+          <View className="flex-row flex-wrap gap-2">
+            <Pressable
+              onPress={() => setSelectedFlavorId(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Any flavor"
+              className="rounded-full border px-3 py-2"
+              style={{
+                borderColor: selectedFlavorId == null ? DUTS.purple : DUTS.border ?? "#E5E5E5",
+                backgroundColor: selectedFlavorId == null ? DUTS.purple : "#FFFFFF"
+              }}
+            >
+              <Text
+                className="text-sm font-bold"
+                style={{ color: selectedFlavorId == null ? "#FFFFFF" : DUTS.ink }}
+              >
+                Any flavor
+              </Text>
+            </Pressable>
+            {flavors.map((flavor) => {
+              const on = selectedFlavorId === flavor.id;
+              return (
+                <Pressable
+                  key={flavor.id}
+                  onPress={() => setSelectedFlavorId(flavor.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={flavor.name}
+                  className="rounded-full border px-3 py-2"
+                  style={{
+                    borderColor: on ? DUTS.purple : "#E5E5E5",
+                    backgroundColor: on ? DUTS.purple : "#FFFFFF"
+                  }}
+                >
+                  <Text className="text-sm font-bold" style={{ color: on ? "#FFFFFF" : DUTS.ink }}>
+                    {flavor.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
       ) : null}
 
       {purchasable && smartBasket && product.catalogProductId ? (

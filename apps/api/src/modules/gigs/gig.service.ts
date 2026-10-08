@@ -17,7 +17,8 @@ import {
   isAssistedFulfillment,
   isAssistedPickupConfirmationRequired,
   hasFulfillmentNote,
-  FULFILLMENT_NOTE
+  FULFILLMENT_NOTE,
+  formatFlavorFulfillmentLine
 } from "@gigflow/shared";
 
 import type { CreateGigInput, GigEstimateInput } from "@gigflow/shared";
@@ -1277,7 +1278,11 @@ async function attachCommercePickupContext<T extends { id: string; status?: stri
       ...gig,
       commercePickup: {
         shopName: order.merchant.name,
-        items: order.items.map((i) => ({ name: i.productNameSnapshot, quantity: i.quantity })),
+        items: order.items.map((i) => ({
+          name: i.productNameSnapshot,
+          quantity: i.quantity,
+          flavorLine: formatFlavorFulfillmentLine(i.flavorPreference, i.flavorNameSnapshot)
+        })),
         merchantConfirmed,
         confirmationRequired,
         itemsConfirmed: hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.PICKUP_CONFIRMED),
@@ -1296,7 +1301,7 @@ async function attachCommercePickupContext<T extends { id: string; status?: stri
   const order = await prisma.commerceOrder.findFirst({
     where: { linkedDeliveryGigId: gig.id },
     include: {
-      items: { select: { productNameSnapshot: true, quantity: true } },
+      items: { select: { productNameSnapshot: true, quantity: true, flavorPreference: true, flavorNameSnapshot: true } },
       merchant: { select: { name: true } }
     }
   });
@@ -1311,7 +1316,11 @@ async function attachCommercePickupContext<T extends { id: string; status?: stri
     ...gig,
     commercePickup: {
       shopName: order.merchant.name,
-      items: order.items.map((i) => ({ name: i.productNameSnapshot, quantity: i.quantity })),
+      items: order.items.map((i) => ({
+        name: i.productNameSnapshot,
+        quantity: i.quantity,
+        flavorLine: formatFlavorFulfillmentLine(i.flavorPreference, i.flavorNameSnapshot)
+      })),
       merchantConfirmed,
       confirmationRequired,
       itemsConfirmed: hasFulfillmentNote(order.notes, FULFILLMENT_NOTE.PICKUP_CONFIRMED),

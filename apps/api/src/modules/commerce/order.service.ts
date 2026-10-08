@@ -16,6 +16,7 @@ import {
   distanceKmBetween,
   FULFILLMENT_NOTE,
   addFulfillmentNote,
+  formatFlavorCustomerLine,
   hasFulfillmentNote,
   isAssistedFulfillment,
   parseAlcoholCommerceEnabled,
@@ -163,6 +164,10 @@ export async function quoteBasketTotals(input: {
   customerLat: number;
   customerLng: number;
   lines: BasketLine[];
+  locationMode?: string | null;
+  deliveryPrecision?: string | null;
+  typedAddress?: string | null;
+  deliveryLabel?: string | null;
 }) {
   const settings = await getMarketplaceSettings();
   const subtotalCents = input.lines.reduce((s, l) => s + l.lineTotalCents, 0);
@@ -172,7 +177,11 @@ export async function quoteBasketTotals(input: {
   );
   const delivery = await quotePilotCommerceDelivery({
     routeDistanceKm,
-    lines: input.lines
+    lines: input.lines,
+    locationMode: input.locationMode,
+    deliveryPrecision: input.deliveryPrecision,
+    typedAddress: input.typedAddress,
+    deliveryLabel: input.deliveryLabel
   });
   const deliveryFeeCents = delivery.deliveryFeeCents;
   const serviceFeeCents = settings.serviceFeeCents;
@@ -190,6 +199,9 @@ export async function createConfirmedCommerceOrder(input: {
   deliveryLabel: string;
   deliveryLatitude: number;
   deliveryLongitude: number;
+  locationMode?: string | null;
+  deliveryPrecision?: string | null;
+  typedAddress?: string | null;
   customerWhatsAppPhone?: string;
   paymentMethod?: CommercePaymentMethod | string;
   paymentStatus?: CommercePaymentStatus;
@@ -305,7 +317,11 @@ export async function createConfirmedCommerceOrder(input: {
         merchantLng: Number(merchant.longitude),
         customerLat: input.deliveryLatitude,
         customerLng: input.deliveryLongitude,
-        lines
+        lines,
+        locationMode: input.locationMode,
+        deliveryPrecision: input.deliveryPrecision,
+        typedAddress: input.typedAddress ?? input.deliveryLabel,
+        deliveryLabel: input.deliveryLabel
       });
 
   const isMobileMoney =
@@ -348,6 +364,9 @@ export async function createConfirmedCommerceOrder(input: {
         create: lines.map((l) => ({
           productId: l.productId,
           productNameSnapshot: l.productName,
+          flavorOptionId: l.flavorOptionId ?? null,
+          flavorNameSnapshot: l.flavorName ?? null,
+          flavorPreference: l.flavorPreference ?? null,
           quantity: l.quantity,
           unitPriceCents: l.unitPriceCents,
           lineTotalCents: l.lineTotalCents
@@ -1220,17 +1239,24 @@ export async function syncCommerceOrderFromGig(gigId: string, gigStatus: GigStat
 export function formatOrderSummaryWhatsApp(order: {
   orderNumber: number;
   merchant: { name: string };
-  items: Array<{ quantity: number; productNameSnapshot: string; lineTotalCents: number }>;
+  items: Array<{
+    quantity: number;
+    productNameSnapshot: string;
+    lineTotalCents: number;
+    flavorPreference?: string | null;
+    flavorNameSnapshot?: string | null;
+  }>;
   subtotalCents: number;
   deliveryFeeCents: number;
   serviceFeeCents: number;
   totalCents: number;
   deliveryLabel: string;
 }): string {
-  const lines = order.items.map(
-    (i) =>
-      `${i.quantity} × ${i.productNameSnapshot} — $${(i.lineTotalCents / 100).toFixed(2)}`
-  );
+  const lines = order.items.map((i) => {
+    const flavor = formatFlavorCustomerLine(i.flavorPreference, i.flavorNameSnapshot);
+    const flavorBit = flavor ? `\n  ${flavor}` : "";
+    return `${i.quantity} × ${i.productNameSnapshot}${flavorBit} — $${(i.lineTotalCents / 100).toFixed(2)}`;
+  });
   return [
     "Your order:",
     ...lines.map((l) => `• ${l}`),

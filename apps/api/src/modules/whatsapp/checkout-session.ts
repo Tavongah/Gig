@@ -7,6 +7,7 @@ export type CheckoutExpectedInput =
   | "NONE"
   | "PRODUCT_TEXT"
   | "PRODUCT_DISAMBIGUATION"
+  | "PRODUCT_FLAVOR"
   | "READY_TO_ORDER"
   | "LOCATION"
   | "LOCATION_CLARIFICATION"
@@ -31,6 +32,9 @@ export type LockedProductLine = {
   productName: string;
   unitPriceCents: number;
   merchantId: string;
+  flavorOptionId?: string | null;
+  flavorName?: string | null;
+  flavorPreference?: "ANY" | "SPECIFIC" | null;
 };
 
 export type ParkedPayment = {
@@ -102,6 +106,8 @@ export function conversationStateForExpected(expected: CheckoutExpectedInput): W
       return WhatsAppConversationState.AWAITING_LOCATION;
     case "PRODUCT_DISAMBIGUATION":
       return WhatsAppConversationState.AWAITING_PRODUCT_CHOICE;
+    case "PRODUCT_FLAVOR":
+      return WhatsAppConversationState.BUILDING_CART;
     case "ORDER_CONFIRMATION":
     case "CHANGE_WHAT":
       return WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION;
@@ -330,8 +336,15 @@ export function sanitizeCheckoutContext(
   if (ctx.expectedInput !== "PRODUCT_DISAMBIGUATION") {
     ctx.pendingChoices = undefined;
     ctx.lastDisambiguationQuery = undefined;
-    if (ctx.expectedInput !== "LOCATION_CLARIFICATION") ctx.choiceId = undefined;
+    if (ctx.expectedInput !== "LOCATION_CLARIFICATION" && ctx.expectedInput !== "PRODUCT_FLAVOR") {
+      ctx.choiceId = undefined;
+    }
   } else if (!ctx.choiceId && ctx.pendingChoices?.[0]) {
+    ctx.choiceId = newCheckoutSessionId();
+  }
+  if (ctx.expectedInput !== "PRODUCT_FLAVOR") {
+    ctx.pendingFlavorChoices = undefined;
+  } else if (!ctx.choiceId && ctx.pendingFlavorChoices?.[0]) {
     ctx.choiceId = newCheckoutSessionId();
   }
 
