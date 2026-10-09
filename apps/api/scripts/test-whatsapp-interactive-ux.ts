@@ -62,6 +62,7 @@ async function main() {
   const welcome = formatCustomerWelcome();
   assert(/Welcome to DUTS/i.test(welcome), "welcome heading");
   assert(/What would you like to do/i.test(welcome), "welcome question");
+  assert(/1\. Shop/.test(welcome) && /2\. Track order/.test(welcome) && /3\. Help/.test(welcome), "welcome numeric fallback");
   assert(!/CommerceOrder|Smart Basket|Fulfillment|CheckoutSession/i.test(welcome), "no internals");
   assert(/What would you like to do/.test(formatMainMenu()), "returning menu");
   assert(/What do you need/.test(formatShopPrompt()), "shop prompt");
@@ -217,8 +218,11 @@ async function main() {
     { id: "x", title: "EcoCash" },
     { id: "y", title: "Cash on delivery" }
   ]);
-  assert(calls.some((c) => c.body.includes("Body=") && /EcoCash/.test(decodeURIComponent(c.body))), "text fallback");
-  assert(calls.some((c) => /Reply:/i.test(decodeURIComponent(c.body))), "reply hints when buttons unavailable");
+  assert(calls.some((c) => c.body.includes("Body=") && /EcoCash/.test(decodeURIComponent(c.body.replace(/\+/g, " ")))), "text fallback");
+  assert(
+    calls.some((c) => /Reply with 1/.test(decodeURIComponent(c.body.replace(/\+/g, " ")))),
+    "numbered fallback when buttons unavailable"
+  );
 
   console.log("P–U mock send of menu/payment/products/location…");
   resetWhatsAppProviderForTests();

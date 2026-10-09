@@ -162,6 +162,61 @@ export function isLivePendingPayment(ctx: ConversationContext): boolean {
   );
 }
 
+export function hasActiveCheckoutBasket(ctx: ConversationContext): boolean {
+  return Boolean(
+    ctx.requestedItems?.length || ctx.draftLines?.length || ctx.lockedProductLines?.length
+  );
+}
+
+/** Live payment / EcoCash capture — do not recover to menu. */
+export function isProtectedWhatsAppTransaction(ctx: ConversationContext): boolean {
+  if (isLivePendingPayment(ctx)) return true;
+  const expected = ctx.expectedInput;
+  return (
+    expected === "PAYMENT_PENDING" ||
+    expected === "ECOCASH_NUMBER" ||
+    expected === "PAYMENT_RETRY" ||
+    expected === "PENDING_PAYMENT_HANDOFF"
+  );
+}
+
+/** Empty BUILDING_CART / leftover location with no basket must not trap Menu/Hi. */
+export function isAbandonedCheckoutDraft(
+  ctx: ConversationContext,
+  state: WhatsAppConversationState
+): boolean {
+  if (isProtectedWhatsAppTransaction(ctx)) return false;
+  if (
+    ctx.checkoutStatus === "COMPLETED" ||
+    ctx.checkoutStatus === "CANCELLED" ||
+    ctx.checkoutStatus === "EXPIRED"
+  ) {
+    return true;
+  }
+  if (hasActiveCheckoutBasket(ctx)) return false;
+  const expected = ctx.expectedInput ?? "NONE";
+  if (expected === "NONE" || expected === "PRODUCT_TEXT" || expected === "READY_TO_ORDER") return true;
+  if (state === WhatsAppConversationState.BUILDING_CART) return true;
+  if (expected === "LOCATION" || expected === "LOCATION_CLARIFICATION") return true;
+  return expected === "PRODUCT_FLAVOR";
+}
+
+/** Hi/Hello stay on a real in-progress checkout; Menu still recovers unless payment is live. */
+export function shouldHoldGreetingAtCheckout(
+  ctx: ConversationContext,
+  state: WhatsAppConversationState
+): boolean {
+  if (isProtectedWhatsAppTransaction(ctx)) return true;
+  if (isAbandonedCheckoutDraft(ctx, state)) return false;
+  const expected = ctx.expectedInput ?? "NONE";
+  if (expected === "NONE" || expected === "PRODUCT_TEXT") return false;
+  return hasActiveCheckoutBasket(ctx);
+}
+
+export function isMainMenuNumericEligible(ctx: ConversationContext): boolean {
+  return (ctx.expectedInput ?? "NONE") === "NONE";
+}
+
 export function conversationOwnsOrder(ctx: ConversationContext, orderId: string): boolean {
   if (ctx.pendingPaymentOrderId === orderId || ctx.activeOrderId === orderId) return true;
   return Boolean(ctx.parkedPayments?.some((p) => p.pendingPaymentOrderId === orderId));

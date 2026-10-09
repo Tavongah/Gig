@@ -52,6 +52,7 @@
     "test:low-data-address-fallback": "tsx scripts/test-low-data-address-fallback.ts",
     "test:location-clarification-context": "tsx scripts/test-location-clarification-context.ts",
     "test:whatsapp-interactive-ux": "tsx scripts/test-whatsapp-interactive-ux.ts",
+    "test:whatsapp-regression": "tsx scripts/test-whatsapp-regression-suite.ts",
     "test:unlisted-item-request": "tsx scripts/test-unlisted-item-request.ts",
     "test:product-flavor-options": "tsx scripts/test-product-flavor-options.ts",
     "test:commerce-courier-ux": "tsx scripts/test-commerce-courier-ux.ts",

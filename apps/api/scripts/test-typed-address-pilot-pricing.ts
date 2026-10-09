@@ -71,6 +71,9 @@ assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.MEDIUM, 130);
 assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.LARGE, 170);
 assert.equal(isMsuGweruTypedPilotAddress(ADDRESS), true);
 assert.equal(isMsuGweruTypedPilotAddress("34 Nehosho, senga Gweru"), true);
+assert.equal(isMsuGweruTypedPilotAddress("Senga"), true);
+assert.equal(isMsuGweruTypedPilotAddress("Nehosho"), true);
+assert.equal(isMsuGweruTypedPilotAddress("House 24 Senga 2 near MSU"), true);
 assert.equal(isMsuGweruTypedPilotAddress("Harare CBD"), false);
 
 {

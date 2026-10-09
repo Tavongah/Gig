@@ -115,7 +115,8 @@ export function isMsuGweruTypedPilotAddress(text: string | null | undefined): bo
   const hasMsu = /\bmsu\b/.test(hay) || /\bmidlands state\b/.test(hay);
   const hasSenga = /\bsenga\b/.test(hay);
   const hasNehosho = /\bnehosho\b/.test(hay);
-  return (hasGweru || hasMsu) && (hasSenga || hasNehosho || hasMsu);
+  // Pilot zone landmarks (Senga / Nehosho / MSU) plus explicit Gweru+landmark forms.
+  return hasSenga || hasNehosho || hasMsu || (hasGweru && (hasSenga || hasNehosho || hasMsu));
 }
 
 export function resolvePilotLocationMode(input: {

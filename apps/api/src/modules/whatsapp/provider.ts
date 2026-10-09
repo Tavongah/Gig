@@ -1,4 +1,5 @@
 ﻿import { createHmac, timingSafeEqual } from "node:crypto";
+import { formatChoiceTextFallback } from "./copy.js";
 import { validateTwilioRequest } from "./twilio-payload.js";
 
 export type WhatsAppButton = { id: string; title: string; description?: string };
@@ -226,10 +227,9 @@ export class TwilioWhatsAppProvider implements WhatsAppProvider {
         params.set("ContentVariables", JSON.stringify(opts.contentVariables));
       }
     } else {
-      const hints = (opts.buttons ?? []).slice(0, 3).map((b) => b.title).filter(Boolean);
+      const hints = (opts.buttons ?? []).map((b) => b.title).filter(Boolean);
       const body = opts.body ?? "";
-      const combined =
-        hints.length > 0 ? `${body.slice(0, 1400)}\n\nReply: ${hints.join(" · ")}` : body.slice(0, 1600);
+      const combined = hints.length > 0 ? formatChoiceTextFallback(body, hints).slice(0, 1600) : body.slice(0, 1600);
       params.set("Body", combined);
     }
     if (opts.statusCallbackUrl) {

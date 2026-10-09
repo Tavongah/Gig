@@ -1,4 +1,5 @@
 import type { ConversationContext } from "./conversation.service.js";
+import { setExpected } from "./checkout-session.js";
 import {
   registerInteractiveAction,
   type InteractiveActionKind,
@@ -8,6 +9,7 @@ import { getWhatsAppProvider, type WhatsAppButton } from "./provider.js";
 import {
   formatChangeWhat,
   formatCustomerHelpMenu,
+  formatChoiceTextFallback,
   formatCustomerWelcome,
   formatDisambiguation,
   formatLocationAmbiguous,
@@ -69,12 +71,19 @@ export async function sendCustomerChoices(
     }
     await wa.sendButtons(phone, body, buttons.slice(0, 3));
   } catch {
-    await wa.sendText(phone, body);
+    await wa.sendText(
+      phone,
+      formatChoiceTextFallback(
+        body,
+        choices.map((c) => c.title)
+      )
+    );
   }
 }
 
 export async function sendMainMenu(phone: string, ctx: ConversationContext, welcome: boolean): Promise<void> {
   ctx.welcomeSentAt = ctx.welcomeSentAt ?? new Date().toISOString();
+  setExpected(ctx, "NONE");
   const body = welcome ? formatCustomerWelcome() : formatMainMenu();
   await sendCustomerChoices(phone, ctx, body, [
     { title: "Shop", action: { kind: "MENU_SHOP" } },

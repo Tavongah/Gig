@@ -26,12 +26,44 @@ export function formatCustomerWelcome(): string {
     "",
     "Shop from local stores and get your order delivered to you.",
     "",
-    "What would you like to do?"
+    "What would you like to do?",
+    "",
+    "1. Shop",
+    "2. Track order",
+    "3. Help",
+    "",
+    "Reply with 1, 2 or 3."
   ].join("\n");
 }
 
 export function formatMainMenu(): string {
-  return "What would you like to do?";
+  return [
+    "What would you like to do?",
+    "",
+    "1. Shop",
+    "2. Track order",
+    "3. Help",
+    "",
+    "Reply with 1, 2 or 3."
+  ].join("\n");
+}
+
+/** Numbered text equivalent for interactive choices. Buttons are presentation only. */
+export function formatChoiceTextFallback(body: string, titles: string[]): string {
+  const labels = titles.map((t) => t.trim()).filter(Boolean);
+  if (!labels.length) return body;
+  const alreadyNumbered = labels.every((title, i) =>
+    new RegExp(`(?:^|\\n)${i + 1}\\.\\s+${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i").test(body)
+  );
+  const replyLine =
+    labels.length === 1
+      ? "Reply with 1."
+      : `Reply with ${labels.map((_, i) => String(i + 1)).slice(0, -1).join(", ")} or ${labels.length}.`;
+  if (alreadyNumbered) {
+    return /reply with \d/i.test(body) ? body : `${body}\n\n${replyLine}`;
+  }
+  const numbered = labels.map((title, i) => `${i + 1}. ${title}`).join("\n");
+  return `${body}\n\n${numbered}\n\n${replyLine}`;
 }
 
 export function formatShopPrompt(): string {

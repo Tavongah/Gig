@@ -131,10 +131,13 @@ import {
   humanDeliveryLabel,
   isCartCommand,
   isLivePendingPayment,
+  isMainMenuNumericEligible,
+  isProtectedWhatsAppTransaction,
   isUnfinishedCheckout,
   parseNumericChoice,
   sanitizeCheckoutContext,
   setExpected,
+  shouldHoldGreetingAtCheckout,
   supersedeCheckoutDraft
 } from "./checkout-session.js";
 import {
@@ -148,6 +151,7 @@ import {
   attachFlavorToLock,
   displayNameWithFlavor,
   flavorInquiryFromText,
+  flavorUxEnabled,
   sendFlavorChoicesForProduct
 } from "./whatsapp-flavor.js";
 import { normalizePhoneNumber } from "../auth/access.service.js";
@@ -222,9 +226,15 @@ export async function handleCustomerWhatsAppMessage(
   );
   if (interactiveHandled) return interactiveHandled;
 
-  const menuTap = classifyCustomerMenuTap(text);
+  let menuTap = classifyCustomerMenuTap(text);
+  if (!menuTap && isMainMenuNumericEligible(ctx)) {
+    const n = parseNumericChoice(text);
+    if (n === 1) menuTap = "SHOP";
+    else if (n === 2) menuTap = "TRACK";
+    else if (n === 3) menuTap = "HELP";
+  }
   if (menuTap === "SHOP" || menuTap === "MENU" || isGreetingOrMenuIntent(text)) {
-    if (isUnfinishedCheckout(ctx, conv.state) || isLivePendingPayment(ctx)) {
+    if (isProtectedWhatsAppTransaction(ctx)) {
       await promptCurrentCheckoutStep(phone, conv.id, ctx);
       return { handled: true };
     }
@@ -237,8 +247,10 @@ export async function handleCustomerWhatsAppMessage(
       });
       return { handled: true };
     }
-    await sendMainMenu(phone, ctx, !isReturningWhatsAppCustomer(ctx));
-    await updateConversation(conv.id, { context: ctx });
+    if (menuTap === "MENU" || !shouldHoldGreetingAtCheckout(ctx, conv.state)) {
+      return recoverToMainMenu(phone, conv.id, ctx, !isReturningWhatsAppCustomer(ctx));
+    }
+    await promptCurrentCheckoutStep(phone, conv.id, ctx);
     return { handled: true };
   }
 
@@ -289,7 +301,7 @@ export async function handleCustomerWhatsAppMessage(
   }
 
   if (isHelpIntent(text) || text.toLowerCase() === "help" || menuTap === "HELP") {
-    if (isUnfinishedCheckout(ctx, conv.state) || isLivePendingPayment(ctx)) {
+    if (isProtectedWhatsAppTransaction(ctx)) {
       await wa.sendText(phone, formatCheckoutHelp(ctx.expectedInput));
       return { handled: true };
     }
@@ -351,6 +363,17 @@ export async function handleCustomerWhatsAppMessage(
 
   if (expect === "CHANGE_WHAT") {
     return handleChangeWhat(phone, conv.id, ctx, text);
+  }
+
+  if (expect === "PRODUCT_FLAVOR" && !flavorUxEnabled()) {
+    ctx.pendingFlavorChoices = undefined;
+    setExpected(ctx, "PRODUCT_TEXT");
+    await sendShopPrompt(phone, ctx);
+    await updateConversation(conv.id, {
+      state: WhatsAppConversationState.BUILDING_CART,
+      context: ctx
+    });
+    return { handled: true };
   }
 
   if (expect === "PRODUCT_FLAVOR") {
@@ -2217,6 +2240,24 @@ async function quoteBasketTotalsFromContext(ctx: ConversationContext) {
   });
 }
 
+async function recoverToMainMenu(
+  phone: string,
+  convId: string,
+  ctx: ConversationContext,
+  welcome: boolean
+): Promise<{ handled: true }> {
+  const next: ConversationContext = {
+    ...cancelCheckoutDraft(ctx),
+    welcomeSentAt: ctx.welcomeSentAt
+  };
+  await sendMainMenu(phone, next, welcome);
+  await updateConversation(convId, {
+    state: WhatsAppConversationState.IDLE,
+    context: next
+  });
+  return { handled: true };
+}
+
 async function tryHandleInteractiveAction(
   phone: string,
   customerId: string,
@@ -2231,11 +2272,10 @@ async function tryHandleInteractiveAction(
   if (resolved.ok === false) {
     const wa = getWhatsAppProvider();
     await wa.sendText(phone, formatStaleChoiceNotice());
-    if (isUnfinishedCheckout(ctx, state) || isLivePendingPayment(ctx)) {
+    if (isProtectedWhatsAppTransaction(ctx) || shouldHoldGreetingAtCheckout(ctx, state)) {
       await promptCurrentCheckoutStep(phone, convId, ctx);
     } else {
-      await sendMainMenu(phone, ctx, false);
-      await updateConversation(convId, { context: ctx });
+      return recoverToMainMenu(phone, convId, ctx, false);
     }
     return { handled: true };
   }
@@ -2252,17 +2292,7 @@ async function applyInteractiveAction(
 ): Promise<{ handled: boolean }> {
   switch (action.kind) {
     case "MENU_SHOP":
-      if (isUnfinishedCheckout(ctx, state) || isLivePendingPayment(ctx)) {
-        const expect = ctx.expectedInput ?? "NONE";
-        if (expect === "PRODUCT_TEXT" || expect === "NONE" || expect === "READY_TO_ORDER") {
-          setExpected(ctx, "PRODUCT_TEXT");
-          await sendShopPrompt(phone, ctx);
-          await updateConversation(convId, {
-            state: WhatsAppConversationState.BUILDING_CART,
-            context: ctx
-          });
-          return { handled: true };
-        }
+      if (isProtectedWhatsAppTransaction(ctx)) {
         await promptCurrentCheckoutStep(phone, convId, ctx);
         return { handled: true };
       }
@@ -2276,7 +2306,7 @@ async function applyInteractiveAction(
     case "MENU_TRACK":
       return presentCustomerTracking(phone, convId, state, ctx, customerId);
     case "MENU_HELP":
-      if (isUnfinishedCheckout(ctx, state) || isLivePendingPayment(ctx)) {
+      if (isProtectedWhatsAppTransaction(ctx)) {
         await getWhatsAppProvider().sendText(phone, formatCheckoutHelp(ctx.expectedInput));
         return { handled: true };
       }
@@ -2284,14 +2314,22 @@ async function applyInteractiveAction(
       await updateConversation(convId, { context: ctx });
       return { handled: true };
     case "MENU_MAIN":
-      if (isUnfinishedCheckout(ctx, state) || isLivePendingPayment(ctx)) {
+      if (isProtectedWhatsAppTransaction(ctx)) {
         await promptCurrentCheckoutStep(phone, convId, ctx);
         return { handled: true };
       }
-      await sendMainMenu(phone, ctx, false);
-      await updateConversation(convId, { context: ctx });
-      return { handled: true };
+      return recoverToMainMenu(phone, convId, ctx, false);
     case "SELECT_FLAVOR": {
+      if (!flavorUxEnabled()) {
+        await getWhatsAppProvider().sendText(phone, formatStaleChoiceNotice());
+        setExpected(ctx, "PRODUCT_TEXT");
+        await sendShopPrompt(phone, ctx);
+        await updateConversation(convId, {
+          state: WhatsAppConversationState.BUILDING_CART,
+          context: ctx
+        });
+        return { handled: true };
+      }
       const pending = ctx.pendingFlavorChoices?.[0];
       const pick = pending?.flavors.find((f) => (f.id ?? null) === (action.flavorOptionId ?? null));
       if (!pending || pending.productId !== action.productId || !pick) {
@@ -2481,6 +2519,10 @@ async function promptCurrentCheckoutStep(
       await getWhatsAppProvider().sendText(phone, formatCheckoutHelp(expect));
       return;
     case "PRODUCT_FLAVOR": {
+      if (!flavorUxEnabled()) {
+        await sendShopPrompt(phone, ctx);
+        return;
+      }
       const pending = ctx.pendingFlavorChoices?.[0];
       if (pending) {
         await sendFlavorChoicesForProduct(phone, ctx, { id: pending.productId, name: pending.productName });
