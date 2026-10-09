@@ -46,6 +46,7 @@
     "test:storefront-catalog-browse": "tsx scripts/test-storefront-catalog-browse.ts",
     "test:smart-basket": "tsx scripts/test-smart-basket-match.ts",
     "test:multi-shop-checkout": "tsx scripts/test-multi-shop-checkout.ts",
+    "test:customer-primary-shop": "tsx scripts/test-customer-primary-shop.ts",
     "test:checkout-prep": "tsx scripts/test-checkout-prep.ts",
     "test:pilot-delivery-pricing": "tsx scripts/test-pilot-delivery-pricing.ts",
     "test:whatsapp-checkout-isolation": "tsx scripts/test-whatsapp-checkout-isolation.ts",

@@ -29,6 +29,7 @@ import {
   parseMultiShopMaxExtraRouteKm,
   parseMultiShopMaxExtraRouteRatio,
   parseMultiShopMaxPickupRouteKm,
+  resolveCustomerPrimaryMerchant,
   type CombinedRouteResult,
   type MultiShopAllocation
 } from "@gigflow/shared";
@@ -462,6 +463,17 @@ export function presentCustomerCheckout(checkout: {
 }) {
   const shopCount = checkout.orders.length;
   const first = checkout.orders[0];
+  const primary = resolveCustomerPrimaryMerchant(
+    checkout.orders.map((o) => ({
+      merchantId: o.merchant.id,
+      merchantName: o.merchant.name,
+      quantity: o.items.reduce((sum, i) => sum + i.quantity, 0),
+      subtotalCents: o.items.reduce((sum, i) => sum + i.lineTotalCents, 0)
+    }))
+  );
+  const primaryOrder =
+    checkout.orders.find((o) => o.merchant.id === primary?.merchantId) ?? first;
+  const primaryName = primary?.merchantName ?? first?.merchant.name;
   const gigStatus = checkout.linkedDeliveryGig?.status ?? null;
   const hasCourier = Boolean(checkout.linkedDeliveryGig?.assignedWorkerId);
   const pickupProgress = (checkout.pickupStops ?? [])
@@ -503,10 +515,14 @@ export function presentCustomerCheckout(checkout: {
     currency: checkout.currency,
     paymentStatus: checkout.paymentStatus,
     paymentMethod: checkout.paymentMethod,
-    merchant: first
-      ? { id: first.merchant.id, name: shopCount > 1 ? `${shopCount} shops` : first.merchant.name, locationLabel: first.merchant.locationLabel ?? null }
-      : { id: "", name: "Shops", locationLabel: null },
-    merchantName: shopCount > 1 ? `${shopCount} shops` : first?.merchant.name,
+    merchant: primaryOrder
+      ? {
+          id: primaryOrder.merchant.id,
+          name: primaryName ?? primaryOrder.merchant.name,
+          locationLabel: primaryOrder.merchant.locationLabel ?? null
+        }
+      : { id: "", name: "Shop", locationLabel: null },
+    merchantName: primaryName,
     deliveryLabel: checkout.deliveryLabel,
     items: checkout.orders.flatMap((o) =>
       o.items.map((i) => ({

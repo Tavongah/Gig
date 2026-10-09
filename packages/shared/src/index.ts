@@ -400,6 +400,12 @@ export {
 } from "./multi-shop-checkout.js";
 
 export {
+  resolveCustomerPrimaryMerchant,
+  type CustomerPrimaryShop,
+  type CustomerPrimaryShopInput
+} from "./customer-primary-shop.js";
+
+export {
   cartLineIdentity,
   formatFlavorCustomerLine,
   formatFlavorFulfillmentLine,
