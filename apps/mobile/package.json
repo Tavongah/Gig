@@ -15,6 +15,7 @@
     "test:guest-storefront-ui": "npx tsx scripts/test-guest-storefront-ui.ts",
     "test:storefront-catalog-ui": "npx tsx scripts/test-storefront-catalog-ui.ts",
     "test:storefront-visual": "npx tsx scripts/test-storefront-visual.ts",
+    "test:storefront-motion": "npx tsx scripts/test-storefront-motion.ts",
     "test:storefront-categories": "npx tsx scripts/test-storefront-categories.ts",
     "test:smart-basket-ui": "npx tsx scripts/test-smart-basket-ui.ts",
     "test:simple-checkout-ui": "npx tsx scripts/test-simple-checkout-ui.ts",
