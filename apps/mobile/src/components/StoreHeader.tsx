@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { DUTS } from "../lib/theme";
 import { CountBadge } from "./motion/CountBadge";
-import { STOREFRONT_MAX_WIDTH, categoryIcon, useStorefrontLayout } from "../lib/storefront-ui";
+import { STOREFRONT_GUTTER, categoryIcon, storefrontShellStyle, useStorefrontLayout } from "../lib/storefront-ui";
 import { headerChipCategories, isSmartBasketEnabled } from "../lib/storefront-categories";
 import { openStorefrontCategory } from "../lib/storefront-nav";
 import { useShopBrowse } from "../lib/shop-browse";
@@ -81,7 +81,7 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
   }
 
   const searchField = (
-    <View className="flex-row items-center rounded-full border border-border bg-surface px-3.5 py-2.5">
+    <View className={`flex-row items-center rounded-full border border-border bg-surface px-3.5 ${isDesktopNav ? "py-2.5" : "py-2"}`}>
       <Ionicons name="search" size={18} color={DUTS.muted} />
       <TextInput
         value={q}
@@ -142,8 +142,13 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className={isDesktopNav ? "mt-3" : "mt-4"}
-        contentContainerStyle={{ gap: 8, paddingRight: 28 }}
+        className={`duts-chip-row ${isDesktopNav ? "mt-3" : "mt-2"}`}
+        style={{ marginHorizontal: -STOREFRONT_GUTTER }}
+        contentContainerStyle={{
+          gap: 8,
+          paddingLeft: STOREFRONT_GUTTER,
+          paddingRight: STOREFRONT_GUTTER + 20
+        }}
       >
         {chips.map((cat) => (
           <Pressable
@@ -152,6 +157,10 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
             accessibilityRole="button"
             accessibilityLabel={`Category ${cat.label}`}
             className="duts-chip flex-row items-center rounded-full border border-border bg-card px-3 py-2"
+            style={({ pressed }) => ({
+              transform: [{ scale: pressed ? 0.97 : 1 }],
+              backgroundColor: pressed ? DUTS.surface : DUTS.card
+            })}
           >
             <Ionicons name={categoryIcon(cat.label)} size={16} color={DUTS.purple} />
             <Text className="ml-1.5 text-sm font-semibold text-ink">{cat.label}</Text>
@@ -162,6 +171,10 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
           accessibilityRole="button"
           accessibilityLabel="All categories"
           className="duts-chip flex-row items-center rounded-full border border-border bg-card px-3 py-2"
+          style={({ pressed }) => ({
+            transform: [{ scale: pressed ? 0.97 : 1 }],
+            backgroundColor: pressed ? DUTS.surface : DUTS.card
+          })}
         >
           <Ionicons name="grid-outline" size={16} color={DUTS.purple} />
           <Text className="ml-1.5 text-sm font-semibold text-ink">All categories</Text>
@@ -177,7 +190,7 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
         isDesktopNav ? ({ position: "sticky", top: 0, zIndex: 30 } as object) : undefined
       ]}
     >
-      <View className="w-full self-center px-4 py-3" style={{ maxWidth: STOREFRONT_MAX_WIDTH }}>
+      <View className={`w-full self-center ${isDesktopNav ? "py-3" : "py-2"}`} style={storefrontShellStyle}>
         {isDesktopNav ? (
           <>
             <View className="flex-row items-center gap-4">
@@ -206,7 +219,7 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
               </Pressable>
             </View>
             <View className="mt-2">{areaControl}</View>
-            <View className="mt-3">{searchField}</View>
+            <View className="mt-2">{searchField}</View>
             {compact ? null : categoryRow}
           </>
         )}
@@ -244,7 +257,7 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
 
 export function StorePage({ children }: { children: ReactNode }) {
   return (
-    <View className="w-full flex-1 self-center px-4" style={{ maxWidth: STOREFRONT_MAX_WIDTH }}>
+    <View className="w-full flex-1 self-center" style={storefrontShellStyle}>
       {children}
     </View>
   );
