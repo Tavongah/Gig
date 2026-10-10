@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { DUTS } from "../lib/theme";
+import { useStorefrontLayout } from "../lib/storefront-ui";
 import { categoryIonicon, type ResolvedStorefrontCategory } from "../lib/storefront-categories";
 
 type Props = {
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export function StorefrontCategoryCard({ category, onPress, compact }: Props) {
+  const { categoryCardWidth } = useStorefrontLayout();
   const comingSoon = category.state === "COMING_SOON";
   const restricted = category.state === "RESTRICTED" || category.restricted;
   const status = comingSoon ? "Coming soon" : restricted ? "Age restricted" : null;
@@ -19,8 +21,14 @@ export function StorefrontCategoryCard({ category, onPress, compact }: Props) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={status ? `${category.label}, ${status}` : `Shop ${category.label}`}
-      className={`duts-cat-card items-center rounded-2xl border border-border bg-card ${compact ? "px-2 py-3" : "px-2 py-4"}`}
-      style={({ pressed }) => [{ width: compact ? "100%" : 108, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
+      className={`duts-cat-card items-center rounded-2xl border border-border bg-card ${compact ? "px-2 py-3" : "px-2 py-3"}`}
+      style={({ pressed }) => [
+        {
+          width: compact ? "100%" : categoryCardWidth,
+          transform: [{ scale: pressed ? 0.97 : 1 }],
+          backgroundColor: pressed ? DUTS.surface : DUTS.card
+        }
+      ]}
     >
       <View
         className="items-center justify-center rounded-full"

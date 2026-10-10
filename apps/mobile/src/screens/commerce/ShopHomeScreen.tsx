@@ -12,6 +12,7 @@ import { api } from "../../lib/api";
 import { addStorefrontProduct } from "../../lib/storefront-cart";
 import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
+import { STOREFRONT_GUTTER } from "../../lib/storefront-ui";
 import { moreOnDutsCategories, shopByCategories, isSmartBasketEnabled } from "../../lib/storefront-categories";
 import { openStorefrontCategory } from "../../lib/storefront-nav";
 import { StorefrontCategoryCard } from "../../components/StorefrontCategoryCard";
@@ -122,17 +123,27 @@ export function ShopHomeScreen() {
   const moreCatalog = products.filter((p) => !isProductCardPurchasable(p));
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ overflow: "hidden" }}>
       <StoreHeader categories={catalogNames} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
         <StorePage>
-          <Text className="mt-4 text-sm text-muted">Need it? DUTS it. Shop local. Get it delivered.</Text>
+          <Text className="mt-3 text-sm text-muted">Need it? DUTS it. Shop local. Get it delivered.</Text>
           <Text className="mt-1 text-sm text-muted">Delivery from $0.50</Text>
 
           {shopBy.length > 0 ? (
             <SectionReveal className="mt-5">
-              <Text className="mb-3 text-lg font-extrabold text-ink">Shop by category</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 28 }}>
+              <Text className="mb-2 text-lg font-extrabold text-ink">Shop by category</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="duts-chip-row"
+                style={{ marginHorizontal: -STOREFRONT_GUTTER }}
+                contentContainerStyle={{
+                  gap: 10,
+                  paddingLeft: STOREFRONT_GUTTER,
+                  paddingRight: STOREFRONT_GUTTER + 16
+                }}
+              >
                 {shopBy.map((cat) => (
                   <StorefrontCategoryCard
                     key={cat.slug}
@@ -144,8 +155,8 @@ export function ShopHomeScreen() {
             </SectionReveal>
           ) : null}
 
-          <SectionReveal className="mt-6">
-            <Text className="mb-3 text-lg font-extrabold text-ink">Available now</Text>
+          <SectionReveal className="mt-5">
+            <Text className="mb-2 text-lg font-extrabold text-ink">Available now</Text>
             {availableNow.length === 0 && !productsQuery.isLoading && moreCatalog.length === 0 ? (
               <Text className="text-sm text-muted">No products found. Try another search.</Text>
             ) : availableNow.length === 0 && !productsQuery.isLoading ? (
@@ -162,18 +173,18 @@ export function ShopHomeScreen() {
           </SectionReveal>
 
           {sectionCategories.length > 0 ? (
-            <View className="mt-6">
+            <View className="mt-5">
               {sectionCategories.map((cat, i) => {
                 const rows = (sectionQueries[i]?.data?.products ?? []) as ProductCardData[];
                 return (
-                  <SectionReveal key={cat.name} className="mb-6">
-                    <View className="mb-3 flex-row items-center justify-between">
-                      <Text className="text-lg font-extrabold text-ink">{cat.name}</Text>
+                  <SectionReveal key={cat.name} className="mb-5">
+                    <View className="mb-2 min-h-[44px] flex-row items-center justify-between">
+                      <Text className="flex-1 pr-3 text-lg font-extrabold text-ink">{cat.name}</Text>
                       <Pressable
                         onPress={() => navigation.navigate("ProductSearch", { category: cat.name, q: undefined })}
                         accessibilityRole="button"
                         accessibilityLabel={`See all ${cat.name}`}
-                        className="flex-row items-center"
+                        className="min-h-[44px] flex-row items-center"
                       >
                         <Text className="text-sm font-bold" style={{ color: DUTS.purple }}>
                           See all
@@ -195,8 +206,8 @@ export function ShopHomeScreen() {
           ) : null}
 
           {moreCatalog.length > 0 ? (
-            <SectionReveal className="mt-6">
-              <Text className="mb-3 text-lg font-extrabold text-ink">More products</Text>
+            <SectionReveal className="mt-5">
+              <Text className="mb-2 text-lg font-extrabold text-ink">More products</Text>
               <ProductGrid
                 products={moreCatalog}
                 onPress={openProduct}
@@ -211,7 +222,7 @@ export function ShopHomeScreen() {
               onPress={() => void productsQuery.fetchNextPage()}
               accessibilityRole="button"
               accessibilityLabel="Show more products"
-              className="mt-5 self-center rounded-full border border-border bg-card px-5 py-3"
+              className="mt-4 items-center rounded-full border border-border bg-card px-5 py-3" style={{ alignSelf: "stretch" }}
             >
               <Text className="text-center text-sm font-extrabold text-ink">
                 {productsQuery.isFetchingNextPage ? "Loading…" : "SHOW MORE PRODUCTS"}
@@ -219,8 +230,8 @@ export function ShopHomeScreen() {
             </Pressable>
           ) : null}
 
-          <SectionReveal className="mt-8">
-            <Text className="mb-3 text-lg font-extrabold text-ink">Nearby shops</Text>
+          <SectionReveal className="mt-6">
+            <Text className="mb-2 text-lg font-extrabold text-ink">Nearby shops</Text>
             {(shopsQuery.data?.shops ?? []).length === 0 ? (
               <Text className="text-sm text-muted">No shops nearby yet. You can still browse the DUTS catalog.</Text>
             ) : (
@@ -242,8 +253,8 @@ export function ShopHomeScreen() {
           </SectionReveal>
 
           {moreOnDuts.length > 0 ? (
-            <SectionReveal className="mt-8">
-              <View className="mb-3 flex-row items-center justify-between">
+            <SectionReveal className="mt-6">
+              <View className="mb-2 min-h-[44px] flex-row items-center justify-between">
                 <Text className="text-lg font-extrabold text-ink">Coming to DUTS</Text>
                 <Pressable
                   onPress={() => navigation.navigate("AllCategories")}

@@ -83,8 +83,8 @@ export function MarketplaceCategoryScreen({ route, navigation }: Props) {
 
           {showCatalog ? (
             <View className="mt-10">
-              <Text className="mb-3 text-lg font-extrabold text-ink">{label}</Text>
-              <Text className="mb-4 text-sm text-muted">Browse the catalog. Ordering is not available yet.</Text>
+              <Text className="mb-2 text-lg font-extrabold text-ink">{label}</Text>
+              <Text className="mb-3 text-sm text-muted">Browse the catalog. Ordering is not available yet.</Text>
               <ProductGrid
                 products={products}
                 loading={productsQuery.isLoading}

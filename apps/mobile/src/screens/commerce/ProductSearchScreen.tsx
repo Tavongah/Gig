@@ -75,7 +75,7 @@ export function ProductSearchScreen({ route, navigation }: Props) {
       <StoreHeader categories={catalogNames} initialQuery={q} compact={!category} showCategories={!q} />
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
         <StorePage>
-          <Text className="mt-4 text-xl font-black text-ink">{title}</Text>
+          <Text className="mt-3 text-lg font-extrabold text-ink">{title}</Text>
           {products.length === 0 && !query.isLoading && !skipCatalogFetch ? (
             <View className="mt-10 items-center px-6">
               <Ionicons name="search-outline" size={32} color={DUTS.placeholder} />
@@ -97,8 +97,8 @@ export function ProductSearchScreen({ route, navigation }: Props) {
               ) : null}
             </View>
           ) : skipCatalogFetch ? null : (
-            <View className="mt-4">
-              <ProductGrid
+            <View className="mt-3">
+              <ProductGrid>
                 products={products}
                 loading={query.isLoading}
                 onPress={openProduct}
@@ -119,7 +119,8 @@ export function ProductSearchScreen({ route, navigation }: Props) {
               onPress={() => void query.fetchNextPage()}
               accessibilityRole="button"
               accessibilityLabel="Show more products"
-              className="mt-5 self-center rounded-full border border-border bg-card px-5 py-3"
+              className="mt-4 items-center rounded-full border border-border bg-card px-5 py-3"
+              style={{ alignSelf: "stretch" }}
             >
               <Text className="text-center text-sm font-extrabold text-ink">
                 {query.isFetchingNextPage ? "Loading…" : "SHOW MORE PRODUCTS"}

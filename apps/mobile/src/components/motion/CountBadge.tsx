@@ -16,7 +16,7 @@ export function CountBadge({ count }: { count: number }) {
     scale.setValue(1);
     Animated.sequence([
       Animated.timing(scale, {
-        toValue: 1.16,
+        toValue: 1.22,
         duration: MOTION.fast,
         easing: Easing.out(Easing.quad),
         useNativeDriver: true

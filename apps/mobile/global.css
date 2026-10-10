@@ -7,6 +7,8 @@ body,
 #root {
   height: 100%;
   width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -37,6 +39,19 @@ body {
 
 .duts-product-card-image {
   transition-duration: 220ms;
+  object-fit: contain;
+  object-position: center;
+}
+
+.duts-product-image-frame {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  background-color: #ffffff;
+}
+
+.duts-chip-row {
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 12px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 12px), transparent 100%);
 }
 
 .duts-section-reveal {
@@ -67,6 +82,18 @@ body {
   .duts-chip:hover,
   .duts-cat-card:hover {
     transform: translateY(-1px);
+  }
+}
+
+@media (hover: none) {
+  .duts-product-card:active {
+    transform: scale(0.98);
+  }
+
+  .duts-chip:active,
+  .duts-cat-card:active {
+    transform: scale(0.97);
+    background-color: #f8fafc;
   }
 }
 
