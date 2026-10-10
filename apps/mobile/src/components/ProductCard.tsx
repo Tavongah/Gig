@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Image, Pressable, Text, View } from "react-native";
+import { Image, Pressable, Text, View, type DimensionValue } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { DUTS } from "../lib/theme";
 import { productCardMeta } from "../lib/storefront-ui";
@@ -26,7 +26,7 @@ type Props = {
   onPress: () => void;
   onAdd?: () => void;
   pricePrefix?: string;
-  width?: number;
+  width?: DimensionValue;
   variant?: "grid" | "rail";
 };
 
@@ -56,7 +56,7 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
   const showImage = Boolean(product.imageUrl) && !imgFailed;
   const meta = productCardMeta(product.name, product.brand, product.sizeLabel);
   const rail = variant === "rail";
-  const cardWidth = width ?? (rail ? RAIL_CARD_WIDTH : undefined);
+  const cardWidth: DimensionValue = width ?? (rail ? RAIL_CARD_WIDTH : "100%");
 
   return (
     <Pressable
@@ -77,11 +77,11 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
       ]}
     >
       <View
-        className="w-full items-center justify-center"
+        className="duts-product-image-frame w-full items-center justify-center"
         style={{
-          height: rail ? 132 : cardWidth ?? 160,
+          aspectRatio: 1,
           backgroundColor: "#FFFFFF",
-          padding: 10
+          padding: 8
         }}
       >
         {showImage ? (
@@ -101,11 +101,11 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
         )}
       </View>
       <View className="px-2.5 pb-2.5 pt-2">
-        <Text className="text-[13px] font-semibold leading-4 text-ink" numberOfLines={2}>
+        <Text className="text-[13px] font-semibold leading-4 text-ink" numberOfLines={2} style={{ minHeight: 32 }}>
           {product.name}
         </Text>
         {meta ? (
-          <Text className="mt-0.5 text-[11px] text-muted" numberOfLines={1}>
+          <Text className="mt-0.5 text-[11px] leading-4 text-muted" numberOfLines={1} style={{ minHeight: 16 }}>
             {meta}
           </Text>
         ) : (
@@ -149,16 +149,16 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
   );
 }
 
-export function ProductCardSkeleton({ width, variant = "grid" }: { width?: number; variant?: "grid" | "rail" }) {
+export function ProductCardSkeleton({ width, variant = "grid" }: { width?: DimensionValue; variant?: "grid" | "rail" }) {
   const rail = variant === "rail";
-  const cardWidth = width ?? (rail ? RAIL_CARD_WIDTH : undefined);
+  const cardWidth: DimensionValue = width ?? (rail ? RAIL_CARD_WIDTH : "100%");
   return (
     <View
       className="overflow-hidden rounded-xl border border-border bg-card"
       style={{ width: cardWidth }}
       accessibilityLabel="Loading product"
     >
-      <View className="duts-skeleton-shine" style={{ height: rail ? 132 : cardWidth ?? 160, backgroundColor: "#F3F4F6" }} />
+      <View className="duts-skeleton-shine duts-product-image-frame w-full" style={{ aspectRatio: 1, backgroundColor: "#F3F4F6" }} />
       <View className="gap-2 px-2.5 py-2.5">
         <View className="duts-skeleton-shine h-3 rounded bg-surface" />
         <View className="duts-skeleton-shine h-3 w-2/3 rounded bg-surface" />

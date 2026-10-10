@@ -16,6 +16,7 @@ function read(rel: string) {
 const ui = read("lib/storefront-ui.ts");
 assert.ok(ui.includes("productCardMeta"), "brand/size helper");
 assert.ok(ui.includes("STOREFRONT_MAX_WIDTH"), "desktop max width");
+assert.ok(ui.includes("STOREFRONT_GUTTER"), "consistent gutters");
 assert.ok(ui.includes("categoryIcon"), "category icons");
 
 const card = read("components/ProductCard.tsx");
@@ -24,6 +25,7 @@ assert.ok(!/\bVIEW\b/.test(card), "VIEW CTA removed");
 assert.ok(card.includes("h-8 w-8"), "compact add");
 assert.ok(card.includes("onError"), "image failure placeholder");
 assert.ok(card.includes("numberOfLines={2}"), "name clamp");
+assert.ok(card.includes("aspectRatio"), "stable image frame");
 
 const header = read("components/StoreHeader.tsx");
 assert.ok(header.includes("Search DUTS"));
