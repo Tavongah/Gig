@@ -98,7 +98,7 @@ export function ProductSearchScreen({ route, navigation }: Props) {
             </View>
           ) : skipCatalogFetch ? null : (
             <View className="mt-3">
-              <ProductGrid>
+              <ProductGrid
                 products={products}
                 loading={query.isLoading}
                 onPress={openProduct}

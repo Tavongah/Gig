@@ -54,6 +54,7 @@ assert.ok(home.includes("Need it? DUTS it."), "DUTS identity");
 
 const search = read("screens/commerce/ProductSearchScreen.tsx");
 assert.ok(search.includes("commerceNearbyProducts"), "search uses catalog API");
+assert.ok(!search.includes("<ProductGrid>"), "ProductGrid keeps props");
 assert.ok(search.indexOf("<ProductGrid") < search.lastIndexOf("Coming soon"), "coming soon below search results");
 assert.ok(search.includes("SHOW MORE PRODUCTS") || search.includes("Show more"), "search pagination");
 assert.ok(search.includes("addStorefrontProduct"), "search add gated");
