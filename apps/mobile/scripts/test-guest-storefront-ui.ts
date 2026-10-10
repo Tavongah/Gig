@@ -54,14 +54,15 @@ assert.ok(areaStore.includes("Africa/Harare"), "timezone hint for default area")
 assert.ok(!areaStore.includes("getCurrentCoordinates"), "area store must not request GPS");
 
 const cart = read("screens/commerce/CartScreen.tsx");
-assert.ok(cart.includes("GuestCheckoutChoice"), "guest checkout decision");
-assert.ok(cart.includes('label="Continue"'), "continue CTA");
+assert.ok(cart.includes("commerceGuestHandoff"), "guest cart starts WhatsApp handoff");
+assert.ok(cart.includes("Continue with WhatsApp"), "WhatsApp is the primary cart CTA");
 assert.ok(cart.includes("Calculated at checkout"), "deferred delivery copy");
 assert.ok(cart.includes("deferDelivery"), "guest quote defers delivery");
 assert.ok(!cart.includes("Total") || cart.includes("deferred"), "guest cart must not treat deferred quote as final total");
+assert.ok(!cart.includes("Find a shop"), "guest cart must not show Find Shop");
 
 const choice = read("screens/commerce/GuestCheckoutChoiceScreen.tsx");
-assert.ok(choice.includes("Continue on WhatsApp"), "WhatsApp CTA");
+assert.ok(choice.includes("Continue with WhatsApp"), "WhatsApp CTA");
 assert.ok(choice.includes("Sign in or create account"), "account path");
 assert.ok(choice.includes("No account needed."), "WhatsApp is first-class");
 assert.ok(choice.includes("Use your DUTS account and saved delivery details."), "account copy");

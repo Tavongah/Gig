@@ -81,39 +81,32 @@ export function GuestCheckoutChoiceScreen({ navigation }: Props) {
     <View className="flex-1 bg-background">
       <StoreHeader compact showCategories={false} />
       <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>
-        <Text className="text-2xl font-black text-ink">How would you like to order?</Text>
-        <Text className="mt-2 text-base text-muted">WhatsApp or a DUTS account — both complete your order.</Text>
+        <Text className="text-2xl font-black text-ink">Continue with WhatsApp</Text>
+        <Text className="mt-2 text-base text-muted">No account needed. We'll confirm your location and total in WhatsApp.</Text>
 
         {error ? <Text className="mt-4 text-sm text-danger">{error}</Text> : null}
 
-        <Pressable
-          onPress={chooseWhatsApp}
-          disabled={handoffMut.isPending}
-          accessibilityRole="button"
-          accessibilityLabel="Continue on WhatsApp"
-          className="mt-8 rounded-2xl border border-border bg-card p-5"
-        >
-          <View className="h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: "#F4EEFF" }}>
-            <Ionicons name="logo-whatsapp" size={26} color={DUTS.purple} />
-          </View>
-          <Text className="mt-3 text-lg font-extrabold text-ink">
-            {handoffMut.isPending ? "Opening WhatsApp…" : "Continue on WhatsApp"}
-          </Text>
-          <Text className="mt-1 text-sm text-muted">No account needed.</Text>
-          <Text className="mt-0.5 text-sm text-muted">We'll confirm your location and total in WhatsApp.</Text>
-        </Pressable>
+        <View className="mt-8">
+          <AppButton
+            label={handoffMut.isPending ? "Opening WhatsApp…" : "Continue with WhatsApp"}
+            onPress={chooseWhatsApp}
+            disabled={handoffMut.isPending}
+            loading={handoffMut.isPending}
+          />
+        </View>
+        <View className="mt-3 items-center">
+          <Ionicons name="logo-whatsapp" size={26} color={DUTS.purple} />
+        </View>
 
         <Pressable
           onPress={chooseAccount}
           accessibilityRole="button"
           accessibilityLabel="Sign in or create account"
-          className="mt-4 rounded-2xl border border-border bg-card p-5"
+          className="mt-8 items-center"
         >
-          <View className="h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: "#F4EEFF" }}>
-            <Ionicons name="person-outline" size={24} color={DUTS.purple} />
-          </View>
-          <Text className="mt-3 text-lg font-extrabold text-ink">Sign in or create account</Text>
-          <Text className="mt-1 text-sm text-muted">Use your DUTS account and saved delivery details.</Text>
+          <Ionicons name="person-outline" size={22} color={DUTS.muted} />
+          <Text className="mt-2 text-sm font-semibold text-muted">Sign in or create account</Text>
+          <Text className="mt-1 text-center text-sm text-muted">Use your DUTS account and saved delivery details.</Text>
         </Pressable>
       </ScrollView>
     </View>

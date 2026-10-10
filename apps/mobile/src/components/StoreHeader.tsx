@@ -90,7 +90,7 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
         className="ml-2 flex-1 text-base text-ink"
         returnKeyType="search"
         onSubmitEditing={() => runSearch()}
-        accessibilityLabel="Search products and shops"
+        accessibilityLabel="Search products"
         accessibilityRole="search"
       />
     </View>

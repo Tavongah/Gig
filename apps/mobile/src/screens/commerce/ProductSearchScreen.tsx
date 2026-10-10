@@ -61,7 +61,6 @@ export function ProductSearchScreen({ route, navigation }: Props) {
   });
   const unlistedEnabled = configQuery.data?.unlistedItemRequestEnabled === true;
   const products = query.data?.pages.flatMap((page) => page.products) ?? [];
-  const total = query.data?.pages[0]?.total;
   const title = category ?? (q.trim() ? `Results for “${q.trim()}”` : "Search");
 
   function openProduct(p: ProductCardData) {
@@ -77,11 +76,6 @@ export function ProductSearchScreen({ route, navigation }: Props) {
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
         <StorePage>
           <Text className="mt-4 text-xl font-black text-ink">{title}</Text>
-          {typeof total === "number" && !query.isLoading ? (
-            <Text className="mt-1 text-sm text-muted">
-              {total} {total === 1 ? "product" : "products"}
-            </Text>
-          ) : null}
           {products.length === 0 && !query.isLoading && !skipCatalogFetch ? (
             <View className="mt-10 items-center px-6">
               <Text className="text-center text-base font-bold text-ink">

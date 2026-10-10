@@ -308,7 +308,7 @@ export function ShopSearchTabScreen() {
           <TextInput
             value={q}
             onChangeText={setQ}
-            placeholder="Search products and shops"
+            placeholder="Search products"
             placeholderTextColor={DUTS.placeholder}
             className="ml-2 flex-1 text-base text-ink"
             returnKeyType="search"

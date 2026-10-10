@@ -119,11 +119,7 @@ export const useCommerceCartStore = create<CartState>((set, get) => ({
     }
 
     if (options?.allowMulti && state.merchantId && state.merchantId !== input.merchantId) {
-      const shops = new Set(state.lines.map((l) => l.merchantId));
-      shops.add(input.merchantId);
-      const shopCount = shops.size;
-      const notice =
-        shopCount > 1 ? `Added ✓  Your delivery now includes ${shopCount} nearby shops.` : null;
+      const notice = "Added ✓";
       const qty = input.quantity ?? 1;
       const key = cartLineKey(input);
       const existing = state.lines.find((l) => cartLineKey(l) === key);

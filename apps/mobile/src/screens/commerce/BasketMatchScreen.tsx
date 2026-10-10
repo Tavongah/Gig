@@ -149,8 +149,8 @@ export function BasketMatchScreen({ navigation }: Props) {
       <View className="flex-1 bg-background">
         <StoreHeader compact showCategories={false} />
         <StorePage>
-          <Text className="mt-6 text-2xl font-black text-ink">Find a shop</Text>
-          <Text className="mt-3 text-base text-muted">Choose a shopping area to find nearby shops.</Text>
+          <Text className="mt-6 text-2xl font-black text-ink">Select Shop</Text>
+          <Text className="mt-3 text-base text-muted">Choose a shopping area to continue.</Text>
           <View className="mt-6">
             <AppButton label="Keep shopping" variant="secondary" onPress={() => navigation.navigate("MainTabs", { screen: "Home" })} />
           </View>
@@ -170,7 +170,7 @@ export function BasketMatchScreen({ navigation }: Props) {
           {loading && !matchQuery.data ? (
             <View className="mt-16 items-center">
               <ActivityIndicator color={DUTS.purple} />
-              <Text className="mt-3 text-sm text-muted">Finding a shop…</Text>
+              <Text className="mt-3 text-sm text-muted">Checking availability…</Text>
             </View>
           ) : !top ? (
             <>
@@ -188,20 +188,20 @@ export function BasketMatchScreen({ navigation }: Props) {
             <>
               {top.complete ? (
                 <>
-                  <Text className="mt-6 text-2xl font-black text-ink">We found your items</Text>
+                  <Text className="mt-6 text-2xl font-black text-ink">Select Shop</Text>
                   <Text className="mt-2 text-base text-muted">Everything is available from</Text>
                   <Text className="mt-1 text-xl font-black text-ink">{top.merchantName}</Text>
                   <Text className="mt-2 text-base font-semibold text-ink">
-                    {top.fulfilledLineCount} items · {money(top.itemSubtotalCents)}
+                    {money(top.itemSubtotalCents)}
                     {showDistance && top.distanceKm != null ? ` · ${top.distanceKm} km` : ""}
                   </Text>
                 </>
               ) : (
                 <>
-                  <Text className="mt-6 text-2xl font-black text-ink">
-                    We found {top.fulfilledLineCount} of your {top.requestedLineCount} items at one nearby shop
+                  <Text className="mt-6 text-2xl font-black text-ink">Select Shop</Text>
+                  <Text className="mt-2 text-base text-muted">
+                    Some items are available from {top.merchantName}. Unavailable items are listed below.
                   </Text>
-                  <Text className="mt-2 text-xl font-black text-ink">{top.merchantName}</Text>
                 </>
               )}
 
@@ -241,9 +241,7 @@ export function BasketMatchScreen({ navigation }: Props) {
               <View className="mt-6">
                 <AppButton
                   label={
-                    top.complete
-                      ? "Continue with this shop"
-                      : `Continue with ${top.fulfilledLineCount} item${top.fulfilledLineCount === 1 ? "" : "s"}`
+                    top.complete ? "Continue with this shop" : "Select Shop"
                   }
                   onPress={() => continueWith(top)}
                   disabled={selectMut.isPending}

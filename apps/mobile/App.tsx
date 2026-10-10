@@ -70,7 +70,7 @@ const guestLinking = {
       ProductDetail: "product",
       ShopDetail: "shop/:merchantId",
       GuestCheckoutChoice: "order",
-      BasketMatch: "find-shop",
+      BasketMatch: "select-shop",
       ForgotPassword: "forgot-password",
       ResetPassword: resetPasswordLink
     }
@@ -98,7 +98,7 @@ const appLinking = {
       ShopDetail: "shop/:merchantId",
       ShopLocation: "deliver-to",
       GuestCheckoutChoice: "order",
-      BasketMatch: "find-shop",
+      BasketMatch: "select-shop",
       ForgotPassword: "forgot-password",
       ResetPassword: resetPasswordLink,
       PaymentSuccess: {

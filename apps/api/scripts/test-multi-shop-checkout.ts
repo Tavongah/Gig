@@ -153,16 +153,19 @@ pass("U", "alcohol still blocked");
 assert.ok(orderSvc.includes("PRODUCT_UNAVAILABLE"));
 pass("V", "unavailable product fails revalidation");
 
-assert.ok(cartUi.includes("shops • One delivery") || cartUi.includes("DUTS will collect from more than one shop."));
+assert.ok(!cartUi.includes("shops • One delivery"));
+assert.ok(!cartUi.includes("DUTS will collect from more than one shop."));
+assert.ok(!cartUi.includes("Find a shop"));
+assert.ok(cartUi.includes("Continue with WhatsApp"));
 assert.ok(cartUi.includes("rounded-2xl"));
-pass("W", "grouped cart layout present for mobile");
+pass("W", "customer cart hides multi-shop complexity");
 
 assert.ok(cartUi.includes("Your cart"));
-pass("X", "desktop uses same grouped cart layout");
+pass("X", "desktop uses the same simplified cart");
 
 assert.ok(cartStore.includes("Different shop"));
 assert.ok(cartStore.includes("allowMulti"));
-assert.ok(cartUi.includes("3 shops") || src("../../mobile/src/lib/storefront-cart.ts").includes("already includes 3 shops"));
+assert.ok(src("../src/modules/commerce/customer-commerce.service.ts").includes("Your delivery already includes 3 shops."));
 assert.ok(src("../../mobile/src/lib/storefront-cart.ts").includes("too far") || src("../../mobile/src/lib/api.ts").includes("ROUTE_NOT_ELIGIBLE"));
 assert.ok(!cards.includes("pickupSequence"));
 assert.ok(storefront.includes("comingSoon") || storefront.includes("Coming Soon") || storefront.includes("comingSoonCategories"));

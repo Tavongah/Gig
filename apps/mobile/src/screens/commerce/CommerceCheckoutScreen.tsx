@@ -11,7 +11,7 @@ import { useSessionStore } from "../../stores/session.store";
 import { useShopLocationStore } from "../../stores/shop-location.store";
 import { cartLineKey, useCommerceCartStore } from "../../stores/commerce-cart.store";
 import { toCheckoutLine } from "../../lib/storefront-cart";
-import { formatFlavorCustomerLine } from "@gigflow/shared";
+import { formatFlavorCustomerLine, resolveCustomerPrimaryMerchant } from "@gigflow/shared";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CommerceCheckout">;
 type PayMethod = "CASH" | "ECOCASH";
@@ -99,6 +99,16 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
   }
 
   const quote = prepQuery.data;
+  const primaryShop = quote
+    ? resolveCustomerPrimaryMerchant(
+        (quote.merchants ?? []).map((shop) => ({
+          merchantId: shop.id,
+          merchantName: shop.name,
+          quantity: shop.itemCount,
+          subtotalCents: shop.itemsSubtotalCents
+        }))
+      ) ?? { merchantId: quote.merchant.id, merchantName: quote.merchant.name }
+    : null;
   const placing = checkoutMut.isPending;
   const ready = Boolean(quote) && !prepQuery.isFetching && !placing;
   const placeLabel = quote
@@ -111,11 +121,8 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
     <View className="flex-1 bg-background">
       <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 24, paddingTop: 12 }}>
         <Text className="text-2xl font-black text-ink">YOUR DUTS ORDER</Text>
-        {quote ? (
-          <Text className="mt-1 text-sm font-semibold text-muted">
-            {quote.lines.reduce((n, l) => n + l.quantity, 0)} items
-            {(quote.shopCount ?? 1) > 1 ? ` • ${quote.shopCount} shops` : ""}
-          </Text>
+        {primaryShop ? (
+          <Text className="mt-1 text-sm font-semibold text-muted">Shop: {primaryShop.merchantName}</Text>
         ) : null}
         {prepQuery.isFetching && !quote ? (
           <Text className="mt-4 text-base text-muted">Getting your order ready…</Text>

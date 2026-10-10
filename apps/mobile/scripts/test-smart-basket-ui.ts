@@ -35,12 +35,15 @@ assert.ok(!shop.includes("addCatalogProduct"), "shop page is not forced through 
 
 const cart = read("screens/commerce/CartScreen.tsx");
 assert.ok(cart.includes("Your shopping list"), "shopping list heading");
-assert.ok(cart.includes("Find a shop"), "Find a Shop CTA");
+assert.ok(!cart.includes("Find a shop"), "Find Shop removed from cart");
+assert.ok(cart.includes("commerceBasketMatch"), "auto-select uses existing match API");
 assert.ok(cart.includes("From $"), "From price labeled");
-assert.ok(cart.includes('label="Continue"'), "merchant cart checkout remains");
-assert.ok(cart.includes("GuestCheckoutChoice"), "WhatsApp/account handoff unchanged");
+assert.ok(cart.includes("Continue with WhatsApp"), "WhatsApp is the primary cart CTA");
+assert.ok(cart.includes("commerceGuestHandoff"), "WhatsApp handoff unchanged");
+assert.ok(cart.includes("BasketMatch"), "Select Shop only when auto-select cannot finish");
 
 const match = read("screens/commerce/BasketMatchScreen.tsx");
+assert.ok(match.includes("Select Shop"), "Select Shop copy when a choice is required");
 assert.ok(match.includes("We found your items") || match.includes("Everything is available"), "complete match copy");
 assert.ok(match.includes("of your"), "partial match copy");
 assert.ok(match.includes("Other shops"), "other shops");
