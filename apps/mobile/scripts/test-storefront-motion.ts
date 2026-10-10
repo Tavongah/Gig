@@ -45,6 +45,9 @@ assert.ok(press.includes("useReducedMotion"), "press respects reduced motion");
 const reveal = read("components/motion/SectionReveal.tsx");
 assert.ok(reveal.includes("IntersectionObserver"), "web section entrance");
 assert.ok(reveal.includes("useReducedMotion"), "section respects reduced motion");
+const home = read("screens/commerce/ShopHomeScreen.tsx");
+assert.ok(home.includes("SectionReveal"), "home uses section entrance");
+assert.ok(!home.includes("Popular"), "no fake popularity");
 
 const badge = read("components/motion/CountBadge.tsx");
 assert.ok(badge.includes("useNativeDriver: true"), "badge uses transform driver");

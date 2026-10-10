@@ -78,7 +78,8 @@ export function ProductSearchScreen({ route, navigation }: Props) {
           <Text className="mt-4 text-xl font-black text-ink">{title}</Text>
           {products.length === 0 && !query.isLoading && !skipCatalogFetch ? (
             <View className="mt-10 items-center px-6">
-              <Text className="text-center text-base font-bold text-ink">
+              <Ionicons name="search-outline" size={32} color={DUTS.placeholder} />
+              <Text className="mt-3 text-center text-base font-bold text-ink">
                 {unlistedEnabled ? "Can't find what you need?" : "No products found"}
               </Text>
               <Text className="mt-1 text-center text-sm text-muted">

@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { ProductGrid, ProductRail } from "../../components/ProductGrid";
+import { SectionReveal } from "../../components/motion/SectionReveal";
 import { StoreHeader, StorePage } from "../../components/StoreHeader";
 import { isProductCardPurchasable, type ProductCardData } from "../../components/ProductCard";
 import { api } from "../../lib/api";
@@ -129,7 +130,7 @@ export function ShopHomeScreen() {
           <Text className="mt-1 text-sm text-muted">Delivery from $0.50</Text>
 
           {shopBy.length > 0 ? (
-            <View className="mt-5">
+            <SectionReveal className="mt-5">
               <Text className="mb-3 text-lg font-extrabold text-ink">Shop by category</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 28 }}>
                 {shopBy.map((cat) => (
@@ -140,10 +141,10 @@ export function ShopHomeScreen() {
                   />
                 ))}
               </ScrollView>
-            </View>
+            </SectionReveal>
           ) : null}
 
-          <View className="mt-6">
+          <SectionReveal className="mt-6">
             <Text className="mb-3 text-lg font-extrabold text-ink">Available now</Text>
             {availableNow.length === 0 && !productsQuery.isLoading && moreCatalog.length === 0 ? (
               <Text className="text-sm text-muted">No products found. Try another search.</Text>
@@ -158,14 +159,14 @@ export function ShopHomeScreen() {
                 pricePrefix={fromPrefix}
               />
             )}
-          </View>
+          </SectionReveal>
 
           {sectionCategories.length > 0 ? (
             <View className="mt-6">
               {sectionCategories.map((cat, i) => {
                 const rows = (sectionQueries[i]?.data?.products ?? []) as ProductCardData[];
                 return (
-                  <View key={cat.name} className="mb-6">
+                  <SectionReveal key={cat.name} className="mb-6">
                     <View className="mb-3 flex-row items-center justify-between">
                       <Text className="text-lg font-extrabold text-ink">{cat.name}</Text>
                       <Pressable
@@ -187,14 +188,14 @@ export function ShopHomeScreen() {
                       onAdd={addProduct}
                       pricePrefix={fromPrefix}
                     />
-                  </View>
+                  </SectionReveal>
                 );
               })}
             </View>
           ) : null}
 
           {moreCatalog.length > 0 ? (
-            <View className="mt-6">
+            <SectionReveal className="mt-6">
               <Text className="mb-3 text-lg font-extrabold text-ink">More products</Text>
               <ProductGrid
                 products={moreCatalog}
@@ -202,7 +203,7 @@ export function ShopHomeScreen() {
                 onAdd={addProduct}
                 pricePrefix={fromPrefix}
               />
-            </View>
+            </SectionReveal>
           ) : null}
 
           {productsQuery.hasNextPage ? (
@@ -218,7 +219,7 @@ export function ShopHomeScreen() {
             </Pressable>
           ) : null}
 
-          <View className="mt-8">
+          <SectionReveal className="mt-8">
             <Text className="mb-3 text-lg font-extrabold text-ink">Nearby shops</Text>
             {(shopsQuery.data?.shops ?? []).length === 0 ? (
               <Text className="text-sm text-muted">No shops nearby yet. You can still browse the DUTS catalog.</Text>
@@ -238,10 +239,10 @@ export function ShopHomeScreen() {
                 </Pressable>
               ))
             )}
-          </View>
+          </SectionReveal>
 
           {moreOnDuts.length > 0 ? (
-            <View className="mt-8">
+            <SectionReveal className="mt-8">
               <View className="mb-3 flex-row items-center justify-between">
                 <Text className="text-lg font-extrabold text-ink">Coming to DUTS</Text>
                 <Pressable
@@ -265,7 +266,7 @@ export function ShopHomeScreen() {
                   </View>
                 ))}
               </View>
-            </View>
+            </SectionReveal>
           ) : null}
 
           {!browse.isGuest ? (

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -276,7 +277,10 @@ export function CartScreen() {
         <StoreHeader compact showCategories={false} />
         <TabScreen style={{ paddingTop: 8 }}>
           <Text className="text-2xl font-black text-ink">{smartBasket ? "Your shopping list" : "Your cart"}</Text>
-          <Text className="mt-4 text-base text-muted">Your cart is empty. Browse products to get started.</Text>
+          <View className="mt-6 items-center">
+            <Ionicons name="cart-outline" size={36} color={DUTS.placeholder} />
+          </View>
+          <Text className="mt-4 text-center text-base text-muted">Your cart is empty. Browse products to get started.</Text>
           <View className="mt-6">
             <AppButton label="Continue shopping" variant="secondary" onPress={() => navigation.navigate("MainTabs", { screen: "Home" })} />
           </View>

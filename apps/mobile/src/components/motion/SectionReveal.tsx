@@ -6,7 +6,7 @@ import { useReducedMotion } from "../../lib/use-reduced-motion";
 
 type Props = ViewProps & { children: ReactNode };
 
-export function SectionReveal({ children, style, ...rest }: Props) {
+export function SectionReveal({ children, style, className, ...rest }: Props) {
   const reduce = useReducedMotion();
   const ref = useRef<View>(null);
   const [visible, setVisible] = useState(reduce || Platform.OS !== "web");
@@ -38,9 +38,11 @@ export function SectionReveal({ children, style, ...rest }: Props) {
     return () => observer.disconnect();
   }, [reduce]);
 
+  const revealClass = `${className ?? ""}`.trim();
+
   if (reduce) {
     return (
-      <View ref={ref} style={style} {...rest}>
+      <View ref={ref} style={style} {...rest} className={revealClass || undefined}>
         {children}
       </View>
     );
@@ -48,7 +50,7 @@ export function SectionReveal({ children, style, ...rest }: Props) {
 
   if (Platform.OS !== "web") {
     return (
-      <Animated.View entering={FadeIn.duration(MOTION.section)} style={style} {...rest}>
+      <Animated.View entering={FadeIn.duration(MOTION.section)} style={style} {...rest} className={revealClass || undefined}>
         {children}
       </Animated.View>
     );
@@ -58,7 +60,7 @@ export function SectionReveal({ children, style, ...rest }: Props) {
     <View
       ref={ref}
       {...rest}
-      className={`duts-section-reveal${visible ? " duts-section-reveal--in" : ""}`}
+      className={`duts-section-reveal${visible ? " duts-section-reveal--in" : ""}${revealClass ? ` ${revealClass}` : ""}`}
       style={style}
     >
       {children}
