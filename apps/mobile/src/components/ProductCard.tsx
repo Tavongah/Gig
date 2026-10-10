@@ -4,6 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { DUTS } from "../lib/theme";
 import { productCardMeta } from "../lib/storefront-ui";
 import { alcoholPurchaseAllowed } from "../lib/storefront-categories";
+import { RAIL_CARD_WIDTH } from "../lib/motion";
+import { useReducedMotion } from "../lib/use-reduced-motion";
 
 export type ProductCardData = {
   productId: string | null;
@@ -46,6 +48,7 @@ export function isProductCardPurchasable(product: {
 export function ProductCard({ product, onPress, onAdd, pricePrefix, width, variant = "grid" }: Props) {
   const [imgFailed, setImgFailed] = useState(false);
   const [added, setAdded] = useState(false);
+  const reduce = useReducedMotion();
   const purchasable = isProductCardPurchasable(product);
   const offerCount = product.merchantOfferCount ?? product.offerCount ?? 0;
   const showFrom = purchasable ? pricePrefix ?? (offerCount > 1 ? "From " : "") : "";
@@ -53,22 +56,23 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
   const showImage = Boolean(product.imageUrl) && !imgFailed;
   const meta = productCardMeta(product.name, product.brand, product.sizeLabel);
   const rail = variant === "rail";
-  const cardWidth = width ?? (rail ? 152 : undefined);
+  const cardWidth = width ?? (rail ? RAIL_CARD_WIDTH : undefined);
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${product.name}, ${price}`}
-      className="overflow-hidden rounded-xl border border-border bg-card"
-      style={[
+      className="duts-product-card overflow-hidden rounded-xl border border-border bg-card"
+      style={({ pressed }) => [
         {
           width: cardWidth,
           shadowColor: "#111827",
           shadowOffset: { width: 0, height: 1 },
           shadowOpacity: 0.05,
           shadowRadius: 6,
-          elevation: 1
+          elevation: 1,
+          transform: [{ scale: !reduce && pressed ? 0.98 : 1 }]
         }
       ]}
     >
@@ -83,6 +87,7 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
         {showImage ? (
           <Image
             source={{ uri: product.imageUrl! }}
+            className="duts-product-card-image"
             style={{ width: "85%", height: "85%" }}
             resizeMode="contain"
             accessibilityLabel={product.name}
@@ -123,8 +128,12 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
               }}
               accessibilityRole="button"
               accessibilityLabel={added ? `Added ${product.name}` : `Add ${product.name}`}
-              className="h-8 min-w-[32px] items-center justify-center rounded-full px-1"
-              style={{ backgroundColor: DUTS.purple }}
+              className="h-8 w-8 items-center justify-center rounded-full px-1"
+              style={({ pressed }) => ({
+                backgroundColor: DUTS.purple,
+                minWidth: added ? 44 : 32,
+                transform: [{ scale: !reduce && pressed ? 0.92 : added ? 1.06 : 1 }]
+              })}
               hitSlop={6}
             >
               {added ? (
@@ -142,18 +151,18 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
 
 export function ProductCardSkeleton({ width, variant = "grid" }: { width?: number; variant?: "grid" | "rail" }) {
   const rail = variant === "rail";
-  const cardWidth = width ?? (rail ? 152 : undefined);
+  const cardWidth = width ?? (rail ? RAIL_CARD_WIDTH : undefined);
   return (
     <View
       className="overflow-hidden rounded-xl border border-border bg-card"
       style={{ width: cardWidth }}
       accessibilityLabel="Loading product"
     >
-      <View style={{ height: rail ? 132 : cardWidth ?? 160, backgroundColor: "#F3F4F6" }} />
+      <View className="duts-skeleton-shine" style={{ height: rail ? 132 : cardWidth ?? 160, backgroundColor: "#F3F4F6" }} />
       <View className="gap-2 px-2.5 py-2.5">
-        <View className="h-3 rounded bg-surface" />
-        <View className="h-3 w-2/3 rounded bg-surface" />
-        <View className="h-3 w-1/3 rounded bg-surface" />
+        <View className="duts-skeleton-shine h-3 rounded bg-surface" />
+        <View className="duts-skeleton-shine h-3 w-2/3 rounded bg-surface" />
+        <View className="duts-skeleton-shine h-3 w-1/3 rounded bg-surface" />
       </View>
     </View>
   );

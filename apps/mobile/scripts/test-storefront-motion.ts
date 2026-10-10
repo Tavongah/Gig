@@ -50,4 +50,15 @@ const badge = read("components/motion/CountBadge.tsx");
 assert.ok(badge.includes("useNativeDriver: true"), "badge uses transform driver");
 assert.ok(badge.includes("useReducedMotion"), "badge respects reduced motion");
 
+const card = read("components/ProductCard.tsx");
+assert.ok(card.includes("duts-product-card"), "card motion class");
+assert.ok(card.includes("Added ✓"), "add acknowledgement");
+assert.ok(card.includes("h-8 w-8"), "compact add");
+
+const rail = read("components/ProductGrid.tsx");
+assert.ok(rail.includes("snapToInterval"), "rail snap");
+assert.ok(rail.includes("RAIL_PEEK"), "next-card peek");
+assert.ok(rail.includes("Previous products"), "desktop previous");
+assert.ok(!rail.includes("auto-scroll") && !rail.includes("setInterval"), "no auto conveyor");
+
 console.log(JSON.stringify({ ok: true }, null, 2));

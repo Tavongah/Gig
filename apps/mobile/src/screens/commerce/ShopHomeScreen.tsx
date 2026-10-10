@@ -131,7 +131,7 @@ export function ShopHomeScreen() {
           {shopBy.length > 0 ? (
             <View className="mt-5">
               <Text className="mb-3 text-lg font-extrabold text-ink">Shop by category</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 8 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 28 }}>
                 {shopBy.map((cat) => (
                   <StorefrontCategoryCard
                     key={cat.slug}
@@ -180,15 +180,13 @@ export function ShopHomeScreen() {
                         <Ionicons name="chevron-forward" size={16} color={DUTS.purple} />
                       </Pressable>
                     </View>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      <ProductRail
-                        products={rows}
-                        loading={sectionQueries[i]?.isLoading}
-                        onPress={openProduct}
-                        onAdd={addProduct}
-                        pricePrefix={fromPrefix}
-                      />
-                    </ScrollView>
+                    <ProductRail
+                      products={rows}
+                      loading={sectionQueries[i]?.isLoading}
+                      onPress={openProduct}
+                      onAdd={addProduct}
+                      pricePrefix={fromPrefix}
+                    />
                   </View>
                 );
               })}

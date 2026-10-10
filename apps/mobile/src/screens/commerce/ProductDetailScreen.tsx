@@ -92,7 +92,6 @@ export function ProductDetailScreen({ route }: Props) {
     if (!alcoholPurchaseAllowed(product.category)) return;
     if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
     const flavor = selectedFlavor();
-    markAdded(offer.productId);
     void tryAddOfferToCart(
       {
         productId: offer.productId,
@@ -109,7 +108,9 @@ export function ProductDetailScreen({ route }: Props) {
       },
       browse.geo,
       browse.token
-    );
+    ).then((ok) => {
+      if (ok) markAdded(offer.productId);
+    });
   }
 
   const imageCanvas = (
@@ -128,6 +129,7 @@ export function ProductDetailScreen({ route }: Props) {
       ) : showImage ? (
         <Image
           source={{ uri: product!.imageUrl! }}
+          className="duts-product-card-image"
           style={{ width: "86%", height: "86%", maxWidth: 420, maxHeight: 420 }}
           resizeMode="contain"
           accessibilityLabel={product?.name}
@@ -214,7 +216,7 @@ export function ProductDetailScreen({ route }: Props) {
             accessibilityRole="button"
             accessibilityLabel={`Add ${product.name} to shopping list`}
             className="h-12 items-center justify-center rounded-full px-4"
-            style={{ backgroundColor: DUTS.purple }}
+            style={({ pressed }) => ({ backgroundColor: DUTS.purple, transform: [{ scale: pressed ? 0.97 : 1 }] })}
           >
             <Text className="font-extrabold text-white">{addedKey === "list" ? "Added ✓" : "ADD"}</Text>
           </Pressable>
@@ -238,7 +240,11 @@ export function ProductDetailScreen({ route }: Props) {
                 accessibilityRole="button"
                 accessibilityLabel={`Add ${product.name} from ${offer.merchantName}`}
                 className="h-11 min-w-[44px] rounded-full px-4"
-                style={{ backgroundColor: DUTS.purple, justifyContent: "center" }}
+                style={({ pressed }) => ({
+                  backgroundColor: DUTS.purple,
+                  justifyContent: "center",
+                  transform: [{ scale: pressed ? 0.97 : 1 }]
+                })}
               >
                 <Text className="font-extrabold text-white">
                   {addedKey === offer.productId ? "Added ✓" : "ADD TO CART"}

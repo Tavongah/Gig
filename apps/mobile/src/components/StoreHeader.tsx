@@ -151,7 +151,7 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
         horizontal
         showsHorizontalScrollIndicator={false}
         className={isDesktopNav ? "mt-3" : "mt-4"}
-        contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+        contentContainerStyle={{ gap: 8, paddingRight: 28 }}
       >
         {chips.map((cat) => (
           <Pressable
@@ -159,7 +159,7 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
             onPress={() => openStorefrontCategory(navigation, cat, categories)}
             accessibilityRole="button"
             accessibilityLabel={`Category ${cat.label}`}
-            className="flex-row items-center rounded-full border border-border bg-card px-3 py-2"
+            className="duts-chip flex-row items-center rounded-full border border-border bg-card px-3 py-2"
           >
             <Ionicons name={categoryIcon(cat.label)} size={16} color={DUTS.purple} />
             <Text className="ml-1.5 text-sm font-semibold text-ink">{cat.label}</Text>
@@ -169,7 +169,7 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
           onPress={() => navigation.navigate("AllCategories")}
           accessibilityRole="button"
           accessibilityLabel="All categories"
-          className="flex-row items-center rounded-full border border-border bg-card px-3 py-2"
+          className="duts-chip flex-row items-center rounded-full border border-border bg-card px-3 py-2"
         >
           <Ionicons name="grid-outline" size={16} color={DUTS.purple} />
           <Text className="ml-1.5 text-sm font-semibold text-ink">All categories</Text>

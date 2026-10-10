@@ -19,8 +19,8 @@ export function StorefrontCategoryCard({ category, onPress, compact }: Props) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={status ? `${category.label}, ${status}` : `Shop ${category.label}`}
-      className={`items-center rounded-2xl border border-border bg-card ${compact ? "px-2 py-3" : "px-2 py-4"}`}
-      style={{ width: compact ? "100%" : 108 }}
+      className={`duts-cat-card items-center rounded-2xl border border-border bg-card ${compact ? "px-2 py-3" : "px-2 py-4"}`}
+      style={({ pressed }) => [{ width: compact ? "100%" : 108, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
     >
       <View
         className="items-center justify-center rounded-full"
