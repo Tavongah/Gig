@@ -23,6 +23,7 @@ const card = read("components/ProductCard.tsx");
 assert.ok(card.includes("Price coming soon"), "subdued unavailable copy");
 assert.ok(!/\bVIEW\b/.test(card), "VIEW CTA removed");
 assert.ok(card.includes("h-8 w-8"), "compact add");
+assert.ok(card.includes("bg-brand"), "add fill visible on web");
 assert.ok(card.includes("onError"), "image failure placeholder");
 assert.ok(card.includes("numberOfLines={2}"), "name clamp");
 assert.ok(card.includes("aspectRatio"), "stable image frame");

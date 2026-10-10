@@ -128,10 +128,11 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
               }}
               accessibilityRole="button"
               accessibilityLabel={added ? `Added ${product.name}` : `Add ${product.name}`}
-              className="h-8 w-8 items-center justify-center rounded-full px-1"
+              className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand px-1"
               style={({ pressed }) => ({
                 backgroundColor: DUTS.purple,
                 minWidth: added ? 44 : 32,
+                flexShrink: 0,
                 transform: [{ scale: !reduce && pressed ? 0.92 : added ? 1.06 : 1 }]
               })}
               hitSlop={6}
