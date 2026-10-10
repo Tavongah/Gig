@@ -46,7 +46,10 @@ export function AppButton({
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ disabled: isDisabled, busy: loading }}
-        style={({ pressed }) => [{ opacity: pressed ? 0.88 : 1, borderRadius: radius, overflow: "hidden" }]}
+        className="duts-cta"
+        style={({ pressed }) => [
+          { opacity: pressed ? 0.88 : 1, borderRadius: radius, overflow: "hidden", transform: [{ scale: pressed ? 0.98 : 1 }] }
+        ]}
       >
         <DutsGradient style={{ borderRadius: radius, minHeight: 48, justifyContent: "center" }} className={padding}>
           {loading ? (

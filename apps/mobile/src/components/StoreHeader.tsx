@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { DUTS } from "../lib/theme";
+import { CountBadge } from "./motion/CountBadge";
 import { STOREFRONT_MAX_WIDTH, categoryIcon, useStorefrontLayout } from "../lib/storefront-ui";
 import { headerChipCategories, isSmartBasketEnabled } from "../lib/storefront-categories";
 import { openStorefrontCategory } from "../lib/storefront-nav";
@@ -126,16 +127,7 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
     >
       <View>
         <Ionicons name="cart-outline" size={22} color={DUTS.ink} />
-        {cartCount > 0 ? (
-          <View
-            className="absolute -right-2 -top-1 min-w-[16px] items-center rounded-full px-1"
-            style={{ backgroundColor: DUTS.purple }}
-          >
-            <Text style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>
-              {cartCount > 99 ? "99+" : cartCount}
-            </Text>
-          </View>
-        ) : null}
+        <CountBadge count={cartCount} />
       </View>
       {isDesktopNav ? (
         <Text className="ml-2 text-sm font-bold text-ink">Cart{cartCount ? ` (${cartCount})` : ""}</Text>

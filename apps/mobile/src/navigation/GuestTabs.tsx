@@ -8,6 +8,7 @@ import { CartScreen } from "../screens/commerce/CartScreen";
 import { AuthNavigator } from "./AuthNavigator";
 import type { GuestTabParamList } from "./types";
 import { DUTS } from "../lib/theme";
+import { CountBadge } from "../components/motion/CountBadge";
 import { useCommerceCartStore } from "../stores/commerce-cart.store";
 import { useDesiredBasketStore } from "../stores/desired-basket.store";
 import { isSmartBasketEnabled } from "../lib/storefront-categories";
@@ -45,16 +46,7 @@ function TabIcon({
     >
       <View>
         <Ionicons name={focused ? config.iconFocused : config.icon} size={22} color={color} />
-        {badge && badge > 0 ? (
-          <View
-            className="absolute -right-2 -top-1 min-w-[16px] items-center rounded-full px-1"
-            style={{ backgroundColor: DUTS.purple }}
-          >
-            <Text style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>
-              {badge > 99 ? "99+" : badge}
-            </Text>
-          </View>
-        ) : null}
+        <CountBadge count={badge ?? 0} />
       </View>
       <Text
         numberOfLines={1}

@@ -86,7 +86,7 @@ export function GuestCheckoutChoiceScreen({ navigation }: Props) {
 
         {error ? <Text className="mt-4 text-sm text-danger">{error}</Text> : null}
 
-        <View className="mt-8">
+        <View className="duts-cta mt-8">
           <AppButton
             label={handoffMut.isPending ? "Opening WhatsApp…" : "Continue with WhatsApp"}
             onPress={chooseWhatsApp}

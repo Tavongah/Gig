@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
@@ -17,6 +17,7 @@ import type { RootStackParamList } from "../../navigation/types";
 import { cartLineKey, useCommerceCartStore } from "../../stores/commerce-cart.store";
 import { desiredFlavorLabel, desiredLineKey, useDesiredBasketStore } from "../../stores/desired-basket.store";
 import { toCheckoutLine } from "../../lib/storefront-cart";
+import { useReducedMotion } from "../../lib/use-reduced-motion";
 
 export function CartScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -34,6 +35,9 @@ export function CartScreen() {
   const smartBasket = isSmartBasketEnabled();
   const [quoteError, setQuoteError] = useState("");
   const [working, setWorking] = useState(false);
+  const [ctaCue, setCtaCue] = useState(false);
+  const ctaReadyOnce = useRef(false);
+  const reduceMotion = useReducedMotion();
 
   const quoteMut = useMutation({
     mutationFn: () => {
@@ -61,6 +65,19 @@ export function CartScreen() {
     quoteMut.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines, browse.isGuest, browse.exact?.latitude, browse.exact?.longitude]);
+
+  useEffect(() => {
+    if (!lines.length) {
+      ctaReadyOnce.current = false;
+      setCtaCue(false);
+      return;
+    }
+    if (ctaReadyOnce.current || reduceMotion) return;
+    ctaReadyOnce.current = true;
+    setCtaCue(true);
+    const timer = setTimeout(() => setCtaCue(false), 360);
+    return () => clearTimeout(timer);
+  }, [lines.length, reduceMotion]);
 
   const shoppingList = smartBasket ? desired : [];
   const empty = !lines.length && !shoppingList.length;
@@ -325,6 +342,7 @@ export function CartScreen() {
               onPress={() => setQuantity(cartLineKey(line), line.quantity - 1)}
               accessibilityLabel="Decrease quantity"
               className="h-11 w-11 items-center justify-center rounded-full border border-border"
+              style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.94 : 1 }] }]}
             >
               <Text className="text-lg font-bold">−</Text>
             </Pressable>
@@ -333,6 +351,7 @@ export function CartScreen() {
               onPress={() => setQuantity(cartLineKey(line), line.quantity + 1)}
               accessibilityLabel="Increase quantity"
               className="h-11 w-11 items-center justify-center rounded-full border border-border"
+              style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.94 : 1 }] }]}
             >
               <Text className="text-lg font-bold">+</Text>
             </Pressable>
@@ -392,7 +411,7 @@ export function CartScreen() {
             </Pressable>
           ) : null}
         </ScrollView>
-        <View className="border-t border-border bg-background px-1 pb-5 pt-3">
+        <View className={`border-t border-border bg-background px-1 pb-5 pt-3${ctaCue ? " duts-cta-ready" : ""}`}>
           <AppButton
             label={primaryLabel}
             onPress={() => void continuePrimary()}

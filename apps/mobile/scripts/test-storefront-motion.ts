@@ -61,4 +61,12 @@ assert.ok(rail.includes("RAIL_PEEK"), "next-card peek");
 assert.ok(rail.includes("Previous products"), "desktop previous");
 assert.ok(!rail.includes("auto-scroll") && !rail.includes("setInterval"), "no auto conveyor");
 
+const tabs = read("navigation/GuestTabs.tsx");
+assert.ok(tabs.includes("CountBadge"), "cart badge motion");
+const cart = read("screens/commerce/CartScreen.tsx");
+assert.ok(cart.includes("Continue with WhatsApp"), "WhatsApp CTA preserved");
+assert.ok(cart.includes("commerceGuestHandoff"), "handoff unchanged");
+assert.ok(cart.includes("duts-cta-ready"), "restrained CTA cue");
+assert.ok(!cart.includes("setInterval"), "CTA does not pulse");
+
 console.log(JSON.stringify({ ok: true }, null, 2));
