@@ -3,9 +3,12 @@ import { Image, Pressable, Text, View, type DimensionValue } from "react-native"
 import { Ionicons } from "@expo/vector-icons";
 import { DUTS } from "../lib/theme";
 import { productCardMeta } from "../lib/storefront-ui";
-import { alcoholPurchaseAllowed } from "../lib/storefront-categories";
+import { alcoholPurchaseAllowed, isSmartBasketEnabled } from "../lib/storefront-categories";
 import { RAIL_CARD_WIDTH } from "../lib/motion";
 import { useReducedMotion } from "../lib/use-reduced-motion";
+import { storefrontCardAdjustRef, storefrontCardQuantity } from "../lib/storefront-card-quantity";
+import { useCommerceCartStore } from "../stores/commerce-cart.store";
+import { useDesiredBasketStore } from "../stores/desired-basket.store";
 
 export type ProductCardData = {
   productId: string | null;
@@ -45,9 +48,46 @@ export function isProductCardPurchasable(product: {
   );
 }
 
+function CardQtyButton({
+  label,
+  icon,
+  onPress,
+  reduce,
+  compact
+}: {
+  label: string;
+  icon: "add" | "remove";
+  onPress: () => void;
+  reduce: boolean;
+  compact?: boolean;
+}) {
+  const size = compact ? 28 : 32;
+  return (
+    <Pressable
+      onPress={(e) => {
+        e.stopPropagation?.();
+        onPress();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      className={compact ? "h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand" : "h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand px-1"}
+      style={({ pressed }) => ({
+        backgroundColor: DUTS.purple,
+        width: size,
+        height: size,
+        minWidth: size,
+        flexShrink: 0,
+        transform: [{ scale: !reduce && pressed ? 0.92 : 1 }]
+      })}
+      hitSlop={compact ? 8 : 6}
+    >
+      <Ionicons name={icon} size={compact ? 16 : 18} color="#FFFFFF" />
+    </Pressable>
+  );
+}
+
 export function ProductCard({ product, onPress, onAdd, pricePrefix, width, variant = "grid" }: Props) {
   const [imgFailed, setImgFailed] = useState(false);
-  const [added, setAdded] = useState(false);
   const reduce = useReducedMotion();
   const purchasable = isProductCardPurchasable(product);
   const offerCount = product.merchantOfferCount ?? product.offerCount ?? 0;
@@ -57,6 +97,30 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
   const meta = productCardMeta(product.name, product.brand, product.sizeLabel);
   const rail = variant === "rail";
   const cardWidth: DimensionValue = width ?? (rail ? RAIL_CARD_WIDTH : "100%");
+  const desiredLines = useDesiredBasketStore((s) => s.lines);
+  const cartLines = useCommerceCartStore((s) => s.lines);
+  const setDesiredQty = useDesiredBasketStore((s) => s.setQuantity);
+  const setCartQty = useCommerceCartStore((s) => s.setQuantity);
+  const quantity = storefrontCardQuantity(product, {
+    smartBasket: isSmartBasketEnabled(),
+    desiredLines,
+    cartLines
+  });
+
+  function applyAdjust(delta: 1 | -1) {
+    const ref = storefrontCardAdjustRef(
+      product,
+      {
+        smartBasket: isSmartBasketEnabled(),
+        desiredLines,
+        cartLines
+      },
+      delta
+    );
+    if (!ref) return;
+    if (ref.store === "desired") setDesiredQty(ref.lineKey, ref.nextQuantity);
+    else setCartQty(ref.lineKey, ref.nextQuantity);
+  }
 
   return (
     <Pressable
@@ -111,7 +175,7 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
         ) : (
           <View className="h-4" />
         )}
-        <View className="mt-1.5 min-h-[28px] flex-row items-center justify-between gap-1">
+        <View className="mt-1.5 min-h-[32px] flex-row items-center justify-between gap-1">
           <Text
             className={`flex-1 text-[13px] ${purchasable ? "font-extrabold text-ink" : "font-medium text-muted"}`}
             numberOfLines={1}
@@ -119,30 +183,32 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
             {price}
           </Text>
           {purchasable && onAdd ? (
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation?.();
-                onAdd();
-                setAdded(true);
-                setTimeout(() => setAdded(false), 1200);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={added ? `Added ${product.name}` : `Add ${product.name}`}
-              className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand px-1"
-              style={({ pressed }) => ({
-                backgroundColor: DUTS.purple,
-                minWidth: added ? 44 : 32,
-                flexShrink: 0,
-                transform: [{ scale: !reduce && pressed ? 0.92 : added ? 1.06 : 1 }]
-              })}
-              hitSlop={6}
-            >
-              {added ? (
-                <Text className="text-[10px] font-black text-white">Added ✓</Text>
-              ) : (
-                <Ionicons name="add" size={18} color="#FFFFFF" />
-              )}
-            </Pressable>
+            quantity > 0 ? (
+              <View className="shrink-0 flex-row items-center">
+                <CardQtyButton
+                  label={`Decrease ${product.name} quantity`}
+                  icon="remove"
+                  reduce={reduce}
+                  compact
+                  onPress={() => applyAdjust(-1)}
+                />
+                <Text
+                  className="min-w-[14px] px-0.5 text-center text-[13px] font-extrabold text-ink"
+                  accessibilityLabel={`${product.name} quantity ${quantity}`}
+                >
+                  {quantity}
+                </Text>
+                <CardQtyButton
+                  label={`Increase ${product.name} quantity`}
+                  icon="add"
+                  reduce={reduce}
+                  compact
+                  onPress={() => applyAdjust(1)}
+                />
+              </View>
+            ) : (
+              <CardQtyButton label={`Add ${product.name}`} icon="add" reduce={reduce} onPress={() => onAdd()} />
+            )
           ) : null}
         </View>
       </View>

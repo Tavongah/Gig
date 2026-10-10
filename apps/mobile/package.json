@@ -17,6 +17,7 @@
     "test:storefront-visual": "npx tsx scripts/test-storefront-visual.ts",
     "test:storefront-motion": "npx tsx scripts/test-storefront-motion.ts",
     "test:storefront-add": "npx tsx scripts/test-storefront-add.ts",
+    "test:storefront-card-stepper": "npx tsx scripts/test-storefront-card-stepper.ts",
     "test:storefront-categories": "npx tsx scripts/test-storefront-categories.ts",
     "test:smart-basket-ui": "npx tsx scripts/test-smart-basket-ui.ts",
     "test:simple-checkout-ui": "npx tsx scripts/test-simple-checkout-ui.ts",

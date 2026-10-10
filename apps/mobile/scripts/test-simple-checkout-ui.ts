@@ -43,7 +43,7 @@ assert.ok(!home.includes("getCurrentCoordinates"), "A homepage does not auto-req
 assert.ok(!home.includes("Use my location"), "A homepage does not request GPS");
 assert.ok(browse.includes("areaId"), "B signed-in users can browse by area without exact location");
 assert.ok(header.includes("useAreaPicker"), "B location is not forced before browse");
-assert.ok(card.includes("Added ✓"), "C one-tap add confirmation");
+assert.ok(card.includes("onAdd()"), "C one-tap add still calls existing cart add");
 assert.ok(cart.includes("Continue with WhatsApp"), "D cart CTA is Continue with WhatsApp");
 assert.ok(!cart.includes("Continue to order"), "D no Continue to order extra wording");
 assert.ok(cart.includes("commerceGuestHandoff"), "E guest continue starts WhatsApp handoff");

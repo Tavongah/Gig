@@ -55,8 +55,9 @@ assert.ok(badge.includes("useReducedMotion"), "badge respects reduced motion");
 
 const card = read("components/ProductCard.tsx");
 assert.ok(card.includes("duts-product-card"), "card motion class");
-assert.ok(card.includes("Added ✓"), "add acknowledgement");
+assert.ok(!card.includes("Added ✓"), "clipped Added acknowledgement removed from card");
 assert.ok(card.includes("h-8 w-8"), "compact add");
+assert.ok(card.includes("0.92"), "press scale feedback preserved");
 
 const rail = read("components/ProductGrid.tsx");
 assert.ok(rail.includes("snapToInterval"), "rail snap");

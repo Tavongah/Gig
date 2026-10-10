@@ -20,10 +20,11 @@ assert.ok(card.includes("purchasable && onAdd"), "Add gated on purchasable + han
 assert.ok(card.includes("bg-brand"), "Add has visible brand fill on web");
 assert.ok(card.includes("shrink-0") || card.includes("flexShrink: 0"), "Add does not shrink away");
 assert.ok(card.includes("h-8 w-8"), "compact add size preserved");
-assert.ok(card.includes("onAdd();"), "existing handler still invoked");
+assert.ok(card.includes("onAdd()"), "existing handler still invoked");
 assert.ok(card.includes("e.stopPropagation"), "card press does not double-fire add");
-assert.ok(card.includes("Added ✓"), "success acknowledgement preserved");
-assert.ok(card.includes("setAdded(true)"), "success follows handler call");
+assert.ok(card.includes("storefrontCardQuantity"), "quantity comes from authoritative cart state");
+assert.ok(!card.includes("Added ✓"), "clipped Added presentation replaced by stepper");
+assert.ok(!card.includes("setAdded"), "no local added acknowledgement state");
 assert.ok(!card.includes("setInterval"), "add is not animation-driven");
 
 const grid = read("components/ProductGrid.tsx");
