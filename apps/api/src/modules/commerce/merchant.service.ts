@@ -294,33 +294,52 @@ export type ProductMatch = {
 export function scoreProductMatch(product: Product, query: string): number {
   const terms = expandSearchTerms(query);
   const normalizedQuery = normalizeProductSearchName(query);
-  const hay = `${product.normalizedName} ${product.searchAliases.join(" ")}`;
+  const name = product.normalizedName;
+  const nameTokens = name.split(/\s+/).filter(Boolean);
+  const aliasHay = product.searchAliases.join(" ");
+  const hay = `${name} ${aliasHay}`;
   let score = 0;
+
+  const nameHasTerm = (t: string) =>
+    name === t || nameTokens.includes(t) || (t.length >= 3 && name.includes(t));
+
+  // Direct lexical relevance of the customer's original query against the product NAME.
+  // Expanded aliases / searchAlias bags must not equal this, or brand metadata outranks the asked token.
+  if (name === normalizedQuery) score += 100;
+  else if (nameTokens.includes(normalizedQuery)) score += 70;
+  else if (normalizedQuery.length >= 3 && name.includes(normalizedQuery)) score += 40;
+
   for (const t of terms) {
-    if (!t) continue;
-    if (hay === t || product.normalizedName === t) score += 100;
-    else if (hay.includes(t)) score += 40;
-    else if (t.includes(product.normalizedName) && product.normalizedName.length >= 3) score += 20;
-    else {
-      // Bounded typo tolerance: ≤1 for len≥4, ≤2 for len≥6
-      const tokens = hay.split(/\s+/);
-      for (const tok of tokens) {
-        if (tok.length >= 4 && t.length >= 4 && editDistanceAtMost(tok, t, 1)) {
-          score += 25;
-          break;
-        }
-        if (tok.length >= 6 && t.length >= 6 && editDistanceAtMost(tok, t, 2)) {
-          score += 18;
-          break;
-        }
-      }
+    if (!t || t === normalizedQuery) continue;
+    if (name === t) score += 50;
+    else if (nameTokens.includes(t)) score += 25;
+    else if (t.length >= 3 && name.includes(t)) score += 20;
+    else if (t.includes(name) && name.length >= 3) score += 20;
+    else score += typoScoreAgainstTokens(t, nameTokens);
+  }
+
+  if (!nameHasTerm(normalizedQuery)) {
+    const aliasTokens = aliasHay.split(/\s+/).filter(Boolean);
+    if (aliasTokens.includes(normalizedQuery) || (normalizedQuery.length >= 3 && aliasHay.includes(normalizedQuery))) {
+      score += 15;
+    } else {
+      score += typoScoreAgainstTokens(normalizedQuery, nameTokens);
     }
   }
+
   // Size hints: 2l / 500ml
   if (/\b2l\b/.test(normalizedQuery) && /\b2\s*l\b|\b2l\b/.test(hay)) score += 15;
   if (/\b1l\b/.test(normalizedQuery) && /\b1\s*l\b|\b1l\b/.test(hay)) score += 15;
   if (/\b500/.test(normalizedQuery) && /500/.test(hay)) score += 15;
   return score;
+}
+
+function typoScoreAgainstTokens(term: string, tokens: string[]): number {
+  for (const tok of tokens) {
+    if (tok.length >= 4 && term.length >= 4 && editDistanceAtMost(tok, term, 1)) return 25;
+    if (tok.length >= 6 && term.length >= 6 && editDistanceAtMost(tok, term, 2)) return 18;
+  }
+  return 0;
 }
 
 function editDistanceAtMost(a: string, b: string, max: number): boolean {

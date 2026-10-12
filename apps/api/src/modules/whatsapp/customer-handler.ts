@@ -38,6 +38,8 @@ import {
   classifyShoppingIntent,
   classifyCustomerMenuTap,
   extractShoppingItemsWithOptionalAi,
+  replaceDisambiguatedRequestedItems,
+  resolveProductDisambiguationReply,
   isSameAgainIntent,
   isCancelIntent,
   isChangeIntent,
@@ -464,6 +466,24 @@ export async function handleCustomerWhatsAppMessage(
     if (choiceHandled) return choiceHandled;
     const pending = ctx.pendingChoices?.[0];
     if (pending?.options?.length) {
+      const reply = resolveProductDisambiguationReply(text, pending.options);
+      if (reply.action === "new_query") {
+        ctx.requestedItems = replaceDisambiguatedRequestedItems(
+          ctx.requestedItems,
+          pending.query,
+          ctx.lastDisambiguationQuery,
+          reply.items
+        );
+        ctx.pendingChoices = undefined;
+        ctx.lastDisambiguationQuery = undefined;
+        ctx.choiceId = undefined;
+        setExpected(ctx, "PRODUCT_TEXT");
+        await updateConversation(conv.id, {
+          state: WhatsAppConversationState.BUILDING_CART,
+          context: ctx
+        });
+        return resolveProductsThenContinue(phone, conv.id, ctx);
+      }
       await sendProductChoices(
         phone,
         ctx,
@@ -1356,46 +1376,9 @@ async function tryApplyDisambiguation(
 ) {
   const pending = ctx.pendingChoices?.[0];
   if (!pending) return null;
-
-  const prepared = text.trim().toLowerCase().replace(/[?.!]+/g, " ").replace(/\s+/g, " ").trim();
-  let choice: number | null = null;
-  if (/^\d+$/.test(prepared)) choice = Number(prepared);
-  else if (/^(number\s*)?(1|one)\b|first|the first/i.test(prepared)) choice = 1;
-  else if (/^(number\s*)?(2|two)\b|second|the second/i.test(prepared)) choice = 2;
-  else if (/^(number\s*)?(3|three)\b|third|the third/i.test(prepared)) choice = 3;
-  else {
-    const n = prepared
-      .replace(/\b(the|a|an|one|please)\b/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    const scored = pending.options.map((o, idx) => {
-      const name = o.name.toLowerCase();
-      let s = 0;
-      if (name.includes(n) || n.includes(name.split(/\s+/)[0] ?? "")) s += 40;
-      const tokens = n.split(/\s+/).filter((t) => t.length > 2);
-      for (const tok of tokens) {
-        if (name.includes(tok)) s += 20;
-      }
-      if (n.includes("2l") && /2\s*l|2l/i.test(o.name)) s += 25;
-      if (n.includes("1l") && /1\s*l|1l/i.test(o.name)) s += 25;
-      if (n.includes("500") && /500/i.test(o.name)) s += 25;
-      if (/(big|large)/i.test(n) && /2\s*l|2l/i.test(o.name)) s += 20;
-      if (/(small|smaller)/i.test(n) && /1\s*l|1l|500/i.test(o.name)) s += 20;
-      if (/(cheap|cheaper|lowest)/i.test(n)) s += 1000 - o.priceCents; // prefer lower price
-      if (/\borange\b/i.test(n) && /orange/i.test(o.name)) s += 30;
-      if (/\braspberry\b/i.test(n) && /raspberry/i.test(o.name)) s += 30;
-      return { idx, s };
-    });
-    scored.sort((a, b) => b.s - a.s);
-    if (scored[0] && scored[0].s >= 20) {
-      if (!scored[1] || scored[0].s - scored[1].s >= 10) {
-        choice = scored[0].idx + 1;
-      }
-    }
-  }
-
-  if (choice == null) return null;
-  return applyProductChoice(phone, convId, ctx, choice);
+  const reply = resolveProductDisambiguationReply(text, pending.options);
+  if (reply.action !== "select") return null;
+  return applyProductChoice(phone, convId, ctx, reply.choice);
 }
 
 async function buildAndPresentQuote(

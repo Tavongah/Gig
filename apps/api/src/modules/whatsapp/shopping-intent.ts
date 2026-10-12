@@ -226,6 +226,92 @@ function expandAdjacentProductTokens(query: string, quantity: number): Requested
   return [{ query, quantity }];
 }
 
+export type ProductDisambiguationOption = {
+  productId: string;
+  name: string;
+  priceCents: number;
+};
+
+export type ProductDisambiguationReply =
+  | { action: "select"; choice: number }
+  | { action: "new_query"; items: RequestedShoppingItem[] }
+  | { action: "reprompt" };
+
+/** Map a clarification reply to a numbered option, or null if it is not a selection. */
+export function matchPendingProductChoice(
+  text: string,
+  options: ProductDisambiguationOption[]
+): number | null {
+  const prepared = text.trim().toLowerCase().replace(/[?.!]+/g, " ").replace(/\s+/g, " ").trim();
+  let choice: number | null = null;
+  if (/^\d+$/.test(prepared)) choice = Number(prepared);
+  else if (/^(number\s*)?(1|one)\b|first|the first/i.test(prepared)) choice = 1;
+  else if (/^(number\s*)?(2|two)\b|second|the second/i.test(prepared)) choice = 2;
+  else if (/^(number\s*)?(3|three)\b|third|the third/i.test(prepared)) choice = 3;
+  else {
+    const n = prepared
+      .replace(/\b(the|a|an|one|please)\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const scored = options.map((o, idx) => {
+      const name = o.name.toLowerCase();
+      let s = 0;
+      if (name.includes(n) || n.includes(name.split(/\s+/)[0] ?? "")) s += 40;
+      const tokens = n.split(/\s+/).filter((t) => t.length > 2);
+      for (const tok of tokens) {
+        if (name.includes(tok)) s += 20;
+      }
+      if (n.includes("2l") && /2\s*l|2l/i.test(o.name)) s += 25;
+      if (n.includes("1l") && /1\s*l|1l/i.test(o.name)) s += 25;
+      if (n.includes("500") && /500/i.test(o.name)) s += 25;
+      if (/(big|large)/i.test(n) && /2\s*l|2l/i.test(o.name)) s += 20;
+      if (/(small|smaller)/i.test(n) && /1\s*l|1l|500/i.test(o.name)) s += 20;
+      if (/(cheap|cheaper|lowest)/i.test(n)) s += 1000 - o.priceCents;
+      if (/\borange\b/i.test(n) && /orange/i.test(o.name)) s += 30;
+      if (/\braspberry\b/i.test(n) && /raspberry/i.test(o.name)) s += 30;
+      return { idx, s };
+    });
+    scored.sort((a, b) => b.s - a.s);
+    if (scored[0] && scored[0].s >= 20) {
+      if (!scored[1] || scored[0].s - scored[1].s >= 10) {
+        choice = scored[0].idx + 1;
+      }
+    }
+  }
+  if (choice == null || choice < 1 || choice > options.length) return null;
+  return choice;
+}
+
+/**
+ * A clearly new product phrase must leave stale product clarification.
+ * Numeric / ordinal / option-name replies keep existing selection behavior.
+ */
+export function resolveProductDisambiguationReply(
+  text: string,
+  options: ProductDisambiguationOption[]
+): ProductDisambiguationReply {
+  const choice = matchPendingProductChoice(text, options);
+  if (choice != null) return { action: "select", choice };
+  const items = extractShoppingItems(text);
+  if (items.length) return { action: "new_query", items };
+  return { action: "reprompt" };
+}
+
+/** Replace only the pending clarification query; keep other cart lines. */
+export function replaceDisambiguatedRequestedItems(
+  requestedItems: RequestedShoppingItem[] | undefined,
+  pendingQuery: string | undefined,
+  lastDisambiguationQuery: string | undefined,
+  newItems: RequestedShoppingItem[]
+): RequestedShoppingItem[] {
+  return [
+    ...(requestedItems ?? []).filter(
+      (r) => r.query !== pendingQuery && r.query !== lastDisambiguationQuery
+    ),
+    ...newItems
+  ];
+}
+
 export function extractBudgetCents(text: string): number | null {
   const m =
     text.match(/\b(?:i have|budget(?:\s+of)?|only(?:\s+want)?(?:\s+to)?\s+spend|under|below|max(?:imum)?)\s+\$?\s*(\d+(?:\.\d{1,2})?)/i) ||

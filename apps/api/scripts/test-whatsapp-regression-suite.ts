@@ -131,6 +131,7 @@ async function main() {
   assert.ok(itemsIntent.kind === "NEW_LIST" || itemsIntent.kind === "ADD_ITEM" || itemsIntent.kind === "UNKNOWN");
   assert.match(handler, /extractShoppingItemsWithOptionalAi/);
   assert.match(handler, /resolveProductsThenContinue|buildOneStoreBasket|searchProductsByQuery/);
+  assert.match(handler, /resolveProductDisambiguationReply/);
   pass("WA06");
 
   // WA07 add product → cart
