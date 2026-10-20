@@ -108,7 +108,7 @@ export const STOREFRONT_CATEGORIES: StorefrontCategoryConfig[] = [
     slug: "fashion",
     label: "Fashion",
     icon: "shirt-outline",
-    state: "COMING_SOON",
+    state: "LIVE",
     sortOrder: 110,
     restricted: false
   },
@@ -116,7 +116,7 @@ export const STOREFRONT_CATEGORIES: StorefrontCategoryConfig[] = [
     slug: "shoes",
     label: "Shoes",
     icon: "walk-outline",
-    state: "COMING_SOON",
+    state: "LIVE",
     sortOrder: 120,
     restricted: false
   },
@@ -124,7 +124,7 @@ export const STOREFRONT_CATEGORIES: StorefrontCategoryConfig[] = [
     slug: "electronics",
     label: "Electronics",
     icon: "phone-portrait-outline",
-    state: "COMING_SOON",
+    state: "LIVE",
     sortOrder: 130,
     restricted: false
   },
@@ -132,7 +132,7 @@ export const STOREFRONT_CATEGORIES: StorefrontCategoryConfig[] = [
     slug: "auto-parts",
     label: "Auto Parts",
     icon: "car-outline",
-    state: "COMING_SOON",
+    state: "LIVE",
     sortOrder: 140,
     restricted: false
   },
@@ -140,7 +140,7 @@ export const STOREFRONT_CATEGORIES: StorefrontCategoryConfig[] = [
     slug: "home-furniture",
     label: "Home & Furniture",
     icon: "bed-outline",
-    state: "COMING_SOON",
+    state: "LIVE",
     sortOrder: 150,
     restricted: false
   },
@@ -148,7 +148,7 @@ export const STOREFRONT_CATEGORIES: StorefrontCategoryConfig[] = [
     slug: "beauty",
     label: "Beauty",
     icon: "flower-outline",
-    state: "COMING_SOON",
+    state: "LIVE",
     sortOrder: 160,
     restricted: false
   },
@@ -156,7 +156,7 @@ export const STOREFRONT_CATEGORIES: StorefrontCategoryConfig[] = [
     slug: "baby",
     label: "Baby",
     icon: "heart-outline",
-    state: "COMING_SOON",
+    state: "LIVE",
     sortOrder: 170,
     restricted: false
   },
@@ -164,7 +164,7 @@ export const STOREFRONT_CATEGORIES: StorefrontCategoryConfig[] = [
     slug: "sports-outdoors",
     label: "Sports & Outdoors",
     icon: "football-outline",
-    state: "COMING_SOON",
+    state: "LIVE",
     sortOrder: 180,
     restricted: false
   }
@@ -299,7 +299,16 @@ export function allLiveCatalogCategories(catalogNames: string[]): ResolvedStoref
   const extra = catalogNames
     .filter((name) => !featured.some((f) => f.catalogName === name || f.label === name))
     .map((name, i) => liveFromCatalog(name, 200 + i));
-  return [...featured, ...extra];
+  const seen = new Set([...featured, ...extra].map((c) => c.slug));
+  const configuredLive = STOREFRONT_CATEGORIES.filter((c) => c.state === "LIVE" && !c.restricted)
+    .filter((c) => !seen.has(c.slug))
+    .map((c) => {
+      const catalogName = catalogNames.find(
+        (n) => matchesCatalog(c, n) || n.toLowerCase() === c.label.toLowerCase()
+      );
+      return { ...c, catalogName };
+    });
+  return [...featured, ...extra, ...configuredLive];
 }
 
 export function matchComingSoonFromSearch(q: string, catalogNames: string[] = []) {

@@ -15,8 +15,8 @@ export function openStorefrontCategory(
     navigation.navigate("ProductSearch", { category: typeof category === "string" ? category : undefined, q: undefined });
     return;
   }
-  if (dest.state === "LIVE" && dest.catalogName) {
-    navigation.navigate("ProductSearch", { category: dest.catalogName, q: undefined });
+  if (dest.state === "LIVE") {
+    navigation.navigate("ProductSearch", { category: dest.catalogName ?? dest.label, q: undefined });
     return;
   }
   navigation.navigate("MarketplaceCategory", { slug: dest.slug });

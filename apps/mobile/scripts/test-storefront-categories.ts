@@ -7,10 +7,12 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   STOREFRONT_CATEGORIES,
+  allLiveCatalogCategories,
   canPurchaseStorefrontCategory,
   comingSoonCategories,
   featuredLiveCategories,
   isAlcoholRestrictedCategory,
+  isPublicStorefrontCatalogProduct,
   matchComingSoonFromSearch,
   parseAlcoholCommerceEnabled,
   parseSmartBasketEnabled,
@@ -36,7 +38,7 @@ assert.equal(canPurchaseStorefrontCategory("Alcohol", false), false);
 assert.equal(canPurchaseStorefrontCategory("Alcohol", true), true);
 assert.equal(canPurchaseStorefrontCategory("Groceries", false), true);
 
-const catalog = ["Groceries", "Drinks", "Household", "Personal Care", "Vegetables", "Staples", "Soft Drinks"];
+const catalog = ["Groceries", "Drinks", "Household", "Personal Care", "Vegetables", "Staples", "Soft Drinks", "Shoes", "Baby Products"];
 const featured = featuredLiveCategories(catalog).map((c) => c.label);
 assert.ok(featured.includes("Groceries"));
 assert.ok(featured.includes("Drinks"));
@@ -45,25 +47,31 @@ assert.ok(!featured.includes("Fashion"));
 assert.ok(!featured.includes("Soft Drinks"));
 
 const soon = comingSoonCategories(catalog).map((c) => c.label);
-for (const label of [
-  "Fashion",
-  "Shoes",
-  "Electronics",
-  "Auto Parts",
-  "Home & Furniture",
-  "Beauty",
-  "Baby",
-  "Sports & Outdoors"
-]) {
-  assert.ok(soon.includes(label), `missing coming soon ${label}`);
-}
+assert.equal(soon.length, 0, "coming-soon category restriction removed");
+assert.ok(!soon.includes("Shoes"));
+assert.ok(!soon.includes("Fashion"));
 assert.ok(!soon.includes("Groceries"));
 assert.equal(STOREFRONT_CATEGORIES.find((c) => c.slug === "alcohol")?.state, "RESTRICTED");
 assert.equal(STOREFRONT_CATEGORIES.find((c) => c.slug === "alcohol")?.requiresAgeGate, true);
-assert.equal(resolveStorefrontCategory("fashion")?.state, "COMING_SOON");
+assert.equal(STOREFRONT_CATEGORIES.find((c) => c.slug === "shoes")?.state, "LIVE");
+assert.equal(resolveStorefrontCategory("fashion")?.state, "LIVE");
+assert.equal(resolveStorefrontCategory("shoes")?.state, "LIVE");
 assert.equal(resolveStorefrontCategory("Groceries", catalog)?.state, "LIVE");
-assert.equal(matchComingSoonFromSearch("shoes")?.label, "Shoes");
-assert.equal(matchComingSoonFromSearch("mazoe"), undefined);
+assert.equal(resolveStorefrontCategory("Shoes", catalog)?.state, "LIVE");
+assert.equal(resolveStorefrontCategory("Shoes", catalog)?.catalogName, "Shoes");
+assert.equal(matchComingSoonFromSearch("shoes", catalog), undefined);
+assert.equal(matchComingSoonFromSearch("mazoe", catalog), undefined);
+
+const live = allLiveCatalogCategories(catalog).map((c) => c.catalogName ?? c.label);
+assert.ok(live.includes("Groceries"));
+assert.ok(live.includes("Shoes"));
+assert.ok(live.includes("Baby Products"));
+assert.ok(allLiveCatalogCategories(["Groceries"]).some((c) => c.label === "Shoes" && c.state === "LIVE"));
+assert.ok(!featuredLiveCategories(["Groceries"]).some((c) => c.label === "Shoes"));
+assert.equal(isPublicStorefrontCatalogProduct({ id: "ok", status: "APPROVED" }), true);
+assert.equal(isPublicStorefrontCatalogProduct({ id: "pending", status: "PENDING" }), false);
+assert.equal(isPublicStorefrontCatalogProduct({ id: "rejected", status: "REJECTED" }), false);
+assert.equal(isPublicStorefrontCatalogProduct({ id: "archived", status: "ARCHIVED" }), false);
 
 const home = read("screens/commerce/ShopHomeScreen.tsx");
 assert.ok(home.includes("Coming to DUTS"));
@@ -95,5 +103,15 @@ assert.ok(detail.includes("alcoholPurchaseAllowed"));
 
 const cart = read("lib/storefront-cart.ts");
 assert.ok(cart.includes("alcoholPurchaseAllowed"));
+
+const nav = read("lib/storefront-nav.ts");
+assert.ok(nav.includes('dest.state === "LIVE"'));
+assert.ok(nav.includes("dest.catalogName ?? dest.label"));
+assert.match(nav, /navigate\("ProductSearch"/);
+assert.ok(nav.includes("MarketplaceCategory"), "restricted destinations still use marketplace screen");
+
+const search = read("screens/commerce/ProductSearchScreen.tsx");
+assert.ok(search.includes("comingSoonFromQuery"));
+assert.ok(search.includes("commerceNearbyProducts"));
 
 console.log(JSON.stringify({ ok: true }, null, 2));
