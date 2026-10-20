@@ -344,6 +344,18 @@ export {
 } from "./catalog.js";
 
 export {
+  CANONICAL_CATALOG_CATEGORIES,
+  applyFutureCatalogCategory,
+  classifyCatalogCategory,
+  sameCatalogCategoryFamily,
+  summarizeCategoryClassifications,
+  type CanonicalCatalogCategory,
+  type CatalogCategoryClassification,
+  type CatalogCategoryInput,
+  type CategoryConfidence
+} from "./catalog-category-classifier.js";
+
+export {
   STOREFRONT_CATEGORIES,
   STOREFRONT_CATEGORY_STATES,
   allLiveCatalogCategories,

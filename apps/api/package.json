@@ -36,6 +36,8 @@
     "test:merchant-ready-delivery": "tsx scripts/test-merchant-ready-delivery.ts",
     "test:meriden-test-merchant": "tsx scripts/test-meriden-test-merchant.ts",
     "test:catalog-helpers": "tsx scripts/test-catalog-helpers.ts",
+    "test:catalog-category-classifier": "tsx scripts/test-catalog-category-classifier.ts",
+    "dry-run:catalog-category-classifier": "tsx scripts/dry-run-catalog-category-classifier.ts",
     "test:catalog-foundation": "tsx scripts/test-catalog-foundation.ts",
     "test:admin-catalog-visibility": "tsx scripts/test-admin-catalog-visibility.ts",
     "test:catalog-image-manifest": "tsx scripts/test-catalog-image-manifest.ts",
