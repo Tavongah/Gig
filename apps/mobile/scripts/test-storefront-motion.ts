@@ -21,6 +21,7 @@ assert.ok(motion.includes("normal: 220"), "normal token");
 assert.ok(motion.includes("section: 360"), "section token");
 assert.ok(!motion.includes("800"), "no long UI durations");
 assert.ok(motion.includes("RAIL_PEEK"), "rail peek");
+assert.ok(motion.includes("RAIL_AMBIENT_PX_PER_SEC"), "slow ambient rail speed");
 assert.ok(!motion.includes("Popular"), "no fake popularity in motion notes used as copy");
 
 const reduce = read("lib/use-reduced-motion.ts");
@@ -63,7 +64,14 @@ const rail = read("components/ProductGrid.tsx");
 assert.ok(rail.includes("snapToInterval"), "rail snap");
 assert.ok(rail.includes("RAIL_PEEK"), "next-card peek");
 assert.ok(rail.includes("Previous products"), "desktop previous");
-assert.ok(!rail.includes("auto-scroll") && !rail.includes("setInterval"), "no auto conveyor");
+assert.ok(rail.includes("requestAnimationFrame"), "ambient rAF scroll");
+assert.ok(rail.includes("pauseAmbient"), "interaction yields");
+assert.ok(rail.includes("onScrollBeginDrag"), "swipe pauses ambient");
+assert.ok(rail.includes("RAIL_AMBIENT_PX_PER_SEC"), "uses slow speed token");
+assert.ok(rail.includes("if (reduce || products.length < 3) return"), "reduced motion disables ambient");
+assert.ok(!rail.includes("setInterval"), "no interval conveyor");
+assert.ok(!rail.includes("@keyframes"), "no CSS marquee");
+assert.ok(!rail.includes("Math.random"), "motion does not reshuffle products");
 
 const tabs = read("navigation/GuestTabs.tsx");
 assert.ok(tabs.includes("CountBadge"), "cart badge motion");
