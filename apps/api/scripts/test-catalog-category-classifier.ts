@@ -158,6 +158,7 @@ assert.doesNotMatch(classifierSrc, /UPDATE\s+"CatalogProduct"/i);
 assert.match(classifierSrc, /confidence === "HIGH"/);
 
 const catalogService = readSrc("src/modules/commerce/catalog.service.ts");
+assert.match(catalogService, /applyFutureCatalogCategory/);
 assert.doesNotMatch(catalogService, /classifyCatalogCategory.*updateMany/);
 const migrateFn = catalogService.slice(catalogService.indexOf("migrateExistingProductsToCatalog"));
 assert.match(migrateFn, /product\.category\?\.trim\(\) \|\| "Uncategorized"/);

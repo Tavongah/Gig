@@ -3,6 +3,7 @@ import {
   CATALOG_PRODUCT_SCAN_LIMIT,
   MERCHANT_CATALOG_SEARCH_LIMIT_MAX,
   UNRESOLVED_LEGACY_CATALOG_PRODUCT_IDS,
+  applyFutureCatalogCategory,
   catalogSearchHaystack,
   createCatalogProductSchema,
   expandSearchTerms,
@@ -121,6 +122,14 @@ export async function createCatalogProduct(
   opts?: { actorUserId?: string; submittedByMerchantId?: string }
 ) {
   const parsed = createCatalogProductSchema.parse(input);
+  const resolved = applyFutureCatalogCategory({
+    name: parsed.name,
+    brand: parsed.brand,
+    description: parsed.description,
+    category: parsed.category,
+    subcategory: parsed.subcategory,
+    sizeLabel: parsed.sizeLabel
+  });
   const barcode = normalizeBarcode(parsed.barcode);
   if (barcode) {
     const existingBarcode = await prisma.catalogProduct.findUnique({ where: { barcode } });
@@ -140,7 +149,7 @@ export async function createCatalogProduct(
       normalizedName: normalizeProductSearchName(parsed.name),
       brand: parsed.brand?.trim() || null,
       description: parsed.description?.trim() || null,
-      category: parsed.category.trim(),
+      category: resolved.category,
       subcategory: parsed.subcategory?.trim() || null,
       sizeLabel: parsed.sizeLabel?.trim() || null,
       unit: parsed.unit?.trim() || null,
@@ -459,6 +468,14 @@ export async function submitMerchantNewCatalogProduct(merchantId: string, input:
     }
   }
 
+  const resolved = applyFutureCatalogCategory({
+    name: parsed.name,
+    brand: parsed.brand,
+    description: parsed.description,
+    category: parsed.category,
+    sizeLabel: parsed.sizeLabel
+  });
+
   return prisma.$transaction(async (tx) => {
     const barcode = normalizeBarcode(parsed.barcode);
     if (barcode) {
@@ -476,7 +493,7 @@ export async function submitMerchantNewCatalogProduct(merchantId: string, input:
         normalizedName: normalizeProductSearchName(parsed.name),
         brand: parsed.brand?.trim() || null,
         description: parsed.description?.trim() || null,
-        category: parsed.category.trim(),
+        category: resolved.category,
         sizeLabel: parsed.sizeLabel?.trim() || null,
         unit: parsed.unit?.trim() || null,
         barcode,
