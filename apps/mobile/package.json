@@ -20,6 +20,7 @@
     "test:storefront-card-stepper": "npx tsx scripts/test-storefront-card-stepper.ts",
     "test:storefront-categories": "npx tsx scripts/test-storefront-categories.ts",
     "test:storefront-home-rotate": "npx tsx scripts/test-storefront-home-rotate.ts",
+    "test:storefront-related": "npx tsx scripts/test-storefront-related.ts",
     "test:smart-basket-ui": "npx tsx scripts/test-smart-basket-ui.ts",
     "test:simple-checkout-ui": "npx tsx scripts/test-simple-checkout-ui.ts",
     "test:commerce-courier-ux-ui": "npx tsx scripts/test-commerce-courier-ux-ui.ts",

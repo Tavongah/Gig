@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -9,14 +9,18 @@ import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import { productCardMeta } from "../../lib/storefront-ui";
 import { alcoholPurchaseAllowed, isSmartBasketEnabled } from "../../lib/storefront-categories";
+import { addStorefrontProduct, tryAddOfferToCart } from "../../lib/storefront-cart";
+import { storefrontVisitSeed } from "../../lib/storefront-home-rotate";
+import { pickMoreLikeThis, relatedSearchQuery } from "../../lib/storefront-related";
+import { ProductRail } from "../../components/ProductGrid";
+import type { ProductCardData } from "../../components/ProductCard";
 import { StoreHeader, StorePage } from "../../components/StoreHeader";
 import type { RootStackParamList } from "../../navigation/types";
-import { tryAddOfferToCart } from "../../lib/storefront-cart";
 import { useDesiredBasketStore } from "../../stores/desired-basket.store";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProductDetail">;
 
-export function ProductDetailScreen({ route }: Props) {
+export function ProductDetailScreen({ route, navigation }: Props) {
   const browse = useShopBrowse();
   const addToShoppingListStore = useDesiredBasketStore((s) => s.addItem);
   const smartBasket = isSmartBasketEnabled();
@@ -53,6 +57,72 @@ export function ProductDetailScreen({ route }: Props) {
   const fromPriceCents = detailQuery.data?.fromPriceCents ?? null;
   const showImage = Boolean(product?.imageUrl) && !imgFailed;
   const meta = product ? productCardMeta(product.name, product.brand, product.sizeLabel) : "";
+  const visitSeed = useMemo(() => storefrontVisitSeed(), []);
+  const relatedQ = product ? relatedSearchQuery(product) : "";
+  const relatedQuery = useQuery({
+    queryKey: [
+      "commerce-related",
+      ...browse.queryKey,
+      product?.catalogProductId,
+      product?.category,
+      relatedQ
+    ],
+    queryFn: async () => {
+      const base = {
+        ...(browse.geo ?? {}),
+        category: product?.category ?? undefined,
+        limit: 24,
+        offset: 0
+      };
+      const first = await api.commerceNearbyProducts(
+        { ...base, q: relatedQ || undefined },
+        browse.token
+      );
+      let products = first.products;
+      if (
+        relatedQ &&
+        products.filter((p) => p.catalogProductId !== product?.catalogProductId).length < 3
+      ) {
+        const second = await api.commerceNearbyProducts(base, browse.token);
+        const seen = new Set(products.map((p) => p.catalogProductId ?? p.name));
+        for (const row of second.products) {
+          const key = row.catalogProductId ?? row.name;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          products = [...products, row];
+        }
+      }
+      return products;
+    },
+    enabled: browse.ready && Boolean(product && (product.category || relatedQ))
+  });
+  const moreLikeThis = useMemo(
+    () =>
+      product
+        ? pickMoreLikeThis({
+            seed: product,
+            candidates: relatedQuery.data ?? [],
+            visitSeed,
+            limit: 10
+          })
+        : [],
+    [product, relatedQuery.data, visitSeed]
+  );
+
+  function openRelated(p: ProductCardData) {
+    navigation.navigate("ProductDetail", {
+      catalogProductId: p.catalogProductId ?? undefined,
+      productId: p.productId ?? undefined
+    });
+  }
+
+  function addRelated(p: ProductCardData) {
+    addStorefrontProduct({ product: p, geo: browse.geo, token: browse.token, isGuest: browse.isGuest });
+  }
+
+  function relatedPricePrefix(p: ProductCardData) {
+    return isSmartBasketEnabled() || (p.merchantOfferCount ?? 0) > 1 ? "From " : "";
+  }
 
   function markAdded(key: string) {
     setAddedKey(key);
@@ -274,6 +344,18 @@ export function ProductDetailScreen({ route }: Props) {
             <View style={desktop ? { width: "46%" } : undefined}>{imageCanvas}</View>
             <View style={desktop ? { width: "50%", paddingTop: 8 } : undefined}>{info}</View>
           </View>
+          {moreLikeThis.length > 0 ? (
+            <View className="mt-8">
+              <Text className="mb-2 text-lg font-extrabold text-ink">More like this</Text>
+              <ProductRail
+                products={moreLikeThis}
+                loading={relatedQuery.isLoading && moreLikeThis.length === 0}
+                onPress={openRelated}
+                onAdd={addRelated}
+                pricePrefix={relatedPricePrefix}
+              />
+            </View>
+          ) : null}
         </StorePage>
       </ScrollView>
     </View>

@@ -69,6 +69,8 @@ assert.ok(!detail.includes("No merchant"), "no internal architecture copy");
 assert.ok(!detail.includes("CatalogProduct"), "no CatalogProduct leak");
 assert.ok(detail.includes("purchasable"), "add only when purchasable");
 assert.ok(detail.includes("ADD TO CART"), "purchasable CTA");
+assert.ok(detail.includes("More like this"), "related products rail");
+assert.ok(!detail.includes("You may also like"), "no complement section without metadata");
 
 const api = read("lib/api.ts");
 assert.ok(api.includes("purchasable"), "API card includes purchasable");
