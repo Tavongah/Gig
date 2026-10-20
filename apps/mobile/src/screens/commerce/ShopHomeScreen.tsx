@@ -14,6 +14,7 @@ import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import { STOREFRONT_GUTTER } from "../../lib/storefront-ui";
 import { moreOnDutsCategories, shopByCategories, isSmartBasketEnabled } from "../../lib/storefront-categories";
+import { rotateStorefrontProducts, storefrontVisitSeed } from "../../lib/storefront-home-rotate";
 import { openStorefrontCategory } from "../../lib/storefront-nav";
 import { StorefrontCategoryCard } from "../../components/StorefrontCategoryCard";
 import type { RootStackParamList } from "../../navigation/types";
@@ -72,11 +73,7 @@ export function ShopHomeScreen() {
     queryFn: () => api.commerceCategories(browse.geo, browse.token),
     enabled: browse.ready
   });
-  const shopsQuery = useQuery({
-    queryKey: ["commerce-shops", ...browse.queryKey],
-    queryFn: () => api.commerceNearbyShops(browse.geo!, browse.token),
-    enabled: Boolean(browse.geo)
-  });
+  const visitSeed = useMemo(() => storefrontVisitSeed(), []);
 
   const catalogNames = useMemo(() => {
     const fromApi = (categoriesQuery.data?.categories ?? []).map((c) => c.name);
@@ -118,7 +115,10 @@ export function ShopHomeScreen() {
     return isSmartBasketEnabled() || (p.merchantOfferCount ?? 0) > 1 ? "From " : "";
   }
 
-  const products = productsQuery.data?.pages.flatMap((page) => page.products) ?? [];
+  const products = useMemo(() => {
+    const pages = productsQuery.data?.pages ?? [];
+    return pages.flatMap((page, i) => rotateStorefrontProducts(page.products, visitSeed, i + 1));
+  }, [productsQuery.data?.pages, visitSeed]);
   const availableNow = products.filter(isProductCardPurchasable);
   const moreCatalog = products.filter((p) => !isProductCardPurchasable(p));
 
@@ -175,7 +175,11 @@ export function ShopHomeScreen() {
           {sectionCategories.length > 0 ? (
             <View className="mt-5">
               {sectionCategories.map((cat, i) => {
-                const rows = (sectionQueries[i]?.data?.products ?? []) as ProductCardData[];
+                const rows = rotateStorefrontProducts(
+                  (sectionQueries[i]?.data?.products ?? []) as ProductCardData[],
+                  visitSeed,
+                  i + 41
+                );
                 return (
                   <SectionReveal key={cat.name} className="mb-5">
                     <View className="mb-2 min-h-[44px] flex-row items-center justify-between">
@@ -229,28 +233,6 @@ export function ShopHomeScreen() {
               </Text>
             </Pressable>
           ) : null}
-
-          <SectionReveal className="mt-6">
-            <Text className="mb-2 text-lg font-extrabold text-ink">Nearby shops</Text>
-            {(shopsQuery.data?.shops ?? []).length === 0 ? (
-              <Text className="text-sm text-muted">No shops nearby yet. You can still browse the DUTS catalog.</Text>
-            ) : (
-              (shopsQuery.data?.shops ?? []).map((shop) => (
-                <Pressable
-                  key={shop.id}
-                  onPress={() => navigation.navigate("ShopDetail", { merchantId: shop.id })}
-                  className="mb-2 rounded-2xl border border-border bg-card px-4 py-3.5"
-                  accessibilityRole="button"
-                  accessibilityLabel={browse.isGuest ? shop.name : `${shop.name}, ${shop.distanceKm} kilometers`}
-                >
-                  <Text className="text-base font-bold text-ink">{shop.name}</Text>
-                  <Text className="mt-0.5 text-sm text-muted">
-                    {browse.isGuest ? shop.locationLabel : `${shop.distanceKm} km · ${shop.locationLabel}`}
-                  </Text>
-                </Pressable>
-              ))
-            )}
-          </SectionReveal>
 
           {moreOnDuts.length > 0 ? (
             <SectionReveal className="mt-6">

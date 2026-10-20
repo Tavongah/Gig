@@ -51,6 +51,7 @@ assert.ok(home.includes("SHOW MORE PRODUCTS") || home.includes("Show more"), "pa
 assert.ok(home.includes("addStorefrontProduct") || home.includes("isProductCardPurchasable"), "home add gated");
 assert.ok(home.includes("useInfiniteQuery"), "paged catalog fetch");
 assert.ok(home.includes("Need it? DUTS it."), "DUTS identity");
+assert.ok(!home.includes("Nearby shops"), "nearby shops not on homepage");
 
 const search = read("screens/commerce/ProductSearchScreen.tsx");
 assert.ok(search.includes("commerceNearbyProducts"), "search uses catalog API");
