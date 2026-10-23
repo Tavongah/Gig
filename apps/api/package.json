@@ -62,6 +62,8 @@
     "test:unlisted-item-request": "tsx scripts/test-unlisted-item-request.ts",
     "test:product-flavor-options": "tsx scripts/test-product-flavor-options.ts",
     "test:commerce-courier-ux": "tsx scripts/test-commerce-courier-ux.ts",
+    "test:seller-marketplace-commission": "tsx scripts/test-seller-marketplace-commission.ts",
+    "test:seller-marketplace": "tsx scripts/test-seller-marketplace-v1.ts",
     "migrate:products-to-catalog": "tsx scripts/migrate-products-to-catalog.ts",
     "seed:pilot-merchant": "tsx scripts/seed-pilot-merchant.ts",
     "seed:meriden-test-merchant": "tsx scripts/seed-meriden-test-merchant.ts"

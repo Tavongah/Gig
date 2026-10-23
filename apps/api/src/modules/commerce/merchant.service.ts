@@ -1,5 +1,6 @@
 import {
   DEFAULT_MARKETPLACE_MERCHANT_RADIUS_KM,
+  DEFAULT_MARKETPLACE_SELLER_COMMISSION_RATE,
   canPurchaseStorefrontCategory,
   distanceKmBetween,
   expandSearchTerms,
@@ -35,7 +36,11 @@ export async function getMarketplaceSettings() {
       ? Number(settings.marketplaceMerchantRadiusKm)
       : DEFAULT_MARKETPLACE_MERCHANT_RADIUS_KM,
     serviceFeeCents: settings?.marketplaceServiceFeeCents ?? 0,
-    merchantCommissionRate: settings ? Number(settings.marketplaceMerchantCommissionRate) : 0.1
+    merchantCommissionRate: settings ? Number(settings.marketplaceMerchantCommissionRate) : 0.1,
+    /** Additive seller marketplace rate — unused by merchant order math. */
+    sellerCommissionRate: settings
+      ? Number(settings.marketplaceSellerCommissionRate)
+      : DEFAULT_MARKETPLACE_SELLER_COMMISSION_RATE
   };
 }
 

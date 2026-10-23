@@ -97,7 +97,12 @@ const envSchema = z.object({
   UNLISTED_ITEM_COD_ENABLED: z.string().optional(),
   UNLISTED_ITEM_MIN_PRICE_CENTS: z.string().optional(),
   UNLISTED_ITEM_MAX_PRICE_CENTS: z.string().optional(),
-  UNLISTED_ITEM_SEARCH_TTL_SECONDS: z.string().optional()
+  UNLISTED_ITEM_SEARCH_TTL_SECONDS: z.string().optional(),
+  /**
+   * Seller Marketplace customer fulfillment. Default OFF until controlled E2E.
+   * Admin-operated seller foundation APIs may exist while this stays false.
+   */
+  SELLER_MARKETPLACE_ENABLED: z.string().optional()
 });
 
 export const env = envSchema.parse(process.env);

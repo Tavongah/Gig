@@ -209,6 +209,7 @@ model User {
   auditLogs          AuditLog[]
   earningsTransactions WorkerEarningsTransaction[]
   ownedMerchants       Merchant[]                  @relation("MerchantOwner")
+  ownedSellers         Seller[]                    @relation("SellerOwner")
   commerceOrders       CommerceOrder[]             @relation("CommerceOrderUser")
   commerceCheckouts    CommerceCheckout[]          @relation("CommerceCheckoutUser")
   commerceCustomers    CommerceCustomer[]          @relation("CommerceCustomerUser")
@@ -616,6 +617,11 @@ model PlatformSetting {
   marketplaceServiceFeeCents Int      @default(0)
   /** Merchant commission rate on item subtotal (0–1). Configurable; not final economics. */
   marketplaceMerchantCommissionRate Decimal @default(0.10) @db.Decimal(4, 3)
+  /**
+   * Independent seller marketplace commission on merchandise subtotal (0–1).
+   * Additive Seller Marketplace V1 knob — does not alter merchant commission behavior.
+   */
+  marketplaceSellerCommissionRate Decimal @default(0.15) @db.Decimal(4, 3)
   updatedAt                  DateTime @updatedAt
   createdAt                  DateTime @default(now())
 }
@@ -751,6 +757,7 @@ model CatalogProduct {
   images           CatalogProductImage[]
   flavorOptions    CatalogProductFlavorOption[]
   merchantOffers   Product[]
+  sellerOffers     SellerOffer[]
   imageAcquisition CatalogImageAcquisition?
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
@@ -1359,5 +1366,116 @@ model UnlistedItemPaymentAttempt {
   @@unique([provider, providerPaymentId])
   @@index([requestId, status])
   @@index([status, expiresAt])
+}
+
+// ─── Seller Marketplace V1 (Point 1: seller-owned inventory, no warehouse) ───
+
+enum SellerStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum SellerOfferStatus {
+  ACTIVE
+  PAUSED
+  SOLD_OUT
+}
+
+/**
+ * Settlement lifecycle for seller merchandise proceeds.
+ * Delivery fee is never seller revenue. Do not mark READY_FOR_SETTLEMENT
+ * until payment is confirmed (COD stays PENDING_PAYMENT until collected).
+ */
+enum SellerSettlementStatus {
+  PENDING_PAYMENT
+  READY_FOR_SETTLEMENT
+  SETTLED
+  VOIDED
+}
+
+/**
+ * Independent marketplace seller — NOT a Merchant shop.
+ * Keeps physical inventory; DUTS coordinates courier pickup at seller location.
+ */
+model Seller {
+  id                  String          @id @default(uuid())
+  ownerUserId         String?
+  owner               User?           @relation("SellerOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  displayName         String
+  contactName         String
+  phone               String
+  whatsappPhone       String?
+  pickupLocationLabel String
+  pickupLatitude      Decimal         @db.Decimal(9, 6)
+  pickupLongitude     Decimal         @db.Decimal(9, 6)
+  status              SellerStatus    @default(PENDING)
+  notes               String?
+  offers              SellerOffer[]
+  settlements         SellerSettlement[]
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([status])
+  @@index([ownerUserId])
+  @@unique([whatsappPhone])
+}
+
+/**
+ * Seller offer against canonical CatalogProduct.
+ * Price + quantity live here; catalog identity stays on CatalogProduct.
+ */
+model SellerOffer {
+  id                String            @id @default(uuid())
+  sellerId          String
+  seller            Seller            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  catalogProductId  String
+  catalogProduct    CatalogProduct    @relation(fields: [catalogProductId], references: [id], onDelete: Restrict)
+  priceCents        Int
+  currency          String            @default("usd")
+  quantityAvailable Int               @default(0)
+  status            SellerOfferStatus @default(ACTIVE)
+  conditionNote     String?
+  settlements       SellerSettlement[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([sellerId, catalogProductId])
+  @@index([catalogProductId, status])
+  @@index([sellerId, status])
+}
+
+/**
+ * Accounting foundation for completed seller fulfillments.
+ * Optional commerceOrderId leaves room for future order wiring without
+ * changing CommerceOrder.merchantId semantics in V1.
+ */
+model SellerSettlement {
+  id                     String                 @id @default(uuid())
+  sellerId               String
+  seller                 Seller                 @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  sellerOfferId          String
+  sellerOffer            SellerOffer            @relation(fields: [sellerOfferId], references: [id], onDelete: Restrict)
+  catalogProductId       String
+  quantity               Int
+  merchandiseCents       Int
+  commissionRateSnapshot Decimal                @db.Decimal(4, 3)
+  commissionCents        Int
+  sellerProceedsCents    Int
+  /** Recorded for audit only — never treated as seller revenue. */
+  deliveryFeeCents       Int                    @default(0)
+  commerceOrderId        String?
+  status                 SellerSettlementStatus @default(PENDING_PAYMENT)
+  paymentStatusSnapshot  String?
+  fulfilledAt            DateTime?
+  settledAt              DateTime?
+  voidedAt               DateTime?
+  notes                  String?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  @@index([sellerId, status])
+  @@index([sellerOfferId])
+  @@index([commerceOrderId])
 }
 
