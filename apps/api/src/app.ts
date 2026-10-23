@@ -22,6 +22,7 @@ import { catalogAdminRouter } from "./modules/commerce/catalog.routes.js";
 import { catalogMediaRouter } from "./modules/commerce/catalog-media.routes.js";
 import { customerCommerceRouter } from "./modules/commerce/customer-commerce.routes.js";
 import { createCommercePaymentsRouter } from "./modules/commerce/payments/payments.routes.js";
+import { sellerAdminRouter } from "./modules/commerce/seller.routes.js";
 import { raw } from "express";
 
 export function createApp(io: Server) {
@@ -100,6 +101,7 @@ export function createApp(io: Server) {
   app.use("/v1/admin", adminRouter);
   app.use("/v1/admin/commerce", commerceAdminRouter);
   app.use("/v1/admin/commerce", catalogAdminRouter);
+  app.use("/v1/admin/commerce", sellerAdminRouter);
   app.use("/v1/commerce", customerCommerceRouter);
   app.use("/v1/commerce/payments", createCommercePaymentsRouter());
   app.use("/v1/whatsapp", createWhatsAppRouter(io));
