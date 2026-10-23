@@ -300,6 +300,23 @@ export {
 } from "./commerce.js";
 
 export {
+  parseSellerMarketplaceEnabled,
+  sellerStatuses,
+  sellerOfferStatuses,
+  sellerSettlementStatuses,
+  DEFAULT_MARKETPLACE_SELLER_COMMISSION_RATE,
+  computeSellerCommissionCents,
+  createSellerSchema,
+  updateSellerSchema,
+  createSellerOfferSchema,
+  updateSellerOfferSchema,
+  recordSellerFulfillmentSchema,
+  type SellerStatus,
+  type SellerOfferStatus,
+  type SellerSettlementStatus
+} from "./seller-marketplace.js";
+
+export {
   catalogProductStatuses,
   catalogProductSources,
   CATALOG_PRODUCT_SCAN_LIMIT,
