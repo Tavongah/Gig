@@ -1,0 +1,104 @@
+# Temporary verification only. Does not deploy, migrate, or update main.
+name: Verify production access
+
+on:
+  push:
+    branches:
+      - cursor/verify-prod-access-cfb9
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gigflow-production
+  cancel-in-progress: false
+
+jobs:
+  verify-access:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confirm SSH target is DUTS production DNS
+        id: dns
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_SSH_USER: ${{ secrets.DO_SSH_USER }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, socket
+          host=os.environ.get("DO_HOST","").strip()
+          user=os.environ.get("DO_SSH_USER","").strip()
+          names=["api.duts.tech","www.duts.tech","admin.duts.tech","app.duts.tech","duts.tech"]
+
+          def ips(name):
+              try:
+                  infos=socket.getaddrinfo(name, 443, socket.AF_INET)
+              except socket.gaierror:
+                  return []
+              return sorted({item[4][0] for item in infos})
+
+          dns={name: ips(name) for name in names}
+          for name, values in dns.items():
+              print(f"dns {name} {','.join(values) if values else 'none'}")
+
+          host_ips=set()
+          if host:
+              try:
+                  socket.inet_aton(host)
+                  host_ips.add(host)
+              except OSError:
+                  host_ips.update(ips(host))
+
+          matched=[name for name, values in dns.items() if host_ips & set(values)]
+          match="yes" if "api.duts.tech" in matched else "no"
+          print("dns_match_api=" + match)
+          print("dns_match_names=" + (",".join(matched) if matched else "none"))
+          print("host_present=" + ("yes" if host else "no"))
+          print("user_present=" + ("yes" if user else "no"))
+          print("user_is_deploy=" + ("yes" if user=="deploy" else "no"))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"match={match}\n")
+              fh.write("host_present=" + ("yes" if host else "no") + "\n")
+              fh.write("user_present=" + ("yes" if user else "no") + "\n")
+          PY
+
+      - name: Public health endpoints
+        run: |
+          set -euo pipefail
+          echo "PUBLIC_API_HEALTH_BEGIN"
+          curl -fsS --max-time 20 "https://api.duts.tech/health" | head -c 200 || echo "PUBLIC_API_HEALTH=fail"
+          echo
+          echo "PUBLIC_API_HEALTH_END"
+          echo "PUBLIC_READY_BEGIN"
+          curl -fsS --max-time 20 "https://api.duts.tech/ready" | head -c 200 || echo "PUBLIC_READY=fail"
+          echo
+          echo "PUBLIC_READY_END"
+          echo "PUBLIC_MARKETING_BEGIN"
+          curl -fsS --max-time 20 "https://www.duts.tech/health" | head -c 80 || echo "PUBLIC_MARKETING=fail"
+          echo
+          echo "PUBLIC_MARKETING_END"
+
+      - name: Stop when deploy SSH secrets are missing
+        if: steps.dns.outputs.host_present != 'yes' || steps.dns.outputs.user_present != 'yes'
+        run: |
+          echo "DO_HOST or DO_SSH_USER is empty. SSH was not attempted."
+          exit 1
+
+      - name: Read-only SSH verification and existing backup
+        if: steps.dns.outputs.host_present == 'yes' && steps.dns.outputs.user_present == 'yes'
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DNS_TARGET_MATCH: ${{ steps.dns.outputs.match }}
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_SSH_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          port: 22
+          timeout: 30s
+          command_timeout: 60m
+          envs: DNS_TARGET_MATCH
+          script_file: .github/workflows/verify-production-remote.sh
