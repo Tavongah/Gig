@@ -12,6 +12,7 @@ import { useShopLocationStore } from "../../stores/shop-location.store";
 import { cartLineKey, useCommerceCartStore } from "../../stores/commerce-cart.store";
 import { toCheckoutLine } from "../../lib/storefront-cart";
 import { formatFlavorCustomerLine, resolveCustomerPrimaryMerchant } from "@gigflow/shared";
+import { SellerPilotCheckout } from "./SellerPilotCheckout";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CommerceCheckout">;
 type PayMethod = "CASH" | "ECOCASH";
@@ -23,6 +24,9 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
   const location = useShopLocationStore((s) => s.location);
   const lines = useCommerceCartStore((s) => s.lines);
   const clear = useCommerceCartStore((s) => s.clear);
+  const sellerLines = lines.filter((line) => line.sellerOfferId);
+  const sellerCart =
+    sellerLines.length > 0 && sellerLines.length === lines.length && new Set(sellerLines.map((line) => line.sellerOfferId)).size === 1;
   const [method, setMethod] = useState<PayMethod>("CASH");
   const [ecoCashPhone, setEcoCashPhone] = useState(user?.phoneNumber ?? "");
   const [error, setError] = useState("");
@@ -57,7 +61,7 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
         },
         token
       ),
-    enabled: Boolean(session && token && location && lines.length)
+    enabled: Boolean(session && token && location && lines.length && !sellerCart)
   });
 
   useEffect(() => {
@@ -96,6 +100,28 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
 
   if (!location) {
     return null;
+  }
+
+  if (sellerCart && sellerLines[0]) {
+    return (
+      <SellerPilotCheckout
+        line={sellerLines[0]}
+        location={{ latitude: location.latitude, longitude: location.longitude, label: location.label }}
+        token={token}
+        contactName={user.fullName ?? "Customer"}
+        contactPhone={user.phoneNumber ?? ""}
+        onPlaced={clear}
+      />
+    );
+  }
+
+  if (sellerLines.length > 0) {
+    return (
+      <View className="flex-1 bg-background px-5 pt-8">
+        <Text className="text-2xl font-black text-ink">YOUR DUTS ORDER</Text>
+        <Text className="mt-4 text-base text-ink">Finish your current order before adding this item.</Text>
+      </View>
+    );
   }
 
   const quote = prepQuery.data;

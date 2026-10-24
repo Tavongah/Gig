@@ -448,7 +448,10 @@ export {
 export {
   commitSellerFulfillmentSchema,
   confirmSellerFulfillmentPaymentSchema,
+  createCustomerSellerPurchaseSchema,
   createSellerFulfillmentSchema,
+  customerSellerPaymentLabel,
+  customerSellerPurchaseStatusLabel,
   createSellerOfferSchema,
   createSellerSchema,
   parseSellerMarketplaceEnabled,
@@ -468,6 +471,13 @@ export {
   type SellerSettlementStatus,
   type SellerStatus
 } from "./seller-marketplace.js";
+
+export {
+  merchantCartBlockedBySellerPilot,
+  planSellerPilotCartAdd,
+  type SellerPilotCartAddResult,
+  type SellerPilotCartLine
+} from "./seller-pilot-cart.js";
 
 export {
   compareSmartBasketMatches,

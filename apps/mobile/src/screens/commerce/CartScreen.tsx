@@ -40,6 +40,8 @@ export function CartScreen() {
   const ctaReadyOnce = useRef(false);
   const reduceMotion = useReducedMotion();
 
+  const sellerCart = lines.length > 0 && lines.every((line) => Boolean(line.sellerOfferId));
+
   const quoteMut = useMutation({
     mutationFn: () => {
       if (browse.isGuest || !browse.exact) {
@@ -62,7 +64,7 @@ export function CartScreen() {
 
   useEffect(() => {
     setQuoteError("");
-    if (!lines.length) return;
+    if (!lines.length || sellerCart) return;
     quoteMut.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines, browse.isGuest, browse.exact?.latitude, browse.exact?.longitude]);
@@ -183,6 +185,18 @@ export function CartScreen() {
     setQuoteError("");
     setWorking(true);
     try {
+      if (sellerCart) {
+        if (browse.isGuest) {
+          chooseAccount();
+          return;
+        }
+        if (!browse.exact) {
+          navigation.navigate("ShopLocation", { next: "checkout" });
+          return;
+        }
+        navigation.navigate("CommerceCheckout");
+        return;
+      }
       if (shoppingList.length && !useCommerceCartStore.getState().lines.length) {
         const selected = await autoSelectBestShop();
         if (!selected) return;
@@ -312,9 +326,11 @@ export function CartScreen() {
       subtotalCents: group.lines.reduce((s, l) => s + l.unitPriceCents * l.quantity, 0)
     }))
   );
-  const canContinue = shoppingList.length && !lines.length
+  const canContinue = sellerCart
     ? !working
-    : Boolean(quote) && !quoteMut.isPending && !quoteError && !working;
+    : shoppingList.length && !lines.length
+      ? !working
+      : Boolean(quote) && !quoteMut.isPending && !quoteError && !working;
 
   function renderLine(line: (typeof lines)[number]) {
     const priced = quotedLine(line);
@@ -365,7 +381,8 @@ export function CartScreen() {
     );
   }
 
-  const primaryLabel = browse.isGuest ? "Continue with WhatsApp" : "Continue";
+  const primaryLabel = sellerCart && browse.isGuest ? "Sign in to continue" : browse.isGuest ? "Continue with WhatsApp" : "Continue";
+  const sellerSubtotalCents = sellerCart ? lines.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0) : 0;
 
   return (
     <View className="flex-1 bg-background">
@@ -376,7 +393,7 @@ export function CartScreen() {
           {lines.length ? (
             <>
               <Text className="text-2xl font-black text-ink">Your cart</Text>
-              {primaryShop ? (
+              {primaryShop && !sellerCart ? (
                 <Text className="mt-1 text-sm font-semibold text-muted">Shop: {primaryShop.merchantName}</Text>
               ) : null}
               {notice ? <Text className="mt-2 text-sm font-semibold text-ink">{notice}</Text> : null}
@@ -387,7 +404,12 @@ export function CartScreen() {
           {quoteMut.isPending ? <ActivityIndicator className="mt-4" color={DUTS.purple} /> : null}
           {quoteError ? <Text className="mt-3 text-sm text-danger">{quoteError}</Text> : null}
 
-          {quote ? (
+          {sellerCart ? (
+            <View className="mt-6 gap-1 rounded-2xl border border-border bg-surface p-4">
+              <Text className="text-sm text-muted">Subtotal       {moneyLabel(sellerSubtotalCents)}</Text>
+              <Text className="text-sm text-muted">Delivery       Calculated at checkout</Text>
+            </View>
+          ) : quote ? (
             <View className="mt-6 gap-1 rounded-2xl border border-border bg-surface p-4">
               <Text className="text-sm text-muted">Subtotal       {moneyLabel(quote.subtotalCents)}</Text>
               <Text className="text-sm text-muted">

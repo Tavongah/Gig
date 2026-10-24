@@ -10,6 +10,7 @@ import { DUTS } from "../../lib/theme";
 import { productCardMeta } from "../../lib/storefront-ui";
 import { alcoholPurchaseAllowed, isSmartBasketEnabled } from "../../lib/storefront-categories";
 import { addStorefrontProduct, tryAddOfferToCart } from "../../lib/storefront-cart";
+import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 import { storefrontVisitSeed } from "../../lib/storefront-home-rotate";
 import { pickMoreLikeThis, relatedSearchQuery } from "../../lib/storefront-related";
 import { ProductRail } from "../../components/ProductGrid";
@@ -48,6 +49,13 @@ export function ProductDetailScreen({ route, navigation }: Props) {
       ),
     enabled: Boolean(route.params.catalogProductId || route.params.productId)
   });
+  const pilotOfferId = route.params.sellerOfferId;
+  const pilotQuery = useQuery({
+    queryKey: ["pilot-offer", pilotOfferId],
+    queryFn: () => api.commercePilotOffer(pilotOfferId!, browse.token),
+    enabled: Boolean(pilotOfferId)
+  });
+  const pilot = pilotQuery.data?.offer;
 
   const product = detailQuery.data?.product;
   const offers = detailQuery.data?.offers ?? [];
@@ -55,7 +63,8 @@ export function ProductDetailScreen({ route, navigation }: Props) {
   const alcoholOk = alcoholPurchaseAllowed(product?.category);
   const purchasable = Boolean(detailQuery.data?.purchasable && offers.length && alcoholOk);
   const fromPriceCents = detailQuery.data?.fromPriceCents ?? null;
-  const showImage = Boolean(product?.imageUrl) && !imgFailed;
+  const heroImage = product?.imageUrl || pilot?.imageUrl || null;
+  const showImage = Boolean(heroImage) && !imgFailed;
   const meta = product ? productCardMeta(product.name, product.brand, product.sizeLabel) : "";
   const visitSeed = useMemo(() => storefrontVisitSeed(), []);
   const relatedQ = product ? relatedSearchQuery(product) : "";
@@ -157,6 +166,25 @@ export function ProductDetailScreen({ route, navigation }: Props) {
     });
   }
 
+  function addPilotOffer() {
+    if (!pilot?.available) return;
+    if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
+    const added = useCommerceCartStore.getState().addSellerPilot({
+      productId: pilot.catalogProductId,
+      catalogProductId: pilot.catalogProductId,
+      name: pilot.productName,
+      imageUrl: pilot.imageUrl,
+      sizeLabel: pilot.sizeLabel,
+      unitPriceCents: pilot.unitPriceCents,
+      merchantId: pilot.offerId,
+      merchantName: "",
+      sellerOfferId: pilot.offerId,
+      sellableQuantity: pilot.sellableQuantity,
+      quantity: 1
+    });
+    if (added) markAdded(pilot.offerId);
+  }
+
   function addFromOffer(offer: (typeof offers)[number]) {
     if (!product) return;
     if (!alcoholPurchaseAllowed(product.category)) return;
@@ -198,11 +226,11 @@ export function ProductDetailScreen({ route, navigation }: Props) {
         <ActivityIndicator color={DUTS.purple} />
       ) : showImage ? (
         <Image
-          source={{ uri: product!.imageUrl! }}
+          source={{ uri: heroImage! }}
           className="duts-product-card-image"
           style={{ width: "86%", height: "86%", maxWidth: 420, maxHeight: 420 }}
           resizeMode="contain"
-          accessibilityLabel={product?.name}
+          accessibilityLabel={product?.name ?? pilot?.productName}
           {...({ loading: "lazy" } as object)}
           onError={() => setImgFailed(true)}
         />
@@ -215,7 +243,27 @@ export function ProductDetailScreen({ route, navigation }: Props) {
     </View>
   );
 
-  const info = product ? (
+  const pilotInfo = pilot ? (
+    <View className="gap-2">
+      <Text className="text-2xl font-black text-ink">{pilot.productName}</Text>
+      {pilot.sizeLabel ? <Text className="text-base text-muted">{pilot.sizeLabel}</Text> : null}
+      <Text className="mt-2 text-2xl font-black text-ink">${(pilot.unitPriceCents / 100).toFixed(2)}</Text>
+      <Text className="text-sm font-semibold text-muted">{pilot.available ? "Delivery available" : "Unavailable"}</Text>
+      {pilot.available ? (
+        <Pressable
+          onPress={addPilotOffer}
+          accessibilityRole="button"
+          accessibilityLabel={`Add ${pilot.productName}`}
+          className="mt-4 h-12 items-center justify-center rounded-full px-4"
+          style={({ pressed }) => ({ backgroundColor: DUTS.purple, transform: [{ scale: pressed ? 0.97 : 1 }] })}
+        >
+          <Text className="font-extrabold text-white">{addedKey === pilot.offerId ? "Added ✓" : "ADD TO CART"}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  ) : null;
+
+  const info = pilotInfo ? pilotInfo : product ? (
     <View className="gap-2">
       <Text className="text-2xl font-black text-ink">{product.name}</Text>
       {meta ? <Text className="text-base text-muted">{meta}</Text> : null}
