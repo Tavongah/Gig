@@ -28,12 +28,18 @@ jobs:
         env:
           DO_HOST: ${{ secrets.DO_HOST }}
           DO_SSH_USER: ${{ secrets.DO_SSH_USER }}
+          DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
+          API_DOMAIN: ${{ secrets.API_DOMAIN }}
+          MARKETING_DOMAIN: ${{ secrets.MARKETING_DOMAIN }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import os, socket
           host=os.environ.get("DO_HOST","").strip()
           user=os.environ.get("DO_SSH_USER","").strip()
+          key=os.environ.get("DO_SSH_KEY","").strip()
+          api_domain=os.environ.get("API_DOMAIN","").strip()
+          marketing_domain=os.environ.get("MARKETING_DOMAIN","").strip()
           names=["api.duts.tech","www.duts.tech","admin.duts.tech","app.duts.tech","duts.tech"]
 
           def ips(name):
@@ -62,10 +68,16 @@ jobs:
           print("host_present=" + ("yes" if host else "no"))
           print("user_present=" + ("yes" if user else "no"))
           print("user_is_deploy=" + ("yes" if user=="deploy" else "no"))
+          print("key_present=" + ("yes" if key else "no"))
+          print("api_domain_secret_present=" + ("yes" if api_domain else "no"))
+          print("marketing_domain_secret_present=" + ("yes" if marketing_domain else "no"))
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
               fh.write(f"match={match}\n")
               fh.write("host_present=" + ("yes" if host else "no") + "\n")
               fh.write("user_present=" + ("yes" if user else "no") + "\n")
+              fh.write("key_present=" + ("yes" if key else "no") + "\n")
+              fh.write("api_domain_present=" + ("yes" if api_domain else "no") + "\n")
+              fh.write("marketing_domain_present=" + ("yes" if marketing_domain else "no") + "\n")
           PY
 
       - name: Public health endpoints
@@ -84,20 +96,26 @@ jobs:
           echo
           echo "PUBLIC_MARKETING_END"
 
-      - name: Stop when deploy SSH secrets are missing
-        if: steps.dns.outputs.host_present != 'yes' || steps.dns.outputs.user_present != 'yes'
+      - name: Stop when the deploy key is missing or the host is not production
+        if: steps.dns.outputs.key_present != 'yes' || (steps.dns.outputs.host_present == 'yes' && steps.dns.outputs.match != 'yes')
         run: |
-          echo "DO_HOST or DO_SSH_USER is empty. SSH was not attempted."
+          echo "key_present=${{ steps.dns.outputs.key_present }}"
+          echo "host_present=${{ steps.dns.outputs.host_present }}"
+          echo "user_present=${{ steps.dns.outputs.user_present }}"
+          echo "api_domain_secret_present=${{ steps.dns.outputs.api_domain_present }}"
+          echo "marketing_domain_secret_present=${{ steps.dns.outputs.marketing_domain_present }}"
+          echo "dns_match_api=${{ steps.dns.outputs.match }}"
+          echo "SSH was not attempted."
           exit 1
 
       - name: Read-only SSH verification and existing backup
-        if: steps.dns.outputs.host_present == 'yes' && steps.dns.outputs.user_present == 'yes'
+        if: steps.dns.outputs.key_present == 'yes' && (steps.dns.outputs.host_present != 'yes' || steps.dns.outputs.match == 'yes')
         uses: appleboy/ssh-action@v1.2.0
         env:
-          DNS_TARGET_MATCH: ${{ steps.dns.outputs.match }}
+          DNS_TARGET_MATCH: ${{ steps.dns.outputs.host_present == 'yes' && steps.dns.outputs.match || 'yes' }}
         with:
-          host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_SSH_USER }}
+          host: ${{ secrets.DO_HOST || 'api.duts.tech' }}
+          username: ${{ secrets.DO_SSH_USER || 'deploy' }}
           key: ${{ secrets.DO_SSH_KEY }}
           port: 22
           timeout: 30s
