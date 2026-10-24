@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { cartLineIdentity } from "@gigflow/shared";
+import { cartLineIdentity, merchantCartBlockedBySellerPilot, planSellerPilotCartAdd } from "@gigflow/shared";
 
 export type CartLine = {
   productId: string;
@@ -13,6 +13,9 @@ export type CartLine = {
   quantity: number;
   merchantId: string;
   merchantName: string;
+  /** Set only for a controlled pilot purchase. Merchant lines omit this. */
+  sellerOfferId?: string | null;
+  sellableQuantity?: number | null;
   flavorOptionId?: string | null;
   flavorName?: string | null;
   flavorPreference?: "ANY" | "SPECIFIC" | null;
@@ -38,6 +41,7 @@ type CartState = {
   hydrated: boolean;
   pendingCheckout: boolean;
   addOffer: (line: Omit<CartLine, "quantity"> & { quantity?: number }, options?: { allowMulti?: boolean }) => boolean;
+  addSellerPilot: (line: Omit<CartLine, "quantity"> & { sellerOfferId: string; sellableQuantity: number; quantity?: number }) => boolean;
   notice: string | null;
   clearNotice: () => void;
   setQuantity: (lineKey: string, quantity: number) => void;
@@ -93,6 +97,10 @@ export const useCommerceCartStore = create<CartState>((set, get) => ({
   clearNotice: () => set({ notice: null }),
 
   addOffer: (input, options) => {
+    if (merchantCartBlockedBySellerPilot(get().lines)) {
+      set({ notice: "Finish your current order before adding this item." });
+      return false;
+    }
     if (!input.productId || !input.merchantId) return false;
     const state = get();
     if (state.merchantId && state.merchantId !== input.merchantId && !options?.allowMulti) {
@@ -165,14 +173,33 @@ export const useCommerceCartStore = create<CartState>((set, get) => ({
     return true;
   },
 
+  addSellerPilot: (input) => {
+    const decision = planSellerPilotCartAdd(get().lines, input);
+    if (!decision.ok) {
+      set({ notice: decision.message });
+      return false;
+    }
+    set({
+      lines: decision.lines,
+      merchantId: null,
+      merchantName: null,
+      notice: "Added ✓"
+    });
+    return true;
+  },
+
   setQuantity: (lineKey, quantity) => {
     if (quantity <= 0) {
       get().remove(lineKey);
       return;
     }
+    const current = get().lines.find((line) => cartLineKey(line) === lineKey);
+    const cap = current?.sellerOfferId && current.sellableQuantity && current.sellableQuantity > 0
+      ? current.sellableQuantity
+      : 99;
     set({
       lines: get().lines.map((l) =>
-        cartLineKey(l) === lineKey ? { ...l, quantity: Math.min(99, quantity) } : l
+        cartLineKey(l) === lineKey ? { ...l, quantity: Math.min(cap, quantity) } : l
       )
     });
   },

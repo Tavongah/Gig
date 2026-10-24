@@ -1179,6 +1179,65 @@ export const api = {
       }>;
     }>("/commerce/cart/prepare", { method: "POST", body: JSON.stringify(payload) }, token),
 
+  commercePilotOffer: (offerId: string, token?: string) =>
+    request<{
+      offer: {
+        offerId: string;
+        catalogProductId: string;
+        productName: string;
+        brand: string | null;
+        sizeLabel: string | null;
+        imageUrl: string | null;
+        unitPriceCents: number;
+        currency: string;
+        sellableQuantity: number;
+        available: boolean;
+      };
+    }>(`/commerce/pilot-offers/${offerId}`, {}, token),
+
+  commercePilotPurchase: (
+    payload: {
+      offerId: string;
+      quantity: number;
+      expectedUnitPriceCents: number;
+      dropoffLabel: string;
+      dropoffLatitude: number;
+      dropoffLongitude: number;
+      dropoffContactName: string;
+      dropoffContactPhone: string;
+      paymentMethod: "CASH" | "ECOCASH";
+      payerPhone?: string;
+    },
+    token: string
+  ) =>
+    request<{
+      purchase: {
+        purchaseId: string;
+        productName: string;
+        quantity: number;
+        unitPriceCents: number;
+        merchandiseCents: number;
+        deliveryFeeCents: number;
+        totalCents: number;
+        currency: string;
+        statusLabel: string;
+        paymentLabel: string;
+      };
+    }>("/commerce/pilot-purchases", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  commercePilotPurchaseStatus: (purchaseId: string, token: string) =>
+    request<{
+      purchase: {
+        purchaseId: string;
+        productName: string;
+        quantity: number;
+        statusLabel: string;
+        paymentLabel: string;
+        totalCents: number;
+        deliveryFeeCents: number;
+      };
+    }>(`/commerce/pilot-purchases/${purchaseId}`, {}, token),
+
   commerceCheckout: (
     payload: {
       lat: number;

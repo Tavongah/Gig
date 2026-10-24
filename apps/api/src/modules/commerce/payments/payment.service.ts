@@ -316,6 +316,9 @@ export async function applyProviderPaymentResult(
     const { applyUnlistedProviderPaymentResult } = await import("../unlisted-item-payment.js");
     const unlisted = await applyUnlistedProviderPaymentResult(result);
     if (unlisted) return unlisted;
+    const { applySellerProviderPaymentResult } = await import("../seller-customer-payment.js");
+    const sellerPayment = await applySellerProviderPaymentResult(result);
+    if (sellerPayment) return sellerPayment;
     throw new AppError("Unknown payment attempt.", 404, "PAYMENT_ATTEMPT_NOT_FOUND");
   }
 
