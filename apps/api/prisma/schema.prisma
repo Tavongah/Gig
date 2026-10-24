@@ -420,6 +420,7 @@ model Gig {
   commerceOrder         CommerceOrder?
   commerceCheckout      CommerceCheckout?
   unlistedItemRequest   UnlistedItemRequest?
+  sellerFulfillment     SellerFulfillment?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
@@ -979,6 +980,7 @@ model Seller {
   notes               String?
   offers              SellerOffer[]
   ledgerEntries       SellerLedgerEntry[]
+  fulfillments        SellerFulfillment[]
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
@@ -994,11 +996,15 @@ model SellerOffer {
   catalogProductId String
   catalogProduct   CatalogProduct    @relation(fields: [catalogProductId], references: [id], onDelete: Restrict)
   priceCents       Int
+  /** Physical units still with the seller. Not reduced by checkout browsing. */
   quantity         Int
+  /** Subset of quantity held for an open seller fulfillment. */
+  reservedQuantity Int               @default(0)
   currency         String            @default("usd")
   /** New offers stay paused until an admin explicitly activates a verified seller. */
   status           SellerOfferStatus @default(PAUSED)
   ledgerEntries    SellerLedgerEntry[]
+  fulfillments     SellerFulfillment[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -1034,11 +1040,70 @@ model SellerLedgerEntry {
   reversedBy          SellerLedgerEntry[]     @relation("SellerLedgerReversal")
   /** Future order id. No CommerceOrder foreign key in V1. */
   reference           String?
+  sellerFulfillmentId String?                 @unique
+  sellerFulfillment   SellerFulfillment?      @relation(fields: [sellerFulfillmentId], references: [id], onDelete: Restrict)
   createdAt           DateTime                @default(now())
 
   @@index([sellerId, createdAt])
   @@index([sellerOfferId])
   @@index([settlementStatus])
+}
+
+/**
+ * Pilot seller purchase. Not a CommerceOrder and not a Merchant.
+ * Inventory is reserved here and committed once when delivery is recorded.
+ */
+enum SellerFulfillmentStatus {
+  PAYMENT_PENDING
+  READY_FOR_PICKUP
+  NEEDS_ATTENTION
+  DELIVERED
+  CANCELLED
+  PAYMENT_FAILED
+}
+
+model SellerFulfillment {
+  id                    String                   @id @default(uuid())
+  sellerId              String
+  seller                Seller                   @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  sellerOfferId         String
+  sellerOffer           SellerOffer              @relation(fields: [sellerOfferId], references: [id], onDelete: Restrict)
+  catalogProductId      String
+  productNameSnapshot   String
+  sellerNameSnapshot    String
+  quantity              Int
+  unitPriceCents        Int
+  merchandiseCents      Int
+  /** Rate copied at reservation. Later platform changes do not rewrite it. */
+  commissionRate        Decimal                  @db.Decimal(4, 3)
+  commissionCents       Int
+  sellerProceedsCents   Int
+  /** DUTS delivery economics. Never added into sellerProceedsCents. */
+  deliveryFeeCents      Int                      @default(0)
+  currency              String                   @default("usd")
+  paymentStatus         CommercePaymentStatus    @default(PENDING)
+  paymentReference      String?
+  status                SellerFulfillmentStatus  @default(PAYMENT_PENDING)
+  idempotencyKey        String?                  @unique
+  linkedDeliveryGigId   String?                  @unique
+  linkedDeliveryGig     Gig?                     @relation(fields: [linkedDeliveryGigId], references: [id], onDelete: SetNull)
+  reservationReleasedAt DateTime?
+  inventoryCommittedAt  DateTime?
+  dropoffLabel          String
+  dropoffLatitude       Decimal                  @db.Decimal(9, 6)
+  dropoffLongitude      Decimal                  @db.Decimal(9, 6)
+  dropoffContactName    String
+  dropoffContactPhone   String
+  needsAttentionReason  String?
+  cancelledAt           DateTime?
+  deliveredAt           DateTime?
+  ledgerEntry           SellerLedgerEntry?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  @@index([sellerId, status])
+  @@index([sellerOfferId])
+  @@index([paymentStatus])
 }
 
 enum CommerceCustomerSource {
