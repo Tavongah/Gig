@@ -106,3 +106,33 @@ export const commitSellerFulfillmentSchema = z.object({
 export const sellerCommissionRateSchema = z.object({
   rate: z.number().min(0).max(1)
 });
+
+export const sellerFulfillmentStatuses = [
+  "PAYMENT_PENDING",
+  "READY_FOR_PICKUP",
+  "NEEDS_ATTENTION",
+  "DELIVERED",
+  "CANCELLED",
+  "PAYMENT_FAILED"
+] as const;
+
+export type SellerFulfillmentStatus = (typeof sellerFulfillmentStatuses)[number];
+
+export const createSellerFulfillmentSchema = z.object({
+  quantity: z.number().int().min(1).max(100),
+  dropoffLabel: z.string().min(3).max(240),
+  dropoffLatitude: z.number().min(-90).max(90),
+  dropoffLongitude: z.number().min(-180).max(180),
+  dropoffContactName: z.string().min(2).max(100),
+  dropoffContactPhone: z.string().min(7).max(24),
+  paymentMethod: z.enum(["PREPAID", "CASH"]),
+  idempotencyKey: z.string().min(8).max(120).optional()
+});
+
+export const confirmSellerFulfillmentPaymentSchema = z.object({
+  paymentReference: z.string().min(1).max(120)
+});
+
+export const sellerFulfillmentAttentionSchema = z.object({
+  reason: z.string().min(3).max(240)
+});
