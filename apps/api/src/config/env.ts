@@ -93,6 +93,11 @@ const envSchema = z.object({
   UNLISTED_ITEM_REQUEST_ENABLED: z.string().optional(),
   /** Optional catalog flavor preferences. Default OFF until physical E2E. */
   PRODUCT_FLAVOR_OPTIONS_ENABLED: z.string().optional(),
+  /**
+   * Independent seller customer fulfillment. Default OFF until controlled E2E.
+   * Admin seller onboarding does not require this flag.
+   */
+  SELLER_MARKETPLACE_ENABLED: z.string().optional(),
   /** COD for unlisted items. Default OFF — courier has no purchase float. */
   UNLISTED_ITEM_COD_ENABLED: z.string().optional(),
   UNLISTED_ITEM_MIN_PRICE_CENTS: z.string().optional(),
