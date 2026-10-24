@@ -82,6 +82,7 @@ export function presentSellerOffer(offer: OfferWithCatalog) {
     priceCents: offer.priceCents,
     quantity: offer.quantity,
     reservedQuantity: offer.reservedQuantity,
+    customerPilotEnabled: offer.customerPilotEnabled,
     currency: offer.currency,
     status: offer.status,
     createdAt: offer.createdAt,
@@ -343,6 +344,9 @@ export async function updateSellerOffer(sellerId: string, offerId: string, input
     where: { id: offer.id },
     data: {
       ...(parsed.priceCents !== undefined ? { priceCents: parsed.priceCents } : {}),
+      ...(parsed.customerPilotEnabled !== undefined
+        ? { customerPilotEnabled: parsed.customerPilotEnabled }
+        : {}),
       quantity,
       status
     },

@@ -92,7 +92,8 @@ export const updateSellerOfferSchema = z
   .object({
     priceCents: z.number().int().min(1).max(10_000_000).optional(),
     quantity: z.number().int().min(0).max(100_000).optional(),
-    status: activatableOfferStatus.optional()
+    status: activatableOfferStatus.optional(),
+    customerPilotEnabled: z.boolean().optional()
   })
   .refine((value) => Object.keys(value).length > 0, { message: "No offer changes." });
 
@@ -136,3 +137,48 @@ export const confirmSellerFulfillmentPaymentSchema = z.object({
 export const sellerFulfillmentAttentionSchema = z.object({
   reason: z.string().min(3).max(240)
 });
+
+export const createCustomerSellerPurchaseSchema = z.object({
+  offerId: z.string().uuid(),
+  quantity: z.number().int().min(1).max(100),
+  expectedUnitPriceCents: z.number().int().min(1).max(10_000_000),
+  dropoffLabel: z.string().min(3).max(240),
+  dropoffLatitude: z.number().min(-90).max(90),
+  dropoffLongitude: z.number().min(-180).max(180),
+  dropoffContactName: z.string().min(2).max(100),
+  dropoffContactPhone: z.string().min(7).max(24),
+  paymentMethod: z.enum(["ECOCASH", "CASH"]),
+  payerPhone: z.string().min(7).max(24).optional()
+});
+
+/** Customer-facing words. Internal fulfillment enums stay off this string. */
+export function customerSellerPurchaseStatusLabel(input: {
+  status: string;
+  gigStatus?: string | null;
+}): string {
+  if (input.status === "PAYMENT_FAILED") return "Payment failed";
+  if (input.status === "CANCELLED") return "Cancelled";
+  if (input.status === "NEEDS_ATTENTION") return "Needs attention";
+  if (input.status === "DELIVERED") return "Delivered";
+  if (input.status === "PAYMENT_PENDING") return "Payment pending";
+  if (input.gigStatus === "EN_ROUTE_TO_DROPOFF" || input.gigStatus === "ARRIVED_AT_DROPOFF") {
+    return "Out for delivery";
+  }
+  if (
+    input.gigStatus === "ASSIGNED" ||
+    input.gigStatus === "ACCEPTED" ||
+    input.gigStatus === "EN_ROUTE_TO_PICKUP" ||
+    input.gigStatus === "ARRIVED_AT_PICKUP"
+  ) {
+    return "Courier assigned";
+  }
+  if (input.status === "READY_FOR_PICKUP") return "Preparing pickup";
+  return "Order confirmed";
+}
+
+export function customerSellerPaymentLabel(paymentStatus: string): string {
+  if (paymentStatus === "PAID") return "Paid";
+  if (paymentStatus === "DUE_ON_DELIVERY") return "Pay on delivery";
+  if (paymentStatus === "PAYMENT_FAILED") return "Payment failed";
+  return "Payment pending";
+}
