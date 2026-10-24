@@ -1000,6 +1000,8 @@ model SellerOffer {
   quantity         Int
   /** Subset of quantity held for an open seller fulfillment. */
   reservedQuantity Int               @default(0)
+  /** Customer web purchase gate. Existing offers stay off. */
+  customerPilotEnabled Boolean       @default(false)
   currency         String            @default("usd")
   /** New offers stay paused until an admin explicitly activates a verified seller. */
   status           SellerOfferStatus @default(PAUSED)
@@ -1066,6 +1068,8 @@ model SellerFulfillment {
   id                    String                   @id @default(uuid())
   sellerId              String
   seller                Seller                   @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  /** Shopper who placed this pilot purchase. Not the delivery gig client. */
+  customerUserId        String?
   sellerOfferId         String
   sellerOffer           SellerOffer              @relation(fields: [sellerOfferId], references: [id], onDelete: Restrict)
   catalogProductId      String
@@ -1098,12 +1102,41 @@ model SellerFulfillment {
   cancelledAt           DateTime?
   deliveredAt           DateTime?
   ledgerEntry           SellerLedgerEntry?
+  paymentAttempts       SellerPaymentAttempt[]
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
 
   @@index([sellerId, status])
   @@index([sellerOfferId])
   @@index([paymentStatus])
+  @@index([customerUserId])
+}
+
+/**
+ * Customer payment for one seller fulfillment.
+ * Separate from CommercePaymentAttempt so a callback cannot be applied to a merchant order by guesswork.
+ */
+model SellerPaymentAttempt {
+  id                  String                       @id @default(uuid())
+  sellerFulfillmentId String
+  sellerFulfillment   SellerFulfillment            @relation(fields: [sellerFulfillmentId], references: [id], onDelete: Restrict)
+  provider            String
+  providerPaymentId   String?                      @unique
+  merchantReference   String?                      @unique
+  payerPhone          String
+  amountCents         Int
+  currency            String                       @default("usd")
+  status              CommercePaymentAttemptStatus @default(CREATED)
+  failureReason       String?
+  pollUrl             String?
+  paynowReference     String?
+  expiresAt           DateTime?
+  initiatedAt         DateTime?
+  confirmedAt         DateTime?
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+
+  @@index([sellerFulfillmentId, status])
 }
 
 enum CommerceCustomerSource {

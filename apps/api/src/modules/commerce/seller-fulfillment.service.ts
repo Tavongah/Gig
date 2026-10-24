@@ -7,7 +7,8 @@
  * is allowed. Inventory is reserved at creation and committed once when delivery
  * is recorded. Seller proceeds are written once, from the rate snapshotted here.
  *
- * Every entry point fails closed while SELLER_MARKETPLACE_ENABLED is off.
+ * New reservations fail closed while SELLER_MARKETPLACE_ENABLED is off.
+ * An order already reserved stays readable and can still be paid, delivered, or settled.
  */
 
 import {
@@ -244,7 +245,6 @@ export async function createSellerFulfillment(sellerId: string, offerId: string,
 }
 
 export async function confirmSellerFulfillmentPayment(fulfillmentId: string, input: unknown) {
-  assertSellerMarketplaceEnabled();
   const parsed = confirmSellerFulfillmentPaymentSchema.parse(input);
   let changed = false;
   const updated = await prisma.$transaction(async (tx) => {
@@ -286,7 +286,6 @@ async function releaseOpenReservation(tx: Prisma.TransactionClient, row: SellerF
 }
 
 export async function failSellerFulfillmentPayment(fulfillmentId: string) {
-  assertSellerMarketplaceEnabled();
   let changed = false;
   const updated = await prisma.$transaction(async (tx) => {
     const row = await tx.sellerFulfillment.findUnique({ where: { id: fulfillmentId } });
@@ -323,7 +322,6 @@ async function gigCollected(gigId: string | null) {
 }
 
 export async function cancelSellerFulfillment(fulfillmentId: string) {
-  assertSellerMarketplaceEnabled();
   if (await gigCollected((await loadFulfillment(fulfillmentId)).linkedDeliveryGigId)) {
     return markSellerFulfillmentNeedsAttention(fulfillmentId, {
       reason: "Cancellation requested after pickup. Goods were already collected."
@@ -371,7 +369,6 @@ export async function cancelSellerFulfillment(fulfillmentId: string) {
 }
 
 export async function markSellerFulfillmentNeedsAttention(fulfillmentId: string, input: unknown) {
-  assertSellerMarketplaceEnabled();
   const parsed = sellerFulfillmentAttentionSchema.parse(input);
   const collected = await gigCollected((await loadFulfillment(fulfillmentId)).linkedDeliveryGigId);
   const updated = await prisma.$transaction(async (tx) => {
@@ -403,7 +400,6 @@ function socketOrStub(): Server {
 }
 
 export async function linkSellerFulfillmentDelivery(fulfillmentId: string, actingUserId: string) {
-  assertSellerMarketplaceEnabled();
   const existing = await loadFulfillment(fulfillmentId);
   if (existing.linkedDeliveryGigId && existing.linkedDeliveryGig) {
     return deliveryLinkView(existing);
@@ -503,7 +499,6 @@ function deliveryLinkView(row: Awaited<ReturnType<typeof loadFulfillment>>) {
 }
 
 export async function completeSellerFulfillment(fulfillmentId: string) {
-  assertSellerMarketplaceEnabled();
   let changed = false;
   const completed = await prisma.$transaction(async (tx) => {
     const row = await tx.sellerFulfillment.findUnique({
@@ -588,7 +583,6 @@ export async function completeSellerFulfillment(fulfillmentId: string) {
 }
 
 export async function confirmSellerCodCollection(fulfillmentId: string) {
-  assertSellerMarketplaceEnabled();
   let changed = false;
   const updated = await prisma.$transaction(async (tx) => {
     const row = await tx.sellerFulfillment.findUnique({
@@ -626,12 +620,10 @@ export async function confirmSellerCodCollection(fulfillmentId: string) {
 }
 
 export async function getSellerFulfillment(fulfillmentId: string) {
-  assertSellerMarketplaceEnabled();
   return presentFulfillment(await loadFulfillment(fulfillmentId));
 }
 
 export async function listSellerFulfillments(sellerId: string) {
-  assertSellerMarketplaceEnabled();
   const seller = await prisma.seller.findUnique({ where: { id: sellerId }, select: { id: true } });
   if (!seller) throw new AppError("Seller not found.", 404, "SELLER_NOT_FOUND");
   const rows = await prisma.sellerFulfillment.findMany({

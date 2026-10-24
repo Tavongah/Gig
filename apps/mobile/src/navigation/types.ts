@@ -45,7 +45,7 @@ export type RootStackParamList = {
   WorkerFindItem: { requestId: string };
   MarketplaceCategory: { slug: string };
   AllCategories: undefined;
-  ProductDetail: { catalogProductId?: string; productId?: string };
+  ProductDetail: { catalogProductId?: string; productId?: string; sellerOfferId?: string };
   ShopDetail: { merchantId: string };
   ShopLocation: { next?: "checkout" } | undefined;
   GuestCheckoutChoice: undefined;
