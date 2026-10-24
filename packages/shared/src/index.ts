@@ -446,6 +446,25 @@ export {
 } from "./unlisted-item-request.js";
 
 export {
+  commitSellerFulfillmentSchema,
+  createSellerOfferSchema,
+  createSellerSchema,
+  parseSellerMarketplaceEnabled,
+  sellerCommissionRateSchema,
+  sellerLedgerKinds,
+  sellerOfferStatuses,
+  sellerSettlementStatuses,
+  sellerStatuses,
+  splitSellerMerchandiseCents,
+  updateSellerOfferSchema,
+  updateSellerSchema,
+  type SellerMerchandiseSplit,
+  type SellerOfferStatus,
+  type SellerSettlementStatus,
+  type SellerStatus
+} from "./seller-marketplace.js";
+
+export {
   compareSmartBasketMatches,
   coverageRatio,
   evaluateMerchantCoverage,
