@@ -65,6 +65,15 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     environment: production
     steps:
+      - uses: actions/checkout@v4
+      - name: Require deployment secrets
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_SSH_USER: ${{ secrets.DO_SSH_USER }}
+          DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
+          API_DOMAIN: ${{ secrets.API_DOMAIN }}
+          MARKETING_DOMAIN: ${{ secrets.MARKETING_DOMAIN }}
+        run: bash deploy/digitalocean/scripts/require-deploy-secrets.sh
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -74,8 +83,7 @@ jobs:
           script: |
             set -euo pipefail
             cd /opt/gigflow
-            chmod +x deploy/digitalocean/scripts/*.sh
-            ./deploy/digitalocean/scripts/deploy.sh
+            bash deploy/digitalocean/scripts/deploy.sh
       - name: Smoke test API
         run: |
           curl -fsS "https://${{ secrets.API_DOMAIN }}/health" | grep -q '"ok":true'
