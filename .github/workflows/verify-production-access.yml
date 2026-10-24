@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  deployments: write
 
 concurrency:
   group: gigflow-production
@@ -16,7 +17,8 @@ concurrency:
 jobs:
   verify-access:
     runs-on: ubuntu-latest
-    environment: production
+    environment:
+      name: production
     timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
