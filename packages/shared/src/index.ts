@@ -447,9 +447,13 @@ export {
 
 export {
   commitSellerFulfillmentSchema,
+  confirmSellerFulfillmentPaymentSchema,
+  createSellerFulfillmentSchema,
   createSellerOfferSchema,
   createSellerSchema,
   parseSellerMarketplaceEnabled,
+  sellerFulfillmentAttentionSchema,
+  sellerFulfillmentStatuses,
   sellerCommissionRateSchema,
   sellerLedgerKinds,
   sellerOfferStatuses,
@@ -458,6 +462,7 @@ export {
   splitSellerMerchandiseCents,
   updateSellerOfferSchema,
   updateSellerSchema,
+  type SellerFulfillmentStatus,
   type SellerMerchandiseSplit,
   type SellerOfferStatus,
   type SellerSettlementStatus,

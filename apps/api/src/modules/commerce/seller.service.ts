@@ -30,6 +30,7 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { assertValidMerchantCoordinates } from "./merchant-onboarding.service.js";
 import { normalizeMerchantPhone } from "./merchant.service.js";
+import { commitUnreservedOfferQuantity } from "./seller-inventory.js";
 
 const offerInclude = {
   catalogProduct: { select: { id: true, name: true, status: true } }
@@ -80,6 +81,7 @@ export function presentSellerOffer(offer: OfferWithCatalog) {
     catalogStatus: offer.catalogProduct.status,
     priceCents: offer.priceCents,
     quantity: offer.quantity,
+    reservedQuantity: offer.reservedQuantity,
     currency: offer.currency,
     status: offer.status,
     createdAt: offer.createdAt,
@@ -116,6 +118,13 @@ async function readSellerCommission(db: Prisma.TransactionClient | typeof prisma
     throw new AppError("Seller commission is not configured.", 409, "SELLER_COMMISSION_UNCONFIGURED");
   }
   return { rate, decimal: settings.marketplaceSellerCommissionRate };
+}
+
+/** Rate copied onto a seller fulfillment. Callers must store it; do not reread it at settlement. */
+export async function readSellerCommissionForFulfillment(
+  db: Prisma.TransactionClient | typeof prisma = prisma
+) {
+  return readSellerCommission(db);
 }
 
 export async function getSellerCommissionRate() {
@@ -406,13 +415,19 @@ export async function listPurchasableSellerOffers(input: { catalogProductId: str
     where: {
       catalogProductId: input.catalogProductId,
       status: "ACTIVE",
-      quantity: { gte: quantity },
       seller: { status: "ACTIVE" },
       catalogProduct: { status: "APPROVED" }
     },
     orderBy: [{ priceCents: "asc" }, { id: "asc" }]
   });
-  return offers.map(toCustomerSellerOffer);
+  return offers
+    .filter((offer) => offer.quantity - offer.reservedQuantity >= quantity)
+    .map((offer) =>
+      toCustomerSellerOffer({
+        ...offer,
+        quantity: offer.quantity - offer.reservedQuantity
+      })
+    );
 }
 
 /**
@@ -446,20 +461,12 @@ export async function commitSellerFulfillment(sellerId: string, offerId: string,
     if (offer.catalogProduct.status !== "APPROVED") {
       throw new AppError("Catalog product is not approved.", 409, "CATALOG_NOT_APPROVED");
     }
-    if (offer.quantity < parsed.quantity) {
+    if (offer.quantity - offer.reservedQuantity < parsed.quantity) {
       throw new AppError("Not enough seller quantity.", 409, "INSUFFICIENT_QUANTITY");
     }
 
-    const decremented = await tx.sellerOffer.updateMany({
-      where: {
-        id: offer.id,
-        sellerId,
-        status: "ACTIVE",
-        quantity: { gte: parsed.quantity }
-      },
-      data: { quantity: { decrement: parsed.quantity } }
-    });
-    if (decremented.count !== 1) {
+    const decremented = await commitUnreservedOfferQuantity(tx, offer.id, parsed.quantity);
+    if (decremented !== 1) {
       throw new AppError("Not enough seller quantity.", 409, "INSUFFICIENT_QUANTITY");
     }
 

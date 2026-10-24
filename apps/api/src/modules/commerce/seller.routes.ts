@@ -1,8 +1,11 @@
 import {
   commitSellerFulfillmentSchema,
+  confirmSellerFulfillmentPaymentSchema,
+  createSellerFulfillmentSchema,
   createSellerOfferSchema,
   createSellerSchema,
   sellerCommissionRateSchema,
+  sellerFulfillmentAttentionSchema,
   updateSellerOfferSchema,
   updateSellerSchema
 } from "@gigflow/shared";
@@ -12,6 +15,18 @@ import { z } from "zod";
 import { AppError } from "../../lib/errors.js";
 import { requireAuth, requireRole } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
+import {
+  cancelSellerFulfillment,
+  completeSellerFulfillment,
+  confirmSellerCodCollection,
+  confirmSellerFulfillmentPayment,
+  createSellerFulfillment,
+  failSellerFulfillmentPayment,
+  getSellerFulfillment,
+  linkSellerFulfillmentDelivery,
+  listSellerFulfillments,
+  markSellerFulfillmentNeedsAttention
+} from "./seller-fulfillment.service.js";
 import {
   commitSellerFulfillment,
   createSeller,
@@ -153,6 +168,125 @@ sellerAdminRouter.post(
     }
   }
 );
+
+sellerAdminRouter.post(
+  "/sellers/:id/offers/:offerId/fulfillments",
+  validateBody(createSellerFulfillmentSchema),
+  async (req, res, next) => {
+    try {
+      const fulfillment = await createSellerFulfillment(
+        routeId(req.params.id, "SELLER_NOT_FOUND"),
+        routeId(req.params.offerId, "SELLER_OFFER_NOT_FOUND"),
+        req.body
+      );
+      res.status(201).json({ fulfillment });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+sellerAdminRouter.get("/sellers/:id/fulfillments", async (req, res, next) => {
+  try {
+    res.json({ fulfillments: await listSellerFulfillments(routeId(req.params.id, "SELLER_NOT_FOUND")) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+sellerAdminRouter.get("/seller-fulfillments/:id", async (req, res, next) => {
+  try {
+    res.json({ fulfillment: await getSellerFulfillment(routeId(req.params.id, "SELLER_FULFILLMENT_NOT_FOUND")) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+sellerAdminRouter.post(
+  "/seller-fulfillments/:id/confirm-payment",
+  validateBody(confirmSellerFulfillmentPaymentSchema),
+  async (req, res, next) => {
+    try {
+      res.json({
+        fulfillment: await confirmSellerFulfillmentPayment(
+          routeId(req.params.id, "SELLER_FULFILLMENT_NOT_FOUND"),
+          req.body
+        )
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+sellerAdminRouter.post("/seller-fulfillments/:id/fail-payment", async (req, res, next) => {
+  try {
+    res.json({
+      fulfillment: await failSellerFulfillmentPayment(routeId(req.params.id, "SELLER_FULFILLMENT_NOT_FOUND"))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+sellerAdminRouter.post("/seller-fulfillments/:id/cancel", async (req, res, next) => {
+  try {
+    res.json({
+      fulfillment: await cancelSellerFulfillment(routeId(req.params.id, "SELLER_FULFILLMENT_NOT_FOUND"))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+sellerAdminRouter.post(
+  "/seller-fulfillments/:id/needs-attention",
+  validateBody(sellerFulfillmentAttentionSchema),
+  async (req, res, next) => {
+    try {
+      res.json({
+        fulfillment: await markSellerFulfillmentNeedsAttention(
+          routeId(req.params.id, "SELLER_FULFILLMENT_NOT_FOUND"),
+          req.body
+        )
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+sellerAdminRouter.post("/seller-fulfillments/:id/link-delivery", async (req, res, next) => {
+  try {
+    const actingUserId = req.auth?.userId;
+    if (!actingUserId) throw new AppError("Not authenticated.", 401, "UNAUTHENTICATED");
+    res.status(201).json(
+      await linkSellerFulfillmentDelivery(routeId(req.params.id, "SELLER_FULFILLMENT_NOT_FOUND"), actingUserId)
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+sellerAdminRouter.post("/seller-fulfillments/:id/complete", async (req, res, next) => {
+  try {
+    res.json({
+      fulfillment: await completeSellerFulfillment(routeId(req.params.id, "SELLER_FULFILLMENT_NOT_FOUND"))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+sellerAdminRouter.post("/seller-fulfillments/:id/confirm-collection", async (req, res, next) => {
+  try {
+    res.json({
+      fulfillment: await confirmSellerCodCollection(routeId(req.params.id, "SELLER_FULFILLMENT_NOT_FOUND"))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 sellerAdminRouter.get("/sellers/:id/ledger", async (req, res, next) => {
   try {
