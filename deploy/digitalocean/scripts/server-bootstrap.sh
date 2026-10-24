@@ -85,10 +85,14 @@ if [[ "${INSTALL_NETDATA:-1}" == "1" ]]; then
   curl -fsSL https://get.netdata.cloud/kickstart.sh | bash -s -- --non-interactive --stable-channel || true
 fi
 
-# Daily Postgres backup cron (runs as deploy user after repo clone)
+# Daily Postgres backup cron. The directory must exist before cron opens the log.
+install -d -m 700 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "/home/$DEPLOY_USER/.gigflow"
 cat > /etc/cron.d/gigflow-backup <<EOF
-15 3 * * * $DEPLOY_USER $APP_DIR/deploy/digitalocean/scripts/backup-postgres.sh >> /var/log/gigflow-backup.log 2>&1
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+15 3 * * * $DEPLOY_USER /usr/bin/bash $APP_DIR/deploy/digitalocean/scripts/backup-postgres.sh >> /home/$DEPLOY_USER/.gigflow/backup.log 2>&1
 EOF
+chmod 644 /etc/cron.d/gigflow-backup
 
 echo ""
 echo "Bootstrap complete."
