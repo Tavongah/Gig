@@ -174,7 +174,10 @@ export const useCommerceCartStore = create<CartState>((set, get) => ({
   },
 
   addSellerPilot: (input) => {
-    const decision = planSellerPilotCartAdd(get().lines, input);
+    const decision = planSellerPilotCartAdd<CartLine>(get().lines, {
+      ...input,
+      quantity: input.quantity && input.quantity > 0 ? input.quantity : 1
+    });
     if (!decision.ok) {
       set({ notice: decision.message });
       return false;
