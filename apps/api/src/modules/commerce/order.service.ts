@@ -36,6 +36,7 @@ import {
   assertCommercePaymentMethodAllowed,
   getCourierRematchIntervalSeconds,
   getFulfillmentAttentionMinutes,
+  getMaxCourierSearchMinutes,
   getMerchantResponseTimeoutSeconds,
   isGuaranteedOrderIntakeEnabled,
   paymentStatusForMethod,
@@ -896,6 +897,7 @@ export async function rematchWaitingCommerceCouriers(io?: Server): Promise<numbe
   if (!socket) return 0;
 
   const staleBefore = new Date(Date.now() - getCourierRematchIntervalSeconds() * 1000);
+  const searchStartedAfter = new Date(Date.now() - getMaxCourierSearchMinutes() * 60_000);
   const waiting = await prisma.commerceOrder.findMany({
     where: {
       status: CommerceOrderStatus.READY_FOR_PICKUP,
@@ -903,7 +905,8 @@ export async function rematchWaitingCommerceCouriers(io?: Server): Promise<numbe
       linkedDeliveryGig: {
         status: { in: [GigStatus.SEARCHING_FOR_WORKER, GigStatus.POSTED] },
         assignedWorkerId: null,
-        updatedAt: { lt: staleBefore }
+        updatedAt: { lt: staleBefore },
+        createdAt: { gt: searchStartedAfter }
       }
     },
     include: { linkedDeliveryGig: true }
@@ -971,8 +974,11 @@ export async function flagLongWaitCommerceOrders(): Promise<number> {
 
 export async function runGuaranteedOrderIntakeJobs(io?: Server): Promise<void> {
   await expireStaleMerchantPendingOrders(io);
-  await rematchWaitingCommerceCouriers(io);
+  const rebroadcast = await rematchWaitingCommerceCouriers(io);
   await flagLongWaitCommerceOrders();
+  if (process.env.NODE_ENV !== "test") {
+    console.info(`[goi] rematch rebroadcast=${rebroadcast}`);
+  }
 }
 
 export async function listMerchantActiveOrders(merchantId: string) {

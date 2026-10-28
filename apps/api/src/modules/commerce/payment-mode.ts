@@ -94,6 +94,47 @@ export function getFulfillmentAttentionMinutes(): number {
   return 60;
 }
 
+/**
+ * How long an unassigned courier search may be rebroadcast.
+ * Default 12 hours: longer than the 60-minute admin attention flag, and still
+ * a same-day pilot window. Measured from DeliveryGig.createdAt, which is when
+ * the search started. gig.updatedAt is not used because rematch rewrites it.
+ * Values outside 1–24 hours fall back to the default so a week-long search
+ * cannot be configured here.
+ */
+export const DEFAULT_MAX_COURIER_SEARCH_MINUTES = 12 * 60;
+
+export function getMaxCourierSearchMinutes(): number {
+  const raw = process.env.COMMERCE_COURIER_SEARCH_MAX_MINUTES;
+  if (raw && /^\d+$/.test(raw)) {
+    const n = Number(raw);
+    if (n >= 60 && n <= 24 * 60) return n;
+  }
+  return DEFAULT_MAX_COURIER_SEARCH_MINUTES;
+}
+
+/** True when automatic rebroadcast must stop. Does not cancel or mutate anything. */
+export function isCourierSearchBeyondMaxAge(gigCreatedAt: Date, now = new Date()): boolean {
+  return now.getTime() - gigCreatedAt.getTime() >= getMaxCourierSearchMinutes() * 60_000;
+}
+
+/**
+ * Age gate for automatic rematch. Status rules match the existing rematch query.
+ * Payment status is intentionally not consulted here.
+ */
+export function canAutomaticallyRebroadcastCourierSearch(input: {
+  orderStatus: string;
+  gigStatus: string;
+  gigCreatedAt: Date;
+  hasAssignedCourier: boolean;
+  now?: Date;
+}): boolean {
+  if (input.orderStatus !== "READY_FOR_PICKUP") return false;
+  if (input.hasAssignedCourier) return false;
+  if (input.gigStatus !== "SEARCHING_FOR_WORKER" && input.gigStatus !== "POSTED") return false;
+  return !isCourierSearchBeyondMaxAge(input.gigCreatedAt, input.now ?? new Date());
+}
+
 /** Mock WhatsApp inbound: only development/test unless ALLOW_WHATSAPP_MOCK=true (never default in pilot). */
 export function assertWhatsAppMockInboundAllowed(): void {
   const appEnv = getAppEnv();

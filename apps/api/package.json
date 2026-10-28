@@ -29,6 +29,7 @@
     "test:whatsapp-twilio": "tsx scripts/test-whatsapp-twilio-transport.ts",
     "test:commerce-zb": "tsx scripts/test-commerce-zb-payment.ts",
     "test:guaranteed-order-intake": "tsx scripts/test-guaranteed-order-intake.ts",
+    "test:courier-search-max-age": "tsx scripts/test-courier-search-max-age.ts",
     "test:commerce-paynow": "tsx scripts/test-commerce-paynow-payment.ts",
     "test:commerce-paynow-official": "tsx scripts/test-commerce-paynow-official.ts",
     "test:commerce-identity": "tsx scripts/test-commerce-customer-identity.ts",
