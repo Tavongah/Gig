@@ -6,6 +6,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "../../../config/prisma.js";
 import { AppError } from "../../../lib/errors.js";
+import { assertCheckoutPayable } from "../unresolved-checkout.service.js";
 import { logDutsFlow } from "../../../lib/flow-log.js";
 import { EcoCashCommercePaymentProvider } from "./ecocash.provider.js";
 import { MockCommercePaymentProvider } from "./mock.provider.js";
@@ -111,13 +112,7 @@ export async function initiateMobileMoneyPaymentForOrder(input: {
     ? await prisma.commerceCheckout.findUnique({ where: { id: checkoutId } })
     : null;
 
-  if (checkout?.status === "AWAITING_FULFILLMENT") {
-    throw new AppError(
-      "This request isn't ready for payment. We'll confirm the total first.",
-      409,
-      "REQUEST_NOT_PAYABLE"
-    );
-  }
+  assertCheckoutPayable(checkout?.status);
 
   if ((checkout ?? order).paymentStatus === CommercePaymentStatus.PAID) {
     throw new AppError("This order is already paid.", 409, "ALREADY_PAID");
@@ -269,7 +264,6 @@ export async function initiateEcoCashPaymentForOrder(input: {
 
 /** Switch a pending/failed mobile-money order to cash on delivery and open merchant flow. */
 export async function switchOrderToCashOnDelivery(commerceOrderId: string) {
-  await cancelPendingPaymentAttempts(commerceOrderId);
   const order = await prisma.commerceOrder.findUniqueOrThrow({
     where: { id: commerceOrderId },
     include: { merchant: true, items: true, customer: true }
@@ -278,6 +272,11 @@ export async function switchOrderToCashOnDelivery(commerceOrderId: string) {
   if (order.paymentStatus === CommercePaymentStatus.PAID) {
     throw new AppError("This order is already paid.", 409, "ALREADY_PAID");
   }
+  if (order.checkoutId) {
+    const checkout = await prisma.commerceCheckout.findUnique({ where: { id: order.checkoutId } });
+    assertCheckoutPayable(checkout?.status);
+  }
+  await cancelPendingPaymentAttempts(commerceOrderId);
 
   const updated = await prisma.commerceOrder.update({
     where: { id: commerceOrderId },

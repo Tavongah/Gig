@@ -36,6 +36,7 @@ import {
 } from "./multi-shop-checkout.service.js";
 import {
   acceptUnresolvedProductRequest,
+  assertCheckoutPayable,
   isAcceptedUnresolvedRequest,
   type AcceptedUnresolvedRequest
 } from "./unresolved-checkout.service.js";
@@ -944,7 +945,7 @@ export async function listCustomerCommerceOrders(userId: string) {
       }
     }),
     prisma.commerceCheckout.findMany({
-      where: { customerId: userId, status: { not: "AWAITING_FULFILLMENT" } },
+      where: { customerId: userId, status: { notIn: ["AWAITING_FULFILLMENT", "PRICE_PROPOSED"] } },
       orderBy: { createdAt: "desc" },
       take: 30,
       include: {
@@ -1022,10 +1023,16 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
     }
   });
   if (checkout) {
-    if (checkout.status === "AWAITING_FULFILLMENT") {
+    if (checkout.status === "AWAITING_FULFILLMENT" || checkout.status === "PRICE_PROPOSED") {
+      const expired =
+        checkout.status === "PRICE_PROPOSED" &&
+        checkout.quoteExpiresAt != null &&
+        checkout.quoteExpiresAt.getTime() <= Date.now();
       return {
-        acceptedRequest: true as const,
+        acceptedRequest: checkout.status === "AWAITING_FULFILLMENT",
+        priceProposed: checkout.status === "PRICE_PROPOSED",
         payable: false as const,
+        expired,
         order: null,
         message: formatUnresolvedRequestAccepted()
       };
@@ -1089,6 +1096,10 @@ export async function payCustomerEcoCash(userId: string, orderId: string, payerP
     where: { id: orderId, customerId: userId }
   });
   if (!order) throw new AppError("Order not found.", 404, "ORDER_NOT_FOUND");
+  if (order.checkoutId) {
+    const checkout = await prisma.commerceCheckout.findUnique({ where: { id: order.checkoutId } });
+    assertCheckoutPayable(checkout?.status);
+  }
   if (order.paymentStatus === "PAID") {
     throw new AppError("This order is already paid.", 409, "ALREADY_PAID");
   }

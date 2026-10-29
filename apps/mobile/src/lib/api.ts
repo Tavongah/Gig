@@ -1287,6 +1287,8 @@ export const api = {
 
   commerceOrder: (orderId: string, token: string) =>
     request<{
+      payable?: false;
+      message?: string;
       order: {
         id: string;
         orderNumber: number;
@@ -1313,7 +1315,7 @@ export const api = {
         deliveryStatus: string | null;
         shopCount?: number;
         pickupProgress?: Array<{ shopName: string; collected: boolean }>;
-      };
+      } | null;
     }>(`/commerce/orders/${orderId}`, {}, token),
 
   commerceGuestHandoff: (payload: {

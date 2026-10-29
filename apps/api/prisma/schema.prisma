@@ -725,6 +725,7 @@ model Merchant {
   products                 Product[]
   catalogProductSubmissions CatalogProduct[] @relation("CatalogProductSubmissions")
   orders                   CommerceOrder[]
+  sourcedCheckoutLines     CommerceCheckoutLine[] @relation("CheckoutLineSourceMerchant")
   guestHandoffs            GuestCommerceHandoff[]
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
@@ -925,6 +926,7 @@ model Product {
   archived         Boolean         @default(false)
   flavorAvailability ProductFlavorAvailability[]
   orderItems       CommerceOrderItem[]
+  sourcedCheckoutLines CommerceCheckoutLine[] @relation("CheckoutLineSourceProduct")
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -1276,6 +1278,8 @@ enum CommerceCheckoutStatus {
   PAYMENT_FAILED
   /** Supported-city catalog demand. Merchandise is unpriced and this checkout is not payable. */
   AWAITING_FULFILLMENT
+  /** Merchant prices are snapshotted. The customer has not approved payment. */
+  PRICE_PROPOSED
 }
 
 enum CommerceCheckoutLineFulfillment {
@@ -1319,6 +1323,13 @@ model CommerceCheckout {
   allocations            Json
   notes                  String?
   idempotencyKey         String?                 @unique
+  /** Increments only when a new merchant quote is snapshotted. */
+  quoteVersion           Int                     @default(0)
+  /** Identifies one immutable proposal. Approval is a later phase. */
+  approvalId             String?
+  quoteExpiresAt         DateTime?
+  /** Validation rows are never price-resolved. */
+  validationFixture      Boolean                 @default(false)
   confirmedAt            DateTime?
   cancelledAt            DateTime?
   deliveredAt            DateTime?
@@ -1332,11 +1343,12 @@ model CommerceCheckout {
   @@index([customerId, status])
   @@index([commerceCustomerId, status])
   @@index([status])
+  @@index([validationFixture, status])
 }
 
 /**
  * Catalog demand under a CommerceCheckout.
- * unitPriceCents stays null until a later phase locks a real merchandise price.
+ * unitPriceCents stays null until a real merchant Product is snapshotted.
  */
 model CommerceCheckoutLine {
   id                  String                           @id @default(uuid())
@@ -1348,11 +1360,18 @@ model CommerceCheckoutLine {
   productNameSnapshot String
   fulfillmentStatus   CommerceCheckoutLineFulfillment  @default(AWAITING_SOURCE)
   unitPriceCents      Int?
+  sourceProductId     String?
+  sourceProduct       Product?                         @relation("CheckoutLineSourceProduct", fields: [sourceProductId], references: [id], onDelete: SetNull)
+  sourceMerchantId    String?
+  sourceMerchant      Merchant?                        @relation("CheckoutLineSourceMerchant", fields: [sourceMerchantId], references: [id], onDelete: SetNull)
+  quotedAt            DateTime?
   createdAt           DateTime                         @default(now())
   updatedAt           DateTime                         @updatedAt
 
   @@index([checkoutId])
   @@index([catalogProductId])
+  @@index([sourceProductId])
+  @@index([sourceMerchantId])
 }
 
 model CommerceCheckoutPickupStop {

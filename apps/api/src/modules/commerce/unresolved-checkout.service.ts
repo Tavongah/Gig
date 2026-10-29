@@ -306,8 +306,14 @@ export async function acceptUnresolvedProductRequest(input: {
   return null;
 }
 
+const NON_PAYABLE_CHECKOUT_STATUSES = new Set<string>([
+  CommerceCheckoutStatus.AWAITING_FULFILLMENT,
+  CommerceCheckoutStatus.PRICE_PROPOSED
+]);
+
+/** Unpriced demand and an unapproved merchant quote cannot be charged. */
 export function assertCheckoutPayable(status: CommerceCheckoutStatus | string | null | undefined) {
-  if (status === CommerceCheckoutStatus.AWAITING_FULFILLMENT) {
+  if (status && NON_PAYABLE_CHECKOUT_STATUSES.has(status)) {
     throw new AppError(
       "This request isn't ready for payment. We'll confirm the total first.",
       409,

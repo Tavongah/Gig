@@ -25,6 +25,16 @@ export function CommerceOrderDetailScreen({ route }: Props) {
   }
 
   const { order } = query.data;
+  if (!order) {
+    return (
+      <View className="flex-1 bg-background px-5 pt-8">
+        <Text className="text-2xl font-black text-ink">YOUR DUTS REQUEST</Text>
+        <Text className="mt-3 text-base text-muted">
+          {query.data.message ?? "This request isn't ready for payment. We'll confirm the total first."}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView className="flex-1 bg-background px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>

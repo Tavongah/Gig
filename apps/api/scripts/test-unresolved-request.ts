@@ -39,8 +39,9 @@ async function main() {
   assert.doesNotMatch(service, /notifyMerchant/);
   assert.doesNotMatch(service, /SellerOffer/);
   assert.doesNotMatch(service, /DeliveryGig/);
-  assert.match(payment, /REQUEST_NOT_PAYABLE/);
-  assert.match(history, /status: \{ not: "AWAITING_FULFILLMENT" \}/);
+  assert.match(payment, /assertCheckoutPayable/);
+  assert.match(service, /REQUEST_NOT_PAYABLE/);
+  assert.match(history, /status: \{ notIn: \["AWAITING_FULFILLMENT", "PRICE_PROPOSED"\] \}/);
   assert.match(handler, /acceptUnresolvedTextRequest/);
   assert.match(handler, /SHOP_NOT_NEARBY/);
   assert.match(formatUnresolvedRequestAccepted(), /We've got your request/);
