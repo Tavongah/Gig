@@ -189,7 +189,7 @@ async function uniqueCatalogByQuery(query: string, quantity: number): Promise<Re
   if (!normalized || normalized.length < 2) return null;
   const rows = await prisma.catalogProduct.findMany({
     where: {
-      status: "APPROVED",
+      status: { in: ["APPROVED", "PENDING"] },
       OR: [{ normalizedName: normalized }, { normalizedName: { contains: normalized } }]
     },
     take: 8,
@@ -264,7 +264,7 @@ export async function acceptUnresolvedProductRequest(input: {
     if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 99) return null;
     const product = products.find((row) => row.id === line.productId);
     const catalog = product?.catalogProduct;
-    if (!product || !catalog || catalog.status !== "APPROVED") return null;
+    if (!product || !catalog || (catalog.status !== "APPROVED" && catalog.status !== "PENDING")) return null;
     lines.push({
       catalogProductId: catalog.id,
       productName: catalog.name,
