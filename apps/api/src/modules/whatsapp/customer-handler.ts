@@ -13,6 +13,8 @@ import {
   quoteBasketTotals
 } from "../commerce/order.service.js";
 import { quoteCart } from "../commerce/customer-commerce.service.js";
+import { acceptUnresolvedProductRequest, acceptUnresolvedTextRequest } from "../commerce/unresolved-checkout.service.js";
+import { AppError } from "../../lib/errors.js";
 import { ensureWhatsAppCommerceCustomer } from "../commerce/commerce-customer.service.js";
 import { applyGuestHandoffToConversation, extractGuestBasketRef } from "../commerce/guest-handoff.service.js";
 import {
@@ -1381,6 +1383,25 @@ async function tryApplyDisambiguation(
   return applyProductChoice(phone, convId, ctx, reply.choice);
 }
 
+async function presentUnresolvedAcceptance(
+  phone: string,
+  convId: string,
+  ctx: ConversationContext,
+  accepted: { checkoutId: string; message: string }
+) {
+  const wa = getWhatsAppProvider();
+  ctx.unresolvedCheckoutId = accepted.checkoutId;
+  ctx.merchantId = undefined;
+  ctx.draftLines = undefined;
+  ctx.draftOrderId = undefined;
+  ctx.paymentPhase = undefined;
+  ctx.pendingPaymentOrderId = undefined;
+  setExpected(ctx, "PRODUCT_TEXT");
+  await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
+  await wa.sendText(phone, accepted.message);
+  return { handled: true as const };
+}
+
 async function buildAndPresentQuote(
   phone: string,
   convId: string,
@@ -1437,6 +1458,16 @@ async function buildAndPresentQuote(
         switchedFromPreferred: false
       };
     } catch (err) {
+      if (err instanceof AppError && err.code === "SHOP_NOT_NEARBY" && ctx.lockedProductLines?.length) {
+        const accepted = await acceptUnresolvedProductRequest({
+          phone,
+          lat: ctx.deliveryLat,
+          lng: ctx.deliveryLng,
+          deliveryLabel: ctx.originalTypedAddress || ctx.deliveryLabel || "Delivery location",
+          lines: ctx.lockedProductLines.map((line) => ({ productId: line.productId, quantity: line.quantity }))
+        });
+        if (accepted) return presentUnresolvedAcceptance(phone, convId, ctx, accepted);
+      }
       const message = err instanceof Error ? err.message : "Some items are unavailable.";
       setExpected(ctx, "PRODUCT_TEXT");
       await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
@@ -1457,6 +1488,14 @@ async function buildAndPresentQuote(
   }
 
   if (!basket.ok) {
+    const accepted = await acceptUnresolvedTextRequest({
+      phone,
+      lat: ctx.deliveryLat,
+      lng: ctx.deliveryLng,
+      deliveryLabel: ctx.originalTypedAddress || ctx.deliveryLabel || "Delivery location",
+      items: ctx.requestedItems ?? []
+    });
+    if (accepted) return presentUnresolvedAcceptance(phone, convId, ctx, accepted);
     const missing = basket.missing.join(", ") || "some items";
     if ((ctx.requestedItems?.length ?? 0) === 1) {
       const offered = await offerUnlistedItemIfEnabled(phone, convId, ctx, ctx.requestedItems?.[0]?.query ?? missing);

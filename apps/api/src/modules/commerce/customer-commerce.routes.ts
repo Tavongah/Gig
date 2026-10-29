@@ -205,9 +205,9 @@ const prepareSchema = z.object({
     .max(40)
 });
 
-customerCommerceRouter.post("/cart/prepare", validateBody(prepareSchema), async (req, res, next) => {
+customerCommerceRouter.post("/cart/prepare", optionalAuth, validateBody(prepareSchema), async (req, res, next) => {
   try {
-    res.json(await prepareCheckout(req.body));
+    res.json(await prepareCheckout({ ...req.body, userId: req.auth?.userId }));
   } catch (err) {
     next(err);
   }

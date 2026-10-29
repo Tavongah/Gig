@@ -152,6 +152,8 @@ export type ConversationContext = {
   pendingUnlistedQuery?: string;
   unlistedRequestId?: string;
   unlistedApprovalId?: string;
+  /** Persisted supported-city request awaiting a merchandise price. Not payable. */
+  unresolvedCheckoutId?: string;
 };
 
 export async function getOrCreateConversation(

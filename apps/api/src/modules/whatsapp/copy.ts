@@ -391,6 +391,14 @@ export function formatCompactMutation(input: {
   return `${note}. Your total is now ${money(input.totalCents)}.\n\nReply ADD, REMOVE, or CHECKOUT.`;
 }
 
+export function formatUnresolvedRequestAccepted(): string {
+  return [
+    "We've got your request.",
+    "We're checking availability and prices.",
+    "We'll confirm the total before payment."
+  ].join("\n");
+}
+
 export function formatMissingItems(missing: string, hint?: string): string {
   return [
     "I couldn't find one nearby shop with everything.",

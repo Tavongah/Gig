@@ -111,6 +111,14 @@ export async function initiateMobileMoneyPaymentForOrder(input: {
     ? await prisma.commerceCheckout.findUnique({ where: { id: checkoutId } })
     : null;
 
+  if (checkout?.status === "AWAITING_FULFILLMENT") {
+    throw new AppError(
+      "This request isn't ready for payment. We'll confirm the total first.",
+      409,
+      "REQUEST_NOT_PAYABLE"
+    );
+  }
+
   if ((checkout ?? order).paymentStatus === CommercePaymentStatus.PAID) {
     throw new AppError("This order is already paid.", 409, "ALREADY_PAID");
   }

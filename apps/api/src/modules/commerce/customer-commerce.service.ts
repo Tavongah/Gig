@@ -35,6 +35,12 @@ import {
   quoteCombinedCart
 } from "./multi-shop-checkout.service.js";
 import {
+  acceptUnresolvedProductRequest,
+  isAcceptedUnresolvedRequest,
+  type AcceptedUnresolvedRequest
+} from "./unresolved-checkout.service.js";
+import { formatUnresolvedRequestAccepted } from "../whatsapp/copy.js";
+import {
   catalogOnlyAcc,
   clampStorefrontPage,
   matchesStorefrontCategory,
@@ -689,7 +695,8 @@ export async function prepareCheckout(input: {
   locationMode?: string | null;
   deliveryPrecision?: string | null;
   deliveryLabel?: string | null;
-}) {
+  userId?: string | null;
+}): Promise<Awaited<ReturnType<typeof quoteCart>> | AcceptedUnresolvedRequest> {
   if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) {
     throw new AppError("Tell us where to deliver.", 400, "LOCATION_REQUIRED");
   }
@@ -709,6 +716,16 @@ export async function prepareCheckout(input: {
       deliveryLabel: input.deliveryLabel
     });
   } catch (error) {
+    if (error instanceof AppError && error.code === "SHOP_NOT_NEARBY" && input.userId) {
+      const accepted = await acceptUnresolvedProductRequest({
+        userId: input.userId,
+        lat: input.lat,
+        lng: input.lng,
+        deliveryLabel: input.deliveryLabel?.trim() || "Delivery location",
+        lines: input.lines.map((line) => ({ productId: line.productId, quantity: line.quantity }))
+      });
+      if (accepted) return accepted;
+    }
     throwCheckoutPrepError(error);
   }
 }
@@ -724,14 +741,30 @@ export async function checkoutCart(input: {
   locationMode?: string | null;
   deliveryPrecision?: string | null;
 }) {
-  const quote = await prepareCheckout({
+  const prepared = await prepareCheckout({
     lat: input.lat,
     lng: input.lng,
     lines: input.lines,
     locationMode: input.locationMode,
     deliveryPrecision: input.deliveryPrecision,
-    deliveryLabel: input.deliveryLabel
+    deliveryLabel: input.deliveryLabel,
+    userId: input.userId
   });
+  if (isAcceptedUnresolvedRequest(prepared)) {
+    return {
+      acceptedRequest: true as const,
+      payable: false as const,
+      order: null,
+      checkout: {
+        id: prepared.checkoutId,
+        orderNumber: prepared.checkoutNumber,
+        status: prepared.status,
+        payable: false as const,
+        message: prepared.message
+      }
+    };
+  }
+  const quote = prepared;
 
   const commerceCustomer = await ensureAppCommerceCustomer(input.userId);
 
@@ -911,7 +944,7 @@ export async function listCustomerCommerceOrders(userId: string) {
       }
     }),
     prisma.commerceCheckout.findMany({
-      where: { customerId: userId },
+      where: { customerId: userId, status: { not: "AWAITING_FULFILLMENT" } },
       orderBy: { createdAt: "desc" },
       take: 30,
       include: {
@@ -989,6 +1022,14 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
     }
   });
   if (checkout) {
+    if (checkout.status === "AWAITING_FULFILLMENT") {
+      return {
+        acceptedRequest: true as const,
+        payable: false as const,
+        order: null,
+        message: formatUnresolvedRequestAccepted()
+      };
+    }
     const view = presentCustomerCheckout(checkout);
     return {
       order: {

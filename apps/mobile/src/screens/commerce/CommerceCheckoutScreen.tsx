@@ -88,6 +88,10 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
       );
     },
     onSuccess: (res) => {
+      if (!res.order?.id) {
+        setError("We've got your request. We're checking availability and prices and will confirm the total before payment.");
+        return;
+      }
       clear();
       navigation.replace("CommerceOrderDetail", { orderId: res.order.id });
     },
@@ -120,6 +124,22 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
       <View className="flex-1 bg-background px-5 pt-8">
         <Text className="text-2xl font-black text-ink">YOUR DUTS ORDER</Text>
         <Text className="mt-4 text-base text-ink">Finish your current order before adding this item.</Text>
+      </View>
+    );
+  }
+
+  if (
+    prepQuery.data &&
+    "acceptedRequest" in prepQuery.data &&
+    (prepQuery.data as { acceptedRequest?: boolean }).acceptedRequest
+  ) {
+    return (
+      <View className="flex-1 bg-background px-5 pt-8">
+        <Text className="text-2xl font-black text-ink">YOUR DUTS ORDER</Text>
+        <Text className="mt-4 text-base text-ink">We've got your request.</Text>
+        <Text className="mt-2 text-base text-ink">
+          We're checking availability and prices and will confirm the total before payment.
+        </Text>
       </View>
     );
   }

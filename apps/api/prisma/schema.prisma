@@ -760,6 +760,7 @@ model CatalogProduct {
   flavorOptions    CatalogProductFlavorOption[]
   merchantOffers   Product[]
   sellerOffers     SellerOffer[]
+  checkoutLines    CommerceCheckoutLine[]
   imageAcquisition CatalogImageAcquisition?
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
@@ -1273,11 +1274,19 @@ enum CommerceCheckoutStatus {
   DELIVERED
   CANCELLED
   PAYMENT_FAILED
+  /** Supported-city catalog demand. Merchandise is unpriced and this checkout is not payable. */
+  AWAITING_FULFILLMENT
+}
+
+enum CommerceCheckoutLineFulfillment {
+  AWAITING_SOURCE
 }
 
 /**
- * Parent customer checkout for 2–3 shop combined delivery.
- * One-shop / historical orders do not create this row.
+ * Parent customer checkout.
+ * Multi-shop delivery uses child CommerceOrders.
+ * Unresolved supported-city demand uses catalog lines and AWAITING_FULFILLMENT, with no child order.
+ * One-shop merchant orders do not create this row.
  */
 model CommerceCheckout {
   id                     String                  @id @default(uuid())
@@ -1298,6 +1307,8 @@ model CommerceCheckout {
   deliveryLabel          String
   deliveryLatitude       Decimal                 @db.Decimal(9, 6)
   deliveryLongitude      Decimal                 @db.Decimal(9, 6)
+  /** Package class snapshot. Null on historical checkouts. */
+  packageClass           String?
   customerWhatsAppPhone  String?
   linkedDeliveryGigId    String?                 @unique
   linkedDeliveryGig      Gig?                    @relation(fields: [linkedDeliveryGigId], references: [id], onDelete: SetNull)
@@ -1314,12 +1325,34 @@ model CommerceCheckout {
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   orders                 CommerceOrder[]
+  lines                  CommerceCheckoutLine[]
   pickupStops            CommerceCheckoutPickupStop[]
   paymentAttempts        CommercePaymentAttempt[]
 
   @@index([customerId, status])
   @@index([commerceCustomerId, status])
   @@index([status])
+}
+
+/**
+ * Catalog demand under a CommerceCheckout.
+ * unitPriceCents stays null until a later phase locks a real merchandise price.
+ */
+model CommerceCheckoutLine {
+  id                  String                           @id @default(uuid())
+  checkoutId          String
+  checkout            CommerceCheckout                 @relation(fields: [checkoutId], references: [id], onDelete: Cascade)
+  catalogProductId    String
+  catalogProduct      CatalogProduct                   @relation(fields: [catalogProductId], references: [id], onDelete: Restrict)
+  quantity            Int
+  productNameSnapshot String
+  fulfillmentStatus   CommerceCheckoutLineFulfillment  @default(AWAITING_SOURCE)
+  unitPriceCents      Int?
+  createdAt           DateTime                         @default(now())
+  updatedAt           DateTime                         @updatedAt
+
+  @@index([checkoutId])
+  @@index([catalogProductId])
 }
 
 model CommerceCheckoutPickupStop {
