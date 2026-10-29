@@ -22,7 +22,8 @@ export type CheckoutExpectedInput =
   | "UNLISTED_OFFER"
   | "UNLISTED_QUOTE"
   | "UNLISTED_PAYMENT"
-  | "UNLISTED_ECOCASH";
+  | "UNLISTED_ECOCASH"
+  | "QUOTE_APPROVAL";
 
 export type CheckoutSource = "WHATSAPP" | "WEB_HANDOFF";
 
@@ -360,7 +361,7 @@ export function isUnfinishedCheckout(ctx: ConversationContext, state: WhatsAppCo
 }
 
 export function sessionIsExpired(ctx: ConversationContext, now = Date.now()): boolean {
-  if (isLivePendingPayment(ctx)) return false;
+  if (isLivePendingPayment(ctx) || ctx.expectedInput === "QUOTE_APPROVAL") return false;
   const started = ctx.sessionStartedAt ? Date.parse(ctx.sessionStartedAt) : NaN;
   const quoted = ctx.draftQuotedAt ? Date.parse(ctx.draftQuotedAt) : NaN;
   const t = Number.isFinite(quoted) ? quoted : started;
@@ -391,7 +392,11 @@ export function sanitizeCheckoutContext(
   if (ctx.expectedInput !== "PRODUCT_DISAMBIGUATION") {
     ctx.pendingChoices = undefined;
     ctx.lastDisambiguationQuery = undefined;
-    if (ctx.expectedInput !== "LOCATION_CLARIFICATION" && ctx.expectedInput !== "PRODUCT_FLAVOR") {
+    if (
+      ctx.expectedInput !== "LOCATION_CLARIFICATION" &&
+      ctx.expectedInput !== "PRODUCT_FLAVOR" &&
+      ctx.expectedInput !== "QUOTE_APPROVAL"
+    ) {
       ctx.choiceId = undefined;
     }
   } else if (!ctx.choiceId && ctx.pendingChoices?.[0]) {

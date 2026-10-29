@@ -54,8 +54,8 @@ async function main() {
   assert.doesNotMatch(proposal, /SellerOffer/);
   assert.doesNotMatch(proposal, /DeliveryGig/);
   assert.doesNotMatch(proposal, /product\.update/);
-  assert.doesNotMatch(handler, /proposeMerchantPriceForCheckout/);
-  assert.doesNotMatch(handler, /PRICE_PROPOSED/);
+  assert.match(handler, /QUOTE_APPROVAL/);
+  assert.match(handler, /approveProposedQuote/);
   assert.match(storefront, /status === "APPROVED"/);
   assert.match(migration, /checkoutNumber" IN \(1, 2\)/);
   assert.match(migration, /phase1-unresolved-validation@duts\.invalid/);

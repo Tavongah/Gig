@@ -7,7 +7,8 @@ import {
   OrderSource,
   PackageCategory,
   PaymentLifecycle,
-  PaymentStatus
+  PaymentStatus,
+  type Prisma
 } from "@prisma/client";
 import type { Server } from "socket.io";
 import {
@@ -211,6 +212,8 @@ export async function createConfirmedCommerceOrder(input: {
   orderSource?: OrderSource;
   checkoutId?: string;
   fulfillmentLabel?: string;
+  /** When set, the order insert joins the caller's transaction. */
+  db?: Prisma.TransactionClient;
   /** When set, skip per-shop delivery quoting (child fulfillments of a parent checkout). */
   totals?: {
     subtotalCents: number;
@@ -223,6 +226,7 @@ export async function createConfirmedCommerceOrder(input: {
   if (input.lines.length === 0) {
     throw new AppError("Basket is empty.", 400, "EMPTY_BASKET");
   }
+  const db = input.db ?? prisma;
   const paymentMethod = resolveCommercePaymentMethod(input.paymentMethod);
   assertCommercePaymentMethodAllowed(paymentMethod);
   const paymentStatus = input.paymentStatus ?? paymentStatusForMethod(paymentMethod);
@@ -235,7 +239,7 @@ export async function createConfirmedCommerceOrder(input: {
   const commerceCustomerId = identity.commerceCustomerId;
   const orderSource = input.orderSource ?? OrderSource.WHATSAPP;
 
-  const merchant = await prisma.merchant.findUniqueOrThrow({ where: { id: input.merchantId } });
+  const merchant = await db.merchant.findUniqueOrThrow({ where: { id: input.merchantId } });
   if (!merchant.isActive || !merchant.acceptsOrders) {
     throw new AppError("This shop is not available right now.", 409, "MERCHANT_CLOSED");
   }
@@ -246,7 +250,7 @@ export async function createConfirmedCommerceOrder(input: {
 
   const alcoholEnabled = parseAlcoholCommerceEnabled(process.env.ALCOHOL_COMMERCE_ENABLED);
   for (const line of input.lines) {
-    const product = await prisma.product.findFirst({
+    const product = await db.product.findFirst({
       where: { id: line.productId, merchantId: input.merchantId, archived: false },
       include: { catalogProduct: { select: { category: true } } }
     });
@@ -339,7 +343,7 @@ export async function createConfirmedCommerceOrder(input: {
     : new Date(Date.now() + getMerchantResponseTimeoutSeconds() * 1000);
   const confirmedAt = isMobileMoney ? null : new Date();
 
-  const order = await prisma.commerceOrder.create({
+  const order = await db.commerceOrder.create({
     data: {
       customerId,
       commerceCustomerId,

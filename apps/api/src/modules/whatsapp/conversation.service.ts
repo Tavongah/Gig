@@ -31,7 +31,8 @@ export type ConversationContext = {
     | "UNLISTED_OFFER"
     | "UNLISTED_QUOTE"
     | "UNLISTED_PAYMENT"
-    | "UNLISTED_ECOCASH";
+    | "UNLISTED_ECOCASH"
+    | "QUOTE_APPROVAL";
   choiceType?: ConversationContext["expectedInput"];
   choiceId?: string;
   sessionStartedAt?: string;
@@ -154,6 +155,10 @@ export type ConversationContext = {
   unlistedApprovalId?: string;
   /** Persisted supported-city request awaiting a merchandise price. Not payable. */
   unresolvedCheckoutId?: string;
+  /** Bound merchant quote. YES approves only this checkout, approval, and version. */
+  quoteCheckoutId?: string;
+  quoteApprovalId?: string;
+  quoteVersion?: number;
 };
 
 export async function getOrCreateConversation(

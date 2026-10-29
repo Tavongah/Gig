@@ -1280,6 +1280,8 @@ enum CommerceCheckoutStatus {
   AWAITING_FULFILLMENT
   /** Merchant prices are snapshotted. The customer has not approved payment. */
   PRICE_PROPOSED
+  /** Customer accepted this exact quote. Payment method is not chosen yet. */
+  CUSTOMER_APPROVED
 }
 
 enum CommerceCheckoutLineFulfillment {
@@ -1328,6 +1330,8 @@ model CommerceCheckout {
   /** Identifies one immutable proposal. Approval is a later phase. */
   approvalId             String?
   quoteExpiresAt         DateTime?
+  /** Set when the customer accepts the current approvalId and quoteVersion. */
+  approvedAt             DateTime?
   /** Validation rows are never price-resolved. */
   validationFixture      Boolean                 @default(false)
   confirmedAt            DateTime?

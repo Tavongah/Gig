@@ -391,6 +391,30 @@ export function formatCompactMutation(input: {
   return `${note}. Your total is now ${money(input.totalCents)}.\n\nReply ADD, REMOVE, or CHECKOUT.`;
 }
 
+export function formatMerchantQuoteProposal(input: {
+  lines: Array<{ name: string; quantity: number; lineTotalCents: number }>;
+  deliveryFeeCents: number;
+  totalCents: number;
+}): string {
+  return [
+    ...input.lines.map((line) => `${line.name} × ${line.quantity} — ${money(line.lineTotalCents)}`),
+    `Delivery — ${money(input.deliveryFeeCents)}`,
+    `Total — ${money(input.totalCents)}`,
+    "",
+    "Confirm this total?",
+    "Reply YES or 1 to confirm.",
+    "Reply NO or 2 to cancel."
+  ].join("\n");
+}
+
+export function formatQuoteDeclined(): string {
+  return "Okay. That total is cancelled. We won't charge you.";
+}
+
+export function formatQuoteExpired(): string {
+  return "That total has expired. We won't charge you. We'll confirm a new total before payment.";
+}
+
 export function formatUnresolvedRequestAccepted(): string {
   return [
     "We've got your request.",

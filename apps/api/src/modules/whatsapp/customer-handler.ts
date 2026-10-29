@@ -14,6 +14,13 @@ import {
 } from "../commerce/order.service.js";
 import { quoteCart } from "../commerce/customer-commerce.service.js";
 import { acceptUnresolvedProductRequest, acceptUnresolvedTextRequest } from "../commerce/unresolved-checkout.service.js";
+import { proposeMerchantPriceForCheckout } from "../commerce/quote-proposal.service.js";
+import {
+  approveProposedQuote,
+  handoffApprovedQuote,
+  invalidateProposedQuote,
+  readPresentableQuote
+} from "../commerce/quote-approval.service.js";
 import { AppError } from "../../lib/errors.js";
 import { ensureWhatsAppCommerceCustomer } from "../commerce/commerce-customer.service.js";
 import { applyGuestHandoffToConversation, extractGuestBasketRef } from "../commerce/guest-handoff.service.js";
@@ -81,7 +88,10 @@ import {
   formatLocationUseThisArea,
   formatMobileMoneyPending,
   formatMobileMoneyPhonePrompt,
+  formatMerchantQuoteProposal,
   formatMissingItems,
+  formatQuoteDeclined,
+  formatQuoteExpired,
   formatOrderCartSummary,
   formatPaymentMethodChoice,
   formatPaymentStillPending,
@@ -295,6 +305,18 @@ export async function handleCustomerWhatsAppMessage(
     }
     await wa.sendText(phone, formatPendingPaymentHandoff());
     return { handled: true };
+  }
+
+  if (ctx.expectedInput === "QUOTE_APPROVAL") {
+    return handleBoundQuoteReply(phone, customerId, conv.id, ctx, text);
+  }
+
+  if (
+    ctx.unresolvedCheckoutId &&
+    (ctx.expectedInput === "PRODUCT_TEXT" || ctx.expectedInput === "NONE" || !ctx.expectedInput)
+  ) {
+    const presented = await bindMerchantQuote(phone, conv.id, ctx, ctx.unresolvedCheckoutId);
+    if (presented) return presented;
   }
 
   if (ctx.expectedInput === "ACTIVE_ORDER_STATUS" && ctx.statusOrderIds?.length) {
@@ -1383,6 +1405,99 @@ async function tryApplyDisambiguation(
   return applyProductChoice(phone, convId, ctx, reply.choice);
 }
 
+async function bindMerchantQuote(
+  phone: string,
+  convId: string,
+  ctx: ConversationContext,
+  checkoutId: string
+) {
+  const quote = await readPresentableQuote(checkoutId);
+  if (!quote) return null;
+  const wa = getWhatsAppProvider();
+  if (quote.expired) {
+    await wa.sendText(phone, formatQuoteExpired());
+    return { handled: true as const };
+  }
+  ctx.quoteCheckoutId = quote.checkoutId;
+  ctx.quoteApprovalId = quote.approvalId;
+  ctx.quoteVersion = quote.quoteVersion;
+  ctx.unresolvedCheckoutId = quote.checkoutId;
+  ctx.choiceId = crypto.randomUUID();
+  ctx.choiceType = "QUOTE_APPROVAL";
+  ctx.draftLines = undefined;
+  ctx.pendingChoices = undefined;
+  setExpected(ctx, "QUOTE_APPROVAL");
+  await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
+  await wa.sendText(phone, formatMerchantQuoteProposal(quote));
+  return { handled: true as const };
+}
+
+async function handleBoundQuoteReply(
+  phone: string,
+  customerId: string,
+  convId: string,
+  ctx: ConversationContext,
+  text: string
+) {
+  const wa = getWhatsAppProvider();
+  const trimmed = text.trim();
+  const lower = trimmed.toLowerCase();
+  const bound =
+    ctx.choiceType === "QUOTE_APPROVAL" &&
+    Boolean(ctx.choiceId && ctx.quoteCheckoutId && ctx.quoteApprovalId && ctx.quoteVersion != null);
+  const yes = trimmed === "1" || /^(yes|confirm)$/i.test(lower);
+  const no = trimmed === "2" || /^(no|cancel)$/i.test(lower);
+  if (!bound) {
+    await wa.sendText(phone, "That confirmation is for an older total.");
+    return { handled: true as const };
+  }
+  if (no) {
+    await invalidateProposedQuote(ctx.quoteCheckoutId!);
+    ctx.quoteCheckoutId = undefined;
+    ctx.quoteApprovalId = undefined;
+    ctx.quoteVersion = undefined;
+    ctx.choiceId = undefined;
+    setExpected(ctx, "PRODUCT_TEXT");
+    await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
+    await wa.sendText(phone, formatQuoteDeclined());
+    return { handled: true as const };
+  }
+  if (!yes) {
+    const quote = await readPresentableQuote(ctx.quoteCheckoutId!);
+    if (quote && !quote.expired) await wa.sendText(phone, formatMerchantQuoteProposal(quote));
+    else await wa.sendText(phone, "Reply YES or 1 to confirm this total, or NO or 2 to cancel.");
+    return { handled: true as const };
+  }
+  try {
+    await approveProposedQuote({
+      checkoutId: ctx.quoteCheckoutId!,
+      approvalId: ctx.quoteApprovalId!,
+      quoteVersion: ctx.quoteVersion!,
+      actor: { commerceCustomerId: customerId, phone }
+    });
+    ctx.paymentPhase = "SELECT_METHOD";
+    setExpected(ctx, "PAYMENT_METHOD");
+    await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_PAYMENT, context: ctx });
+    await sendPaymentChoices(phone, ctx);
+    return { handled: true as const };
+  } catch (error) {
+    const code = error instanceof AppError ? error.code : "";
+    if (code === "QUOTE_EXPIRED" || code === "QUOTE_SOURCE_CHANGED") {
+      const next = await proposeMerchantPriceForCheckout(ctx.quoteCheckoutId!);
+      if (next.outcome === "PROPOSED") {
+        ctx.choiceId = undefined;
+        setExpected(ctx, "PRODUCT_TEXT");
+        await updateConversation(convId, { context: ctx });
+        return (await bindMerchantQuote(phone, convId, ctx, ctx.quoteCheckoutId!)) ?? { handled: true as const };
+      }
+      await wa.sendText(phone, formatQuoteExpired());
+      return { handled: true as const };
+    }
+    await wa.sendText(phone, error instanceof AppError ? error.message : "That total could not be confirmed.");
+    return { handled: true as const };
+  }
+}
+
 async function presentUnresolvedAcceptance(
   phone: string,
   convId: string,
@@ -1995,6 +2110,32 @@ async function finalizeCashPayment(
 ) {
   const wa = getWhatsAppProvider();
 
+  if (ctx.quoteCheckoutId && ctx.quoteApprovalId && ctx.quoteVersion != null) {
+    try {
+      const placed = await handoffApprovedQuote({
+        checkoutId: ctx.quoteCheckoutId,
+        approvalId: ctx.quoteApprovalId,
+        quoteVersion: ctx.quoteVersion,
+        paymentMethod: "CASH",
+        actor: { commerceCustomerId: customerId, phone }
+      });
+      ctx.quoteCheckoutId = undefined;
+      ctx.quoteApprovalId = undefined;
+      ctx.quoteVersion = undefined;
+      ctx.choiceId = undefined;
+      ctx.activeOrderId = placed.orderId;
+      ctx.paymentPhase = undefined;
+      ctx = completeCheckoutSession(ctx);
+      await updateConversation(convId, { state: WhatsAppConversationState.ORDER_ACTIVE, context: ctx });
+      await wa.sendText(phone, formatCashOrderConfirmed(placed.totalCents, placed.orderNumber));
+      return { handled: true };
+    } catch (error) {
+      const err = error as Error & { code?: string };
+      await wa.sendText(phone, err.message || "That total could not be confirmed.");
+      return { handled: true };
+    }
+  }
+
   if (ctx.pendingPaymentOrderId) {
     try {
       const order = await switchOrderToCashOnDelivery(ctx.pendingPaymentOrderId);
@@ -2098,6 +2239,36 @@ async function startMobileMoneyWithPayerPhone(
 
   try {
     let orderId = ctx.pendingPaymentOrderId;
+    if (!orderId && ctx.quoteCheckoutId && ctx.quoteApprovalId && ctx.quoteVersion != null) {
+      const placed = await handoffApprovedQuote({
+        checkoutId: ctx.quoteCheckoutId,
+        approvalId: ctx.quoteApprovalId,
+        quoteVersion: ctx.quoteVersion,
+        paymentMethod: "ECOCASH",
+        payerPhone: rawPhone,
+        actor: { commerceCustomerId: customerId, phone }
+      });
+      orderId = placed.orderId;
+      ctx.quoteCheckoutId = undefined;
+      ctx.quoteApprovalId = undefined;
+      ctx.quoteVersion = undefined;
+      ctx.choiceId = undefined;
+      ctx.activeOrderId = placed.orderId;
+      ctx.pendingPaymentOrderId = placed.orderId;
+      ctx.paymentPhase = "PENDING_PROVIDER";
+      ctx.paymentAttemptId = placed.attemptId;
+      setExpected(ctx, "PAYMENT_PENDING");
+      await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_PAYMENT, context: ctx });
+      await wa.sendText(
+        phone,
+        formatMobileMoneyPending({
+          method: "ECOCASH",
+          displayLocal: validated.displayLocal,
+          paynowTestMode: false
+        })
+      );
+      return { handled: true };
+    }
     if (!orderId) {
       if (!ctx.draftLines?.length || !ctx.merchantId || ctx.deliveryLat == null || ctx.deliveryLng == null) {
         await wa.sendText(phone, "That expired. Tell me what you'd like to buy again.");

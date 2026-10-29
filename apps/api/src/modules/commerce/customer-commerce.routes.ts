@@ -3,6 +3,7 @@ import { z } from "zod";
 import { UserRole } from "@prisma/client";
 import { requireAuth, requireRole, optionalAuth } from "../../middleware/auth.js";
 import { validateBody } from "../../middleware/validate.js";
+import { approveProposedQuote, handoffApprovedQuote } from "./quote-approval.service.js";
 import {
   browseNearbyProducts,
   browseNearbyShops,
@@ -295,6 +296,55 @@ customerCommerceRouter.get("/orders", ...requireCustomer, async (req, res, next)
     next(err);
   }
 });
+
+customerCommerceRouter.post(
+  "/orders/:id/approve",
+  ...requireCustomer,
+  validateBody(z.object({ approvalId: z.string().uuid(), quoteVersion: z.number().int().positive() })),
+  async (req, res, next) => {
+    try {
+      res.json(
+        await approveProposedQuote({
+          checkoutId: String(req.params.id),
+          approvalId: req.body.approvalId,
+          quoteVersion: req.body.quoteVersion,
+          actor: { userId: req.auth!.userId }
+        })
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+customerCommerceRouter.post(
+  "/orders/:id/handoff",
+  ...requireCustomer,
+  validateBody(
+    z.object({
+      approvalId: z.string().uuid(),
+      quoteVersion: z.number().int().positive(),
+      paymentMethod: z.enum(["CASH", "ECOCASH"]),
+      payerPhone: z.string().min(7).max(24).optional()
+    })
+  ),
+  async (req, res, next) => {
+    try {
+      res.status(201).json(
+        await handoffApprovedQuote({
+          checkoutId: String(req.params.id),
+          approvalId: req.body.approvalId,
+          quoteVersion: req.body.quoteVersion,
+          paymentMethod: req.body.paymentMethod,
+          payerPhone: req.body.payerPhone,
+          actor: { userId: req.auth!.userId }
+        })
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 customerCommerceRouter.get("/orders/:id", ...requireCustomer, async (req, res, next) => {
   try {

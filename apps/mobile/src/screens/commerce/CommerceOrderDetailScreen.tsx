@@ -1,4 +1,5 @@
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { api } from "../../lib/api";
@@ -15,6 +16,8 @@ export function CommerceOrderDetailScreen({ route }: Props) {
     queryFn: () => api.commerceOrder(route.params.orderId, token),
     refetchInterval: 15_000
   });
+  const [payerPhone, setPayerPhone] = useState("");
+  const [busy, setBusy] = useState(false);
 
   if (query.isLoading || !query.data) {
     return (
@@ -24,14 +27,101 @@ export function CommerceOrderDetailScreen({ route }: Props) {
     );
   }
 
-  const { order } = query.data;
+  const payload = query.data;
+  const { order } = payload;
   if (!order) {
+    const quote = payload.priceProposed || payload.customerApproved;
     return (
       <View className="flex-1 bg-background px-5 pt-8">
         <Text className="text-2xl font-black text-ink">YOUR DUTS REQUEST</Text>
         <Text className="mt-3 text-base text-muted">
-          {query.data.message ?? "This request isn't ready for payment. We'll confirm the total first."}
+          {payload.message ?? "This request isn't ready for payment. We'll confirm the total first."}
         </Text>
+        {quote && payload.lines?.length ? (
+          <View className="mt-6 gap-2">
+            {payload.lines.map((line) => (
+              <Text key={`${line.name}-${line.quantity}`} className="text-base text-ink">
+                {line.name} × {line.quantity} — ${((line.lineTotalCents ?? 0) / 100).toFixed(2)}
+              </Text>
+            ))}
+            <Text className="text-base text-ink">Delivery — ${((payload.deliveryFeeCents ?? 0) / 100).toFixed(2)}</Text>
+            <Text className="text-lg font-black text-ink">Total — ${((payload.totalCents ?? 0) / 100).toFixed(2)}</Text>
+          </View>
+        ) : null}
+        {payload.priceProposed && payload.approvalId && payload.quoteVersion ? (
+          <Pressable
+            className="mt-6 rounded-2xl bg-brand px-4 py-3"
+            disabled={busy}
+            onPress={async () => {
+              setBusy(true);
+              try {
+                await api.approveCommerceQuote(
+                  route.params.orderId,
+                  { approvalId: payload.approvalId!, quoteVersion: payload.quoteVersion! },
+                  token
+                );
+                await query.refetch();
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <Text className="text-center text-base font-bold text-white">Confirm this total</Text>
+          </Pressable>
+        ) : null}
+        {payload.customerApproved && payload.approvalId && payload.quoteVersion ? (
+          <View className="mt-6 gap-3">
+            <Pressable
+              className="rounded-2xl bg-brand px-4 py-3"
+              disabled={busy}
+              onPress={async () => {
+                setBusy(true);
+                try {
+                  await api.handoffCommerceQuote(
+                    route.params.orderId,
+                    { approvalId: payload.approvalId!, quoteVersion: payload.quoteVersion!, paymentMethod: "CASH" },
+                    token
+                  );
+                  await query.refetch();
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Text className="text-center text-base font-bold text-white">Cash on delivery</Text>
+            </Pressable>
+            <TextInput
+              value={payerPhone}
+              onChangeText={setPayerPhone}
+              placeholder="EcoCash number"
+              className="rounded-2xl border border-border bg-surface px-4 py-3 text-base text-ink"
+            />
+            <Pressable
+              className="rounded-2xl border border-border px-4 py-3"
+              disabled={busy}
+              onPress={async () => {
+                setBusy(true);
+                try {
+                  await api.handoffCommerceQuote(
+                    route.params.orderId,
+                    {
+                      approvalId: payload.approvalId!,
+                      quoteVersion: payload.quoteVersion!,
+                      paymentMethod: "ECOCASH",
+                      payerPhone
+                    },
+                    token
+                  );
+                  await query.refetch();
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Text className="text-center text-base font-bold text-ink">Pay with EcoCash</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     );
   }

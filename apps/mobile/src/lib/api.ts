@@ -1285,10 +1285,39 @@ export const api = {
       }>;
     }>("/commerce/orders", {}, token),
 
+  approveCommerceQuote: (
+    orderId: string,
+    body: { approvalId: string; quoteVersion: number },
+    token: string
+  ) =>
+    request<{ status: string; payable: false }>(
+      `/commerce/orders/${orderId}/approve`,
+      { method: "POST", body: JSON.stringify(body) },
+      token
+    ),
+
+  handoffCommerceQuote: (
+    orderId: string,
+    body: { approvalId: string; quoteVersion: number; paymentMethod: "CASH" | "ECOCASH"; payerPhone?: string },
+    token: string
+  ) =>
+    request<{ orderId: string; orderNumber: number; paymentStatus: string }>(
+      `/commerce/orders/${orderId}/handoff`,
+      { method: "POST", body: JSON.stringify(body) },
+      token
+    ),
+
   commerceOrder: (orderId: string, token: string) =>
     request<{
       payable?: false;
       message?: string;
+      priceProposed?: boolean;
+      customerApproved?: boolean;
+      approvalId?: string | null;
+      quoteVersion?: number;
+      deliveryFeeCents?: number;
+      totalCents?: number;
+      lines?: Array<{ name: string; quantity: number; lineTotalCents: number }>;
       order: {
         id: string;
         orderNumber: number;
