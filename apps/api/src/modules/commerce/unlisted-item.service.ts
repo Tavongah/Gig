@@ -341,7 +341,11 @@ export async function submitUnlistedQuote(
   const delivery = calculatePilotDeliveryPrice({
     routeDistanceKm: routeKm,
     packageClass,
-    locationMode
+    locationMode,
+    typedAddress: row.deliveryInstructions,
+    deliveryLabel: row.deliveryLabel,
+    customerLatitude: customerLat,
+    customerLongitude: customerLng
   });
   if (!delivery.eligible || delivery.deliveryFeeCents == null) {
     throw new AppError("We can't deliver this to the customer location yet.", 409, "SHOP_NOT_NEARBY");

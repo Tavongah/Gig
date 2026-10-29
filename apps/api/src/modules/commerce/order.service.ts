@@ -182,7 +182,9 @@ export async function quoteBasketTotals(input: {
     locationMode: input.locationMode,
     deliveryPrecision: input.deliveryPrecision,
     typedAddress: input.typedAddress,
-    deliveryLabel: input.deliveryLabel
+    deliveryLabel: input.deliveryLabel,
+    customerLatitude: input.customerLat,
+    customerLongitude: input.customerLng
   });
   const deliveryFeeCents = delivery.deliveryFeeCents;
   const serviceFeeCents = settings.serviceFeeCents;

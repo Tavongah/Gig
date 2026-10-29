@@ -235,7 +235,9 @@ export async function quoteCombinedCart(input: {
     lines: input.lines,
     locationMode: input.locationMode,
     deliveryPrecision: input.deliveryPrecision,
-    deliveryLabel: input.deliveryLabel
+    deliveryLabel: input.deliveryLabel,
+    customerLatitude: input.lat,
+    customerLongitude: input.lng
   });
   const deliveryFeeCents = delivery.deliveryFeeCents;
   const serviceFeeCents = settings.serviceFeeCents;

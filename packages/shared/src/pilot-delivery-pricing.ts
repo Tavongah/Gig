@@ -1,12 +1,15 @@
 /**
  * DUTS commerce pilot delivery pricing V1.
  *
- * GPS / shared-location: distance band + package class → $0.50–$2.00 matrix.
- * Typed MSU/Gweru pilot address: package class only → $1.00 / $1.30 / $1.70.
+ * Supported Gweru and Harare deliveries: package class only → $1.00 / $1.30 / $1.70.
+ * Distance does not choose that customer fee. Other GPS routes keep the distance matrix.
  *
  * Does NOT apply to legacy gig/P2P calculateDeliveryPrice.
  * Does NOT split courier payout from the customer fee.
+ * Does NOT decide which merchant is eligible.
  */
+
+import { distanceKmBetween } from "./delivery.js";
 
 export const PILOT_PACKAGE_CLASSES = ["SMALL", "MEDIUM", "LARGE"] as const;
 export type PilotPackageClass = (typeof PILOT_PACKAGE_CLASSES)[number];
@@ -48,6 +51,20 @@ export const MSU_GWERU_TYPED_PILOT_CENTROID = {
   latitude: -19.4970683,
   longitude: 29.838108
 } as const;
+
+/**
+ * Same city seeds as shopping-area clustering. Pricing uses them only to
+ * recognize a Gweru or Harare delivery. Bulawayo and other cities are excluded.
+ */
+export const SUPPORTED_PACKAGE_PRICING_CITY_SEEDS = [
+  { id: "GWERU", name: "gweru", latitude: -19.455, longitude: 29.812 },
+  { id: "HARARE", name: "harare", latitude: -17.8292, longitude: 31.0522 }
+] as const;
+
+/** Same 40km match used to attach a merchant to a shopping-area seed. */
+export const SUPPORTED_PACKAGE_PRICING_MATCH_KM = 40;
+
+export type SupportedPackagePricingCity = (typeof SUPPORTED_PACKAGE_PRICING_CITY_SEEDS)[number]["id"];
 
 export const PILOT_DELIVERY_MATRIX_CENTS: Record<
   PilotDistanceBand,
@@ -117,6 +134,51 @@ export function isMsuGweruTypedPilotAddress(text: string | null | undefined): bo
   const hasNehosho = /\bnehosho\b/.test(hay);
   // Pilot zone landmarks (Senga / Nehosho / MSU) plus explicit Gweru+landmark forms.
   return hasSenga || hasNehosho || hasMsu || (hasGweru && (hasSenga || hasNehosho || hasMsu));
+}
+
+export function supportedPackagePricingCityFromText(
+  text: string | null | undefined
+): SupportedPackagePricingCity | null {
+  const hay = foldAddressText(text);
+  if (!hay) return null;
+  if (/\bharare\b/.test(hay)) return "HARARE";
+  if (/\bgweru\b/.test(hay) || isMsuGweruTypedPilotAddress(text)) return "GWERU";
+  return null;
+}
+
+export function supportedPackagePricingCityFromPoint(
+  latitude: number,
+  longitude: number
+): SupportedPackagePricingCity | null {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  let best: SupportedPackagePricingCity | null = null;
+  let bestKm = Infinity;
+  for (const seed of SUPPORTED_PACKAGE_PRICING_CITY_SEEDS) {
+    const km = distanceKmBetween(
+      { latitude, longitude },
+      { latitude: seed.latitude, longitude: seed.longitude }
+    );
+    if (km < bestKm) {
+      bestKm = km;
+      best = seed.id;
+    }
+  }
+  if (best != null && bestKm <= SUPPORTED_PACKAGE_PRICING_MATCH_KM) return best;
+  return null;
+}
+
+export function resolveSupportedPackagePricingCity(input: {
+  typedAddress?: string | null;
+  deliveryLabel?: string | null;
+  customerLatitude?: number | null;
+  customerLongitude?: number | null;
+}): SupportedPackagePricingCity | null {
+  const fromText =
+    supportedPackagePricingCityFromText(input.typedAddress) ??
+    supportedPackagePricingCityFromText(input.deliveryLabel);
+  if (fromText) return fromText;
+  if (input.customerLatitude == null || input.customerLongitude == null) return null;
+  return supportedPackagePricingCityFromPoint(input.customerLatitude, input.customerLongitude);
 }
 
 export function resolvePilotLocationMode(input: {
@@ -232,13 +294,18 @@ export function calculatePilotDeliveryPrice(input: {
   routeDistanceKm: number;
   packageClass: PilotPackageClass;
   locationMode?: PilotLocationMode | string | null;
+  typedAddress?: string | null;
+  deliveryLabel?: string | null;
+  customerLatitude?: number | null;
+  customerLongitude?: number | null;
 }): PilotDeliveryPriceResult {
   const packageClass = PILOT_PACKAGE_CLASSES.includes(input.packageClass as PilotPackageClass)
     ? (input.packageClass as PilotPackageClass)
     : "MEDIUM";
   const locationMode: PilotLocationMode = input.locationMode === "TYPED_PILOT" ? "TYPED_PILOT" : "GPS";
   const distanceKm = Number.isFinite(input.routeDistanceKm) ? input.routeDistanceKm : Number.NaN;
-  if (locationMode === "TYPED_PILOT") {
+  const supportedCity = resolveSupportedPackagePricingCity(input);
+  if (locationMode === "TYPED_PILOT" || supportedCity) {
     return {
       eligible: true,
       currency: "USD",

@@ -47,6 +47,8 @@ export async function quotePilotCommerceDelivery(input: {
   deliveryPrecision?: string | null;
   typedAddress?: string | null;
   deliveryLabel?: string | null;
+  customerLatitude?: number | null;
+  customerLongitude?: number | null;
 }) {
   const packageClass = await classifyBasketPackageClass(input.lines);
   const locationMode = resolvePilotLocationMode({
@@ -58,7 +60,11 @@ export async function quotePilotCommerceDelivery(input: {
   const priced = calculatePilotDeliveryPrice({
     routeDistanceKm: input.routeDistanceKm,
     packageClass,
-    locationMode
+    locationMode,
+    typedAddress: input.typedAddress,
+    deliveryLabel: input.deliveryLabel,
+    customerLatitude: input.customerLatitude,
+    customerLongitude: input.customerLongitude
   });
   if (!priced.eligible || priced.deliveryFeeCents == null) {
     throw new AppError(PILOT_DELIVERY_INELIGIBLE_MESSAGE, 409, "SHOP_NOT_NEARBY");
