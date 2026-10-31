@@ -17,7 +17,7 @@ import { isSmartBasketEnabled } from "../../lib/storefront-categories";
 import type { RootStackParamList } from "../../navigation/types";
 import { cartLineKey, useCommerceCartStore } from "../../stores/commerce-cart.store";
 import { desiredFlavorLabel, desiredLineKey, useDesiredBasketStore } from "../../stores/desired-basket.store";
-import { toCheckoutLine } from "../../lib/storefront-cart";
+import { applyMerchantCatalogCart, toCheckoutLine } from "../../lib/storefront-cart";
 import { useReducedMotion } from "../../lib/use-reduced-motion";
 
 export function CartScreen() {
@@ -85,80 +85,42 @@ export function CartScreen() {
   const shoppingList = smartBasket ? desired : [];
   const empty = !lines.length && !shoppingList.length;
 
-  function browsePayload() {
-    return browse.geo && "areaId" in browse.geo
-      ? { areaId: browse.geo.areaId }
-      : browse.geo && "lat" in browse.geo
-        ? { location: { latitude: browse.geo.lat, longitude: browse.geo.lng } }
-        : {};
-  }
-
-  function applyBasketSelect(result: Awaited<ReturnType<typeof api.commerceBasketSelect>>) {
-    const imageByCatalog = new Map(desired.map((l) => [l.catalogProductId, l.imageUrl]));
-    useCommerceCartStore.getState().replaceCart({
-      merchantId: result.quote!.merchant.id,
-      merchantName: result.quote!.merchant.name,
-      lines: result.cartLines.map((line) => ({
-        productId: line.productId,
-        catalogProductId: line.catalogProductId || null,
-        name: line.name,
-        imageUrl: imageByCatalog.get(line.catalogProductId) ?? null,
-        sizeLabel: line.sizeLabel,
-        unitPriceCents: line.unitPriceCents,
-        quantity: line.quantity,
-        merchantId: line.merchantId,
-        merchantName: line.merchantName,
-        flavorOptionId: line.flavorOptionId ?? null,
-        flavorPreference: line.flavorPreference ?? null,
-        flavorName: line.flavorName ?? null
-      }))
-    });
-    removeMany(result.cartLines.map((l) => l.catalogProductId).filter(Boolean));
-  }
-
-  async function autoSelectBestShop(): Promise<boolean> {
-    if (!shoppingList.length) return true;
-    if (!browse.geo) {
-      setQuoteError("Choose a shopping area to continue.");
-      return false;
+  async function continueCatalogDemand() {
+    if (!shoppingList.length) return;
+    if (browse.isGuest || !browse.token) {
+      setQuoteError("Sign in to request these products.");
+      chooseAccount();
+      return;
     }
-    const items = shoppingList.map((l) => ({
-      catalogProductId: l.catalogProductId,
-      quantity: l.quantity,
-      flavorOptionId: l.flavorOptionId ?? null,
-      flavorPreference: l.flavorPreference ?? null,
-      flavorName: l.flavorName ?? null
-    }));
-    try {
-      const data = await api.commerceBasketMatch({ ...browsePayload(), items });
-      const top = data.matches[0];
-      if (!top) {
-        setQuoteError("We couldn't find these items nearby yet.");
-        return false;
-      }
-      if (!top.complete) {
-        navigation.navigate("BasketMatch");
-        return false;
-      }
-      const result = await api.commerceBasketSelect({
-        merchantId: top.merchantId,
-        acceptPartial: false,
-        expectedFulfilledLines: top.fulfilledLineCount,
-        deferDelivery: browse.isGuest || data.locationMode === "discovery",
-        ...browsePayload(),
-        items
-      });
-      if (result.changed || !result.quote || !result.cartLines.length) {
-        navigation.navigate("BasketMatch");
-        return false;
-      }
-      applyBasketSelect(result);
-      return true;
-    } catch (e) {
-      setQuoteError(friendlyCheckoutError((e as Error).message));
-      navigation.navigate("BasketMatch");
-      return false;
+    if (!browse.exact) {
+      navigation.navigate("ShopLocation", { next: "checkout" });
+      return;
     }
+    const result = await api.commerceCatalogDemand(
+      {
+        lat: browse.exact.latitude,
+        lng: browse.exact.longitude,
+        deliveryLabel: browse.exact.label,
+        locationMode: browse.exact.locationMode,
+        items: shoppingList.map((line) => ({
+          catalogProductId: line.catalogProductId,
+          quantity: line.quantity,
+          flavorOptionId: line.flavorOptionId ?? null,
+          flavorPreference: line.flavorPreference ?? null,
+          flavorName: line.flavorName ?? null
+        }))
+      },
+      browse.token
+    );
+    if (result.fulfillment === "MERCHANT") {
+      const imageByCatalog = new Map(desired.map((line) => [line.catalogProductId, line.imageUrl]));
+      applyMerchantCatalogCart(result, imageByCatalog);
+      removeMany(result.cartLines.map((line) => line.catalogProductId).filter(Boolean));
+      navigation.navigate("CommerceCheckout");
+      return;
+    }
+    clearDesired();
+    navigation.navigate("CommerceOrderDetail", { orderId: result.checkoutId });
   }
 
   async function startGuestWhatsApp() {
@@ -198,8 +160,8 @@ export function CartScreen() {
         return;
       }
       if (shoppingList.length && !useCommerceCartStore.getState().lines.length) {
-        const selected = await autoSelectBestShop();
-        if (!selected) return;
+        await continueCatalogDemand();
+        return;
       }
       const current = useCommerceCartStore.getState().lines;
       if (!current.length) return;
@@ -381,7 +343,13 @@ export function CartScreen() {
     );
   }
 
-  const primaryLabel = sellerCart && browse.isGuest ? "Sign in to continue" : browse.isGuest ? "Continue with WhatsApp" : "Continue";
+  const catalogDemand = shoppingList.length > 0 && lines.length === 0;
+  const primaryLabel =
+    (sellerCart && browse.isGuest) || (catalogDemand && browse.isGuest)
+      ? "Sign in to continue"
+      : browse.isGuest
+        ? "Continue with WhatsApp"
+        : "Continue";
   const sellerSubtotalCents = sellerCart ? lines.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0) : 0;
 
   return (

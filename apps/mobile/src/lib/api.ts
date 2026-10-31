@@ -1269,6 +1269,51 @@ export const api = {
       };
     }>("/commerce/cart/checkout", { method: "POST", body: JSON.stringify(payload) }, token),
 
+  commerceCatalogDemand: (
+    payload: {
+      lat: number;
+      lng: number;
+      deliveryLabel: string;
+      locationMode?: "GPS" | "TYPED_PILOT";
+      items: Array<{
+        catalogProductId: string;
+        quantity: number;
+        flavorOptionId?: string | null;
+        flavorPreference?: "ANY" | "SPECIFIC" | null;
+        flavorName?: string | null;
+      }>;
+    },
+    token: string
+  ) =>
+    request<
+      | {
+          fulfillment: "MERCHANT";
+          cartLines: Array<{
+            productId: string;
+            catalogProductId: string;
+            name: string;
+            sizeLabel: string | null;
+            quantity: number;
+            unitPriceCents: number;
+            merchantId: string;
+            merchantName: string;
+            flavorOptionId?: string | null;
+            flavorPreference?: "ANY" | "SPECIFIC" | null;
+            flavorName?: string | null;
+          }>;
+          quote: {
+            merchant: { id: string; name: string };
+          };
+        }
+      | {
+          fulfillment: "UNRESOLVED";
+          checkoutId: string;
+          status: string;
+          payable: false;
+          message: string;
+        }
+    >("/commerce/cart/catalog-demand", { method: "POST", body: JSON.stringify(payload) }, token),
+
   commerceOrders: (token: string) =>
     request<{
       orders: Array<{
@@ -1277,9 +1322,11 @@ export const api = {
         status: string;
         statusLabel: string;
         totalCents: number;
+        hideMerchandiseTotal?: boolean;
         currency: string;
         merchantName: string;
         itemCount: number;
+        productSummary?: string | null;
         createdAt: string;
         paymentStatus: string;
       }>;
@@ -1317,7 +1364,7 @@ export const api = {
       quoteVersion?: number;
       deliveryFeeCents?: number;
       totalCents?: number;
-      lines?: Array<{ name: string; quantity: number; lineTotalCents: number }>;
+      lines?: Array<{ name: string; quantity: number; lineTotalCents: number | null }>;
       order: {
         id: string;
         orderNumber: number;

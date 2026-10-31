@@ -150,7 +150,7 @@ export function ProductDetailScreen({ route, navigation }: Props) {
   }
 
   function addToShoppingList() {
-    if (!product?.catalogProductId || !purchasable) return;
+    if (!product?.catalogProductId || !alcoholOk) return;
     if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
     markAdded("list");
     const flavor = selectedFlavor();
@@ -327,7 +327,7 @@ export function ProductDetailScreen({ route, navigation }: Props) {
         </View>
       ) : null}
 
-      {purchasable && smartBasket && product.catalogProductId ? (
+      {smartBasket && product.catalogProductId && alcoholOk ? (
         <View className="mt-4">
           <Pressable
             onPress={addToShoppingList}
@@ -372,11 +372,11 @@ export function ProductDetailScreen({ route, navigation }: Props) {
           ))}
         </View>
       ) : (
-        <Text className="mt-2 text-sm text-muted">
-          {product.category && !alcoholOk
-            ? "Alcohol ordering is coming at launch."
-            : "Not available to order yet."}
-        </Text>
+        product.category && !alcoholOk ? (
+          <Text className="mt-2 text-sm text-muted">Alcohol ordering is coming at launch.</Text>
+        ) : smartBasket && product.catalogProductId ? null : (
+          <Text className="mt-2 text-sm text-muted">Not available to order yet.</Text>
+        )
       )}
     </View>
   ) : detailQuery.isError ? (

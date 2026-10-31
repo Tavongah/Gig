@@ -11,6 +11,7 @@ import {
   isPublicStorefrontCatalogProduct,
   normalizeProductSearchName,
   parseAlcoholCommerceEnabled,
+  resolveSupportedPackagePricingCity,
   type CommerceOrderStatus
 } from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
@@ -35,12 +36,13 @@ import {
   quoteCombinedCart
 } from "./multi-shop-checkout.service.js";
 import {
+  acceptUnresolvedCatalogRequest,
   acceptUnresolvedProductRequest,
   assertCheckoutPayable,
   isAcceptedUnresolvedRequest,
   type AcceptedUnresolvedRequest
 } from "./unresolved-checkout.service.js";
-import { formatUnresolvedRequestAccepted } from "../whatsapp/copy.js";
+import { formatOutsideDeliveryTerritory, formatUnresolvedRequestAccepted } from "../whatsapp/copy.js";
 import {
   catalogOnlyAcc,
   clampStorefrontPage,
@@ -932,6 +934,147 @@ export async function checkoutCart(input: {
   };
 }
 
+/**
+ * Signed-in catalog demand. A complete nearby shop keeps the existing priced
+ * cart. Anything less in Gweru or Harare becomes one unresolved checkout.
+ */
+export async function checkoutCatalogDemand(input: {
+  userId: string;
+  lat: number;
+  lng: number;
+  deliveryLabel: string;
+  items: Array<{
+    catalogProductId: string;
+    quantity: number;
+    flavorOptionId?: string | null;
+    flavorPreference?: "ANY" | "SPECIFIC" | null;
+    flavorName?: string | null;
+  }>;
+}) {
+  if (!input.userId) {
+    throw new AppError("Sign in to request these products.", 401, "AUTH_REQUIRED");
+  }
+  if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) {
+    throw new AppError("Tell us where to deliver.", 400, "LOCATION_REQUIRED");
+  }
+  const { normalizeDesiredItems, matchSmartBasket, selectSmartBasket } = await import("./smart-basket.service.js");
+  const items = normalizeDesiredItems(input.items);
+  if (!items.length) throw new AppError("Your cart is empty.", 400, "EMPTY_BASKET");
+  if (items.length > 40) throw new AppError("That's too many items for one order.", 400, "TOO_MANY_ITEMS");
+
+  const catalogs = await prisma.catalogProduct.findMany({
+    where: { id: { in: items.map((item) => item.catalogProductId) } }
+  });
+  const byId = new Map(catalogs.map((row) => [row.id, row]));
+  const alcoholEnabled = parseAlcoholCommerceEnabled(process.env.ALCOHOL_COMMERCE_ENABLED);
+  for (const item of items) {
+    const catalog = byId.get(item.catalogProductId);
+    if (!catalog || !isPublicStorefrontCatalogProduct(catalog)) {
+      throw new AppError("I couldn't identify that product on DUTS.", 404, "PRODUCT_NOT_FOUND");
+    }
+    if (!canPurchaseStorefrontCategory(catalog.category, alcoholEnabled)) {
+      throw new AppError("Alcohol ordering isn't available yet.", 409, "ALCOHOL_DISABLED");
+    }
+  }
+
+  let complete: { merchantId: string; fulfilledLineCount: number } | null = null;
+  try {
+    const matched = await matchSmartBasket({ lat: input.lat, lng: input.lng, items });
+    complete = matched.matches.find((row) => row.complete) ?? null;
+  } catch (error) {
+    if (!(error instanceof AppError) || error.code !== "FEATURE_DISABLED") throw error;
+  }
+
+  if (complete) {
+    const selected = await selectSmartBasket({
+      merchantId: complete.merchantId,
+      items,
+      lat: input.lat,
+      lng: input.lng,
+      acceptPartial: false,
+      expectedFulfilledLines: complete.fulfilledLineCount,
+      deferDelivery: false
+    });
+    const covered = new Set(selected.cartLines.map((line) => line.catalogProductId));
+    const full = items.every((item) => covered.has(item.catalogProductId));
+    if (!selected.changed && selected.quote && full) {
+      return {
+        fulfillment: "MERCHANT" as const,
+        cartLines: selected.cartLines,
+        quote: selected.quote
+      };
+    }
+  }
+
+  if (items.some((item) => item.flavorPreference === "SPECIFIC" || item.flavorOptionId)) {
+    throw new AppError(
+      "We can't confirm that flavor until a shop is selected. Choose Any flavor, or add a product a nearby shop can fill.",
+      409,
+      "FLAVOR_UNRESOLVED"
+    );
+  }
+
+  const city = resolveSupportedPackagePricingCity({
+    typedAddress: input.deliveryLabel,
+    deliveryLabel: input.deliveryLabel,
+    customerLatitude: input.lat,
+    customerLongitude: input.lng
+  });
+  if (!city) {
+    throw new AppError(formatOutsideDeliveryTerritory(), 409, "OUTSIDE_DELIVERY_TERRITORY");
+  }
+
+  const saved = await acceptUnresolvedCatalogRequest({
+    userId: input.userId,
+    lat: input.lat,
+    lng: input.lng,
+    deliveryLabel: input.deliveryLabel,
+    lines: items.map((item) => ({ catalogProductId: item.catalogProductId, quantity: item.quantity }))
+  });
+  if (!saved) {
+    throw new AppError(formatOutsideDeliveryTerritory(), 409, "OUTSIDE_DELIVERY_TERRITORY");
+  }
+
+  if (saved.propose) {
+    try {
+      const { proposeMerchantPriceForCheckout } = await import("./quote-proposal.service.js");
+      await proposeMerchantPriceForCheckout(saved.checkoutId);
+    } catch (error) {
+      const latest = await prisma.commerceCheckout.findUnique({ where: { id: saved.checkoutId } });
+      if (!latest || latest.status === "AWAITING_FULFILLMENT") throw error;
+    }
+  }
+
+  const row = await prisma.commerceCheckout.findUniqueOrThrow({
+    where: { id: saved.checkoutId },
+    include: { lines: true }
+  });
+  const priced = row.status === "PRICE_PROPOSED" || row.status === "CUSTOMER_APPROVED";
+  return {
+    fulfillment: "UNRESOLVED" as const,
+    checkoutId: row.id,
+    checkoutNumber: row.checkoutNumber,
+    status: row.status,
+    payable: false as const,
+    merchandisePriced: priced,
+    itemsSubtotalCents: priced ? row.itemsSubtotalCents : 0,
+    deliveryFeeCents: row.deliveryFeeCents,
+    totalCents: priced ? row.totalCents : 0,
+    message:
+      row.status === "CUSTOMER_APPROVED"
+        ? "Total confirmed. Choose cash on delivery or EcoCash to continue."
+        : row.status === "PRICE_PROPOSED"
+          ? "Confirm this total?"
+          : formatUnresolvedRequestAccepted(),
+    lines: row.lines.map((line) => ({
+      catalogProductId: line.catalogProductId,
+      productName: line.productNameSnapshot,
+      quantity: line.quantity,
+      unitPriceCents: priced ? line.unitPriceCents : null
+    }))
+  };
+}
+
 export async function listCustomerCommerceOrders(userId: string) {
   const [orders, checkouts] = await Promise.all([
     prisma.commerceOrder.findMany({
@@ -945,10 +1088,11 @@ export async function listCustomerCommerceOrders(userId: string) {
       }
     }),
     prisma.commerceCheckout.findMany({
-      where: { customerId: userId, status: { notIn: ["AWAITING_FULFILLMENT", "PRICE_PROPOSED", "CUSTOMER_APPROVED"] } },
+      where: { customerId: userId, validationFixture: false },
       orderBy: { createdAt: "desc" },
       take: 30,
       include: {
+        lines: { select: { quantity: true, productNameSnapshot: true } },
         orders: {
           include: {
             merchant: { select: { id: true, name: true, locationLabel: true } },
@@ -984,6 +1128,30 @@ export async function listCustomerCommerceOrders(userId: string) {
   }));
 
   const multi = checkouts.map((c) => {
+    if (c.status === "AWAITING_FULFILLMENT" || c.status === "PRICE_PROPOSED" || c.status === "CUSTOMER_APPROVED") {
+      const awaiting = c.status === "AWAITING_FULFILLMENT";
+      return {
+        id: c.id,
+        orderNumber: c.checkoutNumber,
+        status: c.status,
+        statusLabel:
+          c.status === "PRICE_PROPOSED"
+            ? "Confirm this total"
+            : c.status === "CUSTOMER_APPROVED"
+              ? "Choose how to pay"
+              : "Checking availability",
+        fulfillmentHint: awaiting ? formatUnresolvedRequestAccepted() : null,
+        totalCents: awaiting ? 0 : c.totalCents,
+        hideMerchandiseTotal: awaiting,
+        currency: c.currency,
+        merchantName: "DUTS",
+        itemCount: c.lines.reduce((sum, line) => sum + line.quantity, 0),
+        productSummary: c.lines.map((line) => `${line.productNameSnapshot} × ${line.quantity}`).join(", "),
+        createdAt: c.createdAt,
+        paymentStatus: c.paymentStatus,
+        shopCount: 0
+      };
+    }
     const view = presentCustomerCheckout(c);
     return {
       id: view.id,
@@ -992,9 +1160,11 @@ export async function listCustomerCommerceOrders(userId: string) {
       statusLabel: view.statusLabel ?? "Order confirmed",
       fulfillmentHint: view.fulfillmentHint,
       totalCents: view.totalCents,
+      hideMerchandiseTotal: false,
       currency: view.currency,
       merchantName: view.merchantName,
       itemCount: view.items.reduce((s, i) => s + i.quantity, 0),
+      productSummary: null as string | null,
       createdAt: c.createdAt,
       paymentStatus: view.paymentStatus,
       shopCount: view.shopCount
@@ -1046,14 +1216,22 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
         itemsSubtotalCents: proposed ? checkout.itemsSubtotalCents : 0,
         deliveryFeeCents: checkout.deliveryFeeCents,
         totalCents: proposed ? checkout.totalCents : 0,
-        lines: proposed
-          ? checkout.lines.map((line) => ({
-              name: line.productNameSnapshot,
-              quantity: line.quantity,
-              unitPriceCents: line.unitPriceCents,
-              lineTotalCents: (line.unitPriceCents ?? 0) * line.quantity
-            }))
-          : [],
+        lines:
+          checkout.status === "AWAITING_FULFILLMENT"
+            ? checkout.lines.map((line) => ({
+                name: line.productNameSnapshot,
+                quantity: line.quantity,
+                unitPriceCents: null,
+                lineTotalCents: null
+              }))
+            : proposed
+              ? checkout.lines.map((line) => ({
+                  name: line.productNameSnapshot,
+                  quantity: line.quantity,
+                  unitPriceCents: line.unitPriceCents,
+                  lineTotalCents: (line.unitPriceCents ?? 0) * line.quantity
+                }))
+              : [],
         order: null,
         message:
           checkout.status === "CUSTOMER_APPROVED"

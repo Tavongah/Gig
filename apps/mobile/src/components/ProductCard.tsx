@@ -90,6 +90,9 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
   const [imgFailed, setImgFailed] = useState(false);
   const reduce = useReducedMotion();
   const purchasable = isProductCardPurchasable(product);
+  const canRequestCatalog =
+    isSmartBasketEnabled() && Boolean(product.catalogProductId) && alcoholPurchaseAllowed(product.category);
+  const showAdd = Boolean(onAdd) && (purchasable || canRequestCatalog);
   const offerCount = product.merchantOfferCount ?? product.offerCount ?? 0;
   const showFrom = purchasable ? pricePrefix ?? (offerCount > 1 ? "From " : "") : "";
   const price = purchasable ? `${showFrom}$${(product.fromPriceCents! / 100).toFixed(2)}` : "Price coming soon";
@@ -182,7 +185,7 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
           >
             {price}
           </Text>
-          {purchasable && onAdd ? (
+          {showAdd ? (
             quantity > 0 ? (
               <View className="shrink-0 flex-row items-center">
                 <CardQtyButton
@@ -207,7 +210,14 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
                 />
               </View>
             ) : (
-              <CardQtyButton label={`Add ${product.name}`} icon="add" reduce={reduce} onPress={() => onAdd()} />
+              <CardQtyButton
+                label={`Add ${product.name}`}
+                icon="add"
+                reduce={reduce}
+                onPress={() => {
+                  if (onAdd) onAdd();
+                }}
+              />
             )
           ) : null}
         </View>

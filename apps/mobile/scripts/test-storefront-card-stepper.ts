@@ -173,7 +173,8 @@ pass("STEP14");
 }
 
 const card = read("components/ProductCard.tsx");
-assert.ok(card.includes("purchasable && onAdd"), "Add gated on purchasable + handler");
+assert.ok(card.includes("showAdd"), "Add control remains");
+assert.ok(card.includes("canRequestCatalog"), "catalog demand can add without an offer");
 assert.ok(card.includes("storefrontCardQuantity"), "quantity from authoritative helper");
 assert.ok(card.includes("storefrontCardAdjustRef"), "increment/decrement use existing line keys");
 assert.ok(card.includes("onAdd()"), "qty 0 still calls existing Add");

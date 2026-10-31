@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -10,7 +10,8 @@ import type { RootStackParamList } from "../../navigation/types";
 import { useSessionStore } from "../../stores/session.store";
 import { useShopLocationStore } from "../../stores/shop-location.store";
 import { cartLineKey, useCommerceCartStore } from "../../stores/commerce-cart.store";
-import { toCheckoutLine } from "../../lib/storefront-cart";
+import { applyMerchantCatalogCart, toCheckoutLine } from "../../lib/storefront-cart";
+import { useDesiredBasketStore } from "../../stores/desired-basket.store";
 import { formatFlavorCustomerLine, resolveCustomerPrimaryMerchant } from "@gigflow/shared";
 import { SellerPilotCheckout } from "./SellerPilotCheckout";
 
@@ -24,6 +25,10 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
   const location = useShopLocationStore((s) => s.location);
   const lines = useCommerceCartStore((s) => s.lines);
   const clear = useCommerceCartStore((s) => s.clear);
+  const desired = useDesiredBasketStore((s) => s.lines);
+  const removeDesiredMany = useDesiredBasketStore((s) => s.removeMany);
+  const clearDesired = useDesiredBasketStore((s) => s.clear);
+  const demandOnce = useRef(false);
   const sellerLines = lines.filter((line) => line.sellerOfferId);
   const sellerCart =
     sellerLines.length > 0 && sellerLines.length === lines.length && new Set(sellerLines.map((line) => line.sellerOfferId)).size === 1;
@@ -66,8 +71,42 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
 
   useEffect(() => {
     if (prepQuery.error) setError(friendlyCheckoutError((prepQuery.error as Error).message));
-    else setError("");
-  }, [prepQuery.error]);
+    else if (lines.length) setError("");
+  }, [prepQuery.error, lines.length]);
+
+  useEffect(() => {
+    if (!session || !token || !location || lines.length || !desired.length || sellerCart || demandOnce.current) return;
+    demandOnce.current = true;
+    const imageByCatalog = new Map(desired.map((line) => [line.catalogProductId, line.imageUrl]));
+    const items = desired.map((line) => ({
+      catalogProductId: line.catalogProductId,
+      quantity: line.quantity,
+      flavorOptionId: line.flavorOptionId ?? null,
+      flavorPreference: line.flavorPreference ?? null,
+      flavorName: line.flavorName ?? null
+    }));
+    void api
+      .commerceCatalogDemand(
+        {
+          lat: location.latitude,
+          lng: location.longitude,
+          deliveryLabel: location.label,
+          locationMode: location.locationMode,
+          items
+        },
+        token
+      )
+      .then((result) => {
+        if (result.fulfillment === "MERCHANT") {
+          applyMerchantCatalogCart(result, imageByCatalog);
+          removeDesiredMany(result.cartLines.map((line) => line.catalogProductId).filter(Boolean));
+          return;
+        }
+        clearDesired();
+        navigation.replace("CommerceOrderDetail", { orderId: result.checkoutId });
+      })
+      .catch((err: Error) => setError(friendlyCheckoutError(err.message)));
+  }, [session, token, location, lines.length, desired, sellerCart, navigation, removeDesiredMany, clearDesired]);
 
   const checkoutMut = useMutation({
     mutationFn: async () => {
@@ -140,6 +179,15 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
         <Text className="mt-2 text-base text-ink">
           We're checking availability and prices and will confirm the total before payment.
         </Text>
+      </View>
+    );
+  }
+
+  if (!lines.length && desired.length && !sellerCart) {
+    return (
+      <View className="flex-1 bg-background px-5 pt-8">
+        <Text className="text-2xl font-black text-ink">YOUR DUTS ORDER</Text>
+        <Text className="mt-4 text-base text-ink">{error || "Checking your request…"}</Text>
       </View>
     );
   }

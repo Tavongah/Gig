@@ -13,6 +13,7 @@ import {
   getProductDetailNear,
   getShopCatalog,
   listBrowseCategories,
+  checkoutCatalogDemand,
   listCustomerCommerceOrders,
   prepareCheckout,
   quoteCart,
@@ -439,6 +440,28 @@ const basketSelectSchema = z
   .refine((value) => Boolean(value.areaId) || Boolean(value.location), {
     message: "location or areaId required"
   });
+
+const catalogDemandSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  deliveryLabel: z.string().min(1).max(240),
+  locationMode: z.enum(["GPS", "TYPED_PILOT"]).optional(),
+  deliveryPrecision: z.string().max(24).optional(),
+  items: z.array(desiredItemSchema).min(1).max(40)
+});
+
+customerCommerceRouter.post(
+  "/cart/catalog-demand",
+  ...requireCustomer,
+  validateBody(catalogDemandSchema),
+  async (req, res, next) => {
+    try {
+      res.json(await checkoutCatalogDemand({ ...req.body, userId: req.auth!.userId }));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 customerCommerceRouter.post("/basket/match", validateBody(basketMatchSchema), async (req, res, next) => {
   try {

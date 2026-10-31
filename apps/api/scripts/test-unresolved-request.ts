@@ -41,7 +41,8 @@ async function main() {
   assert.doesNotMatch(service, /DeliveryGig/);
   assert.match(payment, /assertCheckoutPayable/);
   assert.match(service, /REQUEST_NOT_PAYABLE/);
-  assert.match(
+  assert.match(history, /validationFixture: false/);
+  assert.doesNotMatch(
     history,
     /status: \{ notIn: \["AWAITING_FULFILLMENT", "PRICE_PROPOSED", "CUSTOMER_APPROVED"\] \}/
   );
@@ -267,10 +268,9 @@ async function main() {
     assert.equal(harareRow.deliveryLabel, HARARE.label);
 
     const listed = await listCustomerCommerceOrders(user.id);
-    assert.equal(
-      listed.orders.some((order) => order.id === gweru.checkout.id || order.id === harare.checkout.id),
-      false
-    );
+    const visible = listed.orders.filter((order) => order.id === gweru.checkout.id || order.id === harare.checkout.id);
+    assert.equal(visible.length, 2);
+    assert.ok(visible.every((order) => order.status === "AWAITING_FULFILLMENT" && order.totalCents === 0));
 
     const sameCount = await prisma.commerceCheckout.count({
       where: { id: { in: checkoutIds } }

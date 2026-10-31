@@ -37,15 +37,20 @@ export function CommerceOrderDetailScreen({ route }: Props) {
         <Text className="mt-3 text-base text-muted">
           {payload.message ?? "This request isn't ready for payment. We'll confirm the total first."}
         </Text>
-        {quote && payload.lines?.length ? (
+        {payload.lines?.length ? (
           <View className="mt-6 gap-2">
             {payload.lines.map((line) => (
               <Text key={`${line.name}-${line.quantity}`} className="text-base text-ink">
-                {line.name} × {line.quantity} — ${((line.lineTotalCents ?? 0) / 100).toFixed(2)}
+                {line.name} × {line.quantity}
+                {line.lineTotalCents != null ? ` — $${(line.lineTotalCents / 100).toFixed(2)}` : ""}
               </Text>
             ))}
-            <Text className="text-base text-ink">Delivery — ${((payload.deliveryFeeCents ?? 0) / 100).toFixed(2)}</Text>
-            <Text className="text-lg font-black text-ink">Total — ${((payload.totalCents ?? 0) / 100).toFixed(2)}</Text>
+            {quote ? (
+              <>
+                <Text className="text-base text-ink">Delivery — ${((payload.deliveryFeeCents ?? 0) / 100).toFixed(2)}</Text>
+                <Text className="text-lg font-black text-ink">Total — ${((payload.totalCents ?? 0) / 100).toFixed(2)}</Text>
+              </>
+            ) : null}
           </View>
         ) : null}
         {payload.priceProposed && payload.approvalId && payload.quoteVersion ? (

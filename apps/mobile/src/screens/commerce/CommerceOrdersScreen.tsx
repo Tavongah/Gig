@@ -37,11 +37,15 @@ export function CommerceOrdersScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Order ${o.orderNumber}`}
           >
-            <Text className="text-base font-bold text-ink">Order #{o.orderNumber}</Text>
-            <Text className="mt-1 text-sm text-muted">{o.merchantName}</Text>
+            <Text className="text-base font-bold text-ink">
+              {o.hideMerchandiseTotal ? "Request" : "Order"} #{o.orderNumber}
+            </Text>
+            <Text className="mt-1 text-sm text-muted">{o.productSummary || o.merchantName}</Text>
             <Text className="mt-1 text-sm font-semibold text-ink">{o.statusLabel}</Text>
             <Text className="mt-1 text-sm text-muted">
-              ${(o.totalCents / 100).toFixed(2)} · {o.itemCount} item{o.itemCount === 1 ? "" : "s"}
+              {o.hideMerchandiseTotal
+                ? `${o.itemCount} item${o.itemCount === 1 ? "" : "s"}`
+                : `$${(o.totalCents / 100).toFixed(2)} · ${o.itemCount} item${o.itemCount === 1 ? "" : "s"}`}
             </Text>
           </Pressable>
         ))}

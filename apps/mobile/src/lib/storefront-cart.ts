@@ -6,6 +6,45 @@ import { alcoholPurchaseAllowed, isSmartBasketEnabled } from "./storefront-categ
 import type { CommerceBrowseGeo } from "./api";
 import { useCommerceCartStore, type CartLine } from "../stores/commerce-cart.store";
 
+export function applyMerchantCatalogCart(
+  result: {
+    cartLines: Array<{
+      productId: string;
+      catalogProductId: string;
+      name: string;
+      sizeLabel: string | null;
+      quantity: number;
+      unitPriceCents: number;
+      merchantId: string;
+      merchantName: string;
+      flavorOptionId?: string | null;
+      flavorPreference?: "ANY" | "SPECIFIC" | null;
+      flavorName?: string | null;
+    }>;
+    quote: { merchant: { id: string; name: string } };
+  },
+  imageByCatalog: Map<string, string | null>
+) {
+  useCommerceCartStore.getState().replaceCart({
+    merchantId: result.quote.merchant.id,
+    merchantName: result.quote.merchant.name,
+    lines: result.cartLines.map((line) => ({
+      productId: line.productId,
+      catalogProductId: line.catalogProductId || null,
+      name: line.name,
+      imageUrl: imageByCatalog.get(line.catalogProductId) ?? null,
+      sizeLabel: line.sizeLabel,
+      unitPriceCents: line.unitPriceCents,
+      quantity: line.quantity,
+      merchantId: line.merchantId,
+      merchantName: line.merchantName,
+      flavorOptionId: line.flavorOptionId ?? null,
+      flavorPreference: line.flavorPreference ?? null,
+      flavorName: line.flavorName ?? null
+    }))
+  });
+}
+
 export function toCheckoutLine(line: CartLine) {
   return {
     productId: line.productId,
@@ -102,7 +141,6 @@ export function addStorefrontProduct(input: {
   isGuest?: boolean;
 }) {
   const { product, geo, token, isGuest } = input;
-  if (!isProductCardPurchasable(product)) return;
   if (!alcoholPurchaseAllowed(product.category)) return;
   if (isGuest) logDutsFlow("GUEST_ADD_TO_CART");
 
@@ -117,7 +155,7 @@ export function addStorefrontProduct(input: {
     return;
   }
 
-  if (!product.productId) return;
+  if (!isProductCardPurchasable(product) || !product.productId) return;
   void api
     .commerceProductDetail(
       {

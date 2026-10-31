@@ -16,7 +16,8 @@ function read(rel: string) {
 }
 
 const card = read("components/ProductCard.tsx");
-assert.ok(card.includes("purchasable && onAdd"), "Add gated on purchasable + handler");
+assert.ok(card.includes("showAdd"), "Add control remains");
+assert.ok(card.includes("canRequestCatalog"), "catalog demand can add without an offer");
 assert.ok(card.includes("bg-brand"), "Add has visible brand fill on web");
 assert.ok(card.includes("shrink-0") || card.includes("flexShrink: 0"), "Add does not shrink away");
 assert.ok(card.includes("h-8 w-8"), "compact add size preserved");

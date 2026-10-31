@@ -7,6 +7,7 @@ import { CommerceCheckoutStatus, type OrderSource, Prisma } from "@prisma/client
 import {
   calculatePilotDeliveryPrice,
   classifyPackage,
+  isPublicStorefrontCatalogProduct,
   normalizeProductSearchName,
   resolveSupportedPackagePricingCity,
   type PilotPackageClass
@@ -304,6 +305,64 @@ export async function acceptUnresolvedProductRequest(input: {
     });
   }
   return null;
+}
+
+/**
+ * Signed-in app catalog lines. Does not invent a price.
+ * Returns null when the destination is outside Gweru and Harare.
+ */
+export async function acceptUnresolvedCatalogRequest(input: {
+  userId: string;
+  lat: number;
+  lng: number;
+  deliveryLabel: string;
+  lines: Array<{ catalogProductId: string; quantity: number }>;
+}): Promise<{ checkoutId: string; propose: boolean } | null> {
+  if (!input.userId || !input.lines.length) return null;
+  const ids = [...new Set(input.lines.map((line) => line.catalogProductId))];
+  const catalogs = await prisma.catalogProduct.findMany({ where: { id: { in: ids } } });
+  if (catalogs.length !== ids.length) return null;
+  const byId = new Map(catalogs.map((row) => [row.id, row]));
+  const lines: ResolvedLine[] = [];
+  for (const line of input.lines) {
+    if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 99) return null;
+    const catalog = byId.get(line.catalogProductId);
+    if (!catalog || !isPublicStorefrontCatalogProduct(catalog)) return null;
+    lines.push({
+      catalogProductId: catalog.id,
+      productName: catalog.name,
+      quantity: line.quantity,
+      category: catalog.category,
+      subcategory: catalog.subcategory,
+      sizeLabel: catalog.sizeLabel,
+      unit: catalog.unit
+    });
+  }
+
+  const customer = await ensureAppCommerceCustomer(input.userId);
+  const key = idempotencyKey(customer.id, lines, input.lat, input.lng);
+  const existing = await prisma.commerceCheckout.findUnique({ where: { idempotencyKey: key } });
+  if (existing) {
+    if (existing.validationFixture || existing.customerId !== input.userId) return null;
+    return {
+      checkoutId: existing.id,
+      propose: existing.status === CommerceCheckoutStatus.AWAITING_FULFILLMENT
+    };
+  }
+
+  const created = await persist({
+    customerKey: customer.id,
+    commerceCustomerId: customer.id,
+    userId: input.userId,
+    phone: customer.whatsappPhone,
+    orderSource: "APP",
+    lat: input.lat,
+    lng: input.lng,
+    deliveryLabel: input.deliveryLabel.trim() || "Delivery location",
+    lines
+  });
+  if (!created) return null;
+  return { checkoutId: created.checkoutId, propose: true };
 }
 
 const NON_PAYABLE_CHECKOUT_STATUSES = new Set<string>([

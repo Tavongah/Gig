@@ -59,6 +59,7 @@
     "test:quote-proposal": "tsx scripts/test-quote-proposal.ts",
     "test:quote-approval": "tsx scripts/test-quote-approval.ts",
     "test:catalog-request": "tsx scripts/test-catalog-request-path.ts",
+    "test:catalog-demand": "tsx scripts/test-catalog-demand.ts",
     "test:whatsapp-checkout-isolation": "tsx scripts/test-whatsapp-checkout-isolation.ts",
     "test:low-data-address-fallback": "tsx scripts/test-low-data-address-fallback.ts",
     "test:location-clarification-context": "tsx scripts/test-location-clarification-context.ts",
