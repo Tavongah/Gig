@@ -140,10 +140,19 @@ export function catalogSearchHaystack(input: {
   sizeLabel?: string | null;
   barcode?: string | null;
   category?: string | null;
+  subcategory?: string | null;
   flavorNames?: string[] | null;
 }): string {
   return normalizeProductSearchName(
-    [input.name, input.brand, input.sizeLabel, input.barcode, input.category, ...(input.flavorNames ?? [])]
+    [
+      input.name,
+      input.brand,
+      input.sizeLabel,
+      input.barcode,
+      input.category,
+      input.subcategory,
+      ...(input.flavorNames ?? [])
+    ]
       .filter(Boolean)
       .join(" ")
   );

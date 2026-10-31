@@ -89,6 +89,7 @@ const CATEGORY_FAMILIES: Record<string, CanonicalCatalogCategory[]> = {
   produce: ["Vegetables", "Fruit"],
   protein: ["Beef", "Chicken", "Pork", "Fish & Protein"],
   shoes: ["Shoes"],
+  toiletries: ["Personal Care"],
   fashion: ["Fashion"],
   electronics: ["Electronics"],
   auto: ["Auto Parts"],
@@ -401,6 +402,37 @@ export function classifyCatalogCategory(input: CatalogCategoryInput): CatalogCat
   };
 }
 
+/**
+ * Category for a shop offer entering the marketplace catalog.
+ * A confident type wins. A single brand signal corrects a conflicting label.
+ * An unrelated stored category is kept when the name has no signal.
+ */
+export function categoryFromShopOffer(input: {
+  name: string;
+  category?: string | null;
+  unit?: string | null;
+}): string {
+  const classified = classifyCatalogCategory({
+    name: input.name,
+    category: input.category,
+    sizeLabel: input.unit
+  });
+  if (classified.suggestedCategory && classified.confidence === "HIGH") {
+    return classified.suggestedCategory;
+  }
+  const nameHay = tokenSet(input.name);
+  const families = new Set<string>();
+  for (const spec of CATEGORY_SIGNALS) {
+    if ((spec.brand ?? []).some((brand) => signalHits(nameHay, brand))) families.add(spec.category);
+  }
+  if (families.size === 1) {
+    const only = [...families][0]!;
+    if (!input.category || !sameCatalogCategoryFamily(input.category, only)) return only;
+  }
+  const current = (input.category ?? "").trim();
+  return current || "Other";
+}
+
 export function applyFutureCatalogCategory(
   input: CatalogCategoryInput,
   classify: (value: CatalogCategoryInput) => CatalogCategoryClassification = classifyCatalogCategory
@@ -451,4 +483,86 @@ export function summarizeCategoryClassifications(rows: CatalogCategoryClassifica
     else summary.lowUnsure += 1;
   }
   return summary;
+}
+
+function foldPlural(word: string): string {
+  if (word.endsWith("ies") && word.length > 4) return `${word.slice(0, -3)}y`;
+  if (/(?:ses|ches|shes|xes)$/.test(word) && word.length > 4) return word.slice(0, -2);
+  if (word.endsWith("s") && !word.endsWith("ss") && word.length > 3) return word.slice(0, -1);
+  return word;
+}
+
+function queryKeys(query: string): string[] {
+  const n = normalizeProductSearchName(query);
+  if (!n) return [];
+  return [...new Set([n, foldPlural(n)])];
+}
+
+function specDescribesItsCategory(spec: CategorySignals): boolean {
+  const label = foldPlural(normalizeProductSearchName(spec.category));
+  return spec.type.some((type) => foldPlural(normalizeProductSearchName(type)) === label);
+}
+
+function levenshtein(a: string, b: string): number {
+  if (Math.abs(a.length - b.length) > 1) return 2;
+  let prev = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j]! + 1, cur[j - 1]! + 1, prev[j - 1]! + cost);
+    }
+    prev = cur;
+  }
+  return prev[b.length] ?? 2;
+}
+
+/**
+ * Categories a customer phrase refers to directly.
+ * A product-type word such as "soap" does not open the whole parent category.
+ * A category word, family word, or synonym of a self-named category does.
+ */
+export function catalogCategoriesForCustomerQuery(query: string): CanonicalCatalogCategory[] {
+  const n = normalizeProductSearchName(query);
+  const words = n.split(" ").filter(Boolean);
+  if (!n || words.length > 2) return [];
+  const keys = new Set(queryKeys(n));
+  const found = new Set<CanonicalCatalogCategory>();
+
+  for (const category of CANONICAL_CATALOG_CATEGORIES) {
+    const label = normalizeProductSearchName(category);
+    if (keys.has(label) || keys.has(foldPlural(label))) found.add(category);
+  }
+  for (const [family, members] of Object.entries(CATEGORY_FAMILIES)) {
+    if (!keys.has(family) && !keys.has(foldPlural(family))) continue;
+    for (const member of members) found.add(member);
+  }
+  for (const spec of CATEGORY_SIGNALS) {
+    if (!specDescribesItsCategory(spec)) continue;
+    const hit = spec.type.some((type) => {
+      const token = normalizeProductSearchName(type);
+      return keys.has(token) || keys.has(foldPlural(token));
+    });
+    if (hit) found.add(spec.category);
+  }
+  return [...found];
+}
+
+/** One category for a single-character typo. Ambiguous typos stay unresolved. */
+export function fuzzyCatalogCategoryForCustomerQuery(query: string): CanonicalCatalogCategory | null {
+  const n = normalizeProductSearchName(query);
+  if (n.length < 5 || n.includes(" ")) return null;
+  if (catalogCategoriesForCustomerQuery(n).length > 0) return null;
+  const hits = new Set<CanonicalCatalogCategory>();
+  const consider = (label: string, category: CanonicalCatalogCategory) => {
+    const token = normalizeProductSearchName(label);
+    if (!token || token.includes(" ")) return;
+    if (levenshtein(n, token) === 1) hits.add(category);
+  };
+  for (const category of CANONICAL_CATALOG_CATEGORIES) consider(category, category);
+  for (const spec of CATEGORY_SIGNALS) {
+    if (!specDescribesItsCategory(spec)) continue;
+    for (const type of spec.type) consider(type, spec.category);
+  }
+  return hits.size === 1 ? [...hits][0]! : null;
 }

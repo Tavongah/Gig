@@ -94,7 +94,13 @@ export type ConversationContext = {
   };
   pendingChoices?: Array<{
     query: string;
-    options: Array<{ productId: string; name: string; priceCents?: number | null; catalogOnly?: boolean }>;
+    options: Array<{
+      productId: string;
+      name: string;
+      priceCents?: number | null;
+      catalogOnly?: boolean;
+      imageUrl?: string | null;
+    }>;
     choiceId?: string;
   }>;
   pendingLocationChoices?: Array<{

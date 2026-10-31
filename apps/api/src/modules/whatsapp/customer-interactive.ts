@@ -119,12 +119,61 @@ export async function sendCartActions(
   ]);
 }
 
+const CATALOG_DISCOVERY_IMAGE_CAP = 5;
+
+function publicCatalogImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Best-effort catalog photo. A miss leaves the text reply untouched. */
+export async function sendBestEffortProductImage(
+  phone: string,
+  imageUrl: string | null | undefined,
+  caption: string
+): Promise<boolean> {
+  const mediaUrl = publicCatalogImageUrl(imageUrl);
+  if (!mediaUrl) return false;
+  const wa = getWhatsAppProvider();
+  if (!wa.sendOutbound) return false;
+  try {
+    const result = await wa.sendOutbound(phone, { body: caption.slice(0, 1024), mediaUrl });
+    return result.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function sendProductChoices(
   phone: string,
   ctx: ConversationContext,
   title: string,
-  options: Array<{ productId: string; name: string; priceCents?: number | null; catalogOnly?: boolean }>
+  options: Array<{
+    productId: string;
+    name: string;
+    priceCents?: number | null;
+    catalogOnly?: boolean;
+    imageUrl?: string | null;
+  }>
 ): Promise<void> {
+  const seenImages = new Set<string>();
+  let imagesSent = 0;
+  for (const [index, option] of options.entries()) {
+    if (imagesSent >= CATALOG_DISCOVERY_IMAGE_CAP) break;
+    const mediaUrl = publicCatalogImageUrl(option.imageUrl);
+    if (!mediaUrl || seenImages.has(mediaUrl)) continue;
+    seenImages.add(mediaUrl);
+    const price =
+      option.priceCents != null && option.priceCents > 0 ? ` — $${(option.priceCents / 100).toFixed(2)}` : "";
+    const sent = await sendBestEffortProductImage(phone, mediaUrl, `${index + 1}. ${option.name}${price}`);
+    if (sent) imagesSent += 1;
+  }
   const body = formatDisambiguation(title, options);
   const bounded = options.slice(0, 10);
   await sendCustomerChoices(

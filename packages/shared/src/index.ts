@@ -346,7 +346,10 @@ export {
 export {
   CANONICAL_CATALOG_CATEGORIES,
   applyFutureCatalogCategory,
+  catalogCategoriesForCustomerQuery,
+  categoryFromShopOffer,
   classifyCatalogCategory,
+  fuzzyCatalogCategoryForCustomerQuery,
   sameCatalogCategoryFamily,
   summarizeCategoryClassifications,
   type CanonicalCatalogCategory,

@@ -341,13 +341,9 @@ export function formatDisambiguation(
     )
     .join("\n");
   const max = Math.min(options.length, 3);
-  return [
-    title,
-    "",
-    list,
-    "",
-    max <= 2 ? `Reply 1 or 2.` : `Reply 1, 2, or 3.`
-  ].join("\n");
+  const reply =
+    options.length > 3 ? "Reply with the number or product name." : max <= 2 ? `Reply 1 or 2.` : `Reply 1, 2, or 3.`;
+  return [title, "", list, "", reply].join("\n");
 }
 
 export function formatBudgetOver(input: {

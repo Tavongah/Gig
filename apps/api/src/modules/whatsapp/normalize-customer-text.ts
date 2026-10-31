@@ -126,6 +126,8 @@ export function prepareCustomerTextForMatching(raw: string): string {
 /** Soft prefixes often used before a shopping list. */
 export function stripShoppingLeadIns(text: string): string {
   return text
+    .replace(/^(?:i(?:'m| am)|we(?:'re| are))\s+looking\s+for\s+/i, "")
+    .replace(/^looking\s+for\s+/i, "")
     .replace(/^(i\s+)?(want|need|wanna|like)\s+/i, "")
     .replace(/^(give|get|bring)\s+(me\s+)?/i, "")
     .replace(/^please\s+/i, "")

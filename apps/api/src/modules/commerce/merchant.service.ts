@@ -215,7 +215,7 @@ export async function upsertProductForMerchant(
         searchAliases: aliases
       }
     });
-    if (!updated.catalogProductId) {
+    if (updated.available && !updated.archived) {
       const { ensureCatalogLinkForProduct } = await import("./catalog.service.js");
       await ensureCatalogLinkForProduct(updated.id);
     }
@@ -246,7 +246,11 @@ export async function upsertProductForMerchant(
 export async function setProductAvailability(merchantId: string, productId: string, available: boolean) {
   const product = await prisma.product.findFirst({ where: { id: productId, merchantId, archived: false } });
   if (!product) throw new AppError("Product not found.", 404, "PRODUCT_NOT_FOUND");
-  return prisma.product.update({ where: { id: productId }, data: { available } });
+  const updated = await prisma.product.update({ where: { id: productId }, data: { available } });
+  if (!available) return updated;
+  const { ensureCatalogLinkForProduct } = await import("./catalog.service.js");
+  await ensureCatalogLinkForProduct(updated.id);
+  return prisma.product.findUniqueOrThrow({ where: { id: updated.id } });
 }
 
 export async function archiveProduct(merchantId: string, productId: string) {

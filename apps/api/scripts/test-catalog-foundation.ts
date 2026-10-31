@@ -122,7 +122,7 @@ async function main() {
     });
     assert.equal(submitConfirm.requiresConfirmation, false);
     if (!submitConfirm.requiresConfirmation) {
-      assert.equal(submitConfirm.catalogProduct.status, "PENDING");
+      assert.equal(submitConfirm.catalogProduct.status, "APPROVED");
       assert.equal(submitConfirm.product.merchantId, merchant.id);
       assert.equal(submitConfirm.product.available, true);
     }
@@ -150,7 +150,7 @@ async function main() {
 
     // Order item snapshots untouched shape check
     const orderItemFields = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
-      `SELECT column_name FROM information_schema.columns WHERE table_name = 'CommerceOrderItem'`
+      `SELECT column_name::text AS column_name FROM information_schema.columns WHERE table_name = 'CommerceOrderItem'`
     );
     const cols = orderItemFields.map((c) => c.column_name);
     assert.ok(cols.includes("productNameSnapshot"));

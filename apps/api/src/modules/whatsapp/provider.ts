@@ -8,6 +8,7 @@ export type OutboundWhatsAppMessage = {
   to: string;
   body: string;
   buttons?: WhatsAppButton[];
+  mediaUrl?: string;
   at: string;
   providerMessageSid?: string;
 };
@@ -23,6 +24,8 @@ export type WhatsAppSendResult = {
 export type WhatsAppOutboundOptions = {
   body?: string;
   buttons?: WhatsAppButton[];
+  /** Public catalog image. Twilio fetches it; a failure must not replace the text reply. */
+  mediaUrl?: string;
   contentSid?: string;
   contentVariables?: Record<string, string>;
   statusCallbackUrl?: string;
@@ -54,6 +57,8 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
   /** Test hook: next sendOutbound fails with this result then clears. */
   nextFailure: WhatsAppSendResult | null = null;
   failUntilCleared: WhatsAppSendResult | null = null;
+  /** Test hook: image sends fail while text sends continue. */
+  failMedia = false;
 
   async sendText(to: string, body: string): Promise<void> {
     const result = await this.sendOutbound(to, { body });
@@ -71,12 +76,22 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
   }
 
   async sendOutbound(to: string, opts: WhatsAppOutboundOptions): Promise<WhatsAppSendResult> {
+    if (opts.mediaUrl && this.failMedia) {
+      return { ok: false, errorCategory: "PROVIDER", errorMessage: "media failed" };
+    }
     const fail = this.nextFailure ?? this.failUntilCleared;
     if (this.nextFailure) this.nextFailure = null;
     if (fail) return fail;
     const sid = mockSid();
     const body = opts.body ?? "";
-    this.sent.push({ to, body, buttons: opts.buttons, at: new Date().toISOString(), providerMessageSid: sid });
+    this.sent.push({
+      to,
+      body,
+      buttons: opts.buttons,
+      ...(opts.mediaUrl ? { mediaUrl: opts.mediaUrl } : {}),
+      at: new Date().toISOString(),
+      providerMessageSid: sid
+    });
     return { ok: true, providerMessageSid: sid };
   }
 
@@ -84,6 +99,7 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
     this.sent.length = 0;
     this.nextFailure = null;
     this.failUntilCleared = null;
+    this.failMedia = false;
   }
 }
 
@@ -229,8 +245,10 @@ export class TwilioWhatsAppProvider implements WhatsAppProvider {
     } else {
       const hints = (opts.buttons ?? []).map((b) => b.title).filter(Boolean);
       const body = opts.body ?? "";
-      const combined = hints.length > 0 ? formatChoiceTextFallback(body, hints).slice(0, 1600) : body.slice(0, 1600);
+      const limit = opts.mediaUrl ? 1024 : 1600;
+      const combined = hints.length > 0 ? formatChoiceTextFallback(body, hints).slice(0, limit) : body.slice(0, limit);
       params.set("Body", combined);
+      if (opts.mediaUrl) params.set("MediaUrl", opts.mediaUrl);
     }
     if (opts.statusCallbackUrl) {
       params.set("StatusCallback", opts.statusCallbackUrl);
@@ -267,6 +285,7 @@ export class TwilioWhatsAppProvider implements WhatsAppProvider {
         to,
         body: opts.body ?? "",
         buttons: opts.buttons,
+        ...(opts.mediaUrl ? { mediaUrl: opts.mediaUrl } : {}),
         at: new Date().toISOString(),
         providerMessageSid: sid
       });

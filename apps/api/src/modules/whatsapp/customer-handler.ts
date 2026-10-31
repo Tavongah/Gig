@@ -118,6 +118,7 @@ import {
   sendLocationCandidates,
   sendMainMenu,
   sendOrderReview,
+  sendBestEffortProductImage,
   sendPaymentChoices,
   sendProductChoices,
   sendShopPrompt,
@@ -1230,6 +1231,7 @@ async function resolveProductsThenContinue(phone: string, convId: string, ctx: C
     return { handled: true };
   }
 
+  let catalogImagesSent = 0;
   for (const item of items) {
     const decision = await decideCatalogDemand(item.query);
     if (decision.kind === "none") {
@@ -1243,6 +1245,7 @@ async function resolveProductsThenContinue(phone: string, convId: string, ctx: C
         options: decision.options.map((product) => ({
           productId: product.id,
           name: product.name,
+          imageUrl: product.primaryImageUrl,
           catalogOnly: true
         })),
         choiceId
@@ -1261,6 +1264,10 @@ async function resolveProductsThenContinue(phone: string, convId: string, ctx: C
     ctx.requestedItems = (ctx.requestedItems ?? []).map((row) =>
       row.query === item.query ? { query: decision.product.name, quantity: row.quantity } : row
     );
+    if (catalogImagesSent < 5) {
+      const sent = await sendBestEffortProductImage(phone, decision.product.primaryImageUrl, decision.product.name);
+      if (sent) catalogImagesSent += 1;
+    }
   }
 
   if (ctx.deliveryLat != null && ctx.deliveryLng != null) {
@@ -1277,16 +1284,21 @@ async function resolveProductsThenContinue(phone: string, convId: string, ctx: C
 
 async function decideCatalogDemand(query: string): Promise<
   | { kind: "none" }
-  | { kind: "one"; product: { id: string; name: string } }
-  | { kind: "many"; options: Array<{ id: string; name: string }> }
+  | { kind: "one"; product: { id: string; name: string; primaryImageUrl: string | null } }
+  | { kind: "many"; options: Array<{ id: string; name: string; primaryImageUrl: string | null }> }
 > {
   const matches = await matchPublicCatalogDemand(query);
   if (!matches.length) return { kind: "none" };
   const needle = normalizeProductSearchName(query);
   const exact = matches.filter((product) => normalizeProductSearchName(product.name) === needle);
   const pool = exact.length ? exact : matches;
-  if (pool.length === 1) return { kind: "one", product: pool[0]! };
-  return { kind: "many", options: pool.slice(0, 3).map((product) => ({ id: product.id, name: product.name })) };
+  const shown = (product: (typeof pool)[number]) => ({
+    id: product.id,
+    name: product.name,
+    primaryImageUrl: product.primaryImageUrl ?? null
+  });
+  if (pool.length === 1) return { kind: "one", product: shown(pool[0]!) };
+  return { kind: "many", options: pool.slice(0, 5).map(shown) };
 }
 
 function deliveryTerritory(ctx: ConversationContext) {
@@ -1319,6 +1331,7 @@ async function answerPriceQuestion(
     (line) => normalizeProductSearchName(line.productName) === normalizeProductSearchName(decision.product.name)
   );
   if (resolved) {
+    await sendBestEffortProductImage(phone, decision.product.primaryImageUrl, decision.product.name);
     await wa.sendText(phone, formatResolvedSourcePrice(decision.product.name, resolved.unitPriceCents));
     return { handled: true };
   }
@@ -1331,6 +1344,7 @@ async function answerPriceQuestion(
     ctx.requestedItems = [{ query: decision.product.name, quantity: 1 }];
     return buildAndPresentQuote(phone, convId, ctx);
   }
+  await sendBestEffortProductImage(phone, decision.product.primaryImageUrl, decision.product.name);
   await wa.sendText(phone, formatPriceNeedsSource(decision.product.name));
   return { handled: true };
 }
@@ -1360,6 +1374,7 @@ async function answerAvailability(
     ctx.requestedItems = [{ query: decision.product.name, quantity: 1 }];
     return buildAndPresentQuote(phone, convId, ctx);
   }
+  await sendBestEffortProductImage(phone, decision.product.primaryImageUrl, decision.product.name);
   await wa.sendText(phone, formatCanRequestProduct(decision.product.name));
   return { handled: true };
 }
