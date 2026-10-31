@@ -1,9 +1,9 @@
 import { WhatsAppConversationState, WhatsAppParty } from "@prisma/client";
 import type { Server } from "socket.io";
+import { normalizeProductSearchName, resolveSupportedPackagePricingCity } from "@gigflow/shared";
+import { matchPublicCatalogDemand } from "../commerce/catalog.service.js";
 import {
   buildOneStoreBasket,
-  logUnmatchedSearch,
-  searchProductsByQuery,
   searchProductsNear
 } from "../commerce/merchant.service.js";
 import {
@@ -88,8 +88,13 @@ import {
   formatLocationUseThisArea,
   formatMobileMoneyPending,
   formatMobileMoneyPhonePrompt,
+  formatCanRequestProduct,
+  formatCatalogDemandAck,
   formatMerchantQuoteProposal,
-  formatMissingItems,
+  formatOutsideDeliveryTerritory,
+  formatPriceNeedsSource,
+  formatProductNotIdentified,
+  formatResolvedSourcePrice,
   formatQuoteDeclined,
   formatQuoteExpired,
   formatOrderCartSummary,
@@ -126,8 +131,7 @@ import {
   applyUnlistedInteractive,
   continueUnlistedAfterLocation,
   handleUnlistedText,
-  isUnlistedExpected,
-  offerUnlistedItemIfEnabled
+  isUnlistedExpected
 } from "./unlisted-whatsapp.js";
 import {
   isReturningWhatsAppCustomer,
@@ -383,7 +387,7 @@ export async function handleCustomerWhatsAppMessage(
       text
     )
   ) {
-    await wa.sendText(phone, "I can only help you shop from nearby shops. Tell me what you'd like.");
+    await wa.sendText(phone, "I can only help you shop on DUTS. Tell me what you'd like.");
     return { handled: true };
   }
 
@@ -533,15 +537,12 @@ export async function handleCustomerWhatsAppMessage(
     return { handled: true };
   }
 
-  // Need location for catalog-backed answers
   const intent = classifyShoppingIntent(text);
-  if (
-    (intent.kind === "CHECK_PRICE" || intent.kind === "CHECK_AVAILABILITY") &&
-    (ctx.deliveryLat == null || ctx.deliveryLng == null)
-  ) {
-    await updateConversation(conv.id, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
-    await sendLocationAsk(phone);
-    return { handled: true };
+  if (intent.kind === "CHECK_PRICE" && intent.targetQuery) {
+    return answerPriceQuestion(phone, conv.id, ctx, intent);
+  }
+  if (intent.kind === "CHECK_AVAILABILITY" && intent.targetQuery) {
+    return answerAvailability(phone, conv.id, ctx, intent);
   }
 
   if (intent.kind === "HELP") {
@@ -612,19 +613,6 @@ export async function handleCustomerWhatsAppMessage(
       `Got it — I'll keep your items under ${money(intent.budgetCents)} (before delivery). What do you need?`
     );
     return { handled: true };
-  }
-
-  if (intent.kind === "CHECK_PRICE" && intent.targetQuery && ctx.deliveryLat != null && ctx.deliveryLng != null) {
-    return answerPriceQuestion(phone, ctx, intent);
-  }
-
-  if (
-    intent.kind === "CHECK_AVAILABILITY" &&
-    intent.targetQuery &&
-    ctx.deliveryLat != null &&
-    ctx.deliveryLng != null
-  ) {
-    return answerAvailability(phone, ctx, intent);
   }
 
   if (intent.kind === "SHOW_CART" || intent.kind === "CHECK_TOTAL") {
@@ -1243,152 +1231,136 @@ async function resolveProductsThenContinue(phone: string, convId: string, ctx: C
   }
 
   for (const item of items) {
-    const alreadyLocked = ctx.lockedProductLines?.some(
-      (l) => l.productName.toLowerCase() === item.query.toLowerCase()
-    );
-    if (alreadyLocked) continue;
-    const matches = await searchProductsByQuery(item.query, { availableOnly: true });
-    if (matches.length > 1 && matches[0] && matches[1] && matches[0].score - matches[1].score < 30) {
-      const options = matches.slice(0, 3).map((m) => ({
-        productId: m.product.id,
-        name: m.product.name,
-        priceCents: m.product.priceCents
-      }));
+    const decision = await decideCatalogDemand(item.query);
+    if (decision.kind === "none") {
+      await wa.sendText(phone, formatProductNotIdentified(item.query));
+      return { handled: true };
+    }
+    if (decision.kind === "many") {
       const choiceId = crypto.randomUUID();
-      ctx.pendingChoices = [{ query: item.query, options, choiceId }];
+      ctx.pendingChoices = [{
+        query: item.query,
+        options: decision.options.map((product) => ({
+          productId: product.id,
+          name: product.name,
+          catalogOnly: true
+        })),
+        choiceId
+      }];
       ctx.lastDisambiguationQuery = item.query;
       ctx.choiceId = choiceId;
       setExpected(ctx, "PRODUCT_DISAMBIGUATION");
-      const title = options.length === 2 ? `Which ${item.query}?` : "Which one do you want?";
-      await sendProductChoices(phone, ctx, title, options);
+      const title = decision.options.length === 2 ? `Which ${item.query}?` : "Which one do you want?";
+      await sendProductChoices(phone, ctx, title, ctx.pendingChoices[0]!.options);
       await updateConversation(convId, {
         state: WhatsAppConversationState.AWAITING_PRODUCT_CHOICE,
         context: ctx
       });
       return { handled: true };
     }
-    if (matches[0]) {
-      const m = matches[0];
-      const flavor = await attachFlavorToLock(m.product, item.query);
-      if (flavor.unmatched) {
-        await getWhatsAppProvider().sendText(
-          phone,
-          `${flavor.unmatched} isn't an available flavor for ${m.product.name}. I won't substitute another flavor.`
-        );
-        const offered = await sendFlavorChoicesForProduct(phone, ctx, m.product);
-        ctx.lockedProductLines = [
-          ...(ctx.lockedProductLines ?? []).filter((l) => l.productId !== m.product.id),
-          {
-            productId: m.product.id,
-            quantity: item.quantity,
-            productName: m.product.name,
-            unitPriceCents: m.product.priceCents,
-            merchantId: m.merchant.id,
-            flavorOptionId: null,
-            flavorName: null,
-            flavorPreference: "ANY"
-          }
-        ];
-        await updateConversation(convId, {
-          state: WhatsAppConversationState.BUILDING_CART,
-          context: ctx
-        });
-        if (offered.asked) return { handled: true };
-      }
-      ctx.lockedProductLines = [
-        ...(ctx.lockedProductLines ?? []).filter((l) => l.productName.toLowerCase() !== item.query.toLowerCase()),
-        {
-          productId: m.product.id,
-          quantity: item.quantity,
-          productName: m.product.name,
-          unitPriceCents: m.product.priceCents,
-          merchantId: m.merchant.id,
-          flavorOptionId: flavor.flavorOptionId,
-          flavorName: flavor.flavorName,
-          flavorPreference: flavor.flavorPreference
-        }
-      ];
-      ctx.requestedItems = (ctx.requestedItems ?? []).map((r) =>
-        r.query === item.query ? { query: m.product.name, quantity: r.quantity } : r
-      );
-    } else if (items.length === 1) {
-      const offered = await offerUnlistedItemIfEnabled(phone, convId, ctx, item.query);
-      if (offered) return offered;
-    }
+    ctx.requestedItems = (ctx.requestedItems ?? []).map((row) =>
+      row.query === item.query ? { query: decision.product.name, quantity: row.quantity } : row
+    );
   }
 
   if (ctx.deliveryLat != null && ctx.deliveryLng != null) {
     return buildAndPresentQuote(phone, convId, ctx);
   }
-  setExpected(ctx, "READY_TO_ORDER");
-  const lines = cartLinesForDisplay(ctx);
-  const subtotal = lines.reduce((s, l) => s + l.lineTotalCents, 0);
-  await sendCartActions(phone, ctx, { lines, subtotalCents: subtotal });
-  await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
+  setExpected(ctx, "LOCATION");
+  await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_LOCATION, context: ctx });
+  await wa.sendText(
+    phone,
+    formatCatalogDemandAck((ctx.requestedItems ?? []).map((row) => ({ quantity: row.quantity, name: row.query })))
+  );
   return { handled: true };
 }
 
-async function answerPriceQuestion(phone: string, ctx: ConversationContext, intent: ShoppingIntent) {
+async function decideCatalogDemand(query: string): Promise<
+  | { kind: "none" }
+  | { kind: "one"; product: { id: string; name: string } }
+  | { kind: "many"; options: Array<{ id: string; name: string }> }
+> {
+  const matches = await matchPublicCatalogDemand(query);
+  if (!matches.length) return { kind: "none" };
+  const needle = normalizeProductSearchName(query);
+  const exact = matches.filter((product) => normalizeProductSearchName(product.name) === needle);
+  const pool = exact.length ? exact : matches;
+  if (pool.length === 1) return { kind: "one", product: pool[0]! };
+  return { kind: "many", options: pool.slice(0, 3).map((product) => ({ id: product.id, name: product.name })) };
+}
+
+function deliveryTerritory(ctx: ConversationContext) {
+  if (ctx.deliveryLat == null || ctx.deliveryLng == null) return null;
+  return resolveSupportedPackagePricingCity({
+    typedAddress: ctx.originalTypedAddress || ctx.deliveryLabel,
+    deliveryLabel: ctx.deliveryLabel,
+    customerLatitude: ctx.deliveryLat,
+    customerLongitude: ctx.deliveryLng
+  });
+}
+
+async function answerPriceQuestion(
+  phone: string,
+  convId: string,
+  ctx: ConversationContext,
+  intent: ShoppingIntent
+) {
   const wa = getWhatsAppProvider();
-  const matches = await searchProductsNear(ctx.deliveryLat!, ctx.deliveryLng!, intent.targetQuery!, {
-    availableOnly: true
-  });
-  const { logDutsFlow } = await import("../../lib/flow-log.js");
-  logDutsFlow("WHATSAPP_SEARCH", {
-    query: intent.targetQuery,
-    matchType: matches.length === 0 ? "NO_MATCH" : matches.length > 1 ? "AMBIGUOUS" : "MATCHED",
-    resultCount: matches.length
-  });
-  if (matches.length === 0) {
-    await logUnmatchedSearch(intent.targetQuery!, ctx.deliveryLat!, ctx.deliveryLng!);
-    const offered = await offerUnlistedItemIfEnabled(phone, "", ctx, intent.targetQuery!);
-    if (offered) return offered;
-    await wa.sendText(
-      phone,
-      `I couldn't find "${intent.targetQuery}" at nearby shops right now.`
-    );
+  const decision = await decideCatalogDemand(intent.targetQuery!);
+  if (decision.kind === "none") {
+    await wa.sendText(phone, formatProductNotIdentified(intent.targetQuery!));
     return { handled: true };
   }
-  const sorted =
-    intent.reference === "cheapest"
-      ? [...matches].sort((a, b) => a.product.priceCents - b.product.priceCents)
-      : matches;
-  const top = sorted.slice(0, 5);
-  const lines = top
-    .map((m) => `• ${m.product.name} — ${money(m.product.priceCents)} (${m.merchant.name})`)
-    .join("\n");
-  await wa.sendText(phone, `*Prices nearby*\n${lines}`);
+  if (decision.kind === "many") {
+    ctx.requestedItems = [{ query: intent.targetQuery!, quantity: 1 }];
+    return resolveProductsThenContinue(phone, convId, ctx);
+  }
+  const resolved = ctx.draftLines?.find(
+    (line) => normalizeProductSearchName(line.productName) === normalizeProductSearchName(decision.product.name)
+  );
+  if (resolved) {
+    await wa.sendText(phone, formatResolvedSourcePrice(decision.product.name, resolved.unitPriceCents));
+    return { handled: true };
+  }
+  const territory = deliveryTerritory(ctx);
+  if (ctx.deliveryLat != null && territory == null) {
+    await wa.sendText(phone, formatOutsideDeliveryTerritory());
+    return { handled: true };
+  }
+  if (territory) {
+    ctx.requestedItems = [{ query: decision.product.name, quantity: 1 }];
+    return buildAndPresentQuote(phone, convId, ctx);
+  }
+  await wa.sendText(phone, formatPriceNeedsSource(decision.product.name));
   return { handled: true };
 }
 
-async function answerAvailability(phone: string, ctx: ConversationContext, intent: ShoppingIntent) {
+async function answerAvailability(
+  phone: string,
+  convId: string,
+  ctx: ConversationContext,
+  intent: ShoppingIntent
+) {
   const wa = getWhatsAppProvider();
-  const matches = await searchProductsNear(ctx.deliveryLat!, ctx.deliveryLng!, intent.targetQuery!, {
-    availableOnly: true
-  });
-  const { logDutsFlow } = await import("../../lib/flow-log.js");
-  logDutsFlow("WHATSAPP_SEARCH", {
-    query: intent.targetQuery,
-    matchType: matches.length === 0 ? "NO_MATCH" : "MATCHED",
-    resultCount: matches.length
-  });
-  if (matches.length === 0) {
-    await logUnmatchedSearch(intent.targetQuery!, ctx.deliveryLat!, ctx.deliveryLng!);
-    const offered = await offerUnlistedItemIfEnabled(phone, "", ctx, intent.targetQuery!);
-    if (offered) return offered;
-    await wa.sendText(phone, `No nearby shop has "${intent.targetQuery}" available right now.`);
+  const decision = await decideCatalogDemand(intent.targetQuery!);
+  if (decision.kind === "none") {
+    await wa.sendText(phone, formatProductNotIdentified(intent.targetQuery!));
     return { handled: true };
   }
-  const byShop = new Map<string, { name: string; products: string[] }>();
-  for (const m of matches.slice(0, 12)) {
-    const row = byShop.get(m.merchant.id) ?? { name: m.merchant.name, products: [] };
-    row.products.push(`${m.product.name} — ${money(m.product.priceCents)}`);
-    byShop.set(m.merchant.id, row);
+  if (decision.kind === "many") {
+    ctx.requestedItems = [{ query: intent.targetQuery!, quantity: 1 }];
+    return resolveProductsThenContinue(phone, convId, ctx);
   }
-  const body = [...byShop.values()]
-    .map((s) => `*${s.name}*\n${s.products.map((p) => `• ${p}`).join("\n")}`)
-    .join("\n\n");
-  await wa.sendText(phone, `Yes — here's what's nearby:\n\n${body}`);
+  const territory = deliveryTerritory(ctx);
+  if (ctx.deliveryLat != null && territory == null) {
+    await wa.sendText(phone, formatOutsideDeliveryTerritory());
+    return { handled: true };
+  }
+  if (territory) {
+    ctx.requestedItems = [{ query: decision.product.name, quantity: 1 }];
+    return buildAndPresentQuote(phone, convId, ctx);
+  }
+  await wa.sendText(phone, formatCanRequestProduct(decision.product.name));
   return { handled: true };
 }
 
@@ -1574,6 +1546,10 @@ async function buildAndPresentQuote(
       };
     } catch (err) {
       if (err instanceof AppError && err.code === "SHOP_NOT_NEARBY" && ctx.lockedProductLines?.length) {
+        if (!deliveryTerritory(ctx)) {
+          await wa.sendText(phone, formatOutsideDeliveryTerritory());
+          return { handled: true };
+        }
         const accepted = await acceptUnresolvedProductRequest({
           phone,
           lat: ctx.deliveryLat,
@@ -1583,10 +1559,9 @@ async function buildAndPresentQuote(
         });
         if (accepted) return presentUnresolvedAcceptance(phone, convId, ctx, accepted);
       }
-      const message = err instanceof Error ? err.message : "Some items are unavailable.";
       setExpected(ctx, "PRODUCT_TEXT");
       await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
-      await wa.sendText(phone, formatMissingItems(message));
+      await wa.sendText(phone, formatProductNotIdentified("that product"));
       return { handled: true };
     }
   } else {
@@ -1603,6 +1578,10 @@ async function buildAndPresentQuote(
   }
 
   if (!basket.ok) {
+    if (!deliveryTerritory(ctx)) {
+      await wa.sendText(phone, formatOutsideDeliveryTerritory());
+      return { handled: true };
+    }
     const accepted = await acceptUnresolvedTextRequest({
       phone,
       lat: ctx.deliveryLat,
@@ -1611,17 +1590,7 @@ async function buildAndPresentQuote(
       items: ctx.requestedItems ?? []
     });
     if (accepted) return presentUnresolvedAcceptance(phone, convId, ctx, accepted);
-    const missing = basket.missing.join(", ") || "some items";
-    if ((ctx.requestedItems?.length ?? 0) === 1) {
-      const offered = await offerUnlistedItemIfEnabled(phone, convId, ctx, ctx.requestedItems?.[0]?.query ?? missing);
-      if (offered) return offered;
-    }
-    await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
-    const partial = basket.partialByMerchant[0];
-    const hint = partial
-      ? `${partial.merchant.name} has: ${partial.covered.join(", ")}.`
-      : undefined;
-    await wa.sendText(phone, formatMissingItems(missing, hint));
+    await wa.sendText(phone, formatProductNotIdentified(basket.missing.join(", ") || "that product"));
     return { handled: true };
   }
 
@@ -1800,6 +1769,12 @@ async function applyProductChoice(
       ? { query: selected.name, quantity: r.quantity }
       : r
   );
+  if (selected.catalogOnly) {
+    ctx.pendingChoices = undefined;
+    ctx.lastDisambiguationQuery = undefined;
+    ctx.choiceId = undefined;
+    return resolveProductsThenContinue(phone, convId, ctx);
+  }
   const flavor = await attachFlavorToLock(
     { id: selected.productId, name: selected.name },
     pending.query
@@ -1810,7 +1785,7 @@ async function applyProductChoice(
       productId: selected.productId,
       quantity: qty,
       productName: selected.name,
-      unitPriceCents: selected.priceCents,
+      unitPriceCents: selected.priceCents ?? 0,
       merchantId: ctx.merchantId ?? "",
       flavorOptionId: flavor.flavorOptionId,
       flavorName: flavor.flavorName,

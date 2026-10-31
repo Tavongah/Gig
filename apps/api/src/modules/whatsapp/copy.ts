@@ -300,11 +300,46 @@ export function formatOrderReviewPrompt(): string {
   return "Confirm order?";
 }
 
+export function formatCanRequestProduct(name: string): string {
+  return `Yes, you can request ${name} on DUTS. Send your delivery location and I'll confirm the price.`;
+}
+
+export function formatPriceNeedsSource(name: string): string {
+  return `We can get ${name}. Send your delivery location and I'll confirm the price.`;
+}
+
+export function formatResolvedSourcePrice(name: string, unitPriceCents: number): string {
+  return `${name} — ${money(unitPriceCents)}.`;
+}
+
+export function formatProductNotIdentified(name: string): string {
+  return `I couldn't identify ${name} on DUTS. Try the product name again.`;
+}
+
+export function formatOutsideDeliveryTerritory(): string {
+  return "We're not delivering there yet.";
+}
+
+export function formatCatalogDemandAck(lines: Array<{ quantity: number; name: string }>): string {
+  return [
+    "We've got your request.",
+    ...lines.map((line) => `${line.quantity} × ${line.name}`),
+    "",
+    "Send your delivery location and I'll confirm the price."
+  ].join("\n");
+}
+
 export function formatDisambiguation(
   title: string,
-  options: Array<{ name: string; priceCents: number }>
+  options: Array<{ name: string; priceCents?: number | null }>
 ): string {
-  const list = options.map((o, i) => `${i + 1}. ${o.name} — ${money(o.priceCents)}`).join("\n");
+  const list = options
+    .map((o, i) =>
+      o.priceCents != null && o.priceCents > 0
+        ? `${i + 1}. ${o.name} — ${money(o.priceCents)}`
+        : `${i + 1}. ${o.name}`
+    )
+    .join("\n");
   const max = Math.min(options.length, 3);
   return [
     title,

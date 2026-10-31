@@ -7,8 +7,11 @@ import {
   catalogSearchHaystack,
   createCatalogProductSchema,
   expandSearchTerms,
+  canPurchaseStorefrontCategory,
+  isPublicStorefrontCatalogProduct,
   isUnresolvedLegacyCatalogProduct,
   linkMerchantOfferSchema,
+  parseAlcoholCommerceEnabled,
   normalizeBarcode,
   normalizeProductSearchName,
   searchCatalogProductsSchema,
@@ -375,6 +378,17 @@ export async function searchCatalogProducts(input: unknown) {
     .map((row) => presentation(row.p));
 
   return packCatalogSearch(scored, summary);
+}
+
+/** Approved DUTS catalog matches for a customer request. Not filtered by merchant or distance. */
+export async function matchPublicCatalogDemand(query: string) {
+  const found = await searchCatalogProducts({ q: query, limit: 8, status: "APPROVED" });
+  const alcoholEnabled = parseAlcoholCommerceEnabled(process.env.ALCOHOL_COMMERCE_ENABLED);
+  return found.products.filter(
+    (product) =>
+      isPublicStorefrontCatalogProduct(product) &&
+      canPurchaseStorefrontCategory(product.category, alcoholEnabled)
+  );
 }
 
 export async function getCatalogProduct(id: string) {

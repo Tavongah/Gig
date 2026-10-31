@@ -123,7 +123,7 @@ export async function sendProductChoices(
   phone: string,
   ctx: ConversationContext,
   title: string,
-  options: Array<{ productId: string; name: string; priceCents: number }>
+  options: Array<{ productId: string; name: string; priceCents?: number | null; catalogOnly?: boolean }>
 ): Promise<void> {
   const body = formatDisambiguation(title, options);
   const bounded = options.slice(0, 10);
@@ -133,7 +133,7 @@ export async function sendProductChoices(
     body,
     bounded.map((o, i) => ({
       title: o.name.slice(0, 20),
-      description: `$${(o.priceCents / 100).toFixed(2)}`,
+      description: o.priceCents != null && o.priceCents > 0 ? `$${(o.priceCents / 100).toFixed(2)}` : "Choose",
       action: sessionBound(ctx, "SELECT_PRODUCT", {
         productId: o.productId,
         choiceIndex: i + 1,

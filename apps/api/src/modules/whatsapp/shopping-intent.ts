@@ -229,7 +229,8 @@ function expandAdjacentProductTokens(query: string, quantity: number): Requested
 export type ProductDisambiguationOption = {
   productId: string;
   name: string;
-  priceCents: number;
+  priceCents?: number | null;
+  catalogOnly?: boolean;
 };
 
 export type ProductDisambiguationReply =
@@ -266,7 +267,7 @@ export function matchPendingProductChoice(
       if (n.includes("500") && /500/i.test(o.name)) s += 25;
       if (/(big|large)/i.test(n) && /2\s*l|2l/i.test(o.name)) s += 20;
       if (/(small|smaller)/i.test(n) && /1\s*l|1l|500/i.test(o.name)) s += 20;
-      if (/(cheap|cheaper|lowest)/i.test(n)) s += 1000 - o.priceCents;
+      if (/(cheap|cheaper|lowest)/i.test(n)) s += 1000 - (o.priceCents ?? 0);
       if (/\borange\b/i.test(n) && /orange/i.test(o.name)) s += 30;
       if (/\braspberry\b/i.test(n) && /raspberry/i.test(o.name)) s += 30;
       return { idx, s };
