@@ -25,21 +25,15 @@ export function deliveryCustomerStatusLabel(status: string): string {
   switch (status) {
     case "POSTED":
     case "SEARCHING_FOR_WORKER":
-      return "Finding a courier";
     case "WORKER_SELECTED":
-      return "Confirm booking";
     case "WORKER_ASSIGNED":
-      return "Courier assigned";
     case "WORKER_EN_ROUTE":
-      return "Courier going to shop";
     case "WORKER_ARRIVED":
-      return "Courier at the shop";
+      return "Preparing your order";
     case "PACKAGE_COLLECTED":
-      return "Order picked up";
     case "EN_ROUTE_TO_DROPOFF":
-      return "On the way";
     case "ARRIVED_AT_DROPOFF":
-      return "Courier arrived";
+      return "Out for delivery";
     case "WAITING_CUSTOMER_CONFIRMATION":
       return "Delivered — confirming";
     case "COMPLETED":
@@ -57,21 +51,16 @@ export function deliveryCustomerHeadline(status: string): string {
   switch (status) {
     case "POSTED":
     case "SEARCHING_FOR_WORKER":
-      return "Finding a courier near your pickup…";
     case "WORKER_SELECTED":
-      return "Secure payment to confirm your courier";
     case "WORKER_ASSIGNED":
-      return "Your courier is getting ready";
     case "WORKER_EN_ROUTE":
-      return "Your courier is heading to the shop";
     case "WORKER_ARRIVED":
-      return "Courier is at the shop";
+      return "Preparing your order";
     case "PACKAGE_COLLECTED":
-      return "Order picked up — heading to you";
     case "EN_ROUTE_TO_DROPOFF":
-      return "Your order is on the way";
+      return "Your order is out for delivery";
     case "ARRIVED_AT_DROPOFF":
-      return "Courier has arrived — share the delivery code if asked";
+      return "Your order is arriving";
     case "WAITING_CUSTOMER_CONFIRMATION":
       return "Delivery confirmed — finishing up";
     case "COMPLETED":

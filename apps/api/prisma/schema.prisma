@@ -364,6 +364,9 @@ model Gig {
   distanceMiles         Decimal         @db.Decimal(7, 2)
   demandMultiplier      Decimal         @default(1) @db.Decimal(4, 2)
   startsAt              DateTime
+  /** Customer-facing DUTS delivery estimate. Cleared when the assignment is released. */
+  customerDeliveryEstimateStart DateTime?
+  customerDeliveryEstimateEnd   DateTime?
   addressLine1          String
   addressLine2          String?
   city                  String

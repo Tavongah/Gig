@@ -23,12 +23,13 @@ const statuses: CommerceOrderStatus[] = [
 
 assert.equal(commerceShopUiStatusLabel("MERCHANT_PENDING"), "Order confirmed");
 assert.equal(commerceShopUiStatusLabel("MERCHANT_ACCEPTED"), "Preparing your order");
-assert.equal(commerceShopUiStatusLabel("READY_FOR_PICKUP"), "Finding courier");
-assert.equal(commerceShopUiStatusLabel("COURIER_ASSIGNED"), "Courier assigned");
-assert.equal(commerceShopUiStatusLabel("PICKED_UP"), "Order picked up");
-assert.equal(commerceShopUiStatusLabel("OUT_FOR_DELIVERY"), "On the way");
+assert.equal(commerceShopUiStatusLabel("READY_FOR_PICKUP"), "Preparing your order");
+assert.equal(commerceShopUiStatusLabel("COURIER_ASSIGNED"), "Preparing your order");
+assert.equal(commerceShopUiStatusLabel("PICKED_UP"), "Out for delivery");
+assert.equal(commerceShopUiStatusLabel("OUT_FOR_DELIVERY"), "Out for delivery");
 assert.equal(commerceShopUiStatusLabel("DELIVERED"), "Delivered");
-assert.equal(commerceShopUiStatusLabel("COURIER_ASSIGNED", "EN_ROUTE_PICKUP"), "Courier picking up your order");
+assert.equal(commerceShopUiStatusLabel("COURIER_ASSIGNED", "EN_ROUTE_PICKUP"), "Preparing your order");
+assert.doesNotMatch(commerceShopUiStatusLabel("COURIER_ASSIGNED"), /courier/i);
 
 for (const s of statuses) {
   const wa = commerceCustomerStatusCopy(s);

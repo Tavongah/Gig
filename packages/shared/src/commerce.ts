@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  formatCustomerDeliveryEstimateLabel,
+  type CustomerDeliveryEstimate
+} from "./delivery-estimate.js";
 
 export const merchantCategories = [
   "TUCK_SHOP",
@@ -85,25 +89,29 @@ export const whatsappConversationStates = [
 export type WhatsAppConversationState = (typeof whatsappConversationStates)[number];
 
 /** Human-readable commerce + delivery status for WhatsApp customers. */
-export function commerceCustomerStatusCopy(status: CommerceOrderStatus): string {
+export function commerceCustomerStatusCopy(
+  status: CommerceOrderStatus,
+  estimate?: CustomerDeliveryEstimate | null
+): string {
+  if (status === "OUT_FOR_DELIVERY" || status === "PICKED_UP") return "Your order is out for delivery.";
+  if (status === "DELIVERED") return "Your order has been delivered.";
+  const estimateLabel = formatCustomerDeliveryEstimateLabel(estimate);
+  if (
+    estimateLabel &&
+    (status === "MERCHANT_ACCEPTED" || status === "READY_FOR_PICKUP" || status === "COURIER_ASSIGNED")
+  ) {
+    return estimateLabel;
+  }
   switch (status) {
     case "DRAFT":
       return "We're preparing your order summary.";
     case "CUSTOMER_CONFIRMED":
     case "MERCHANT_PENDING":
-      return "Your order is confirmed. We're arranging your delivery.";
+      return "Your order is confirmed.";
     case "MERCHANT_ACCEPTED":
-      return "Your order is being prepared.";
     case "READY_FOR_PICKUP":
-      return "We're finding a courier. Delivery may take longer than usual.";
     case "COURIER_ASSIGNED":
-      return "A courier is on the way.";
-    case "PICKED_UP":
-      return "The courier is collecting your order.";
-    case "OUT_FOR_DELIVERY":
-      return "Your order is on the way.";
-    case "DELIVERED":
-      return "Your order has been delivered.";
+      return "Preparing your order.";
     case "MERCHANT_REJECTED":
       return "There's a problem fulfilling your order. DUTS is checking it now.";
     case "CANCELLED":
@@ -115,46 +123,38 @@ export function commerceCustomerStatusCopy(status: CommerceOrderStatus): string 
   }
 }
 
-/** Short shop-UI status labels (web/PWA). Does not change WhatsApp copy. */
+/** Customer marketplace status. Internal courier states stay off this label. */
 export function commerceShopUiStatusLabel(
   status: CommerceOrderStatus,
-  deliveryGigStatus?: string | null
+  deliveryGigStatus?: string | null,
+  estimate?: CustomerDeliveryEstimate | null
 ): string {
-  if (deliveryGigStatus) {
-    const d = deliveryGigStatus.toUpperCase();
-    if (d === "COMPLETED" || d === "DELIVERED") return "Delivered";
-    if (d === "EN_ROUTE_TO_DROPOFF" || d === "ARRIVED_AT_DROPOFF" || d === "PACKAGE_COLLECTED") return "On the way";
-    if (d === "WORKER_EN_ROUTE" || d === "WORKER_ARRIVED" || d.includes("EN_ROUTE_PICKUP") || d.includes("GOING_TO_SHOP")) {
-      return "Courier picking up your order";
-    }
-    if (d === "WORKER_ASSIGNED" || d === "ACCEPTED") return "Courier assigned";
-    if (d === "SEARCHING_FOR_WORKER" || d === "POSTED") return "Finding courier";
+  const gig = (deliveryGigStatus ?? "").toUpperCase();
+  if (gig === "COMPLETED" || gig === "DELIVERED" || status === "DELIVERED") return "Delivered";
+  if (
+    status === "OUT_FOR_DELIVERY" ||
+    status === "PICKED_UP" ||
+    gig === "EN_ROUTE_TO_DROPOFF" ||
+    gig === "ARRIVED_AT_DROPOFF" ||
+    gig === "PACKAGE_COLLECTED"
+  ) {
+    return "Out for delivery";
   }
+  if (status === "CANCELLED") return "Cancelled";
+  if (status === "PAYMENT_FAILED") return "Payment failed";
+  if (status === "MERCHANT_REJECTED") return "DUTS is checking your order";
+  const estimateLabel = formatCustomerDeliveryEstimateLabel(estimate);
+  if (estimateLabel) return estimateLabel;
+  if (status === "DRAFT") return "Order confirmed";
 
   switch (status) {
-    case "DRAFT":
-      return "Waiting for shop";
     case "CUSTOMER_CONFIRMED":
     case "MERCHANT_PENDING":
       return "Order confirmed";
     case "MERCHANT_ACCEPTED":
-      return "Preparing your order";
     case "READY_FOR_PICKUP":
-      return "Finding courier";
     case "COURIER_ASSIGNED":
-      return "Courier assigned";
-    case "PICKED_UP":
-      return "Order picked up";
-    case "OUT_FOR_DELIVERY":
-      return "On the way";
-    case "DELIVERED":
-      return "Delivered";
-    case "MERCHANT_REJECTED":
-      return "DUTS is checking your order";
-    case "CANCELLED":
-      return "Cancelled";
-    case "PAYMENT_FAILED":
-      return "Payment failed";
+      return "Preparing your order";
     default:
       return "Order update";
   }

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Linking, Platform, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from "react-native";
+import { Platform, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
-import { packageCategoryLabels, type PackageCategory } from "@gigflow/shared";
+import { formatCustomerDeliveryEstimateLabel, packageCategoryLabels, type PackageCategory } from "@gigflow/shared";
 import { api } from "../../lib/api";
 import { friendlyDeliveryError } from "../../lib/delivery-errors";
 import {
@@ -16,9 +16,7 @@ import {
   isDropoffPhase,
   isPickupPhase,
   isPostPickupDelivery,
-  nextCourierDeliveryAction,
-  transportModeEmoji,
-  transportModeLabel
+  nextCourierDeliveryAction
 } from "../../lib/delivery-status";
 import { formatCents } from "../../lib/format";
 import { getCurrentCoordinates, friendlyLocationError } from "../../lib/location";
@@ -45,6 +43,9 @@ export function DeliveryJobScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const queryClient = useQueryClient();
   const [pin, setPin] = useState("");
+  const [estimateDate, setEstimateDate] = useState("");
+  const [estimateFrom, setEstimateFrom] = useState("");
+  const [estimateTo, setEstimateTo] = useState("");
   const [pinLocked, setPinLocked] = useState(false);
   const [releasePanel, setReleasePanel] = useState<"none" | "reasons" | "confirm">("none");
   const [problemPanel, setProblemPanel] = useState(false);
@@ -68,7 +69,6 @@ export function DeliveryJobScreen() {
   });
 
   const gig = gigQuery.data?.gig;
-  const courier = gig?.assignments?.[0]?.worker;
   const action = gig ? nextCourierDeliveryAction(gig.status) : null;
   const commercePickup = gig?.commercePickup;
   const assistedConfirmNeeded = Boolean(
@@ -109,6 +109,29 @@ export function DeliveryJobScreen() {
       [invalidate]
     )
   );
+
+  const estimateMutation = useMutation({
+    mutationFn: () => {
+      const date = estimateDate.trim();
+      const from = estimateFrom.trim();
+      const to = estimateTo.trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Enter the date as YYYY-MM-DD.");
+      const hasWindow = Boolean(from || to);
+      if (hasWindow && (!/^\d{2}:\d{2}$/.test(from) || !/^\d{2}:\d{2}$/.test(to))) {
+        throw new Error("Enter both times as HH:MM, or leave them blank for a date only.");
+      }
+      const start = hasWindow ? `${date}T${from}:00+02:00` : `${date}T00:00:00+02:00`;
+      const end = hasWindow ? `${date}T${to}:00+02:00` : null;
+      return api.setDeliveryEstimate(route.params.gigId, session.token, { start, end });
+    },
+    onSuccess: () => {
+      setInlineError(null);
+      setInlineNotice("Delivery estimate sent");
+      invalidate();
+    },
+    onError: (error: Error) =>
+      setInlineError({ title: "We couldn't save the estimate", body: friendlyDeliveryError(error), kind: "generic" })
+  });
 
   const acceptMutation = useMutation({
     mutationFn: () => api.acceptGig(route.params.gigId, session.token),
@@ -467,26 +490,15 @@ export function DeliveryJobScreen() {
         ) : null}
       </DutsCard>
 
-      {activeRole === "CLIENT" && courier ? (
+      {activeRole === "CLIENT" ? (
         <DutsCard className="gap-2 p-5">
-          <Text className="text-xs font-bold uppercase text-brand">Your courier</Text>
-          <Text className="text-xl font-black text-ink">{courier.fullName}</Text>
-          {courier.workerProfile?.ratingAverage != null ? (
-            <Text className="text-sm text-muted">Rating {Number(courier.workerProfile.ratingAverage).toFixed(1)}</Text>
-          ) : null}
-          {courier.workerProfile?.transportMode ? (
-            <Text className="text-sm text-muted">
-              {transportModeEmoji(courier.workerProfile.transportMode)}{" "}
-              {transportModeLabel(courier.workerProfile.transportMode)}
-            </Text>
-          ) : null}
-          {courier.phoneNumber ? (
-            <LoadingButton
-              label="Call courier"
-              variant="secondary"
-              onPress={() => void Linking.openURL(`tel:${courier.phoneNumber}`)}
-            />
-          ) : null}
+          <Text className="text-xs font-bold uppercase text-brand">Delivery</Text>
+          <Text className="text-xl font-black text-ink">
+            {formatCustomerDeliveryEstimateLabel({
+              start: gig.customerDeliveryEstimateStart,
+              end: gig.customerDeliveryEstimateEnd
+            }) ?? "Preparing your order"}
+          </Text>
         </DutsCard>
       ) : null}
 
@@ -503,6 +515,39 @@ export function DeliveryJobScreen() {
             variant="secondary"
             loading={regenMutation.isPending}
             onPress={() => regenMutation.mutate()}
+          />
+        </DutsCard>
+      ) : null}
+
+      {activeRole === "WORKER" && gig.assignedWorkerId === session.user.id && !isDeliveryCompleteUi(gig.status) ? (
+        <DutsCard className="gap-3 p-5">
+          <Text className="text-xs font-bold uppercase text-brand">Delivery estimate</Text>
+          <Text className="text-sm text-muted">The customer sees this as a DUTS estimate. Your name is not included.</Text>
+          <TextInput
+            value={estimateDate}
+            onChangeText={setEstimateDate}
+            placeholder="Date YYYY-MM-DD"
+            placeholderTextColor={DUTS.placeholder}
+            className="rounded-2xl border border-border bg-surface px-4 py-3 text-ink"
+          />
+          <TextInput
+            value={estimateFrom}
+            onChangeText={setEstimateFrom}
+            placeholder="From HH:MM (optional)"
+            placeholderTextColor={DUTS.placeholder}
+            className="rounded-2xl border border-border bg-surface px-4 py-3 text-ink"
+          />
+          <TextInput
+            value={estimateTo}
+            onChangeText={setEstimateTo}
+            placeholder="To HH:MM (optional)"
+            placeholderTextColor={DUTS.placeholder}
+            className="rounded-2xl border border-border bg-surface px-4 py-3 text-ink"
+          />
+          <LoadingButton
+            label="Send delivery estimate"
+            loading={estimateMutation.isPending}
+            onPress={() => estimateMutation.mutate()}
           />
         </DutsCard>
       ) : null}

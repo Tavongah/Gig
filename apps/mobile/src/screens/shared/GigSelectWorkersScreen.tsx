@@ -80,7 +80,7 @@ export function GigSelectWorkersScreen({ navigation, route }: Props) {
           <Text className="text-sm text-muted">
             {rematching
               ? isDelivery
-                ? "Your previous courier cancelled. We’re searching for another available courier nearby."
+                ? "We're updating your delivery."
                 : "Your previous worker cancelled. We’re searching for another available worker nearby."
               : isDelivery
                 ? "Select a courier to continue your delivery."

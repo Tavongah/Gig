@@ -374,10 +374,7 @@ export async function findNearbyGigs(workerId: string) {
 
   const workerLat = Number(worker.workerProfile.currentLatitude);
   const workerLng = Number(worker.workerProfile.currentLongitude);
-
-  if (!Number.isFinite(workerLat) || !Number.isFinite(workerLng)) {
-    return [];
-  }
+  const hasLocation = Number.isFinite(workerLat) && Number.isFinite(workerLng);
 
   const travelRadiusMiles = Number(worker.workerProfile.travelDistanceMiles);
 
@@ -386,41 +383,62 @@ export async function findNearbyGigs(workerId: string) {
     Boolean(worker.workerProfile.deliveryEligible) &&
     ["WALKING", "BICYCLE", "PUBLIC_TRANSPORT"].includes(String(worker.workerProfile.transportMode ?? ""));
 
-  const gigs = await prisma.gig.findMany({
+  // Available deliveries are national. Distance is for sorting only.
+  const deliveryGigs = courierDeliveryEligible
+    ? await prisma.gig.findMany({
+        where: {
+          fulfillmentType: "DELIVERY",
+          status: { in: SEARCHING_STATUSES },
+          assignedWorkerId: null
+        },
+        include: { serviceCategory: true, client: true },
+        orderBy: { createdAt: "desc" }
+      })
+    : [];
 
-    where: {
+  const localGigs =
+    hasLocation && serviceCategoryIds.length > 0
+      ? await prisma.gig.findMany({
+          where: {
+            status: { in: SEARCHING_STATUSES },
+            NOT: { fulfillmentType: "DELIVERY" },
+            serviceCategoryId: { in: serviceCategoryIds },
+            startsAt: { gte: new Date(Date.now() - 30 * 60 * 1000) }
+          },
+          include: { serviceCategory: true, client: true },
+          orderBy: [{ createdAt: "desc" }, { workerPayoutCents: "desc" }],
+          take: 50
+        })
+      : [];
 
-      status: { in: SEARCHING_STATUSES },
+  const distanceMilesFor = (gig: { latitude: unknown; longitude: unknown }) => {
+    if (!hasLocation) return null;
+    return (
+      Math.round(haversineMiles(workerLat, workerLng, Number(gig.latitude), Number(gig.longitude)) * 10) / 10
+    );
+  };
 
-      serviceCategoryId: { in: serviceCategoryIds },
-
-      startsAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
-
-      ...(courierDeliveryEligible
-        ? {}
-        : { NOT: { fulfillmentType: "DELIVERY" } })
-
-    },
-
-    include: { serviceCategory: true, client: true },
-
-    orderBy: [{ createdAt: "desc" }, { workerPayoutCents: "desc" }],
-
-    take: 50
-
-  });
-
-
-
-  const ranked = gigs
+  const rankedDelivery = deliveryGigs
     .map((gig) => {
-      const distanceMiles = haversineMiles(workerLat, workerLng, Number(gig.latitude), Number(gig.longitude));
-      const gigRadiusMiles = getGigMatchingRadiusMiles(gig.urgency, gig.size);
-      const roundedDistance = Math.round(distanceMiles * 10) / 10;
-
+      const distanceMiles = distanceMilesFor(gig);
       return {
         gig,
-        distanceMiles: roundedDistance,
+        distanceMiles,
+        estimatedResponseMinutes: distanceMiles == null ? null : estimateResponseMinutes(distanceMiles)
+      };
+    })
+    .sort((a, b) => {
+      if (a.distanceMiles == null || b.distanceMiles == null) return b.gig.workerPayoutCents - a.gig.workerPayoutCents;
+      return a.distanceMiles - b.distanceMiles || b.gig.workerPayoutCents - a.gig.workerPayoutCents;
+    });
+
+  const rankedLocal = localGigs
+    .map((gig) => {
+      const distanceMiles = distanceMilesFor(gig)!;
+      const gigRadiusMiles = getGigMatchingRadiusMiles(gig.urgency, gig.size);
+      return {
+        gig,
+        distanceMiles,
         gigRadiusMiles,
         estimatedResponseMinutes: estimateResponseMinutes(distanceMiles)
       };
@@ -428,6 +446,8 @@ export async function findNearbyGigs(workerId: string) {
     .filter((item) => item.distanceMiles <= Math.min(item.gigRadiusMiles, travelRadiusMiles))
     .sort((a, b) => a.distanceMiles - b.distanceMiles || b.gig.workerPayoutCents - a.gig.workerPayoutCents)
     .slice(0, 20);
+
+  const ranked = [...rankedDelivery, ...rankedLocal];
 
   const { buildCourierOfferPayload } = await import("./delivery.service.js");
   const deliveryIds = ranked.filter((item) => item.gig.fulfillmentType === "DELIVERY").map((item) => item.gig.id);
@@ -459,7 +479,7 @@ export async function findNearbyGigs(workerId: string) {
 
   return ranked.map((item) => {
     const sanitized = sanitizeGigForViewer(item.gig, workerId, {
-      distanceMiles: item.distanceMiles,
+      distanceMiles: item.distanceMiles ?? undefined,
       viewerRoles: [UserRole.WORKER]
     });
 
@@ -469,7 +489,7 @@ export async function findNearbyGigs(workerId: string) {
         ...sanitized,
         distanceMiles: item.distanceMiles,
         estimatedResponseMinutes: item.estimatedResponseMinutes,
-        offer: buildCourierOfferPayload(item.gig, item.distanceMiles, commerce),
+        offer: buildCourierOfferPayload(item.gig, item.distanceMiles ?? undefined, commerce),
         commercePickup: commerce
           ? {
               shopName: commerce.shopName,
@@ -543,14 +563,8 @@ function notificationForStatus(
 
   switch (status) {
     case GigStatus.WORKER_EN_ROUTE:
-      return isDelivery
-        ? {
-            type: "WORKER_EN_ROUTE",
-            title: "Courier heading to pickup",
-            body: "Your courier is on the way to the pickup location.",
-            gigId: undefined
-          }
-        : {
+      if (isDelivery) return null;
+      return {
             type: "WORKER_EN_ROUTE",
             title: "Worker on the way",
             body: `Your worker is heading to "${gigTitle}".`,
@@ -558,14 +572,8 @@ function notificationForStatus(
           };
 
     case GigStatus.WORKER_ARRIVED:
-      return isDelivery
-        ? {
-            type: "WORKER_ARRIVED",
-            title: "Courier at pickup",
-            body: "Your courier has arrived at the pickup location.",
-            gigId: undefined
-          }
-        : {
+      if (isDelivery) return null;
+      return {
             type: "WORKER_ARRIVED",
             title: "Worker arrived",
             body: `Your worker has arrived for "${gigTitle}".`,
@@ -1137,6 +1145,24 @@ export async function getGigDetail(gigId: string, userId: string) {
     const workerLat = Number(viewer!.workerProfile!.currentLatitude);
     const workerLng = Number(viewer!.workerProfile!.currentLongitude);
     const travelRadiusMiles = Number(viewer!.workerProfile!.travelDistanceMiles);
+    const deliveryOpen =
+      gig.fulfillmentType === "DELIVERY" &&
+      Boolean(viewer!.workerProfile!.deliveryEligible) &&
+      ["WALKING", "BICYCLE", "PUBLIC_TRANSPORT"].includes(String(viewer!.workerProfile!.transportMode ?? ""));
+
+    if (deliveryOpen) {
+      const distanceMiles =
+        Number.isFinite(workerLat) && Number.isFinite(workerLng)
+          ? Math.round(haversineMiles(workerLat, workerLng, Number(gig.latitude), Number(gig.longitude)) * 10) / 10
+          : undefined;
+      return attachCommercePickupContext(
+        sanitizeGigForViewer(gig, userId, {
+          distanceMiles,
+          viewerRoles: viewer?.roles,
+          isAdmin: viewer?.roles.includes(UserRole.ADMIN)
+        })
+      );
+    }
 
     if (!Number.isFinite(workerLat) || !Number.isFinite(workerLng)) {
       throw new AppError("WORKER_LOCATION_REQUIRED", 400, "WORKER_LOCATION_REQUIRED", {

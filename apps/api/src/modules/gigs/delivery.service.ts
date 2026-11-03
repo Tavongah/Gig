@@ -709,7 +709,7 @@ export async function verifyPickupPin(
     notifyUser(io, gig.clientId, {
       type: "PACKAGE_COLLECTED",
       title: "Package collected",
-      body: "Your courier has collected the package and is heading to the drop-off.",
+      body: "Your order is out for delivery.",
       gigId
     });
     io.to(`gig:${gigId}`).emit("gig:status", {
@@ -949,8 +949,8 @@ export async function arriveAtDropoff(
   if (io) {
     notifyUser(io, gig.clientId, {
       type: "ARRIVED_AT_DROPOFF",
-      title: "Courier at drop-off",
-      body: "Your courier has arrived at the drop-off. Share the delivery code with the recipient.",
+      title: "Delivery update",
+      body: "Your order is arriving. Have the delivery code ready if you're asked for it.",
       gigId
     });
     io.to(`gig:${gigId}`).emit("gig:status", {
@@ -1153,6 +1153,60 @@ function isCommercePostPickup(status: GigStatus, checkoutCollected?: boolean): b
   return Boolean(checkoutCollected);
 }
 
+export async function setCustomerDeliveryEstimate(
+  gigId: string,
+  courierUserId: string,
+  input: { start: string; end?: string | null }
+) {
+  const gig = await prisma.gig.findUnique({ where: { id: gigId } });
+  if (!gig || gig.fulfillmentType !== FulfillmentType.DELIVERY) {
+    throw new AppError("This action is only for deliveries.", 409, "NOT_A_DELIVERY");
+  }
+  if (gig.assignedWorkerId !== courierUserId) {
+    throw new AppError("Only the assigned courier can set the delivery estimate.", 403, "COURIER_NOT_ASSIGNED");
+  }
+  const start = new Date(input.start);
+  const end = input.end ? new Date(input.end) : null;
+  if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) {
+    throw new AppError("Enter a valid delivery time.", 400, "INVALID_DELIVERY_ESTIMATE");
+  }
+  if (end && end.getTime() <= start.getTime()) {
+    throw new AppError("The delivery window must end after it starts.", 400, "INVALID_DELIVERY_ESTIMATE");
+  }
+  const changed = gig.customerDeliveryEstimateStart != null;
+  const same =
+    gig.customerDeliveryEstimateStart?.getTime() === start.getTime() &&
+    (gig.customerDeliveryEstimateEnd?.getTime() ?? null) === (end?.getTime() ?? null);
+  await prisma.gig.update({
+    where: { id: gigId },
+    data: { customerDeliveryEstimateStart: start, customerDeliveryEstimateEnd: end }
+  });
+  if (!same) {
+    const { formatCustomerDeliveryEstimateMessage } = await import("@gigflow/shared");
+    const { notifyCustomerStatus } = await import("../whatsapp/merchant-handler.js");
+    const orders = await prisma.commerceOrder.findMany({
+      where: { OR: [{ linkedDeliveryGigId: gigId }, { checkout: { linkedDeliveryGigId: gigId } }] },
+      select: { customerWhatsAppPhone: true }
+    });
+    const phones = [
+      ...new Set(orders.map((order) => order.customerWhatsAppPhone).filter((phone): phone is string => Boolean(phone)))
+    ];
+    const body = formatCustomerDeliveryEstimateMessage({ start, end }, changed);
+    for (const phone of phones) {
+      try {
+        await notifyCustomerStatus(phone, body);
+      } catch {
+        /* non-blocking */
+      }
+    }
+  }
+  return {
+    customerDeliveryEstimateStart: start.toISOString(),
+    customerDeliveryEstimateEnd: end?.toISOString() ?? null,
+    notified: !same
+  };
+}
+
 export async function releaseCommerceDelivery(
   gigId: string,
   courierUserId: string,
@@ -1300,7 +1354,9 @@ export async function releaseCommerceDelivery(
       where: { id: gigId, assignedWorkerId: courierUserId },
       data: {
         status: GigStatus.SEARCHING_FOR_WORKER,
-        assignedWorkerId: null
+        assignedWorkerId: null,
+        customerDeliveryEstimateStart: null,
+        customerDeliveryEstimateEnd: null
       }
     });
     if (order) {
@@ -1356,23 +1412,6 @@ export async function releaseCommerceDelivery(
       estimatedHours: Number(gig.estimatedHours),
       fulfillmentType: gig.fulfillmentType
     });
-  }
-
-  const lastNotify = await prisma.courierDeliveryRelease.findMany({
-    where: { gigId, outcome: "RELEASED" },
-    orderBy: { createdAt: "desc" },
-    take: 2
-  });
-  const shouldNotifyCustomer =
-    lastNotify.length < 2 || Date.now() - lastNotify[1]!.createdAt.getTime() > 10 * 60 * 1000;
-  if (shouldNotifyCustomer && order?.customerWhatsAppPhone) {
-    try {
-      const { notifyCustomerStatus } = await import("../whatsapp/merchant-handler.js");
-      const { formatFindingAnotherCourier } = await import("../whatsapp/copy.js");
-      await notifyCustomerStatus(order.customerWhatsAppPhone, formatFindingAnotherCourier());
-    } catch {
-      /* non-blocking */
-    }
   }
 
   return {

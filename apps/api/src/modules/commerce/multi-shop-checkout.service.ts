@@ -22,6 +22,7 @@ import {
   fulfillmentLabelAt,
   FULFILLMENT_NOTE,
   addFulfillmentNote,
+  formatCustomerDeliveryEstimateLabel,
   formatFlavorCustomerLine,
   generateDeliveryPin,
   merchantFulfillmentRef,
@@ -440,7 +441,12 @@ export function presentCustomerCheckout(checkout: {
   currency: string;
   deliveryLabel: string;
   notes?: string | null;
-  linkedDeliveryGig?: { status: string; assignedWorkerId?: string | null } | null;
+  linkedDeliveryGig?: {
+    status: string;
+    assignedWorkerId?: string | null;
+    customerDeliveryEstimateStart?: Date | null;
+    customerDeliveryEstimateEnd?: Date | null;
+  } | null;
   orders: Array<{
     id: string;
     fulfillmentLabel: string | null;
@@ -497,7 +503,10 @@ export function presentCustomerCheckout(checkout: {
     statusLabel: needsAttention
       ? "Needs attention"
       : shopCount > 1
-        ? customerMultiShopStatusLabel(checkout.status, gigStatus, hasCourier, pickupProgress)
+        ? customerMultiShopStatusLabel(checkout.status, gigStatus, hasCourier, pickupProgress, {
+            start: checkout.linkedDeliveryGig?.customerDeliveryEstimateStart,
+            end: checkout.linkedDeliveryGig?.customerDeliveryEstimateEnd
+          })
         : undefined,
     fulfillmentHint: needsAttention
       ? "There's a problem fulfilling your order. DUTS is checking it now."
@@ -546,14 +555,16 @@ function customerMultiShopStatusLabel(
   status: string,
   gigStatus: string | null,
   hasCourier: boolean,
-  pickups: Array<{ shopName: string; collected: boolean }>
+  pickups: Array<{ shopName: string; collected: boolean }>,
+  estimate?: { start?: Date | null; end?: Date | null } | null
 ): string {
   if (status === "DELIVERED" || gigStatus === "COMPLETED") return "Delivered";
   if (gigStatus === "EN_ROUTE_TO_DROPOFF" || gigStatus === "ARRIVED_AT_DROPOFF" || gigStatus === "PACKAGE_COLLECTED") {
-    return "On the way";
+    return "Out for delivery";
   }
-  if (hasCourier && pickups.some((p) => !p.collected)) return "Courier picking up your order";
-  if (hasCourier) return "Courier assigned";
+  const estimateLabel = formatCustomerDeliveryEstimateLabel(estimate);
+  if (estimateLabel) return estimateLabel;
+  if (hasCourier || pickups.length) return "Preparing your order";
   if (status === "PAYMENT_PENDING") return "Waiting for payment";
   return "Order confirmed";
 }

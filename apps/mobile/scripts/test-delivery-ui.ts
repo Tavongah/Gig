@@ -15,9 +15,11 @@ import { friendlyDeliveryError, DELIVERY_ERROR_MESSAGES } from "../src/lib/deliv
 import { canClientCancel, nextWorkerAction, statusLabel } from "../src/lib/gig-status";
 
 function run(): void {
-  assert.equal(deliveryCustomerStatusLabel("SEARCHING_FOR_WORKER"), "Finding a courier");
-  assert.equal(deliveryCustomerStatusLabel("PACKAGE_COLLECTED"), "Order picked up");
-  assert.equal(deliveryCustomerStatusLabel("EN_ROUTE_TO_DROPOFF"), "On the way");
+  assert.equal(deliveryCustomerStatusLabel("SEARCHING_FOR_WORKER"), "Preparing your order");
+  assert.equal(deliveryCustomerStatusLabel("WORKER_ASSIGNED"), "Preparing your order");
+  assert.equal(deliveryCustomerStatusLabel("PACKAGE_COLLECTED"), "Out for delivery");
+  assert.equal(deliveryCustomerStatusLabel("EN_ROUTE_TO_DROPOFF"), "Out for delivery");
+  assert.doesNotMatch(deliveryCustomerStatusLabel("WORKER_ASSIGNED"), /courier/i);
   assert.equal(deliveryCustomerStatusLabel("COMPLETED"), "Delivered");
   assert.ok(!deliveryCustomerStatusLabel("WORKER_EN_ROUTE").includes("WORKER_EN_ROUTE"));
 
@@ -51,7 +53,7 @@ function run(): void {
   assert.equal(nextWorkerAction("WORKER_ARRIVED", "DELIVERY"), null);
   assert.ok(nextWorkerAction("WORKER_ARRIVED", "LOCAL_HELP"));
 
-  assert.equal(statusLabel("WORKER_EN_ROUTE", "DELIVERY"), "Courier going to shop");
+  assert.equal(statusLabel("WORKER_EN_ROUTE", "DELIVERY"), "Preparing your order");
   assert.equal(statusLabel("WORKER_EN_ROUTE", "LOCAL_HELP"), "Worker en route");
   assert.equal(transportModeLabel("PUBLIC_TRANSPORT"), "Public Transport / Kombi");
 

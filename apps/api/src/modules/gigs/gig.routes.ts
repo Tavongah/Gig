@@ -48,6 +48,7 @@ import {
   regenerateDeliveryPins,
   reportAssistedPickupProblem,
   releaseCommerceDelivery,
+  setCustomerDeliveryEstimate,
   reportCourierDeliveryProblem,
   COURIER_RELEASE_REASONS,
   startTravelToDropoff,
@@ -313,6 +314,27 @@ export function createGigRouter(io: Server): Router {
         }
         const result = await confirmAssistedPickup(String(req.params.gigId), req.auth!.userId);
         res.json({ success: true, ...result });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/estimate",
+    requireAuth,
+    requireApprovedWorker,
+    validateBody(
+      z.object({
+        start: z.string().min(8).max(40),
+        end: z.string().min(8).max(40).nullable().optional()
+      })
+    ),
+    async (req, res, next) => {
+      try {
+        const body = req.body as { start: string; end?: string | null };
+        const estimate = await setCustomerDeliveryEstimate(String(req.params.gigId), req.auth!.userId, body);
+        res.json({ success: true, estimate });
       } catch (error) {
         next(error);
       }

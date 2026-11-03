@@ -133,10 +133,10 @@ export function ClientMyGigsScreen() {
                   key={gig.id}
                   gig={gig}
                   subtitle={
-                    worker
-                      ? `${isDelivery ? "Courier" : "Worker"}: ${worker.fullName}`
-                      : isDelivery
-                        ? "Finding a courier…"
+                    isDelivery
+                      ? "Preparing your order"
+                      : worker
+                        ? `Worker: ${worker.fullName}`
                         : undefined
                   }
                   onPress={() => openGigForRole(navigation, gig, "CLIENT")}

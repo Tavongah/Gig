@@ -60,6 +60,7 @@ services:
     environment:
       NODE_ENV: production
       TRUST_PROXY: "true"
+      MIGRATE_BEFORE_LISTEN: "true"
       CATALOG_MEDIA_DIR: /data/catalog-media
       DATABASE_URL: postgresql://${POSTGRES_USER:-gigflow}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gigflow}?schema=public
       REDIS_URL: redis://redis:6379

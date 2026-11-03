@@ -94,31 +94,46 @@ export async function expressWorkerInterest(
     throw new AppError("GIG_NOT_AVAILABLE", 409, "GIG_NOT_AVAILABLE", { gig: "This gig is no longer available." });
   }
 
+  const isDelivery = gig.fulfillmentType === "DELIVERY";
   const workerLat = Number(worker.workerProfile?.currentLatitude);
   const workerLng = Number(worker.workerProfile?.currentLongitude);
   const travelRadiusMiles = Number(worker.workerProfile?.travelDistanceMiles ?? 10);
+  const hasLocation = Number.isFinite(workerLat) && Number.isFinite(workerLng);
 
-  if (!Number.isFinite(workerLat) || !Number.isFinite(workerLng)) {
-    throw new AppError("WORKER_LOCATION_REQUIRED", 400, "WORKER_LOCATION_REQUIRED", {
-      location: "Set your current location before responding to gigs."
-    });
+  if (isDelivery) {
+    const deliveryEligible =
+      Boolean(worker.workerProfile?.deliveryEligible) &&
+      ["WALKING", "BICYCLE", "PUBLIC_TRANSPORT"].includes(String(worker.workerProfile?.transportMode ?? ""));
+    if (!deliveryEligible) {
+      throw new AppError("FORBIDDEN", 403, "WORKER_NOT_APPROVED", {
+        worker: "This courier is not eligible for deliveries."
+      });
+    }
+  } else {
+    if (!hasLocation) {
+      throw new AppError("WORKER_LOCATION_REQUIRED", 400, "WORKER_LOCATION_REQUIRED", {
+        location: "Set your current location before responding to gigs."
+      });
+    }
+
+    const gigRadiusMiles = getGigMatchingRadiusMiles(gig.urgency, gig.size);
+    if (
+      !isWithinMatchingRadius(
+        workerLat,
+        workerLng,
+        Number(gig.latitude),
+        Number(gig.longitude),
+        gigRadiusMiles,
+        travelRadiusMiles
+      )
+    ) {
+      throw new AppError("GIG_TOO_FAR", 403, "GIG_TOO_FAR", { location: "This gig is outside your travel radius." });
+    }
   }
 
-  const gigRadiusMiles = getGigMatchingRadiusMiles(gig.urgency, gig.size);
-  if (
-    !isWithinMatchingRadius(
-      workerLat,
-      workerLng,
-      Number(gig.latitude),
-      Number(gig.longitude),
-      gigRadiusMiles,
-      travelRadiusMiles
-    )
-  ) {
-    throw new AppError("GIG_TOO_FAR", 403, "GIG_TOO_FAR", { location: "This gig is outside your travel radius." });
-  }
-
-  const distanceMiles = haversineMiles(workerLat, workerLng, Number(gig.latitude), Number(gig.longitude));
+  const distanceMiles = hasLocation
+    ? haversineMiles(workerLat, workerLng, Number(gig.latitude), Number(gig.longitude))
+    : 0;
   const estimatedArrivalMinutes = estimateResponseMinutes(distanceMiles);
 
   const interest = await prisma.gigInterest.upsert({
@@ -166,14 +181,14 @@ export async function expressWorkerInterest(
 
   if (io) {
     const isDelivery = gig.fulfillmentType === "DELIVERY";
-    notifyUser(io, gig.clientId, {
-      type: "WORKER_INTERESTED",
-      title: isDelivery ? "Courier interested" : "Worker interested",
-      body: isDelivery
-        ? `${worker.fullName} is available for your delivery.`
-        : `${worker.fullName} is interested in "${gig.title}".`,
-      gigId: gig.id
-    });
+    if (!isDelivery) {
+      notifyUser(io, gig.clientId, {
+        type: "WORKER_INTERESTED",
+        title: "Worker interested",
+        body: `${worker.fullName} is interested in "${gig.title}".`,
+        gigId: gig.id
+      });
+    }
     io.to(`user:${gig.clientId}`).emit("gig:interest", { gigId: gig.id, interest });
   }
 
@@ -198,32 +213,28 @@ export async function expressWorkerInterest(
         },
         data: { assignedWorkerId: workerId }
       });
-      if (claimed.count === 1) {
-        await selectWorkerForGig(gigId, gig.clientId, workerId, io);
-        await activateGigAfterWorkerPayment(gigId, io ?? undefined);
-        await prisma.commerceOrder.update({
-          where: { id: commerce.id },
-          data: { status: CommerceOrderStatus.COURIER_ASSIGNED }
+      if (claimed.count !== 1) {
+        await prisma.gigInterest.updateMany({
+          where: { gigId, workerId },
+          data: { status: GigInterestStatus.WITHDRAWN }
         });
-        logDutsFlow("COURIER_ASSIGNED", {
-          gigId,
-          userId: workerId,
-          userRole: "WORKER",
-          fulfillmentType: "DELIVERY",
-          orderId: commerce.id
+        throw new AppError("This delivery is no longer available.", 409, "GIG_NOT_AVAILABLE", {
+          gig: "This gig is no longer available."
         });
-        if (commerce.customerWhatsAppPhone) {
-          try {
-            const { notifyCustomerStatus } = await import("../whatsapp/merchant-handler.js");
-            await notifyCustomerStatus(
-              commerce.customerWhatsAppPhone,
-              `A courier has been assigned for order #${commerce.orderNumber}.`
-            );
-          } catch {
-            /* non-blocking */
-          }
-        }
       }
+      await selectWorkerForGig(gigId, gig.clientId, workerId, io);
+      await activateGigAfterWorkerPayment(gigId, io ?? undefined);
+      await prisma.commerceOrder.update({
+        where: { id: commerce.id },
+        data: { status: CommerceOrderStatus.COURIER_ASSIGNED }
+      });
+      logDutsFlow("COURIER_ASSIGNED", {
+        gigId,
+        userId: workerId,
+        userRole: "WORKER",
+        fulfillmentType: "DELIVERY",
+        orderId: commerce.id
+      });
     }
   }
 
@@ -1080,7 +1091,10 @@ export async function cancelAssignedWorkerAndRematch(
       where: { id: gigId },
       data: {
         status: GigStatus.SEARCHING_FOR_WORKER,
-        assignedWorkerId: null
+        assignedWorkerId: null,
+        ...(gig.fulfillmentType === "DELIVERY"
+          ? { customerDeliveryEstimateStart: null, customerDeliveryEstimateEnd: null }
+          : {})
       }
     });
 
@@ -1118,15 +1132,14 @@ export async function cancelAssignedWorkerAndRematch(
       rematchingStartedAt: new Date().toISOString()
     });
     io.to(`gig:${gigId}`).emit("gig:status", { gigId, status: GigStatus.SEARCHING_FOR_WORKER });
-    notifyUser(io, gig.clientId, {
-      type: "WORKER_CANCELLED_REMATCH",
-      title: gig.fulfillmentType === "DELIVERY" ? "Finding another courier" : "Finding another worker",
-        body:
-          gig.fulfillmentType === "DELIVERY"
-            ? "We're finding another courier for your order. Your order is still confirmed."
-            : "Your previous worker cancelled. We’re searching for another available worker nearby.",
-      gigId
-    });
+    if (gig.fulfillmentType !== "DELIVERY") {
+      notifyUser(io, gig.clientId, {
+        type: "WORKER_CANCELLED_REMATCH",
+        title: "Finding another worker",
+        body: "Your previous worker cancelled. We’re searching for another available worker nearby.",
+        gigId
+      });
+    }
 
     // Re-broadcast to nearby workers (exclude cancelled worker via client filters / interest status).
     const { syncCommerceOrderFromGig } = await import("../commerce/order.service.js");

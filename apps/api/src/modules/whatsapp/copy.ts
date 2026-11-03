@@ -517,22 +517,15 @@ export function formatCustomerMerchantAccepted(): string {
 }
 
 export function formatCustomerOrderReady(): string {
-  return ["✓ Your order is ready.", "", "Finding a courier..."].join("\n");
+  return ["Your order is being prepared.", "", "We'll send your delivery estimate."].join("\n");
 }
 
 export function formatFindingAnotherCourier(): string {
-  return ["We're finding another courier for your order.", "", "Your order is still confirmed."].join("\n");
+  return "We'll send your delivery estimate.";
 }
 
 export function formatCustomerOrderConfirmedArranging(): string {
-  return [
-    "Order confirmed ✓",
-    "",
-    "We're arranging your delivery.",
-    "It may take a little longer than usual.",
-    "",
-    "We'll update you when your courier is assigned."
-  ].join("\n");
+  return ["Order confirmed ✓", "", "We're arranging your delivery.", "It may take a little longer than usual."].join("\n");
 }
 
 export function formatCustomerMerchantSlow(): string {
@@ -545,12 +538,7 @@ export function formatCustomerMerchantSlow(): string {
 }
 
 export function formatCustomerFindingCourier(): string {
-  return [
-    "Order confirmed ✓",
-    "",
-    "We're finding a courier.",
-    "Delivery may take longer than usual."
-  ].join("\n");
+  return ["Order confirmed ✓", "", "We're arranging your delivery.", "It may take a little longer than usual."].join("\n");
 }
 
 export function formatCustomerFulfillmentProblem(): string {

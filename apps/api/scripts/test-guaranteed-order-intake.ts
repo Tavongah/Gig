@@ -78,12 +78,12 @@ assert.equal(
   }),
   "Courier unable to continue"
 );
-assert.match(
+assert.equal(
   customerFulfillmentHint({
     notes: addFulfillmentNote(null, FULFILLMENT_NOTE.FINDING_REPLACEMENT_COURIER),
     hasCourier: false
-  }) ?? "",
-  /finding another courier|still confirmed/i
+  }),
+  null
 );
 assert.match(
   customerFulfillmentHint({ notes: problemNotes, status: "READY_FOR_PICKUP" }) ?? "",
@@ -108,9 +108,9 @@ assert.equal(
 );
 
 assert.equal(commerceShopUiStatusLabel("MERCHANT_PENDING"), "Order confirmed");
-assert.equal(commerceShopUiStatusLabel("READY_FOR_PICKUP"), "Finding courier");
-assert.equal(commerceShopUiStatusLabel("READY_FOR_PICKUP", "SEARCHING_FOR_WORKER"), "Finding courier");
-assert.equal(commerceShopUiStatusLabel("COURIER_ASSIGNED"), "Courier assigned");
+assert.equal(commerceShopUiStatusLabel("READY_FOR_PICKUP"), "Preparing your order");
+assert.equal(commerceShopUiStatusLabel("READY_FOR_PICKUP", "SEARCHING_FOR_WORKER"), "Preparing your order");
+assert.equal(commerceShopUiStatusLabel("COURIER_ASSIGNED"), "Preparing your order");
 assert.doesNotMatch(commerceShopUiStatusLabel("READY_FOR_PICKUP"), /MERCHANT_PENDING|ASSISTED|timeout/i);
 
 assert.match(

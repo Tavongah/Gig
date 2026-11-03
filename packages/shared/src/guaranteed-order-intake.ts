@@ -133,12 +133,6 @@ export function customerFulfillmentHint(input: {
     return "There's a problem fulfilling your order. DUTS is checking it now.";
   }
   if (input.hasCourier) return null;
-  if (input.status === "READY_FOR_PICKUP" || hasFulfillmentNote(input.notes, FULFILLMENT_NOTE.COURIER_SEARCH_WAITING)) {
-    return "We're finding a courier. Delivery may take longer than usual.";
-  }
-  if (hasFulfillmentNote(input.notes, FULFILLMENT_NOTE.FINDING_REPLACEMENT_COURIER) || hasFulfillmentNote(input.notes, FULFILLMENT_NOTE.COURIER_RELEASED)) {
-    return "We're finding another courier for your order. Your order is still confirmed.";
-  }
   if (isAssistedFulfillment(input.notes)) {
     return "We're arranging your delivery. It may take a little longer than usual.";
   }

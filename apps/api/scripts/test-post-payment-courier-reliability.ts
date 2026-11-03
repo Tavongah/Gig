@@ -166,7 +166,9 @@ pass("Z");
 assert.match(zbProvider, /express-checkout\/ecocash/);
 assert.match(paymentService, /applyProviderPaymentResult/);
 assert.doesNotMatch(notifySvc, /Paynow|paynow/);
-assert.match(workflow, /Your order is still confirmed/);
+assert.match(workflow, /fulfillmentType !== "DELIVERY"/);
+assert.doesNotMatch(workflow, /Your order is still confirmed/);
+assert.doesNotMatch(workflow, /A courier has been assigned/);
 
 assert.equal(merchantNotificationAdminLabel("DELIVERED"), "Merchant notified ✓");
 assert.equal(

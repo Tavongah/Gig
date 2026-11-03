@@ -373,14 +373,22 @@ export async function broadcastGigOffer(io: Server, payload: GigOfferPayload): P
   const commerceDelivery =
     payload.fulfillmentType === "DELIVERY" && (await isCommerceLinkedGig(payload.gigId));
 
+  const isDeliveryOffer = payload.fulfillmentType === "DELIVERY";
   const workers = await prisma.workerProfile.findMany({
-    where: {
-      availabilityStatus: "AVAILABLE",
-      currentLatitude: { not: null },
-      currentLongitude: { not: null },
-      user: { accountStatus: "APPROVED" },
-      serviceCategories: { some: { id: payload.serviceCategoryId } }
-    },
+    where: isDeliveryOffer
+      ? {
+          availabilityStatus: "AVAILABLE",
+          deliveryEligible: true,
+          transportMode: { in: ["WALKING", "BICYCLE", "PUBLIC_TRANSPORT"] },
+          user: { accountStatus: "APPROVED" }
+        }
+      : {
+          availabilityStatus: "AVAILABLE",
+          currentLatitude: { not: null },
+          currentLongitude: { not: null },
+          user: { accountStatus: "APPROVED" },
+          serviceCategories: { some: { id: payload.serviceCategoryId } }
+        },
     select: {
       userId: true,
       currentLatitude: true,
@@ -390,33 +398,41 @@ export async function broadcastGigOffer(io: Server, payload: GigOfferPayload): P
   });
 
   for (const worker of workers) {
-    const distanceMiles = haversineMiles(
-      Number(worker.currentLatitude),
-      Number(worker.currentLongitude),
-      payload.latitude,
-      payload.longitude
-    );
+    const hasLocation = worker.currentLatitude != null && worker.currentLongitude != null;
+    const distanceMiles = hasLocation
+      ? haversineMiles(
+          Number(worker.currentLatitude),
+          Number(worker.currentLongitude),
+          payload.latitude,
+          payload.longitude
+        )
+      : null;
     const travelRadiusMiles = Number(worker.travelDistanceMiles);
 
-    if (!isWithinMatchingRadius(
-      Number(worker.currentLatitude),
-      Number(worker.currentLongitude),
-      payload.latitude,
-      payload.longitude,
-      gigRadiusMiles,
-      travelRadiusMiles
-    )) {
+    if (
+      !isDeliveryOffer &&
+      (!hasLocation ||
+        !isWithinMatchingRadius(
+          Number(worker.currentLatitude),
+          Number(worker.currentLongitude),
+          payload.latitude,
+          payload.longitude,
+          gigRadiusMiles,
+          travelRadiusMiles
+        ))
+    ) {
       continue;
     }
 
-    const roundedDistance = Math.round(distanceMiles * 10) / 10;
-    const isDelivery = payload.fulfillmentType === "DELIVERY";
-    const distanceKm = (roundedDistance * 1.60934).toFixed(1);
+    const roundedDistance = distanceMiles == null ? null : Math.round(distanceMiles * 10) / 10;
+    const isDelivery = isDeliveryOffer;
+    const distanceKm = roundedDistance == null ? null : (roundedDistance * 1.60934).toFixed(1);
     const hideCommerceEarnings = commerceDelivery || (isDelivery && payload.workerPayoutCents <= 0);
+    const deliveryDistance = distanceKm == null ? locationSummary : `${distanceKm} km to pickup · ${locationSummary}`;
     const notificationBody = isDelivery
       ? hideCommerceEarnings
-        ? `New delivery · ${distanceKm} km to pickup · ${locationSummary}`
-        : `You earn $${(payload.workerPayoutCents / 100).toFixed(2)} · ${distanceKm} km to pickup · ${locationSummary}`
+        ? `New delivery · ${deliveryDistance}`
+        : `You earn $${(payload.workerPayoutCents / 100).toFixed(2)} · ${deliveryDistance}`
       : `$${(payload.workerPayoutCents / 100).toFixed(0)} • ${roundedDistance} miles away • ${locationSummary}`;
     const offer = {
       gigId: payload.gigId,

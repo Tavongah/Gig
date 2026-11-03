@@ -557,9 +557,9 @@ export async function activateGigAfterWorkerPayment(gigId: string, io?: Server):
   });
   notifyUser(socket, gig.clientId, {
     type: "PAYMENT_CAPTURED",
-    title: isDelivery ? "Courier confirmed" : "Booking confirmed",
+    title: isDelivery ? "Delivery confirmed" : "Booking confirmed",
     body: isDelivery
-      ? "Your courier is assigned. Share the Pickup PIN when they collect the package."
+      ? "We'll send your delivery estimate."
       : "Your payment was received. The worker is paid after the gig is completed.",
     gigId
   });

@@ -209,8 +209,8 @@ async function main() {
     "merchant slow"
   );
   excludesAll(formatCustomerMerchantSlow(), ["cancelled", "merchant_pending", "timeout", "failed"], "merchant slow");
-  includesAll(formatCustomerFindingCourier(), ["finding a courier", "may take longer"], "finding courier");
-  excludesAll(formatCustomerFindingCourier(), ["no couriers", "order failed", "try again"], "finding courier");
+  includesAll(formatCustomerFindingCourier(), ["arranging your delivery", "little longer"], "finding courier");
+  excludesAll(formatCustomerFindingCourier(), ["courier", "no couriers", "order failed", "try again"], "finding courier");
   includesAll(formatCustomerFulfillmentProblem(), ["problem fulfilling", "checking it now"], "fulfillment problem");
   excludesAll(formatCustomerFulfillmentProblem(), ["refund", "switch merchant"], "fulfillment problem");
 

@@ -188,6 +188,8 @@ export interface GigDetail {
   latitude: string | number;
   longitude: string | number;
   startsAt: string;
+  customerDeliveryEstimateStart?: string | null;
+  customerDeliveryEstimateEnd?: string | null;
   createdAt: string;
   estimatedHours?: number | string;
   distanceMiles?: number;
@@ -871,6 +873,17 @@ export const api = {
     request<{ success?: boolean; secrets: { pickupPin: string; deliveryPin: string } }>(
       `/gigs/${gigId}/delivery/regenerate-pins`,
       { method: "POST" },
+      token
+    ),
+
+  setDeliveryEstimate: (
+    gigId: string,
+    token: string,
+    estimate: { start: string; end?: string | null }
+  ) =>
+    request<{ success?: boolean; estimate: { customerDeliveryEstimateStart: string; customerDeliveryEstimateEnd: string | null } }>(
+      `/gigs/${gigId}/delivery/estimate`,
+      { method: "POST", body: JSON.stringify(estimate) },
       token
     ),
 

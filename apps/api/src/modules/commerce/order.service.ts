@@ -1073,28 +1073,24 @@ export async function getCustomerActiveOrders(commerceCustomerId: string) {
 
 export function formatOrderTrackMessage(order: Awaited<ReturnType<typeof getCustomerActiveOrder>>): string {
   if (!order) return "You don't have an active DUTS order right now. Tell me what you'd like to buy.";
-  const courier = order.linkedDeliveryGig?.assignments?.[0]?.worker;
-  const status = commerceCustomerStatusCopy(order.status as never);
+  const status = commerceCustomerStatusCopy(order.status as never, {
+    start: order.linkedDeliveryGig?.customerDeliveryEstimateStart,
+    end: order.linkedDeliveryGig?.customerDeliveryEstimateEnd
+  });
   const gigStatus = order.linkedDeliveryGig?.status;
   let deliveryLine: string | null = null;
-  if (order.status === CommerceOrderStatus.READY_FOR_PICKUP && !courier) {
-    deliveryLine = "We're finding a courier. Delivery may take longer than usual.";
-  } else if (gigStatus === GigStatus.WORKER_EN_ROUTE || gigStatus === GigStatus.WORKER_ARRIVED) {
-    deliveryLine = "Courier is collecting from the shop.";
-  } else if (
+  if (
     gigStatus === GigStatus.PACKAGE_COLLECTED ||
-    gigStatus === GigStatus.EN_ROUTE_TO_DROPOFF
+    gigStatus === GigStatus.EN_ROUTE_TO_DROPOFF ||
+    gigStatus === GigStatus.ARRIVED_AT_DROPOFF
   ) {
-    deliveryLine = "Your order is on the way.";
-  } else if (gigStatus === GigStatus.ARRIVED_AT_DROPOFF) {
-    deliveryLine = "Courier has arrived.";
+    deliveryLine = "Your order is out for delivery.";
   }
 
   return [
     status,
     `Order #${order.orderNumber}`,
     `Shop: ${order.merchant.name}`,
-    courier ? `Courier: ${courier.fullName}` : null,
     deliveryLine,
     `Items: $${(order.subtotalCents / 100).toFixed(2)} · Total: $${(order.totalCents / 100).toFixed(2)}`
   ]
@@ -1212,29 +1208,6 @@ export async function syncCommerceOrderFromGig(gigId: string, gigStatus: GigStat
         orderId: order.id,
         orderNumber: order.orderNumber
       });
-    }
-    try {
-      const { notifyCustomerStatus } = await import("../whatsapp/merchant-handler.js");
-      await notifyCustomerStatus(
-        order.customerWhatsAppPhone,
-        `A courier is on the way for order #${order.orderNumber}.`
-      );
-    } catch {
-      /* non-blocking */
-    }
-  }
-
-  if (next === CommerceOrderStatus.READY_FOR_PICKUP && order.status === CommerceOrderStatus.COURIER_ASSIGNED) {
-    if (order.customerWhatsAppPhone) {
-      try {
-        const { notifyCustomerStatus } = await import("../whatsapp/merchant-handler.js");
-        await notifyCustomerStatus(
-          order.customerWhatsAppPhone,
-          `We're finding another courier for order #${order.orderNumber}.`
-        );
-      } catch {
-        /* non-blocking */
-      }
     }
   }
 

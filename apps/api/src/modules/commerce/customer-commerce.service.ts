@@ -852,7 +852,14 @@ export async function checkoutCart(input: {
             items: true
           }
         },
-        linkedDeliveryGig: { select: { status: true, assignedWorkerId: true } },
+        linkedDeliveryGig: {
+          select: {
+            status: true,
+            assignedWorkerId: true,
+            customerDeliveryEstimateStart: true,
+            customerDeliveryEstimateEnd: true
+          }
+        },
         pickupStops: true
       }
     });
@@ -1084,7 +1091,15 @@ export async function listCustomerCommerceOrders(userId: string) {
       include: {
         merchant: { select: { id: true, name: true } },
         items: true,
-        linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true } }
+        linkedDeliveryGig: {
+          select: {
+            id: true,
+            status: true,
+            assignedWorkerId: true,
+            customerDeliveryEstimateStart: true,
+            customerDeliveryEstimateEnd: true
+          }
+        }
       }
     }),
     prisma.commerceCheckout.findMany({
@@ -1099,7 +1114,15 @@ export async function listCustomerCommerceOrders(userId: string) {
             items: true
           }
         },
-        linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true } },
+        linkedDeliveryGig: {
+          select: {
+            id: true,
+            status: true,
+            assignedWorkerId: true,
+            customerDeliveryEstimateStart: true,
+            customerDeliveryEstimateEnd: true
+          }
+        },
         pickupStops: true
       }
     })
@@ -1109,10 +1132,10 @@ export async function listCustomerCommerceOrders(userId: string) {
     id: o.id,
     orderNumber: o.orderNumber,
     status: o.status,
-    statusLabel: commerceShopUiStatusLabel(
-      o.status as CommerceOrderStatus,
-      o.linkedDeliveryGig?.status ?? null
-    ),
+    statusLabel: commerceShopUiStatusLabel(o.status as CommerceOrderStatus, o.linkedDeliveryGig?.status ?? null, {
+      start: o.linkedDeliveryGig?.customerDeliveryEstimateStart,
+      end: o.linkedDeliveryGig?.customerDeliveryEstimateEnd
+    }),
     fulfillmentHint: customerFulfillmentHint({
       notes: o.notes,
       status: o.status,
@@ -1189,7 +1212,15 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
           items: true
         }
       },
-      linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true } },
+      linkedDeliveryGig: {
+        select: {
+          id: true,
+          status: true,
+          assignedWorkerId: true,
+          customerDeliveryEstimateStart: true,
+          customerDeliveryEstimateEnd: true
+        }
+      },
       pickupStops: true
     }
   });
@@ -1255,7 +1286,15 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
     include: {
       merchant: { select: { id: true, name: true, locationLabel: true } },
       items: true,
-      linkedDeliveryGig: { select: { id: true, status: true, assignedWorkerId: true } }
+      linkedDeliveryGig: {
+        select: {
+          id: true,
+          status: true,
+          assignedWorkerId: true,
+          customerDeliveryEstimateStart: true,
+          customerDeliveryEstimateEnd: true
+        }
+      }
     }
   });
   if (!order) throw new AppError("Order not found.", 404, "ORDER_NOT_FOUND");
@@ -1267,7 +1306,11 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
       status: order.status,
       statusLabel: commerceShopUiStatusLabel(
         order.status as CommerceOrderStatus,
-        order.linkedDeliveryGig?.status ?? null
+        order.linkedDeliveryGig?.status ?? null,
+        {
+          start: order.linkedDeliveryGig?.customerDeliveryEstimateStart,
+          end: order.linkedDeliveryGig?.customerDeliveryEstimateEnd
+        }
       ),
       fulfillmentHint: customerFulfillmentHint({
         notes: order.notes,

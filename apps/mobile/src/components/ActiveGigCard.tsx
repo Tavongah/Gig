@@ -43,23 +43,23 @@ export function ActiveGigCard({ gig, onTrack }: ActiveGigCardProps) {
         </View>
       </View>
 
-      {workerName ? (
+      {isDelivery ? (
         <Text className="text-sm text-muted">
-          {isDelivery ? "Courier" : "Worker"}: <Text className="font-bold text-ink">{workerName}</Text>
+          {gig.customerDeliveryEstimateStart
+            ? "We'll send updates if the delivery estimate changes."
+            : "Preparing your order"}
+        </Text>
+      ) : workerName ? (
+        <Text className="text-sm text-muted">
+          Worker: <Text className="font-bold text-ink">{workerName}</Text>
         </Text>
       ) : (
         <Text className="text-sm text-muted">
           {rematching
-            ? isDelivery
-              ? "Your courier cancelled. We’re matching you with another courier."
-              : "Your worker cancelled. We’re matching you with another worker."
+            ? "Your worker cancelled. We’re matching you with another worker."
             : searching
-              ? isDelivery
-                ? "Finding a courier near your pickup…"
-                : "Waiting for worker matches"
-              : isDelivery
-                ? "Finding another courier nearby"
-                : "Finding another worker nearby"}
+              ? "Waiting for worker matches"
+              : "Finding another worker nearby"}
         </Text>
       )}
 
