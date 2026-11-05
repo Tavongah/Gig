@@ -1203,7 +1203,11 @@ export async function getGigDetail(gigId: string, userId: string) {
 
   if (gig.deliveryJobKind === "SOURCE_AND_DELIVER" && !isClient && !isAssignedWorker) {
     const { isSourceDeliveryPilotCourier } = await import("../commerce/source-delivery-pilot.js");
-    if (!viewer || !isSourceDeliveryPilotCourier(viewer)) {
+    const sourceEligible =
+      isApprovedWorker &&
+      Boolean(viewer?.workerProfile?.deliveryEligible) &&
+      ["WALKING", "BICYCLE", "PUBLIC_TRANSPORT"].includes(String(viewer?.workerProfile?.transportMode ?? ""));
+    if (!viewer || !isSourceDeliveryPilotCourier(viewer) || !sourceEligible) {
       throw new Error("FORBIDDEN");
     }
   }

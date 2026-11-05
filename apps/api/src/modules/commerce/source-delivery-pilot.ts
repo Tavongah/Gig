@@ -1,5 +1,7 @@
 /**
- * Source & Deliver stays off unless production explicitly enables a pilot.
+ * Source & Deliver stays off unless production explicitly enables it.
+ * When it is on, every approved delivery-eligible courier can see and accept
+ * a sourcing job. The courier allowlist is not a visibility gate.
  * Pickup-and-deliver does not use these checks.
  */
 
@@ -22,14 +24,11 @@ export function sourceDeliveryBackfillEnabled(): boolean {
   return sourceDeliveryEnabled() && enabledFlag("SOURCE_DELIVERY_BACKFILL_ENABLED");
 }
 
-export function isSourceDeliveryPilotCourier(user: { id: string; email?: string | null }): boolean {
-  if (!sourceDeliveryEnabled()) return false;
-  const allowed = (process.env.SOURCE_DELIVERY_PILOT_COURIERS ?? "")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-  if (allowed.length === 0) return false;
-  const id = user.id.toLowerCase();
-  const email = (user.email ?? "").trim().toLowerCase();
-  return allowed.includes(id) || (email.length > 0 && allowed.includes(email));
+/**
+ * True when sourcing is enabled. Callers still require an approved courier
+ * with delivery eligibility and a supported transport mode. An empty or
+ * populated SOURCE_DELIVERY_PILOT_COURIERS value does not grant or deny access.
+ */
+export function isSourceDeliveryPilotCourier(_user: { id: string; email?: string | null }): boolean {
+  return sourceDeliveryEnabled();
 }

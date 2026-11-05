@@ -40,7 +40,9 @@ async function main() {
   assert.equal(pilot.sourceDeliveryEnabled(), false);
   assert.equal(pilot.sourceDeliveryAutoPublishEnabled(), false);
   assert.equal(pilot.sourceDeliveryBackfillEnabled(), false);
+  process.env.SOURCE_DELIVERY_PILOT_COURIERS = "not-a-pilot@example.com";
   assert.equal(pilot.isSourceDeliveryPilotCourier({ id: "not-a-pilot", email: "not-a-pilot@example.com" }), false);
+  delete process.env.SOURCE_DELIVERY_PILOT_COURIERS;
   const { publishSourceDeliveryForCheckout, applySourceDeliveryBackfill } = await import(
     "../src/modules/commerce/source-delivery.service.js"
   );
@@ -56,13 +58,17 @@ async function main() {
   process.env.SOURCE_DELIVERY_AUTO_PUBLISH = "true";
   process.env.SOURCE_DELIVERY_BACKFILL_ENABLED = "false";
   process.env.SOURCE_DELIVERY_PILOT_COURIERS = "";
+  assert.equal(pilot.isSourceDeliveryPilotCourier({ id: "anyone", email: "anyone@example.com" }), true);
+  process.env.SOURCE_DELIVERY_PILOT_COURIERS = "someone-else@example.com";
+  assert.equal(pilot.isSourceDeliveryPilotCourier({ id: "anyone", email: "anyone@example.com" }), true);
+  process.env.SOURCE_DELIVERY_PILOT_COURIERS = "";
   const whatsapp = new MockWhatsAppProvider();
   setWhatsAppProviderForTests(whatsapp);
   const { prisma } = await import("../src/config/prisma.js");
   const { createCatalogProduct } = await import("../src/modules/commerce/catalog.service.js");
   const { acceptUnresolvedCatalogRequest } = await import("../src/modules/commerce/unresolved-checkout.service.js");
   const { dryRunSourceDeliveryBackfill } = await import("../src/modules/commerce/source-delivery.service.js");
-  const { findNearbyGigs } = await import("../src/modules/gigs/gig.service.js");
+  const { findNearbyGigs, getGigDetail } = await import("../src/modules/gigs/gig.service.js");
   const { expressWorkerInterest } = await import("../src/modules/gigs/gig-workflow.service.js");
   const { createDelivery, releaseCommerceDelivery, setCustomerDeliveryEstimate, setDeliveryCourierEligibility } =
     await import("../src/modules/gigs/delivery.service.js");
@@ -109,8 +115,6 @@ async function main() {
     });
     createdUserIds.push(user.id);
     await setDeliveryCourierEligibility(user.id, { enabled: true, transportMode: "WALKING" });
-    const allowed = process.env.SOURCE_DELIVERY_PILOT_COURIERS ?? "";
-    process.env.SOURCE_DELIVERY_PILOT_COURIERS = allowed ? `${allowed},${user.id}` : user.id;
     return user;
   }
 
@@ -293,15 +297,23 @@ async function main() {
     const pickupRow = await prisma.gig.findUniqueOrThrow({ where: { id: pickupGigId } });
     assert.equal(pickupRow.deliveryJobKind, "PICKUP_AND_DELIVER");
     assert.equal(pickupRow.fulfillmentType, "DELIVERY");
-    const pilotCouriers = process.env.SOURCE_DELIVERY_PILOT_COURIERS;
     process.env.SOURCE_DELIVERY_PILOT_COURIERS = harareCourier.id;
+    assert.equal(pilot.isSourceDeliveryPilotCourier({ id: gweruCourier.id, email: gweruCourier.email }), true);
     assert.equal((await findNearbyGigs(gweruCourier.id)).some((row) => row.id === pickupGigId), true);
-    assert.equal((await findNearbyGigs(gweruCourier.id)).some((row) => row.id === checkout.linkedDeliveryGigId), false);
+    assert.equal((await findNearbyGigs(gweruCourier.id)).some((row) => row.id === checkout.linkedDeliveryGigId), true);
+    const ineligible = await courier("ineligible", HARARE);
+    await setDeliveryCourierEligibility(ineligible.id, { enabled: false, transportMode: "WALKING" });
+    assert.equal((await findNearbyGigs(ineligible.id)).some((row) => row.id === checkout.linkedDeliveryGigId), false);
+    assert.equal((await findNearbyGigs(ineligible.id)).some((row) => row.id === pickupGigId), false);
     await assert.rejects(
-      () => expressWorkerInterest(checkout.linkedDeliveryGigId!, gweruCourier.id, undefined, fakeIo),
-      (error: unknown) => error instanceof AppError && error.code === "GIG_NOT_AVAILABLE"
+      () => getGigDetail(checkout.linkedDeliveryGigId!, ineligible.id),
+      (error: unknown) => error instanceof Error && error.message === "FORBIDDEN"
     );
-    process.env.SOURCE_DELIVERY_PILOT_COURIERS = pilotCouriers;
+    await assert.rejects(
+      () => expressWorkerInterest(checkout.linkedDeliveryGigId!, ineligible.id, undefined, fakeIo),
+      (error: unknown) => error instanceof AppError && error.code === "WORKER_NOT_APPROVED"
+    );
+    process.env.SOURCE_DELIVERY_PILOT_COURIERS = "";
 
     const [first, second] = await Promise.allSettled([
       expressWorkerInterest(checkout.linkedDeliveryGigId!, harareCourier.id, undefined, fakeIo),
@@ -347,6 +359,9 @@ async function main() {
     assert.equal(cleared.customerDeliveryEstimateStart, null);
     assert.equal(cleared.customerDeliveryEstimateEnd, null);
     assert.equal(customerTexts().length, beforeEstimate + 1);
+    assert.ok(await seenBy(harareCourier.id), "Harare courier sees the released sourcing job");
+    assert.ok(await seenBy(gweruCourier.id), "Gweru courier sees the released sourcing job");
+    assert.equal(await seenBy(ineligible.id), undefined);
 
     const loserId = winnerId === harareCourier.id ? gweruCourier.id : harareCourier.id;
     await expressWorkerInterest(owned.id, loserId, undefined, fakeIo);
