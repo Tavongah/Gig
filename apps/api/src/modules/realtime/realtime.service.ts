@@ -374,6 +374,11 @@ export async function broadcastGigOffer(io: Server, payload: GigOfferPayload): P
     payload.fulfillmentType === "DELIVERY" && (await isCommerceLinkedGig(payload.gigId));
 
   const isDeliveryOffer = payload.fulfillmentType === "DELIVERY";
+  const offeredGig = await prisma.gig.findUnique({
+    where: { id: payload.gigId },
+    select: { deliveryJobKind: true }
+  });
+  const sourceOffer = offeredGig?.deliveryJobKind === "SOURCE_AND_DELIVER";
   const workers = await prisma.workerProfile.findMany({
     where: isDeliveryOffer
       ? {
@@ -393,9 +398,11 @@ export async function broadcastGigOffer(io: Server, payload: GigOfferPayload): P
       userId: true,
       currentLatitude: true,
       currentLongitude: true,
-      travelDistanceMiles: true
+      travelDistanceMiles: true,
+      user: { select: { id: true, email: true } }
     }
   });
+  const { isSourceDeliveryPilotCourier } = await import("../commerce/source-delivery-pilot.js");
 
   for (const worker of workers) {
     const hasLocation = worker.currentLatitude != null && worker.currentLongitude != null;
@@ -408,6 +415,10 @@ export async function broadcastGigOffer(io: Server, payload: GigOfferPayload): P
         )
       : null;
     const travelRadiusMiles = Number(worker.travelDistanceMiles);
+
+    if (sourceOffer && !isSourceDeliveryPilotCourier(worker.user)) {
+      continue;
+    }
 
     if (
       !isDeliveryOffer &&

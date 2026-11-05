@@ -228,6 +228,22 @@ export interface GigDetail {
   packageCategory?: string | null;
   packageDescription?: string | null;
   packageSize?: string | null;
+  deliveryJobKind?: "PICKUP_AND_DELIVER" | "SOURCE_AND_DELIVER" | string;
+  sourceDelivery?: {
+    jobKind: "SOURCE_AND_DELIVER";
+    label: "SOURCE & DELIVER";
+    products: Array<{ name: string; quantity: number }>;
+    sourceAround: string;
+    deliverTo: string;
+    merchandisePriceStatus: "TO_BE_CONFIRMED" | "PROPOSED" | "CONFIRMED";
+    merchandisePriceLabel: string;
+    merchandiseSubtotalCents: number | null;
+    confirmedMerchandiseCents?: number | null;
+    confirmedMerchandiseLabel?: string | null;
+    customerConfirmed?: boolean;
+    paymentLabel?: string | null;
+    deliveryFeeCents: number;
+  };
   commercePickup?: {
     shopName: string;
     items: Array<{ name: string; quantity: number; flavorLine?: string | null }>;
@@ -875,6 +891,16 @@ export const api = {
       { method: "POST" },
       token
     ),
+
+  proposeSourcePrice: (gigId: string, token: string, merchandiseCents: number) =>
+    request<{ success?: boolean }>(
+      `/gigs/${gigId}/delivery/source-price`,
+      { method: "POST", body: JSON.stringify({ merchandiseCents }) },
+      token
+    ),
+
+  reportSourceProductsNotFound: (gigId: string, token: string) =>
+    request<{ success?: boolean }>(`/gigs/${gigId}/delivery/source-not-found`, { method: "POST" }, token),
 
   setDeliveryEstimate: (
     gigId: string,

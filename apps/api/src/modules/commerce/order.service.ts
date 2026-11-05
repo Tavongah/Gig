@@ -1105,6 +1105,38 @@ export async function syncCommerceOrderFromGig(gigId: string, gigStatus: GigStat
     include: { orders: true, pickupStops: true }
   });
   if (checkout) {
+    const linkedGig = await prisma.gig.findUnique({
+      where: { id: gigId },
+      select: { deliveryJobKind: true }
+    });
+    const sourcing =
+      linkedGig?.deliveryJobKind === "SOURCE_AND_DELIVER" || checkout.fulfillmentOwner === "COURIER_SOURCE";
+    if (sourcing) {
+      const confirmed =
+        checkout.status === CommerceCheckoutStatus.CUSTOMER_APPROVED ||
+        checkout.status === CommerceCheckoutStatus.OUT_FOR_DELIVERY ||
+        checkout.status === CommerceCheckoutStatus.DELIVERED;
+      if (
+        confirmed &&
+        (gigStatus === GigStatus.PACKAGE_COLLECTED ||
+          gigStatus === GigStatus.EN_ROUTE_TO_DROPOFF ||
+          gigStatus === GigStatus.ARRIVED_AT_DROPOFF)
+      ) {
+        await prisma.commerceCheckout.update({
+          where: { id: checkout.id },
+          data: { status: CommerceCheckoutStatus.OUT_FOR_DELIVERY }
+        });
+      } else if (
+        confirmed &&
+        (gigStatus === GigStatus.COMPLETED || gigStatus === GigStatus.WAITING_CUSTOMER_CONFIRMATION)
+      ) {
+        await prisma.commerceCheckout.update({
+          where: { id: checkout.id },
+          data: { status: CommerceCheckoutStatus.DELIVERED, deliveredAt: new Date() }
+        });
+      }
+      return;
+    }
     if (gigStatus === GigStatus.WORKER_ASSIGNED || gigStatus === GigStatus.WORKER_SELECTED) {
       await prisma.commerceCheckout.update({
         where: { id: checkout.id },

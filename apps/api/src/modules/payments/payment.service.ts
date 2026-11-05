@@ -547,12 +547,19 @@ export async function activateGigAfterWorkerPayment(gigId: string, io?: Server):
 
   const socket = io ?? getSocketServer();
   const isDelivery = gig.fulfillmentType === "DELIVERY";
+  const sourcing = gig.deliveryJobKind === "SOURCE_AND_DELIVER";
   notifyUser(socket, gig.assignedWorkerId, {
     type: "PAYMENT_SECURED",
-    title: isDelivery ? "Delivery confirmed — go to pickup" : "You have been selected for this gig.",
-    body: isDelivery
-      ? "Payment secured. Pickup details are available — start your trip when ready."
-      : `Payment received for "${gig.title}". You can start travel to the customer.`,
+    title: sourcing
+      ? "Source & deliver accepted"
+      : isDelivery
+        ? "Delivery confirmed — go to pickup"
+        : "You have been selected for this gig.",
+    body: sourcing
+      ? "Merchandise price is not confirmed. Source the products, then set the delivery estimate."
+      : isDelivery
+        ? "Payment secured. Pickup details are available — start your trip when ready."
+        : `Payment received for "${gig.title}". You can start travel to the customer.`,
     gigId
   });
   notifyUser(socket, gig.clientId, {

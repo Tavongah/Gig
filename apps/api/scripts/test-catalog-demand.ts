@@ -19,6 +19,9 @@ import {
 import { assertCheckoutPayable } from "../src/modules/commerce/unresolved-checkout.service.js";
 import { approveProposedQuote, handoffApprovedQuote } from "../src/modules/commerce/quote-approval.service.js";
 
+process.env.SOURCE_DELIVERY_ENABLED = "true";
+process.env.SOURCE_DELIVERY_AUTO_PUBLISH = "true";
+
 const root = dirname(fileURLToPath(import.meta.url));
 const GWERU = { lat: -19.455, lng: 29.812, label: "Senga, Gweru" };
 const HARARE = { lat: -17.8292, lng: 31.0522, label: "Avondale, Harare" };
@@ -38,7 +41,7 @@ async function main() {
 
   const stamp = Date.now();
   const sellersBefore = await prisma.seller.count();
-  const gigsBefore = await prisma.gig.count();
+  const nonSourceBefore = await prisma.gig.count({ where: { deliveryJobKind: { not: "SOURCE_AND_DELIVER" } } });
   const user = await prisma.user.create({
     data: { email: `c2b-${stamp}@duts.test`, fullName: "Catalog Demand", phoneNumber: `+26377${String(stamp).slice(-7)}` }
   });
@@ -125,7 +128,11 @@ async function main() {
     assert.equal(gweruRow.deliveryFeeCents, deliveryFee);
     assert.equal(gweruRow.orders.length, 0);
     assert.equal(gweruRow.paymentAttempts.length, 0);
-    assert.equal(gweruRow.linkedDeliveryGigId, null);
+    assert.ok(gweruRow.linkedDeliveryGigId);
+    assert.equal(
+      (await prisma.gig.findUniqueOrThrow({ where: { id: gweruRow.linkedDeliveryGigId! } })).deliveryJobKind,
+      "SOURCE_AND_DELIVER"
+    );
     assert.deepEqual(
       gweruRow.lines.map((line) => [line.catalogProductId, line.quantity, line.unitPriceCents, line.sourceProductId, line.fulfillmentStatus]).sort(),
       [
@@ -329,12 +336,21 @@ async function main() {
     assert.equal(cod.paymentStatus, "DUE_ON_DELIVERY");
     assert.equal(await prisma.commerceOrder.count({ where: { checkoutId: priced.checkoutId } }), 1);
     assert.equal((await prisma.commerceOrder.findUniqueOrThrow({ where: { id: cod.orderId } })).linkedDeliveryGigId, null);
-    assert.equal(await prisma.gig.count(), gigsBefore);
+    assert.equal(await prisma.gig.count({ where: { deliveryJobKind: { not: "SOURCE_AND_DELIVER" } } }), nonSourceBefore);
     assert.equal(await prisma.seller.count(), sellersBefore);
-    assert.equal(await prisma.gig.count(), gigsBefore);
     console.log("catalog demand c2b ok");
   } finally {
     const userIds = [user.id, other.id];
+    const owned = await prisma.commerceCheckout.findMany({
+      where: { customerId: { in: userIds } },
+      select: { id: true }
+    });
+    const sourceKeys = owned.map((row) => `source-checkout-${row.id}`);
+    await prisma.commerceCheckout.updateMany({
+      where: { customerId: { in: userIds } },
+      data: { linkedDeliveryGigId: null }
+    });
+    if (sourceKeys.length) await prisma.gig.deleteMany({ where: { idempotencyKey: { in: sourceKeys } } });
     await prisma.commercePaymentAttempt.deleteMany({ where: { commerceOrder: { customerId: { in: userIds } } } });
     await prisma.commerceOrder.deleteMany({ where: { customerId: { in: userIds } } });
     await prisma.commerceCheckout.deleteMany({ where: { customerId: { in: userIds } } });

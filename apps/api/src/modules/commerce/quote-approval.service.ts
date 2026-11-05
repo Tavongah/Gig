@@ -60,7 +60,7 @@ type CheckoutRow = {
   orders: Array<{ id: string }>;
 };
 
-function ownsCheckout(row: CheckoutRow, actor: QuoteActor) {
+export function ownsCheckout(row: CheckoutRow, actor: QuoteActor) {
   if (actor.userId && row.customerId === actor.userId) return true;
   if (actor.commerceCustomerId && row.commerceCustomerId === actor.commerceCustomerId) return true;
   if (
@@ -147,6 +147,11 @@ export async function invalidateProposedQuote(checkoutId: string) {
     where: { id: checkoutId, validationFixture: false, orders: { none: {} } }
   });
   if (!current) return;
+  if (current.fulfillmentOwner === "COURIER_SOURCE") {
+    const { declineOpenSourceProposal } = await import("./source-price.service.js");
+    await declineOpenSourceProposal(checkoutId, "REJECTED");
+    return;
+  }
   if (
     current.status !== CommerceCheckoutStatus.PRICE_PROPOSED &&
     current.status !== CommerceCheckoutStatus.CUSTOMER_APPROVED
@@ -172,6 +177,12 @@ export async function invalidateProposedQuote(checkoutId: string) {
       }
     });
     if (cleared.count !== 1) return;
+    if (current.fulfillmentOwner === "COURIER_SOURCE" && current.approvalId) {
+      await tx.sourcePriceProposal.updateMany({
+        where: { id: current.approvalId, status: "PROPOSED" },
+        data: { status: "REJECTED", resolvedAt: new Date() }
+      });
+    }
     await tx.commerceCheckoutLine.updateMany({
       where: { checkoutId },
       data: {
@@ -190,6 +201,30 @@ export async function readPresentableQuote(checkoutId: string) {
     include: { lines: true }
   });
   if (!row || row.validationFixture || row.status !== CommerceCheckoutStatus.PRICE_PROPOSED) return null;
+  if (row.fulfillmentOwner === "COURIER_SOURCE") {
+    const proposal = await prisma.sourcePriceProposal.findFirst({
+      where: { id: row.approvalId ?? "", status: "PROPOSED" }
+    });
+    if (!proposal || !row.approvalId || !row.quoteExpiresAt || row.quoteExpiresAt.getTime() <= Date.now()) {
+      return { expired: true as const, checkoutId: row.id };
+    }
+    return {
+      expired: false as const,
+      sourceDelivery: true as const,
+      checkoutId: row.id,
+      approvalId: row.approvalId,
+      quoteVersion: row.quoteVersion,
+      deliveryFeeCents: row.deliveryFeeCents,
+      serviceFeeCents: row.serviceFeeCents,
+      merchandiseCents: proposal.merchandiseCents,
+      totalCents: proposal.merchandiseCents + row.deliveryFeeCents + row.serviceFeeCents,
+      lines: row.lines.map((line) => ({
+        name: line.productNameSnapshot,
+        quantity: line.quantity,
+        lineTotalCents: 0
+      }))
+    };
+  }
   if (!row.approvalId || !row.quoteExpiresAt || row.quoteExpiresAt.getTime() <= Date.now()) {
     return { expired: true as const, checkoutId: row.id };
   }
@@ -217,6 +252,10 @@ export async function approveProposedQuote(input: {
   const row = await loadCheckout(input.checkoutId);
   if (!row) throw new AppError("Order not found.", 404, "ORDER_NOT_FOUND");
   assertOwned(row, input.actor);
+  if (row.fulfillmentOwner === "COURIER_SOURCE") {
+    const { confirmSourceMerchandisePrice } = await import("./source-price.service.js");
+    return confirmSourceMerchandisePrice(input);
+  }
   if (row.orders.length > 0 && row.approvalId === input.approvalId && row.quoteVersion === input.quoteVersion) {
     return { checkoutId: row.id, status: row.status, approvalId: row.approvalId, quoteVersion: row.quoteVersion, payable: false as const };
   }
@@ -311,6 +350,10 @@ export async function handoffApprovedQuote(input: {
   const row = await loadCheckout(input.checkoutId);
   if (!row) throw new AppError("Order not found.", 404, "ORDER_NOT_FOUND");
   assertOwned(row, input.actor);
+  if (row.fulfillmentOwner === "COURIER_SOURCE") {
+    const { settleSourcePaymentChoice } = await import("./source-price.service.js");
+    return settleSourcePaymentChoice({ checkoutId: row.id, paymentMethod: method });
+  }
   if (row.approvalId !== input.approvalId || row.quoteVersion !== input.quoteVersion) {
     throw new AppError("That confirmation is for an older total.", 409, "QUOTE_STALE_APPROVAL");
   }

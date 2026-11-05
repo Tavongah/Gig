@@ -47,6 +47,7 @@ import {
   quoteDelivery,
   regenerateDeliveryPins,
   reportAssistedPickupProblem,
+  markSourceOutForDelivery,
   releaseCommerceDelivery,
   setCustomerDeliveryEstimate,
   reportCourierDeliveryProblem,
@@ -313,6 +314,55 @@ export function createGigRouter(io: Server): Router {
           return;
         }
         const result = await confirmAssistedPickup(String(req.params.gigId), req.auth!.userId);
+        res.json({ success: true, ...result });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/source-price",
+    requireAuth,
+    requireApprovedWorker,
+    validateBody(z.object({ merchandiseCents: z.number().int().positive().max(10_000_000) })),
+    async (req, res, next) => {
+      try {
+        const { proposeSourceMerchandisePrice } = await import("../commerce/source-price.service.js");
+        const proposal = await proposeSourceMerchandisePrice({
+          gigId: String(req.params.gigId),
+          workerId: req.auth!.userId,
+          merchandiseCents: (req.body as { merchandiseCents: number }).merchandiseCents
+        });
+        res.json({ success: true, proposal });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/source-not-found",
+    requireAuth,
+    requireApprovedWorker,
+    async (req, res, next) => {
+      try {
+        const { reportSourceProductsNotFound } = await import("../commerce/source-price.service.js");
+        const result = await reportSourceProductsNotFound(String(req.params.gigId), req.auth!.userId);
+        res.json({ success: true, ...result });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/:gigId/delivery/source-out-for-delivery",
+    requireAuth,
+    requireApprovedWorker,
+    async (req, res, next) => {
+      try {
+        const result = await markSourceOutForDelivery(String(req.params.gigId), req.auth!.userId, io);
         res.json({ success: true, ...result });
       } catch (error) {
         next(error);

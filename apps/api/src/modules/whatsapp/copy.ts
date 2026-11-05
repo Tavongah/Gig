@@ -422,6 +422,19 @@ export function formatCompactMutation(input: {
   return `${note}. Your total is now ${money(input.totalCents)}.\n\nReply ADD, REMOVE, or CHECKOUT.`;
 }
 
+export function formatSourcePriceConfirmedCash(totalCents: number): string {
+  return ["Total confirmed.", "", `Total: ${money(totalCents)}`, "Payment: Cash on delivery."].join("\n");
+}
+
+export function formatSourceEcoCashRequired(totalCents: number): string {
+  return [
+    "Total confirmed.",
+    "",
+    `Total: ${money(totalCents)}`,
+    "EcoCash payment for this exact total is required before delivery."
+  ].join("\n");
+}
+
 export function formatMerchantQuoteProposal(input: {
   lines: Array<{ name: string; quantity: number; lineTotalCents: number }>;
   deliveryFeeCents: number;

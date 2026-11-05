@@ -61,6 +61,7 @@ export function DeliveryJobScreen() {
     kind: "generic" | "location" | "too_far" | "uncertain";
   } | null>(null);
   const [inlineNotice, setInlineNotice] = useState<string | null>(null);
+  const [merchandiseAmount, setMerchandiseAmount] = useState("");
 
   const gigQuery = useQuery({
     queryKey: ["gig", route.params.gigId],
@@ -386,6 +387,7 @@ export function DeliveryJobScreen() {
       ? packageCategoryLabels[gig.packageCategory as PackageCategory]
       : gig.packageCategory ?? "Package";
 
+  const sourceDelivery = gig.sourceDelivery?.jobKind === "SOURCE_AND_DELIVER" ? gig.sourceDelivery : null;
   const pickupArea = gig.locationSummary || `${gig.city}, ${gig.region}`;
   const dropoffArea =
     gig.dropoffFormattedAddress ||
@@ -467,6 +469,93 @@ export function DeliveryJobScreen() {
       {inlineNotice ? <DutsInlineBanner title={inlineNotice} tone="success" /> : null}
 
       <DutsCard className="gap-3 p-5">
+        {sourceDelivery ? (
+          <>
+            <Text className="text-xs font-bold uppercase text-brand">SOURCE & DELIVER</Text>
+            <Text className="text-sm font-semibold text-ink">You source these products. They are not waiting at a shop.</Text>
+            {sourceDelivery.products.map((product) => (
+              <Text key={`${product.name}-${product.quantity}`} className="text-sm text-ink">
+                {product.name} × {product.quantity}
+              </Text>
+            ))}
+            <Row label="Source around" value={sourceDelivery.sourceAround} />
+            <Row label="Deliver to" value={sourceDelivery.deliverTo} />
+            {sourceDelivery.customerConfirmed ? (
+              <>
+                <Row label="Confirmed merchandise" value={sourceDelivery.confirmedMerchandiseLabel ?? sourceDelivery.merchandisePriceLabel} />
+                <Row label="Customer confirmed" value="YES" />
+                {sourceDelivery.paymentLabel ? <Row label="Payment" value={sourceDelivery.paymentLabel} /> : null}
+              </>
+            ) : (
+              <Row label="Merchandise" value={sourceDelivery.merchandisePriceLabel} />
+            )}
+            {sourceDelivery.merchandisePriceStatus === "PROPOSED" ? (
+              <Text className="text-sm text-muted">Waiting for the customer to confirm this total.</Text>
+            ) : null}
+            <Row label="Delivery fee" value={formatCents(sourceDelivery.deliveryFeeCents)} />
+            {activeRole === "WORKER" &&
+            gig.assignedWorkerId === session.user.id &&
+            (sourceDelivery.merchandisePriceStatus !== "CONFIRMED" || sourceDelivery.customerConfirmed) ? (
+              <>
+                <Text className="text-sm font-semibold text-ink">
+                  {sourceDelivery.customerConfirmed ? "Propose a different total" : "Actual merchandise total"}
+                </Text>
+                <TextInput
+                  value={merchandiseAmount}
+                  onChangeText={setMerchandiseAmount}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  className="rounded-xl border border-slate-200 px-3 py-3 text-base text-ink"
+                />
+                <LoadingButton
+                  label={sourceDelivery.customerConfirmed ? "Submit new price" : "Products found"}
+                  onPress={() => {
+                    const match = merchandiseAmount.trim().match(/^(\d{1,6})(?:\.(\d{1,2}))?$/);
+                    if (!match) {
+                      setInlineError({ title: "Enter a price", body: "Use a dollar amount such as 25.00.", kind: "generic" });
+                      return;
+                    }
+                    const merchandiseCents = Number(match[1]) * 100 + Number((match[2] ?? "").padEnd(2, "0"));
+                    void api
+                      .proposeSourcePrice(gig.id, session.token, merchandiseCents)
+                      .then(() => {
+                        setInlineError(null);
+                        setInlineNotice("Price sent for confirmation.");
+                        void gigQuery.refetch();
+                      })
+                      .catch((error: unknown) => {
+                        setInlineError({
+                          title: "Price was not sent",
+                          body: error instanceof Error ? error.message : "Try again.",
+                          kind: "generic"
+                        });
+                      });
+                  }}
+                />
+                <LoadingButton
+                  label="Products not found"
+                  variant="secondary"
+                  onPress={() => {
+                    void api
+                      .reportSourceProductsNotFound(gig.id, session.token)
+                      .then(() => {
+                        setInlineNotice("Returned to the courier pool.");
+                        void gigQuery.refetch();
+                      })
+                      .catch((error: unknown) => {
+                        setInlineError({
+                          title: "Could not release this job",
+                          body: error instanceof Error ? error.message : "Try again.",
+                          kind: "generic"
+                        });
+                      });
+                  }}
+                />
+              </>
+            ) : null}
+          </>
+        ) : (
+          <>
         <Row label="Pickup" value={pickupArea} />
         <Row label="Drop-off" value={dropoffArea} />
         <Row label="Package" value={`${packageLabel}${gig.packageDescription ? ` · ${gig.packageDescription}` : ""}`} />
@@ -485,7 +574,9 @@ export function DeliveryJobScreen() {
             )}
           </>
         ) : null}
-        {activeRole === "CLIENT" ? (
+          </>
+        )}
+        {activeRole === "CLIENT" && !sourceDelivery ? (
           <Row label="Delivery fee" value={formatCents(gig.totalCents)} />
         ) : null}
       </DutsCard>
@@ -502,7 +593,7 @@ export function DeliveryJobScreen() {
         </DutsCard>
       ) : null}
 
-      {activeRole === "CLIENT" && isSearching(gig.status) && !commercePickup ? (
+      {activeRole === "CLIENT" && isSearching(gig.status) && !commercePickup && !sourceDelivery ? (
         <DutsCard className="gap-3 border border-dashed border-slate-200 p-5">
           <Text className="text-center font-semibold text-ink">Finding a courier near your pickup…</Text>
           <Text className="text-center text-sm text-muted">Keep your pickup and delivery codes ready.</Text>
@@ -556,7 +647,7 @@ export function DeliveryJobScreen() {
         <DutsCard className="gap-3 p-5">
           {isPickupPhase(gig.status) ? (
             <>
-              <Text className="text-xs font-bold uppercase text-brand">Pickup</Text>
+              <Text className="text-xs font-bold uppercase text-brand">{sourceDelivery ? "Source & deliver" : "Pickup"}</Text>
               {commercePickup?.headline ? (
                 <Text className="text-sm font-extrabold text-ink">{commercePickup.headline}</Text>
               ) : null}
@@ -584,7 +675,13 @@ export function DeliveryJobScreen() {
           ) : null}
           {gig.status === "WORKER_ASSIGNED" || gig.status === "WORKER_EN_ROUTE" ? (
                 <LoadingButton
-                  label={commercePickup && (commercePickup.pickupCount ?? 1) > 1 ? "Directions to next pickup" : "Directions to shop"}
+                  label={
+                    sourceDelivery
+                      ? "Directions toward the delivery area"
+                      : commercePickup && (commercePickup.pickupCount ?? 1) > 1
+                        ? "Directions to next pickup"
+                        : "Directions to shop"
+                  }
                   variant="secondary"
                   loading={ensureTravelMutation.isPending}
                   onPress={() => void openPickupDirections()}

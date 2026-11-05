@@ -418,7 +418,10 @@ export async function findNearbyGigs(workerId: string) {
     );
   };
 
+  const { isSourceDeliveryPilotCourier } = await import("../commerce/source-delivery-pilot.js");
+  const sourcePilot = isSourceDeliveryPilotCourier(worker);
   const rankedDelivery = deliveryGigs
+    .filter((gig) => gig.deliveryJobKind !== "SOURCE_AND_DELIVER" || sourcePilot)
     .map((gig) => {
       const distanceMiles = distanceMilesFor(gig);
       return {
@@ -476,6 +479,69 @@ export async function findNearbyGigs(workerId: string) {
       }
     ])
   );
+  const { presentSourceDelivery, resolveSupportedPackagePricingCity } = await import("@gigflow/shared");
+  const sourceIds = ranked
+    .filter((item) => item.gig.fulfillmentType === "DELIVERY" && item.gig.deliveryJobKind === "SOURCE_AND_DELIVER")
+    .map((item) => item.gig.id);
+  const sourceRows = sourceIds.length
+    ? await prisma.commerceCheckout.findMany({
+        where: { linkedDeliveryGigId: { in: sourceIds } },
+        select: {
+          linkedDeliveryGigId: true,
+          deliveryLabel: true,
+          deliveryLatitude: true,
+          deliveryLongitude: true,
+          deliveryFeeCents: true,
+          paymentMethod: true,
+          lines: { select: { productNameSnapshot: true, quantity: true, unitPriceCents: true } },
+          sourcePriceProposals: {
+            where: { status: { in: ["PROPOSED", "CONFIRMED"] } },
+            orderBy: { createdAt: "desc" },
+            select: { merchandiseCents: true, status: true }
+          }
+        }
+      })
+    : [];
+  const sourceByGig = new Map(
+    sourceRows.flatMap((row) => {
+      if (!row.linkedDeliveryGigId) return [];
+      const city =
+        resolveSupportedPackagePricingCity({
+          deliveryLabel: row.deliveryLabel,
+          typedAddress: row.deliveryLabel,
+          customerLatitude: Number(row.deliveryLatitude),
+          customerLongitude: Number(row.deliveryLongitude)
+        }) ?? "Harare";
+      return [
+        [
+          row.linkedDeliveryGigId,
+          presentSourceDelivery({
+            deliveryLabel: row.deliveryLabel,
+            city,
+            deliveryFeeCents: row.deliveryFeeCents,
+            paymentMethod: row.paymentMethod,
+            confirmedMerchandiseCents: row.sourcePriceProposals.find((item) => item.status === "CONFIRMED")?.merchandiseCents ?? null,
+            proposal: row.sourcePriceProposals.find((item) => item.status === "PROPOSED")
+              ? {
+                  merchandiseCents: row.sourcePriceProposals.find((item) => item.status === "PROPOSED")!.merchandiseCents,
+                  confirmed: false
+                }
+              : row.sourcePriceProposals.find((item) => item.status === "CONFIRMED")
+                ? {
+                    merchandiseCents: row.sourcePriceProposals.find((item) => item.status === "CONFIRMED")!.merchandiseCents,
+                    confirmed: true
+                  }
+                : null,
+            lines: row.lines.map((line) => ({
+              name: line.productNameSnapshot,
+              quantity: line.quantity,
+              unitPriceCents: line.unitPriceCents
+            }))
+          })
+        ] as const
+      ];
+    })
+  );
 
   return ranked.map((item) => {
     const sanitized = sanitizeGigForViewer(item.gig, workerId, {
@@ -485,11 +551,14 @@ export async function findNearbyGigs(workerId: string) {
 
     if (item.gig.fulfillmentType === "DELIVERY") {
       const commerce = commerceByGig.get(item.gig.id) ?? null;
+      const sourceDelivery =
+        item.gig.deliveryJobKind === "SOURCE_AND_DELIVER" ? sourceByGig.get(item.gig.id) : undefined;
       return {
         ...sanitized,
         distanceMiles: item.distanceMiles,
         estimatedResponseMinutes: item.estimatedResponseMinutes,
         offer: buildCourierOfferPayload(item.gig, item.distanceMiles ?? undefined, commerce),
+        sourceDelivery,
         commercePickup: commerce
           ? {
               shopName: commerce.shopName,
@@ -1132,6 +1201,13 @@ export async function getGigDetail(gigId: string, userId: string) {
     viewer?.accountStatus === AccountStatus.APPROVED &&
     Boolean(viewer.workerProfile);
 
+  if (gig.deliveryJobKind === "SOURCE_AND_DELIVER" && !isClient && !isAssignedWorker) {
+    const { isSourceDeliveryPilotCourier } = await import("../commerce/source-delivery-pilot.js");
+    if (!viewer || !isSourceDeliveryPilotCourier(viewer)) {
+      throw new Error("FORBIDDEN");
+    }
+  }
+
 
 
   if (!isClient && !isAssignedWorker) {
@@ -1272,6 +1348,44 @@ async function attachCommercePickupContext<T extends { id: string; status?: stri
     "../commerce/multi-shop-checkout.service.js"
   );
   const checkout = await findCheckoutForGig(gig.id);
+  const deliveryJobKind = (gig as { deliveryJobKind?: string }).deliveryJobKind;
+  if (deliveryJobKind === "SOURCE_AND_DELIVER" && checkout && checkout.lines.length > 0) {
+    const { presentSourceDelivery, resolveSupportedPackagePricingCity } = await import("@gigflow/shared");
+    const proposals = await prisma.sourcePriceProposal.findMany({
+      where: { checkoutId: checkout.id, status: { in: ["PROPOSED", "CONFIRMED"] } },
+      orderBy: { createdAt: "desc" }
+    });
+    const pending = proposals.find((item) => item.status === "PROPOSED");
+    const confirmed = proposals.find((item) => item.status === "CONFIRMED");
+    const city =
+      resolveSupportedPackagePricingCity({
+        deliveryLabel: checkout.deliveryLabel,
+        typedAddress: checkout.deliveryLabel,
+        customerLatitude: Number(checkout.deliveryLatitude),
+        customerLongitude: Number(checkout.deliveryLongitude)
+      }) ?? "Harare";
+    return {
+      ...gig,
+      deliveryJobKind: "SOURCE_AND_DELIVER" as const,
+      sourceDelivery: presentSourceDelivery({
+        deliveryLabel: checkout.deliveryLabel,
+        city,
+        deliveryFeeCents: checkout.deliveryFeeCents,
+        lines: checkout.lines.map((line) => ({
+          name: line.productNameSnapshot,
+          quantity: line.quantity,
+          unitPriceCents: line.unitPriceCents
+        })),
+        paymentMethod: checkout.paymentMethod,
+        confirmedMerchandiseCents: confirmed?.merchandiseCents ?? null,
+        proposal: pending
+          ? { merchandiseCents: pending.merchandiseCents, confirmed: false }
+          : confirmed
+            ? { merchandiseCents: confirmed.merchandiseCents, confirmed: true }
+            : null
+      })
+    };
+  }
   if (checkout) {
     const current = await currentChildOrderForGig(gig.id);
     const order = current ?? checkout.orders[0];

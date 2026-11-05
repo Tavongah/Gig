@@ -97,6 +97,8 @@ import {
   formatResolvedSourcePrice,
   formatQuoteDeclined,
   formatQuoteExpired,
+  formatSourceEcoCashRequired,
+  formatSourcePriceConfirmedCash,
   formatOrderCartSummary,
   formatPaymentMethodChoice,
   formatPaymentStillPending,
@@ -1415,7 +1417,17 @@ async function bindMerchantQuote(
   ctx.pendingChoices = undefined;
   setExpected(ctx, "QUOTE_APPROVAL");
   await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
-  await wa.sendText(phone, formatMerchantQuoteProposal(quote));
+  const { formatSourcePriceConfirmation } = await import("@gigflow/shared");
+  await wa.sendText(
+    phone,
+    "sourceDelivery" in quote && quote.sourceDelivery
+      ? formatSourcePriceConfirmation({
+          merchandiseCents: quote.merchandiseCents,
+          deliveryFeeCents: quote.deliveryFeeCents,
+          serviceFeeCents: quote.serviceFeeCents
+        })
+      : formatMerchantQuoteProposal(quote)
+  );
   return { handled: true as const };
 }
 
@@ -1456,12 +1468,28 @@ async function handleBoundQuoteReply(
     return { handled: true as const };
   }
   try {
-    await approveProposedQuote({
+    const approved = await approveProposedQuote({
       checkoutId: ctx.quoteCheckoutId!,
       approvalId: ctx.quoteApprovalId!,
       quoteVersion: ctx.quoteVersion!,
       actor: { commerceCustomerId: customerId, phone }
     });
+    if ("sourceDelivery" in approved && approved.sourceDelivery) {
+      ctx.quoteCheckoutId = undefined;
+      ctx.quoteApprovalId = undefined;
+      ctx.quoteVersion = undefined;
+      ctx.choiceId = undefined;
+      ctx.paymentPhase = undefined;
+      setExpected(ctx, "PRODUCT_TEXT");
+      await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
+      await wa.sendText(
+        phone,
+        approved.paymentMethod === "ECOCASH" || approved.paymentMethod === "ONEMONEY"
+          ? formatSourceEcoCashRequired(approved.totalCents)
+          : formatSourcePriceConfirmedCash(approved.totalCents)
+      );
+      return { handled: true as const };
+    }
     ctx.paymentPhase = "SELECT_METHOD";
     setExpected(ctx, "PAYMENT_METHOD");
     await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_PAYMENT, context: ctx });
@@ -2109,6 +2137,17 @@ async function finalizeCashPayment(
         paymentMethod: "CASH",
         actor: { commerceCustomerId: customerId, phone }
       });
+      if ("sourceDelivery" in placed && placed.sourceDelivery) {
+        ctx.quoteCheckoutId = undefined;
+        ctx.quoteApprovalId = undefined;
+        ctx.quoteVersion = undefined;
+        ctx.choiceId = undefined;
+        ctx.paymentPhase = undefined;
+        setExpected(ctx, "PRODUCT_TEXT");
+        await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
+        await wa.sendText(phone, formatSourcePriceConfirmedCash(placed.totalCents));
+        return { handled: true };
+      }
       ctx.quoteCheckoutId = undefined;
       ctx.quoteApprovalId = undefined;
       ctx.quoteVersion = undefined;
@@ -2238,6 +2277,13 @@ async function startMobileMoneyWithPayerPhone(
         payerPhone: rawPhone,
         actor: { commerceCustomerId: customerId, phone }
       });
+      if ("sourceDelivery" in placed && placed.sourceDelivery) {
+        ctx.paymentPhase = undefined;
+        setExpected(ctx, "PRODUCT_TEXT");
+        await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
+        await wa.sendText(phone, formatSourceEcoCashRequired(placed.totalCents));
+        return { handled: true };
+      }
       orderId = placed.orderId;
       ctx.quoteCheckoutId = undefined;
       ctx.quoteApprovalId = undefined;
@@ -2246,7 +2292,7 @@ async function startMobileMoneyWithPayerPhone(
       ctx.activeOrderId = placed.orderId;
       ctx.pendingPaymentOrderId = placed.orderId;
       ctx.paymentPhase = "PENDING_PROVIDER";
-      ctx.paymentAttemptId = placed.attemptId;
+      ctx.paymentAttemptId = "attemptId" in placed ? placed.attemptId : undefined;
       setExpected(ctx, "PAYMENT_PENDING");
       await updateConversation(convId, { state: WhatsAppConversationState.AWAITING_PAYMENT, context: ctx });
       await wa.sendText(

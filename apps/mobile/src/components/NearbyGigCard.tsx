@@ -21,6 +21,67 @@ export function NearbyGigCard({ gig, onView, onAccept, onDecline, acceptDisabled
   const isDelivery = gig.fulfillmentType === "DELIVERY" || gig.offer?.fulfillmentType === "DELIVERY";
   const offer = gig.offer;
 
+  if (isDelivery && gig.sourceDelivery?.jobKind === "SOURCE_AND_DELIVER") {
+    const source = gig.sourceDelivery;
+    return (
+      <DutsCard className="gap-4 p-5">
+        <Pressable className="gap-1" onPress={onView}>
+          <Text className="text-xs font-bold uppercase text-brand">SOURCE & DELIVER</Text>
+          <Text className="text-sm font-semibold text-ink">You source these products. They are not waiting at a shop.</Text>
+        </Pressable>
+        <View className="gap-1">
+          <Text className="text-sm font-bold text-ink">Products</Text>
+          {source.products.map((product) => (
+            <Text key={`${product.name}-${product.quantity}`} className="text-sm text-ink">
+              {product.name} × {product.quantity}
+            </Text>
+          ))}
+        </View>
+        <View className="gap-2">
+          <Text className="text-sm text-muted">
+            Source around <Text className="font-bold text-ink">{source.sourceAround}</Text>
+          </Text>
+          <Text className="text-sm text-muted">
+            Deliver to <Text className="font-bold text-ink">{source.deliverTo}</Text>
+          </Text>
+          {source.customerConfirmed ? (
+            <>
+              <Text className="text-sm text-muted">
+                Confirmed merchandise{" "}
+                <Text className="font-black text-ink">{source.confirmedMerchandiseLabel}</Text>
+              </Text>
+              <Text className="text-sm text-muted">
+                Customer confirmed <Text className="font-black text-ink">YES</Text>
+              </Text>
+              {source.paymentLabel ? (
+                <Text className="text-sm text-muted">
+                  Payment <Text className="font-bold text-ink">{source.paymentLabel}</Text>
+                </Text>
+              ) : null}
+            </>
+          ) : (
+            <Text className="text-sm text-muted">
+              Merchandise <Text className="font-black text-ink">{source.merchandisePriceLabel}</Text>
+            </Text>
+          )}
+          <Text className="text-sm text-muted">
+            Delivery fee <Text className="font-bold text-ink">{formatCents(source.deliveryFeeCents)}</Text>
+          </Text>
+        </View>
+        <View className="flex-row gap-2">
+          {onDecline ? (
+            <View className="flex-1">
+              <AppButton label="Decline" onPress={onDecline} variant="secondary" size="md" />
+            </View>
+          ) : null}
+          <View className="flex-1">
+            <AppButton label="Accept delivery" onPress={onAccept} disabled={acceptDisabled} variant="primary" size="md" />
+          </View>
+        </View>
+      </DutsCard>
+    );
+  }
+
   if (isDelivery) {
     const commerce = offer?.commerce ?? (gig.commercePickup?.paymentLabel ? {
       shopName: gig.commercePickup.shopName,
@@ -45,7 +106,7 @@ export function NearbyGigCard({ gig, onView, onAccept, onDecline, acceptDisabled
     return (
       <DutsCard className="gap-4 p-5">
         <Pressable className="gap-1" onPress={onView}>
-          <Text className="text-xs font-bold uppercase text-brand">DUTS DELIVERY</Text>
+          <Text className="text-xs font-bold uppercase text-brand">PICKUP & DELIVER</Text>
           <Text className="text-xl font-black text-ink">{pickup}</Text>
           {itemCount ? (
             <Text className="text-sm font-semibold text-ink">

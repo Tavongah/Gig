@@ -20,6 +20,13 @@ import { formatUnresolvedRequestAccepted } from "../whatsapp/copy.js";
 export const UNRESOLVED_CHECKOUT_NOTE =
   "Merchandise price is not set. totalCents is not a payable total.";
 
+async function publishSourceRequestIfEnabled(checkoutId: string) {
+  const { sourceDeliveryAutoPublishEnabled } = await import("./source-delivery-pilot.js");
+  if (!sourceDeliveryAutoPublishEnabled()) return;
+  const { publishSourceDeliveryForCheckout } = await import("./source-delivery.service.js");
+  await publishSourceDeliveryForCheckout(checkoutId);
+}
+
 export type AcceptedUnresolvedRequest = {
   acceptedRequest: true;
   payable: false;
@@ -136,7 +143,10 @@ async function persist(input: {
     where: { idempotencyKey: key },
     include: { lines: true }
   });
-  if (existing?.status === CommerceCheckoutStatus.AWAITING_FULFILLMENT) return present(existing);
+  if (existing?.status === CommerceCheckoutStatus.AWAITING_FULFILLMENT) {
+    await publishSourceRequestIfEnabled(existing.id);
+    return present(existing);
+  }
 
   try {
     const created = await prisma.commerceCheckout.create({
@@ -171,6 +181,7 @@ async function persist(input: {
       },
       include: { lines: true }
     });
+    await publishSourceRequestIfEnabled(created.id);
     return present(created);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -178,7 +189,10 @@ async function persist(input: {
         where: { idempotencyKey: key },
         include: { lines: true }
       });
-      if (replay?.status === CommerceCheckoutStatus.AWAITING_FULFILLMENT) return present(replay);
+      if (replay?.status === CommerceCheckoutStatus.AWAITING_FULFILLMENT) {
+        await publishSourceRequestIfEnabled(replay.id);
+        return present(replay);
+      }
     }
     throw error;
   }
@@ -344,6 +358,9 @@ export async function acceptUnresolvedCatalogRequest(input: {
   const existing = await prisma.commerceCheckout.findUnique({ where: { idempotencyKey: key } });
   if (existing) {
     if (existing.validationFixture || existing.customerId !== input.userId) return null;
+    if (existing.status === CommerceCheckoutStatus.AWAITING_FULFILLMENT) {
+      await publishSourceRequestIfEnabled(existing.id);
+    }
     return {
       checkoutId: existing.id,
       propose: existing.status === CommerceCheckoutStatus.AWAITING_FULFILLMENT

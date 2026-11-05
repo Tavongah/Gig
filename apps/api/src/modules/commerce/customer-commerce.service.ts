@@ -12,6 +12,8 @@ import {
   normalizeProductSearchName,
   parseAlcoholCommerceEnabled,
   resolveSupportedPackagePricingCity,
+  formatSourcePriceConfirmation,
+  sourceRequestCustomerStatusLabel,
   type CommerceOrderStatus
 } from "@gigflow/shared";
 import { prisma } from "../../config/prisma.js";
@@ -1123,6 +1125,11 @@ export async function listCustomerCommerceOrders(userId: string) {
             customerDeliveryEstimateEnd: true
           }
         },
+        sourcePriceProposals: {
+          where: { status: "PROPOSED" },
+          orderBy: { createdAt: "desc" },
+          take: 1
+        },
         pickupStops: true
       }
     })
@@ -1153,6 +1160,9 @@ export async function listCustomerCommerceOrders(userId: string) {
   const multi = checkouts.map((c) => {
     if (c.status === "AWAITING_FULFILLMENT" || c.status === "PRICE_PROPOSED" || c.status === "CUSTOMER_APPROVED") {
       const awaiting = c.status === "AWAITING_FULFILLMENT";
+      const sourceOwned = c.fulfillmentOwner === "COURIER_SOURCE";
+      const sourceConfirmed = sourceOwned && c.status === "CUSTOMER_APPROVED";
+      const proposal = c.sourcePriceProposals[0];
       return {
         id: c.id,
         orderNumber: c.checkoutNumber,
@@ -1160,12 +1170,37 @@ export async function listCustomerCommerceOrders(userId: string) {
         statusLabel:
           c.status === "PRICE_PROPOSED"
             ? "Confirm this total"
-            : c.status === "CUSTOMER_APPROVED"
-              ? "Choose how to pay"
-              : "Checking availability",
-        fulfillmentHint: awaiting ? formatUnresolvedRequestAccepted() : null,
-        totalCents: awaiting ? 0 : c.totalCents,
-        hideMerchandiseTotal: awaiting,
+            : sourceConfirmed
+              ? sourceRequestCustomerStatusLabel({
+                  gigStatus: c.linkedDeliveryGig?.status,
+                  estimate: {
+                    start: c.linkedDeliveryGig?.customerDeliveryEstimateStart,
+                    end: c.linkedDeliveryGig?.customerDeliveryEstimateEnd
+                  }
+                })
+              : c.status === "CUSTOMER_APPROVED"
+                ? "Choose how to pay"
+                : sourceOwned
+                  ? sourceRequestCustomerStatusLabel({
+                      gigStatus: c.linkedDeliveryGig?.status,
+                      estimate: {
+                        start: c.linkedDeliveryGig?.customerDeliveryEstimateStart,
+                        end: c.linkedDeliveryGig?.customerDeliveryEstimateEnd
+                      }
+                    })
+                  : "Checking availability",
+        fulfillmentHint:
+          sourceOwned && proposal
+            ? formatSourcePriceConfirmation({
+                merchandiseCents: proposal.merchandiseCents,
+                deliveryFeeCents: c.deliveryFeeCents,
+                serviceFeeCents: c.serviceFeeCents
+              })
+            : awaiting
+              ? formatUnresolvedRequestAccepted()
+              : null,
+        totalCents: awaiting || (sourceOwned && !sourceConfirmed) ? 0 : c.totalCents,
+        hideMerchandiseTotal: awaiting || (sourceOwned && !sourceConfirmed),
         currency: c.currency,
         merchantName: "DUTS",
         itemCount: c.lines.reduce((sum, line) => sum + line.quantity, 0),

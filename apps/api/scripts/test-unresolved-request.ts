@@ -13,6 +13,9 @@ import { checkoutCart, listCustomerCommerceOrders, prepareCheckout } from "../sr
 import { assertCheckoutPayable, acceptUnresolvedTextRequest } from "../src/modules/commerce/unresolved-checkout.service.js";
 import { formatUnresolvedRequestAccepted } from "../src/modules/whatsapp/copy.js";
 
+process.env.SOURCE_DELIVERY_ENABLED = "true";
+process.env.SOURCE_DELIVERY_AUTO_PUBLISH = "true";
+
 const root = dirname(fileURLToPath(import.meta.url));
 
 function source(rel: string) {
@@ -247,7 +250,11 @@ async function main() {
     assert.equal(row.orders.length, 0);
     assert.equal(row.paymentAttempts.length, 0);
     assert.equal(row.pickupStops.length, 0);
-    assert.equal(row.linkedDeliveryGigId, null);
+    assert.ok(row.linkedDeliveryGigId);
+    const sourceGig = await prisma.gig.findUniqueOrThrow({ where: { id: row.linkedDeliveryGigId! } });
+    assert.equal(sourceGig.deliveryJobKind, "SOURCE_AND_DELIVER");
+    assert.equal(sourceGig.fulfillmentType, "DELIVERY");
+    assert.equal(sourceGig.assignedWorkerId, null);
     assert.equal(row.packageClass, "MEDIUM");
     assert.equal(row.deliveryFeeCents, 130);
     assert.equal(row.itemsSubtotalCents, 0);
@@ -334,6 +341,17 @@ async function main() {
     console.log("unresolved supported-city request: PASS");
   } finally {
     if (checkoutIds.length) {
+      const linked = await prisma.commerceCheckout.findMany({
+        where: { id: { in: checkoutIds } },
+        select: { id: true }
+      });
+      await prisma.commerceCheckout.updateMany({
+        where: { id: { in: checkoutIds } },
+        data: { linkedDeliveryGigId: null }
+      });
+      await prisma.gig.deleteMany({
+        where: { idempotencyKey: { in: linked.map((row) => `source-checkout-${row.id}`) } }
+      });
       await prisma.commerceCheckout.deleteMany({ where: { id: { in: checkoutIds } } });
     }
     await prisma.product.deleteMany({ where: { merchantId: { in: [near.id, far.id, harareShop.id] } } });

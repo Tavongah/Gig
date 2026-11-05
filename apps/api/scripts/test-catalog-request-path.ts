@@ -12,6 +12,9 @@ import { handleCustomerWhatsAppMessage } from "../src/modules/whatsapp/customer-
 import { MockWhatsAppProvider, setWhatsAppProviderForTests } from "../src/modules/whatsapp/provider.js";
 import { supportedPackagePricingCityFromText } from "@gigflow/shared";
 
+process.env.SOURCE_DELIVERY_ENABLED = "true";
+process.env.SOURCE_DELIVERY_AUTO_PUBLISH = "true";
+
 const root = dirname(fileURLToPath(import.meta.url));
 const GWERU = { latitude: -19.455, longitude: 29.812 };
 const HARARE = { latitude: -17.8292, longitude: 31.0522 };
@@ -45,7 +48,7 @@ async function main() {
   setWhatsAppProviderForTests(mock);
   let n = 0;
   const sellersBefore = await prisma.seller.count();
-  const gigsBefore = await prisma.gig.count();
+  const nonSourceBefore = await prisma.gig.count({ where: { deliveryJobKind: { not: "SOURCE_AND_DELIVER" } } });
 
   function phone() {
     const value = zw(stamp + n);
@@ -106,7 +109,11 @@ async function main() {
     const deliveryFee = gweruCheckout.deliveryFeeCents;
     assert.equal(await prisma.commerceOrder.count({ where: { checkoutId: gweruCheckout.id } }), 0);
     assert.equal(await prisma.commercePaymentAttempt.count({ where: { commerceCheckoutId: gweruCheckout.id } }), 0);
-    assert.equal(gweruCheckout.linkedDeliveryGigId, null);
+    assert.ok(gweruCheckout.linkedDeliveryGigId);
+    assert.equal(
+      (await prisma.gig.findUniqueOrThrow({ where: { id: gweruCheckout.linkedDeliveryGigId! } })).deliveryJobKind,
+      "SOURCE_AND_DELIVER"
+    );
 
     const hararePhone = phone();
     await say(hararePhone, cola.name);
@@ -213,7 +220,7 @@ async function main() {
     const nearQuote = await say(nearPhone, "", GWERU);
     assert.match(nearQuote, /\$2\.00/);
     assert.equal(await prisma.commerceCheckout.count({ where: { customerWhatsAppPhone: nearPhone } }), 0);
-    assert.equal(await prisma.gig.count(), gigsBefore);
+    assert.equal(await prisma.gig.count({ where: { deliveryJobKind: { not: "SOURCE_AND_DELIVER" } } }), nonSourceBefore);
     assert.equal(await prisma.seller.count(), sellersBefore);
     console.log("catalog request path c1 ok");
   } finally {
@@ -222,6 +229,16 @@ async function main() {
       : [];
     const customerIds = customers.map((row) => row.id);
     if (customerIds.length) {
+      const owned = await prisma.commerceCheckout.findMany({
+        where: { commerceCustomerId: { in: customerIds } },
+        select: { id: true }
+      });
+      await prisma.commerceCheckout.updateMany({
+        where: { commerceCustomerId: { in: customerIds } },
+        data: { linkedDeliveryGigId: null }
+      });
+      const sourceKeys = owned.map((row) => `source-checkout-${row.id}`);
+      if (sourceKeys.length) await prisma.gig.deleteMany({ where: { idempotencyKey: { in: sourceKeys } } });
       await prisma.commercePaymentAttempt.deleteMany({ where: { commerceOrder: { commerceCustomerId: { in: customerIds } } } });
       await prisma.commerceOrder.deleteMany({ where: { commerceCustomerId: { in: customerIds } } });
       await prisma.commerceCheckout.deleteMany({ where: { commerceCustomerId: { in: customerIds } } });

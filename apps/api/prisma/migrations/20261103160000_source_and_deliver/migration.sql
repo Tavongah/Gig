@@ -1,0 +1,5 @@
+-- CreateEnum
+CREATE TYPE "DeliveryJobKind" AS ENUM ('PICKUP_AND_DELIVER', 'SOURCE_AND_DELIVER');
+
+-- AlterTable
+ALTER TABLE "Gig" ADD COLUMN "deliveryJobKind" "DeliveryJobKind" NOT NULL DEFAULT 'PICKUP_AND_DELIVER';

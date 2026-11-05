@@ -588,6 +588,10 @@ export async function verifyPickupPin(
   io?: Server
 ) {
   const { gig, assignment } = await loadAssignedDelivery(gigId, courierUserId);
+  if (gig.deliveryJobKind === "SOURCE_AND_DELIVER") {
+    const { assertSourceMayLeaveForDelivery } = await import("../commerce/source-price.service.js");
+    await assertSourceMayLeaveForDelivery(gigId);
+  }
   if (gig.status !== GigStatus.WORKER_ARRIVED) {
     throw new AppError(
       "Pickup verification is only allowed after arriving at pickup.",
@@ -1153,6 +1157,50 @@ function isCommercePostPickup(status: GigStatus, checkoutCollected?: boolean): b
   return Boolean(checkoutCollected);
 }
 
+export async function markSourceOutForDelivery(gigId: string, courierUserId: string, io?: Server) {
+  const { gig } = await loadAssignedDelivery(gigId, courierUserId);
+  if (gig.deliveryJobKind !== "SOURCE_AND_DELIVER") {
+    throw new AppError("This action is only for a sourcing delivery.", 409, "NOT_SOURCE_DELIVERY");
+  }
+  if (
+    gig.status === GigStatus.PACKAGE_COLLECTED ||
+    gig.status === GigStatus.EN_ROUTE_TO_DROPOFF ||
+    gig.status === GigStatus.ARRIVED_AT_DROPOFF
+  ) {
+    return { status: gig.status };
+  }
+  const { assertSourceMayLeaveForDelivery } = await import("../commerce/source-price.service.js");
+  await assertSourceMayLeaveForDelivery(gigId);
+  if (
+    gig.status !== GigStatus.WORKER_ASSIGNED &&
+    gig.status !== GigStatus.WORKER_EN_ROUTE &&
+    gig.status !== GigStatus.WORKER_ARRIVED
+  ) {
+    throw new AppError("Accept the sourcing job before delivery.", 409, "INVALID_STATUS_TRANSITION");
+  }
+  await prisma.gig.update({
+    where: { id: gigId, assignedWorkerId: courierUserId },
+    data: { status: GigStatus.PACKAGE_COLLECTED, pickupVerifiedAt: new Date() }
+  });
+  const { syncCommerceOrderFromGig } = await import("../commerce/order.service.js");
+  await syncCommerceOrderFromGig(gigId, GigStatus.PACKAGE_COLLECTED);
+  if (io) {
+    notifyUser(io, gig.clientId, {
+      type: "PACKAGE_COLLECTED",
+      title: "Delivery update",
+      body: "Your order is out for delivery.",
+      gigId
+    });
+  }
+  logDutsFlow("PACKAGE_COLLECTED", {
+    gigId,
+    userId: courierUserId,
+    userRole: "WORKER",
+    fulfillmentType: "DELIVERY"
+  });
+  return { status: GigStatus.PACKAGE_COLLECTED };
+}
+
 export async function setCustomerDeliveryEstimate(
   gigId: string,
   courierUserId: string,
@@ -1184,12 +1232,27 @@ export async function setCustomerDeliveryEstimate(
   if (!same) {
     const { formatCustomerDeliveryEstimateMessage } = await import("@gigflow/shared");
     const { notifyCustomerStatus } = await import("../whatsapp/merchant-handler.js");
-    const orders = await prisma.commerceOrder.findMany({
-      where: { OR: [{ linkedDeliveryGigId: gigId }, { checkout: { linkedDeliveryGigId: gigId } }] },
-      select: { customerWhatsAppPhone: true }
-    });
+    const [orders, checkouts] = await Promise.all([
+      prisma.commerceOrder.findMany({
+        where: { OR: [{ linkedDeliveryGigId: gigId }, { checkout: { linkedDeliveryGigId: gigId } }] },
+        select: { customerWhatsAppPhone: true }
+      }),
+      prisma.commerceCheckout.findMany({
+        where: { linkedDeliveryGigId: gigId },
+        select: {
+          customerWhatsAppPhone: true,
+          commerceCustomer: { select: { whatsappPhone: true } }
+        }
+      })
+    ]);
     const phones = [
-      ...new Set(orders.map((order) => order.customerWhatsAppPhone).filter((phone): phone is string => Boolean(phone)))
+      ...new Set(
+        [
+          ...orders.map((order) => order.customerWhatsAppPhone),
+          ...checkouts.map((checkout) => checkout.customerWhatsAppPhone),
+          ...checkouts.map((checkout) => checkout.commerceCustomer?.whatsappPhone)
+        ].filter((phone): phone is string => Boolean(phone))
+      )
     ];
     const body = formatCustomerDeliveryEstimateMessage({ start, end }, changed);
     for (const phone of phones) {
@@ -1375,6 +1438,11 @@ export async function releaseCommerceDelivery(
       });
     }
   });
+
+  if (gig.deliveryJobKind === "SOURCE_AND_DELIVER" && checkout && checkout.status !== "CUSTOMER_APPROVED") {
+    const { invalidateCourierSourceProposal } = await import("../commerce/source-price.service.js");
+    await invalidateCourierSourceProposal(checkout.id, courierUserId);
+  }
 
   logDutsFlow("COURIER_RELEASED", {
     gigId,

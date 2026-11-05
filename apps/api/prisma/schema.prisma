@@ -45,6 +45,26 @@ enum FulfillmentType {
   DELIVERY
 }
 
+/** How a delivery is fulfilled. Shop orders stay pickup; unresolved requests are sourced by the courier. */
+enum DeliveryJobKind {
+  PICKUP_AND_DELIVER
+  SOURCE_AND_DELIVER
+}
+
+/** One checkout is fulfilled by a shop or by a sourcing courier, never both. */
+enum CheckoutFulfillmentOwner {
+  SHOP
+  COURIER_SOURCE
+}
+
+enum SourcePriceProposalStatus {
+  PROPOSED
+  REJECTED
+  CONFIRMED
+  SUPERSEDED
+  INVALIDATED
+}
+
 enum OrderSource {
   APP
   WEB
@@ -333,6 +353,8 @@ model Gig {
   description           String
   status                GigStatus         @default(POSTED)
   fulfillmentType       FulfillmentType   @default(LOCAL_HELP)
+  /** Shop pickup versus courier sourcing. Existing rows stay PICKUP_AND_DELIVER. */
+  deliveryJobKind       DeliveryJobKind   @default(PICKUP_AND_DELIVER)
   orderSource           OrderSource       @default(APP)
   paymentStatus         PaymentLifecycle  @default(PAYMENT_PENDING)
   pricingType           PricingType       @default(HOURLY)
@@ -1335,6 +1357,8 @@ model CommerceCheckout {
   quoteExpiresAt         DateTime?
   /** Set when the customer accepts the current approvalId and quoteVersion. */
   approvedAt             DateTime?
+  /** Shop quote versus an accepted sourcing courier. Null until one path claims the checkout. */
+  fulfillmentOwner       CheckoutFulfillmentOwner?
   /** Validation rows are never price-resolved. */
   validationFixture      Boolean                 @default(false)
   confirmedAt            DateTime?
@@ -1346,11 +1370,31 @@ model CommerceCheckout {
   lines                  CommerceCheckoutLine[]
   pickupStops            CommerceCheckoutPickupStop[]
   paymentAttempts        CommercePaymentAttempt[]
+  sourcePriceProposals   SourcePriceProposal[]
 
   @@index([customerId, status])
   @@index([commerceCustomerId, status])
   @@index([status])
   @@index([validationFixture, status])
+}
+
+/**
+ * One courier merchandise total for a sourcing job.
+ * The row is a proposal until the customer confirms that exact amount.
+ */
+model SourcePriceProposal {
+  id                String                     @id @default(uuid())
+  checkoutId        String
+  checkout          CommerceCheckout           @relation(fields: [checkoutId], references: [id], onDelete: Cascade)
+  gigId             String
+  workerId          String
+  merchandiseCents  Int
+  status            SourcePriceProposalStatus  @default(PROPOSED)
+  createdAt         DateTime                   @default(now())
+  resolvedAt        DateTime?
+
+  @@index([checkoutId, status])
+  @@index([gigId])
 }
 
 /**

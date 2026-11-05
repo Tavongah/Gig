@@ -288,7 +288,8 @@ export async function proposeMerchantPriceForCheckout(checkoutId: string): Promi
   });
   if (!selected) return present(row, "NOT_PRICED", "NO_FULL_MERCHANT");
 
-  return prisma.$transaction(async (tx) => {
+  try {
+    return await prisma.$transaction(async (tx) => {
     const current = await tx.commerceCheckout.findFirst({
       where: { id: checkoutId, validationFixture: false },
       include: { lines: true }
@@ -297,6 +298,20 @@ export async function proposeMerchantPriceForCheckout(checkoutId: string): Promi
     if (current.status === CommerceCheckoutStatus.PRICE_PROPOSED) return inspectProposal(current);
     if (current.status !== CommerceCheckoutStatus.AWAITING_FULFILLMENT) {
       return present(current, "NOT_PRICED", "NOT_AWAITING");
+    }
+    if (current.linkedDeliveryGigId) {
+      const linkedGig = await tx.gig.findUnique({ where: { id: current.linkedDeliveryGigId } });
+      if (linkedGig?.deliveryJobKind === "SOURCE_AND_DELIVER") {
+        const priorAcceptance = await tx.gigAssignment.count({ where: { gigId: linkedGig.id } });
+        const priorRelease = await tx.courierDeliveryRelease.count({ where: { gigId: linkedGig.id } });
+        if (
+          linkedGig.assignedWorkerId ||
+          priorAcceptance > 0 ||
+          priorRelease > 0
+        ) {
+          return present(current, "NOT_PRICED", "SOURCE_FULFILLMENT_OWNED");
+        }
+      }
     }
 
     const fresh = await tx.product.findMany({
@@ -353,14 +368,29 @@ export async function proposeMerchantPriceForCheckout(checkoutId: string): Promi
         }
       });
     }
+    const { retireUnassignedSourceGig } = await import("./source-delivery.service.js");
+    if (current.linkedDeliveryGigId) {
+      const linkedGig = await tx.gig.findUnique({ where: { id: current.linkedDeliveryGigId } });
+      if (linkedGig?.deliveryJobKind === "SOURCE_AND_DELIVER") {
+        const priorAcceptance = await tx.gigAssignment.count({ where: { gigId: linkedGig.id } });
+        const priorRelease = await tx.courierDeliveryRelease.count({ where: { gigId: linkedGig.id } });
+        if (linkedGig.assignedWorkerId || priorAcceptance > 0 || priorRelease > 0) {
+          throw new Error("SOURCE_FULFILLMENT_OWNED");
+        }
+        const retired = await retireUnassignedSourceGig(tx, checkoutId);
+        if (!retired) throw new Error("SOURCE_FULFILLMENT_OWNED");
+      }
+    }
     const written = await tx.commerceCheckout.updateMany({
       where: {
         id: checkoutId,
         status: CommerceCheckoutStatus.AWAITING_FULFILLMENT,
-        validationFixture: false
+        validationFixture: false,
+        OR: [{ fulfillmentOwner: null }, { fulfillmentOwner: "COURIER_SOURCE" }]
       },
       data: {
         status: CommerceCheckoutStatus.PRICE_PROPOSED,
+        fulfillmentOwner: "SHOP",
         itemsSubtotalCents,
         totalCents: itemsSubtotalCents + current.deliveryFeeCents,
         quoteVersion,
@@ -376,5 +406,11 @@ export async function proposeMerchantPriceForCheckout(checkoutId: string): Promi
       include: { lines: true }
     });
     return present(saved, "PROPOSED");
-  });
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "SOURCE_FULFILLMENT_OWNED") {
+      return present(row, "NOT_PRICED", "SOURCE_FULFILLMENT_OWNED");
+    }
+    throw error;
+  }
 }

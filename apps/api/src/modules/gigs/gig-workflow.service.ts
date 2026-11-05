@@ -95,6 +95,14 @@ export async function expressWorkerInterest(
   }
 
   const isDelivery = gig.fulfillmentType === "DELIVERY";
+  if (gig.deliveryJobKind === "SOURCE_AND_DELIVER") {
+    const { isSourceDeliveryPilotCourier } = await import("../commerce/source-delivery-pilot.js");
+    if (!isSourceDeliveryPilotCourier(worker)) {
+      throw new AppError("This delivery is no longer available.", 409, "GIG_NOT_AVAILABLE", {
+        gig: "This gig is no longer available."
+      });
+    }
+  }
   const workerLat = Number(worker.workerProfile?.currentLatitude);
   const workerLng = Number(worker.workerProfile?.currentLongitude);
   const travelRadiusMiles = Number(worker.workerProfile?.travelDistanceMiles ?? 10);
@@ -204,7 +212,14 @@ export async function expressWorkerInterest(
     // Marketplace WhatsApp orders: customer is not in the app — auto-assign first interested courier.
     // Concurrency: only one winner via conditional update on assignedWorkerId.
     const commerce = await prisma.commerceOrder.findFirst({ where: { linkedDeliveryGigId: gigId } });
-    if (commerce) {
+    const sourceCheckout =
+      gig.deliveryJobKind === "SOURCE_AND_DELIVER"
+        ? await prisma.commerceCheckout.findFirst({
+            where: { linkedDeliveryGigId: gigId },
+            select: { id: true }
+          })
+        : null;
+    if (commerce || sourceCheckout) {
       const claimed = await prisma.gig.updateMany({
         where: {
           id: gigId,
@@ -222,18 +237,41 @@ export async function expressWorkerInterest(
           gig: "This gig is no longer available."
         });
       }
+      if (sourceCheckout) {
+        const shopOrders = await prisma.commerceOrder.count({ where: { checkoutId: sourceCheckout.id } });
+        const owned = shopOrders
+          ? { count: 0 }
+          : await prisma.commerceCheckout.updateMany({
+              where: {
+                id: sourceCheckout.id,
+                OR: [{ fulfillmentOwner: null }, { fulfillmentOwner: "COURIER_SOURCE" }]
+              },
+              data: { fulfillmentOwner: "COURIER_SOURCE" }
+            });
+        if (owned.count !== 1) {
+          await prisma.gig.updateMany({
+            where: { id: gigId, assignedWorkerId: workerId },
+            data: { assignedWorkerId: null, status: GigStatus.CANCELLED, cancelledAt: new Date() }
+          });
+          throw new AppError("This delivery is no longer available.", 409, "GIG_NOT_AVAILABLE", {
+            gig: "This gig is no longer available."
+          });
+        }
+      }
       await selectWorkerForGig(gigId, gig.clientId, workerId, io);
       await activateGigAfterWorkerPayment(gigId, io ?? undefined);
-      await prisma.commerceOrder.update({
-        where: { id: commerce.id },
-        data: { status: CommerceOrderStatus.COURIER_ASSIGNED }
-      });
+      if (commerce) {
+        await prisma.commerceOrder.update({
+          where: { id: commerce.id },
+          data: { status: CommerceOrderStatus.COURIER_ASSIGNED }
+        });
+      }
       logDutsFlow("COURIER_ASSIGNED", {
         gigId,
         userId: workerId,
         userRole: "WORKER",
         fulfillmentType: "DELIVERY",
-        orderId: commerce.id
+        orderId: commerce?.id
       });
     }
   }
@@ -433,20 +471,25 @@ export async function selectWorkerForGig(gigId: string, clientId: string, worker
 
   if (io) {
     const isDelivery = gig.fulfillmentType === "DELIVERY";
+    const sourcing = gig.deliveryJobKind === "SOURCE_AND_DELIVER";
     const { isCommerceLinkedGig } = await import("../commerce/commerce-gig.js");
-    const commerceDelivery = isDelivery && (await isCommerceLinkedGig(gigId));
+    const commerceDelivery = isDelivery && !sourcing && (await isCommerceLinkedGig(gigId));
     notifyUser(io, workerId, {
       type: "WORKER_SELECTED",
-      title: commerceDelivery
-        ? "Delivery accepted"
-        : isDelivery
-          ? "Delivery assigned"
-          : "You have been selected for this gig.",
-      body: commerceDelivery
-        ? "Head to the shop when you're ready."
-        : isDelivery
-          ? "Open the delivery to continue."
-          : `The customer selected you for "${gig.title}". Complete payment to start.`,
+      title: sourcing
+        ? "Source & deliver accepted"
+        : commerceDelivery
+          ? "Delivery accepted"
+          : isDelivery
+            ? "Delivery assigned"
+            : "You have been selected for this gig.",
+      body: sourcing
+        ? "You source these products. They are not waiting at a shop. Merchandise price is not confirmed."
+        : commerceDelivery
+          ? "Head to the shop when you're ready."
+          : isDelivery
+            ? "Open the delivery to continue."
+            : `The customer selected you for "${gig.title}". Complete payment to start.`,
       gigId
     });
     io.to(`user:${workerId}`).emit("worker_selected", {

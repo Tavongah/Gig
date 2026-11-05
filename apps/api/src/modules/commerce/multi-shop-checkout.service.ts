@@ -596,7 +596,15 @@ export async function findCheckoutForGig(gigId: string) {
           commerceCustomer: true
         }
       },
-      pickupStops: { orderBy: { sequence: "asc" } }
+      pickupStops: { orderBy: { sequence: "asc" } },
+      lines: {
+        select: {
+          productNameSnapshot: true,
+          quantity: true,
+          unitPriceCents: true,
+          catalogProductId: true
+        }
+      }
     }
   });
 }
