@@ -18,6 +18,7 @@ export function CommerceOrderDetailScreen({ route }: Props) {
   });
   const [payerPhone, setPayerPhone] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deliveryCode, setDeliveryCode] = useState<string | null>(null);
 
   if (query.isLoading || !query.data) {
     return (
@@ -47,6 +48,9 @@ export function CommerceOrderDetailScreen({ route }: Props) {
             ))}
             {quote ? (
               <>
+                {payload.sourceDelivery && payload.priceProposed ? (
+                  <Text className="text-base text-ink">Items — ${((payload.itemsSubtotalCents ?? 0) / 100).toFixed(2)}</Text>
+                ) : null}
                 <Text className="text-base text-ink">Delivery — ${((payload.deliveryFeeCents ?? 0) / 100).toFixed(2)}</Text>
                 <Text className="text-lg font-black text-ink">Total — ${((payload.totalCents ?? 0) / 100).toFixed(2)}</Text>
               </>
@@ -74,7 +78,30 @@ export function CommerceOrderDetailScreen({ route }: Props) {
             <Text className="text-center text-base font-bold text-white">Confirm this total</Text>
           </Pressable>
         ) : null}
-        {payload.customerApproved && payload.approvalId && payload.quoteVersion ? (
+        {payload.sourceDelivery && payload.customerApproved && payload.gigId ? (
+          <View className="mt-6 gap-3">
+            <Text className="text-base text-ink">Cash is collected on delivery.</Text>
+            <Pressable
+              className="rounded-2xl bg-brand px-4 py-3"
+              disabled={busy}
+              onPress={async () => {
+                setBusy(true);
+                try {
+                  const result = await api.regenerateDeliveryPins(payload.gigId!, token);
+                  setDeliveryCode(result.secrets.deliveryPin);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Text className="text-center text-base font-bold text-white">Show delivery code</Text>
+            </Pressable>
+            {deliveryCode ? (
+              <Text className="text-center text-4xl font-black tracking-[8px] text-ink">{deliveryCode}</Text>
+            ) : null}
+          </View>
+        ) : null}
+        {payload.customerApproved && payload.approvalId && payload.quoteVersion && !payload.sourceDelivery ? (
           <View className="mt-6 gap-3">
             <Pressable
               className="rounded-2xl bg-brand px-4 py-3"

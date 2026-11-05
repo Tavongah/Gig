@@ -68,6 +68,11 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
     else navigation.navigate("MainTabs", { screen: "Account" });
   }
 
+  function openOrders() {
+    if (browse.isGuest) navigation.navigate("MainTabs", { screen: "SignIn" });
+    else navigation.navigate("MainTabs", { screen: "Orders" });
+  }
+
   function openCart() {
     navigation.navigate("MainTabs", { screen: "Cart" });
   }
@@ -199,6 +204,13 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
               </Pressable>
               <View className="min-w-0 flex-1">{searchField}</View>
               {areaControl}
+              {browse.isGuest ? null : (
+                <Pressable onPress={openOrders} accessibilityRole="button" accessibilityLabel="Orders">
+                  <Text className="text-sm font-bold" style={{ color: DUTS.purple }}>
+                    Orders
+                  </Text>
+                </Pressable>
+              )}
               <Pressable onPress={openAccount} accessibilityRole="button" accessibilityLabel={browse.isGuest ? "Sign in" : "Account"}>
                 <Text className="text-sm font-bold" style={{ color: DUTS.purple }}>
                   {browse.isGuest ? "Sign in" : "Account"}

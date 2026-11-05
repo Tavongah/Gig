@@ -902,6 +902,13 @@ export const api = {
   reportSourceProductsNotFound: (gigId: string, token: string) =>
     request<{ success?: boolean }>(`/gigs/${gigId}/delivery/source-not-found`, { method: "POST" }, token),
 
+  markSourceOutForDelivery: (gigId: string, token: string) =>
+    request<{ success?: boolean; status: string }>(
+      `/gigs/${gigId}/delivery/source-out-for-delivery`,
+      { method: "POST" },
+      token
+    ),
+
   setDeliveryEstimate: (
     gigId: string,
     token: string,
@@ -1399,9 +1406,12 @@ export const api = {
       message?: string;
       priceProposed?: boolean;
       customerApproved?: boolean;
+      sourceDelivery?: boolean;
+      gigId?: string | null;
       approvalId?: string | null;
       quoteVersion?: number;
       deliveryFeeCents?: number;
+      itemsSubtotalCents?: number;
       totalCents?: number;
       lines?: Array<{ name: string; quantity: number; lineTotalCents: number | null }>;
       order: {

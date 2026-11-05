@@ -151,6 +151,12 @@ export function DeliveryJobScreen() {
       const gigId = route.params.gigId;
       const token = session.token;
 
+      if (
+        gig.sourceDelivery?.jobKind === "SOURCE_AND_DELIVER" &&
+        (gig.status === "WORKER_ASSIGNED" || gig.status === "WORKER_EN_ROUTE" || gig.status === "WORKER_ARRIVED")
+      ) {
+        return api.markSourceOutForDelivery(gigId, token);
+      }
       if (action.kind === "arrive_pickup") {
         if (action.ensurePickupTravel || gig.status === "WORKER_ASSIGNED") {
           await api.startTravelToPickup(gigId, token);
@@ -393,8 +399,12 @@ export function DeliveryJobScreen() {
     gig.dropoffFormattedAddress ||
     (gig.dropoffCity ? `${gig.dropoffCity}${gig.dropoffRegion ? `, ${gig.dropoffRegion}` : ""}` : "Drop-off");
 
+  const sourceLeaving =
+    Boolean(sourceDelivery) &&
+    (gig.status === "WORKER_ASSIGNED" || gig.status === "WORKER_EN_ROUTE" || gig.status === "WORKER_ARRIVED");
   const needsPin =
     activeRole === "WORKER" &&
+    !sourceLeaving &&
     (action?.kind === "verify_pickup" || action?.kind === "verify_delivery") &&
     !pinLocked &&
     !(action?.kind === "verify_pickup" && assistedConfirmNeeded);
@@ -833,7 +843,7 @@ export function DeliveryJobScreen() {
         !isDeliveryCompleteUi(gig.status) &&
         !(action.kind === "verify_pickup" && assistedConfirmNeeded) ? (
           <LoadingButton
-            label={action.label}
+            label={sourceLeaving ? "Out for delivery" : action.label}
             loading={actionMutation.isPending}
             loadingLabel={"requiresGps" in action && action.requiresGps ? "Confirming location…" : "Updating…"}
             onPress={() => {

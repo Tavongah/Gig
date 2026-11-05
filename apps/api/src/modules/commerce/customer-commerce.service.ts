@@ -1270,18 +1270,33 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
         checkout.quoteExpiresAt != null &&
         checkout.quoteExpiresAt.getTime() <= Date.now();
       const proposed = checkout.status === "PRICE_PROPOSED" || checkout.status === "CUSTOMER_APPROVED";
+      const sourceOwned = checkout.fulfillmentOwner === "COURIER_SOURCE";
+      const openProposal =
+        sourceOwned && checkout.status === "PRICE_PROPOSED" && checkout.approvalId
+          ? await prisma.sourcePriceProposal.findFirst({
+              where: { id: checkout.approvalId, checkoutId: checkout.id, status: "PROPOSED" }
+            })
+          : null;
+      const displayItems = openProposal ? openProposal.merchandiseCents : proposed ? checkout.itemsSubtotalCents : 0;
+      const displayTotal = openProposal
+        ? openProposal.merchandiseCents + checkout.deliveryFeeCents + checkout.serviceFeeCents
+        : proposed
+          ? checkout.totalCents
+          : 0;
       return {
         acceptedRequest: checkout.status === "AWAITING_FULFILLMENT",
         priceProposed: checkout.status === "PRICE_PROPOSED",
         customerApproved: checkout.status === "CUSTOMER_APPROVED",
+        sourceDelivery: sourceOwned,
+        gigId: checkout.linkedDeliveryGigId,
         payable: false as const,
         expired,
         approvalId: proposed ? checkout.approvalId : null,
         quoteVersion: proposed ? checkout.quoteVersion : 0,
         quoteExpiresAt: proposed ? checkout.quoteExpiresAt?.toISOString() ?? null : null,
-        itemsSubtotalCents: proposed ? checkout.itemsSubtotalCents : 0,
+        itemsSubtotalCents: displayItems,
         deliveryFeeCents: checkout.deliveryFeeCents,
-        totalCents: proposed ? checkout.totalCents : 0,
+        totalCents: displayTotal,
         lines:
           checkout.status === "AWAITING_FULFILLMENT"
             ? checkout.lines.map((line) => ({
@@ -1294,17 +1309,19 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
               ? checkout.lines.map((line) => ({
                   name: line.productNameSnapshot,
                   quantity: line.quantity,
-                  unitPriceCents: line.unitPriceCents,
-                  lineTotalCents: (line.unitPriceCents ?? 0) * line.quantity
+                  unitPriceCents: sourceOwned ? null : line.unitPriceCents,
+                  lineTotalCents: sourceOwned ? null : (line.unitPriceCents ?? 0) * line.quantity
                 }))
               : [],
         order: null,
         message:
-          checkout.status === "CUSTOMER_APPROVED"
-            ? "Total confirmed. Choose cash on delivery or EcoCash to continue."
-            : checkout.status === "PRICE_PROPOSED"
-              ? "Confirm this total?"
-              : formatUnresolvedRequestAccepted()
+          sourceOwned && checkout.status === "CUSTOMER_APPROVED"
+            ? "Total confirmed. Cash is collected on delivery."
+            : checkout.status === "CUSTOMER_APPROVED"
+              ? "Total confirmed. Choose cash on delivery or EcoCash to continue."
+              : checkout.status === "PRICE_PROPOSED"
+                ? "Confirm this total?"
+                : formatUnresolvedRequestAccepted()
       };
     }
     const view = presentCustomerCheckout(checkout);
