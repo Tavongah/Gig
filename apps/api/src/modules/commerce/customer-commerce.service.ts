@@ -1161,6 +1161,7 @@ export async function listCustomerCommerceOrders(userId: string) {
     if (c.status === "AWAITING_FULFILLMENT" || c.status === "PRICE_PROPOSED" || c.status === "CUSTOMER_APPROVED") {
       const awaiting = c.status === "AWAITING_FULFILLMENT";
       const sourceOwned = c.fulfillmentOwner === "COURIER_SOURCE";
+      const sourceCancelled = sourceOwned && c.linkedDeliveryGig?.status === "CANCELLED";
       const sourceConfirmed = sourceOwned && c.status === "CUSTOMER_APPROVED";
       const proposal = c.sourcePriceProposals[0];
       return {
@@ -1189,8 +1190,9 @@ export async function listCustomerCommerceOrders(userId: string) {
                       }
                     })
                   : "Checking availability",
-        fulfillmentHint:
-          sourceOwned && proposal
+        fulfillmentHint: sourceCancelled
+          ? "Your order was cancelled."
+          : sourceOwned && proposal
             ? formatSourcePriceConfirmation({
                 merchandiseCents: proposal.merchandiseCents,
                 deliveryFeeCents: c.deliveryFeeCents,
@@ -1271,6 +1273,27 @@ export async function getCustomerCommerceOrder(userId: string, orderId: string) 
         checkout.quoteExpiresAt.getTime() <= Date.now();
       const proposed = checkout.status === "PRICE_PROPOSED" || checkout.status === "CUSTOMER_APPROVED";
       const sourceOwned = checkout.fulfillmentOwner === "COURIER_SOURCE";
+      if (sourceOwned && checkout.linkedDeliveryGig?.status === "CANCELLED") {
+        return {
+          acceptedRequest: false,
+          priceProposed: false,
+          customerApproved: false,
+          sourceDelivery: true,
+          gigId: checkout.linkedDeliveryGigId,
+          payable: false as const,
+          expired: false,
+          message: "Your order was cancelled.",
+          itemsSubtotalCents: checkout.itemsSubtotalCents,
+          deliveryFeeCents: checkout.deliveryFeeCents,
+          totalCents: checkout.totalCents,
+          lines: checkout.lines.map((line) => ({
+            name: line.productNameSnapshot,
+            quantity: line.quantity,
+            unitPriceCents: line.unitPriceCents,
+            lineTotalCents: line.unitPriceCents == null ? null : line.unitPriceCents * line.quantity
+          }))
+        };
+      }
       const openProposal =
         sourceOwned && checkout.status === "PRICE_PROPOSED" && checkout.approvalId
           ? await prisma.sourcePriceProposal.findFirst({

@@ -385,7 +385,8 @@ export async function acceptUnresolvedCatalogRequest(input: {
 const NON_PAYABLE_CHECKOUT_STATUSES = new Set<string>([
   CommerceCheckoutStatus.AWAITING_FULFILLMENT,
   CommerceCheckoutStatus.PRICE_PROPOSED,
-  CommerceCheckoutStatus.CUSTOMER_APPROVED
+  CommerceCheckoutStatus.CUSTOMER_APPROVED,
+  CommerceCheckoutStatus.CANCELLED
 ]);
 
 /** Unpriced demand and an unapproved merchant quote cannot be charged. */

@@ -384,3 +384,47 @@ export async function retireUnassignedSourceGig(
   });
   return true;
 }
+
+/**
+ * A cancelled sourcing gig closes its linked checkout.
+ * Shop-owned checkouts and collected pickups stay on their existing paths.
+ * Payment method and payment status are left unchanged, and no payment row is created.
+ */
+export async function cancelLinkedSourceCheckout(tx: Prisma.TransactionClient, gigId: string): Promise<void> {
+  const gig = await tx.gig.findUnique({
+    where: { id: gigId },
+    select: { deliveryJobKind: true }
+  });
+  if (gig?.deliveryJobKind !== DeliveryJobKind.SOURCE_AND_DELIVER) return;
+
+  const checkout = await tx.commerceCheckout.findFirst({
+    where: { linkedDeliveryGigId: gigId },
+    include: { pickupStops: true, orders: { select: { id: true } } }
+  });
+  if (!checkout || checkout.fulfillmentOwner === "SHOP") return;
+  if (
+    checkout.status === CommerceCheckoutStatus.CANCELLED ||
+    checkout.status === CommerceCheckoutStatus.DELIVERED
+  ) {
+    return;
+  }
+
+  const collected = checkout.pickupStops.some((stop) => stop.status === "COLLECTED" || stop.collectedAt != null);
+  if (collected) {
+    await tx.commerceCheckout.update({
+      where: { id: checkout.id },
+      data: { status: CommerceCheckoutStatus.NEEDS_ATTENTION }
+    });
+    return;
+  }
+  if (checkout.orders.length > 0) return;
+
+  await tx.commerceCheckout.updateMany({
+    where: {
+      id: checkout.id,
+      linkedDeliveryGigId: gigId,
+      status: { notIn: [CommerceCheckoutStatus.CANCELLED, CommerceCheckoutStatus.DELIVERED] }
+    },
+    data: { status: CommerceCheckoutStatus.CANCELLED, cancelledAt: new Date() }
+  });
+}

@@ -500,14 +500,17 @@ export function presentCustomerCheckout(checkout: {
     id: checkout.id,
     orderNumber: checkout.checkoutNumber,
     status: checkout.status,
-    statusLabel: needsAttention
-      ? "Needs attention"
-      : shopCount > 1
-        ? customerMultiShopStatusLabel(checkout.status, gigStatus, hasCourier, pickupProgress, {
-            start: checkout.linkedDeliveryGig?.customerDeliveryEstimateStart,
-            end: checkout.linkedDeliveryGig?.customerDeliveryEstimateEnd
-          })
-        : undefined,
+    statusLabel:
+      checkout.status === "CANCELLED"
+        ? "Cancelled"
+        : needsAttention
+          ? "Needs attention"
+          : shopCount > 1
+            ? customerMultiShopStatusLabel(checkout.status, gigStatus, hasCourier, pickupProgress, {
+                start: checkout.linkedDeliveryGig?.customerDeliveryEstimateStart,
+                end: checkout.linkedDeliveryGig?.customerDeliveryEstimateEnd
+              })
+            : undefined,
     fulfillmentHint: needsAttention
       ? "There's a problem fulfilling your order. DUTS is checking it now."
       : null,

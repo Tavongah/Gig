@@ -424,6 +424,15 @@ export async function settleSourcePaymentChoice(input: {
   if (row.status !== CommerceCheckoutStatus.CUSTOMER_APPROVED) {
     throw new AppError("Confirm the total before choosing payment.", 409, "QUOTE_NOT_APPROVED");
   }
+  if (row.linkedDeliveryGigId) {
+    const gig = await prisma.gig.findUnique({
+      where: { id: row.linkedDeliveryGigId },
+      select: { status: true, deliveryJobKind: true }
+    });
+    if (gig?.deliveryJobKind === DeliveryJobKind.SOURCE_AND_DELIVER && gig.status === GigStatus.CANCELLED) {
+      throw new AppError("This order was cancelled.", 409, "SOURCE_DELIVERY_CANCELLED");
+    }
+  }
   const orders = await prisma.commerceOrder.count({ where: { checkoutId: row.id } });
   if (orders > 0) throw new AppError("A shop is already fulfilling this request.", 409, "SHOP_FULFILLMENT_OWNED");
   if (input.paymentMethod !== "CASH" || row.paymentMethod !== CommercePaymentMethod.CASH) {

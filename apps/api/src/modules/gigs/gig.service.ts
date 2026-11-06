@@ -948,7 +948,8 @@ export async function updateGigStatus(
 
 
 
-  const updatedGig = await prisma.gig.update({
+  const updatedGig = await prisma.$transaction(async (tx) => {
+    const updated = await tx.gig.update({
 
     where: { id: gigId },
 
@@ -1004,6 +1005,12 @@ export async function updateGigStatus(
 
     }
 
+  });
+    if (nextStatus === GigStatus.CANCELLED) {
+      const { cancelLinkedSourceCheckout } = await import("../commerce/source-delivery.service.js");
+      await cancelLinkedSourceCheckout(tx, gigId);
+    }
+    return updated;
   });
 
 

@@ -162,7 +162,9 @@ export function CommerceOrderDetailScreen({ route }: Props) {
     <ScrollView className="flex-1 bg-background px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>
       <Text className="text-2xl font-black text-ink">YOUR DUTS ORDER</Text>
       <Text className="mt-2 text-lg font-bold text-ink">{order.statusLabel}</Text>
-      <Text className="mt-2 text-base text-muted">DUTS is arranging your delivery.</Text>
+      <Text className="mt-2 text-base text-muted">
+        {order.status === "CANCELLED" ? "Your order was cancelled." : "DUTS is arranging your delivery."}
+      </Text>
       <Text className="mt-4 text-lg font-black text-ink">Order #{order.orderNumber}</Text>
       <Text className="mt-1 text-base font-bold text-ink">{order.statusLabel}</Text>
       {order.fulfillmentHint ? (
@@ -209,7 +211,7 @@ export function CommerceOrderDetailScreen({ route }: Props) {
           <Text className="mt-2 text-sm text-muted">Try EcoCash again from checkout, or choose cash on delivery on a new order.</Text>
         </View>
       ) : null}
-      {order.paymentStatus === "DUE_ON_DELIVERY" ? (
+      {order.status !== "CANCELLED" && order.paymentStatus === "DUE_ON_DELIVERY" ? (
         <Text className="mt-5 text-sm text-muted">Pay cash when your order arrives.</Text>
       ) : null}
     </ScrollView>

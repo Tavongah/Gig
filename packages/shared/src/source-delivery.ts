@@ -158,6 +158,7 @@ export function sourceRequestCustomerStatusLabel(input: {
   estimate?: CustomerDeliveryEstimate | null;
 }): string {
   const status = input.gigStatus ?? "";
+  if (status === "CANCELLED") return "Cancelled";
   if (status === "COMPLETED" || status === "DELIVERED") return "Delivered";
   if (OUT_FOR_DELIVERY.has(status)) return "Out for delivery";
   const estimateLabel = formatCustomerDeliveryEstimateLabel(input.estimate);
