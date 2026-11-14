@@ -49,6 +49,9 @@ import { CommerceCheckoutScreen } from "../screens/commerce/CommerceCheckoutScre
 import { GuestCheckoutChoiceScreen } from "../screens/commerce/GuestCheckoutChoiceScreen";
 import { BasketMatchScreen } from "../screens/commerce/BasketMatchScreen";
 import { CommerceOrderDetailScreen } from "../screens/commerce/CommerceOrderDetailScreen";
+import { ShopSouthAfricaScreen } from "../screens/commerce/ShopSouthAfricaScreen";
+import { CrossBorderPayScreen } from "../screens/commerce/CrossBorderPayScreen";
+import { CrossBorderTrackScreen } from "../screens/commerce/CrossBorderTrackScreen";
 import type { RootStackParamList } from "./types";
 import { useSessionStore } from "../stores/session.store";
 import { APP_NAME } from "../lib/brand";
@@ -132,6 +135,9 @@ export function AppNavigator() {
         component={CommerceOrderDetailScreen}
         options={{ title: "Order" }}
       />
+      <Stack.Screen name="ShopSouthAfrica" component={ShopSouthAfricaScreen} options={{ title: "Shop from South Africa" }} />
+      <Stack.Screen name="CrossBorderPay" component={CrossBorderPayScreen} options={{ title: "Quotation" }} />
+      <Stack.Screen name="CrossBorderTrack" component={CrossBorderTrackScreen} options={{ title: "Tracking" }} />
     </Stack.Navigator>
   );
 }

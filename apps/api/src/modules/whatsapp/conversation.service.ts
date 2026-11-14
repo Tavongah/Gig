@@ -165,6 +165,32 @@ export type ConversationContext = {
   quoteCheckoutId?: string;
   quoteApprovalId?: string;
   quoteVersion?: number;
+  /** Isolated South African shopping draft. Absent during local checkout. */
+  crossBorder?: {
+    active: true;
+    step: "LINK" | "QTY" | "SIZE" | "COLOR" | "MORE" | "CITY" | "ADDRESS" | "CONTACT" | "NAME" | "CONFIRM";
+    draftId: string;
+    items: Array<{
+      retailer: string;
+      productUrl: string;
+      productName: string;
+      quantity: number;
+      size: string | null;
+      color: string | null;
+      variantDetails: string | null;
+      notes: string | null;
+    }>;
+    pending: {
+      retailer?: string;
+      productUrl?: string;
+      productName?: string;
+      quantity?: number;
+      size?: string | null;
+      color?: string | null;
+      variantDetails?: string | null;
+      notes?: string | null;
+    } | null;
+  };
 };
 
 export async function getOrCreateConversation(

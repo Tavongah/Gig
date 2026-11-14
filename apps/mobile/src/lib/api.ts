@@ -1623,7 +1623,26 @@ export const api = {
       `/commerce/unlisted-requests/${id}/pay-ecocash`,
       { method: "POST", body: JSON.stringify({ payerPhone }) },
       token
-    )
+    ),
+
+  crossBorderStatus: () =>
+    request<{ enabled: boolean; cardPayments: boolean; ecocash: boolean }>("/cross-border/status"),
+
+  submitCrossBorderRequest: (payload: Record<string, unknown>) =>
+    request<{ reference: string; requestId: string; trackingToken: string | null; message: string }>(
+      "/cross-border/requests",
+      { method: "POST", body: JSON.stringify(payload) }
+    ),
+
+  crossBorderPayment: (token: string) => request<Record<string, unknown>>(`/cross-border/pay/${token}`),
+
+  payCrossBorderEcoCash: (token: string, payerPhone: string) =>
+    request<{ paymentId: string; status: string }>(`/cross-border/pay/${token}`, {
+      method: "POST",
+      body: JSON.stringify({ accept: true, method: "ECOCASH", payerPhone })
+    }),
+
+  crossBorderTracking: (token: string) => request<Record<string, unknown>>(`/cross-border/track/${token}`)
 };
 
 export type UnlistedItemRequestDto = {

@@ -12,6 +12,9 @@ import { ForgotPasswordScreen } from "../screens/auth/ForgotPasswordScreen";
 import { ResetPasswordScreen } from "../screens/auth/ResetPasswordScreen";
 import { PrivacyPolicyScreen } from "../screens/support/PrivacyPolicyScreen";
 import { TermsOfServiceScreen } from "../screens/support/TermsOfServiceScreen";
+import { ShopSouthAfricaScreen } from "../screens/commerce/ShopSouthAfricaScreen";
+import { CrossBorderPayScreen } from "../screens/commerce/CrossBorderPayScreen";
+import { CrossBorderTrackScreen } from "../screens/commerce/CrossBorderTrackScreen";
 import type { GuestStackParamList } from "./types";
 import { DUTS } from "../lib/theme";
 
@@ -44,6 +47,9 @@ export function GuestAppNavigator() {
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ title: "Choose new password" }} />
       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ title: "Privacy Policy" }} />
       <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ title: "Terms of Service" }} />
+      <Stack.Screen name="ShopSouthAfrica" component={ShopSouthAfricaScreen} options={{ title: "Shop from South Africa" }} />
+      <Stack.Screen name="CrossBorderPay" component={CrossBorderPayScreen} options={{ title: "Quotation" }} />
+      <Stack.Screen name="CrossBorderTrack" component={CrossBorderTrackScreen} options={{ title: "Tracking" }} />
     </Stack.Navigator>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CommercePilotPanel } from "./CommercePilotPanel";
 import { DutsCatalogPanel } from "./DutsCatalogPanel";
+import { CrossBorderPanel } from "./CrossBorderPanel";
 
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:4000/v1";
 const TOKEN_KEY = "gigflow_admin_token";
@@ -64,7 +65,7 @@ interface AdminGig {
   client?: { fullName: string };
 }
 
-type AdminTab = "overview" | "pending" | "users" | "gigs" | "commerce";
+type AdminTab = "overview" | "pending" | "users" | "gigs" | "commerce" | "cross-border";
 type CommerceSubTab = "merchants" | "orders" | "catalog" | "deliveries" | "unlisted";
 
 function getToken(): string | null {
@@ -517,6 +518,7 @@ export function App() {
               ["Pending couriers", "pending"],
               ["Users", "users"],
               ["Commerce", "commerce"],
+              ["Cross-Border Orders", "cross-border"],
               ["Local Help", "gigs"]
             ] as const
           ).map(([label, tab]) => (
@@ -711,6 +713,8 @@ export function App() {
             </table>
           </section>
         ) : null}
+
+        {activeTab === "cross-border" ? <CrossBorderPanel apiRequest={apiRequest} /> : null}
 
         {activeTab === "commerce" ? (
           <>

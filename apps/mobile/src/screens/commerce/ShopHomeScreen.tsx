@@ -21,6 +21,28 @@ import type { RootStackParamList } from "../../navigation/types";
 import { useShopAreaStore, timezoneAreaHint } from "../../stores/shop-area.store";
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 
+function CrossBorderHomeLink() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const status = useQuery({
+    queryKey: ["cross-border-status"],
+    queryFn: () => api.crossBorderStatus()
+  });
+  if (!status.data?.enabled) return null;
+  return (
+    <Pressable
+      onPress={() => navigation.navigate("ShopSouthAfrica")}
+      accessibilityRole="button"
+      accessibilityLabel="Shop from South Africa"
+      className="mt-4 rounded-2xl border border-border bg-card p-4"
+    >
+      <Text className="text-base font-extrabold text-ink">Shop from South Africa</Text>
+      <Text className="mt-1 text-sm text-muted">
+        Shop from SHEIN and your favorite South African stores. Send us your product links, get a quotation, pay securely and let DUTS handle delivery to Zimbabwe.
+      </Text>
+    </Pressable>
+  );
+}
+
 const GUEST_CATEGORIES = ["Drinks", "Groceries", "Snacks", "Household"];
 const FALLBACK_AREAS = [
   { id: "harare", name: "Harare", shopCount: 0 },
@@ -129,6 +151,7 @@ export function ShopHomeScreen() {
         <StorePage>
           <Text className="mt-3 text-sm text-muted">Need it? DUTS it. Shop local. Get it delivered.</Text>
           <Text className="mt-1 text-sm text-muted">Delivery from $0.50</Text>
+          <CrossBorderHomeLink />
 
           {shopBy.length > 0 ? (
             <SectionReveal className="mt-5">

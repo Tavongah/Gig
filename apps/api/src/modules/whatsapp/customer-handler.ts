@@ -210,6 +210,15 @@ export async function handleCustomerWhatsAppMessage(
   const text = (msg.text || msg.buttonId || "").trim();
   const customerId = commerceCustomer.id;
 
+  const { tryHandleCrossBorderWhatsApp } = await import("../cross-border/whatsapp.js");
+  const crossBorder = await tryHandleCrossBorderWhatsApp({
+    phone,
+    conversationId: conv.id,
+    ctx,
+    text
+  });
+  if (crossBorder.handled) return { handled: true };
+
   const sanitized = sanitizeCheckoutContext(conv.state, ctx);
   ctx = sanitized.ctx;
   conv = { ...conv, state: sanitized.state };

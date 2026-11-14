@@ -52,6 +52,9 @@ export type RootStackParamList = {
   BasketMatch: undefined;
   CommerceCheckout: undefined;
   CommerceOrderDetail: { orderId: string };
+  ShopSouthAfrica: undefined;
+  CrossBorderPay: { token: string };
+  CrossBorderTrack: { token: string };
   ForgotPassword: undefined;
   ResetPassword: { token?: string } | undefined;
 };

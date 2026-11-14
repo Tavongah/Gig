@@ -24,6 +24,7 @@ import { sellerCustomerRouter } from "./modules/commerce/seller-customer.routes.
 import { catalogMediaRouter } from "./modules/commerce/catalog-media.routes.js";
 import { customerCommerceRouter } from "./modules/commerce/customer-commerce.routes.js";
 import { createCommercePaymentsRouter } from "./modules/commerce/payments/payments.routes.js";
+import { createCrossBorderRouter, crossBorderAdminRouter } from "./modules/cross-border/routes.js";
 import { raw } from "express";
 
 export function createApp(io: Server) {
@@ -100,6 +101,8 @@ export function createApp(io: Server) {
   app.use("/v1/workers", workerRouter);
   app.use("/v1", reviewRouter);
   app.use("/v1/admin", adminRouter);
+  app.use("/v1/admin/cross-border", crossBorderAdminRouter);
+  app.use("/v1/cross-border", createCrossBorderRouter());
   app.use("/v1/admin/commerce", commerceAdminRouter);
   app.use("/v1/admin/commerce", catalogAdminRouter);
   app.use("/v1/admin/commerce", sellerAdminRouter);

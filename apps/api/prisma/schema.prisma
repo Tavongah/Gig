@@ -1679,3 +1679,250 @@ model UnlistedItemPaymentAttempt {
   @@index([status, expiresAt])
 }
 
+/// Isolated South African shopping requests. Not a local CommerceOrder.
+enum CrossBorderRequestStatus {
+  REQUESTED
+  UNDER_REVIEW
+  QUOTED
+  AWAITING_PAYMENT
+  PAYMENT_PENDING
+  PAID
+  READY_TO_PURCHASE
+  PURCHASED
+  RECEIVED_IN_SOUTH_AFRICA
+  IN_TRANSIT_TO_ZIMBABWE
+  CUSTOMS_CLEARANCE
+  READY_FOR_LOCAL_DELIVERY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  PRODUCT_UNAVAILABLE
+  PAYMENT_FAILED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum CrossBorderQuoteStatus {
+  DRAFT
+  APPROVED
+  SENT
+  EXPIRED
+  SUPERSEDED
+  ACCEPTED
+}
+
+enum CrossBorderContactChannel {
+  WHATSAPP
+  EMAIL
+}
+
+enum CrossBorderPaymentStatus {
+  CREATED
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  EXPIRED
+  EXCEPTION
+}
+
+enum CrossBorderNotificationStatus {
+  CREATED
+  ATTEMPTED
+  ACCEPTED
+  FAILED
+}
+
+model CrossBorderReferenceCounter {
+  id        Int @id
+  nextValue Int
+}
+
+model CrossBorderRequest {
+  id                      String                     @id @default(uuid())
+  reference               String                     @unique
+  customerId              String?
+  customerName            String
+  phone                   String?
+  email                   String?
+  preferredContactChannel CrossBorderContactChannel
+  destinationCountry      String                     @default("ZW")
+  destinationCity         String
+  deliveryAddress         String
+  deliveryInstructions    String?
+  status                  CrossBorderRequestStatus   @default(REQUESTED)
+  currency                String                     @default("USD")
+  trackingTokenHash       String                     @unique
+  source                  String
+  whatsappIdempotencyKey  String?                    @unique
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+  lines                   CrossBorderRequestLine[]
+  quotes                  CrossBorderQuote[]
+  payments                CrossBorderPayment[]
+  paymentTokens           CrossBorderPaymentToken[]
+  shipment                CrossBorderShipment?
+  notifications           CrossBorderNotification[]
+  events                  CrossBorderAuditEvent[]
+
+  @@index([status, createdAt])
+}
+
+model CrossBorderRequestLine {
+  id             String             @id @default(uuid())
+  requestId      String
+  request        CrossBorderRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  retailer       String
+  productUrl     String
+  productName    String
+  quantity       Int
+  size           String?
+  color          String?
+  variantDetails String?
+  notes          String?
+  sortOrder      Int                @default(0)
+
+  @@index([requestId])
+}
+
+model CrossBorderQuote {
+  id                         String                  @id @default(uuid())
+  requestId                  String
+  request                    CrossBorderRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  version                    Int
+  currency                   String
+  merchandiseSubtotalCents   Int
+  saShippingCents            Int
+  crossBorderFreightCents    Int
+  customsCents               Int
+  customsIsEstimate          Boolean                 @default(true)
+  serviceFeeCents            Int
+  zimbabweDeliveryCents      Int
+  additionalCents            Int                     @default(0)
+  additionalLabel            String?
+  totalCents                 Int
+  zarMerchandiseCents        Int?
+  exchangeRate               String?
+  exchangeRateSource         String?
+  exchangeRateAt             DateTime?
+  expiresAt                  DateTime
+  status                     CrossBorderQuoteStatus
+  deliveryEstimateNote       String?
+  termsVersion               String
+  createdById                String
+  approvedById               String?
+  approvedAt                 DateTime?
+  sentAt                     DateTime?
+  acceptedAt                 DateTime?
+  createdAt                  DateTime                @default(now())
+  lines                      CrossBorderQuoteLine[]
+  payments                   CrossBorderPayment[]
+  paymentTokens              CrossBorderPaymentToken[]
+
+  @@unique([requestId, version])
+  @@index([requestId, status])
+}
+
+model CrossBorderQuoteLine {
+  id              String           @id @default(uuid())
+  quoteId         String
+  quote           CrossBorderQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  requestLineId   String
+  productName     String
+  retailer        String
+  quantity        Int
+  size            String?
+  color           String?
+  variantDetails  String?
+  unitPriceCents  Int
+  lineTotalCents  Int
+
+  @@index([quoteId])
+}
+
+model CrossBorderPaymentToken {
+  id        String             @id @default(uuid())
+  requestId String
+  request   CrossBorderRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  quoteId   String
+  quote     CrossBorderQuote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  tokenHash String             @unique
+  expiresAt DateTime
+  createdAt DateTime           @default(now())
+
+  @@index([quoteId])
+}
+
+model CrossBorderPayment {
+  id                 String                    @id @default(uuid())
+  requestId          String
+  request            CrossBorderRequest        @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  quoteId            String
+  quote              CrossBorderQuote          @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quoteVersion       Int
+  provider           String
+  providerReference  String?
+  merchantReference  String                    @unique
+  paymentMethod      String
+  currency           String
+  amountCents        Int
+  status             CrossBorderPaymentStatus  @default(CREATED)
+  idempotencyKey     String                    @unique
+  payerPhone         String?
+  paidAt             DateTime?
+  failureReason      String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  @@index([requestId, status])
+  @@index([quoteId])
+}
+
+model CrossBorderShipment {
+  id                      String             @id @default(uuid())
+  requestId               String             @unique
+  request                 CrossBorderRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  retailerOrderReference  String?
+  purchaseAmountCents     Int?
+  purchaseCurrency        String?
+  purchaseDate            DateTime?
+  receiptReference        String?
+  saReceivingNote         String?
+  retailerTrackingNumber  String?
+  shippingProvider        String?
+  trackingNumber          String?
+  shipmentStatus          String?
+  customsNote             String?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+}
+
+model CrossBorderNotification {
+  id                String                         @id @default(uuid())
+  requestId         String
+  request           CrossBorderRequest             @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  quoteId           String?
+  channel           CrossBorderContactChannel
+  kind              String
+  status            CrossBorderNotificationStatus
+  idempotencyKey    String                         @unique
+  providerMessageId String?
+  error             String?
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+
+  @@index([requestId, createdAt])
+}
+
+model CrossBorderAuditEvent {
+  id        String             @id @default(uuid())
+  requestId String
+  request   CrossBorderRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorId   String?
+  action    String
+  payload   Json?
+  createdAt DateTime           @default(now())
+
+  @@index([requestId, createdAt])
+}
+
