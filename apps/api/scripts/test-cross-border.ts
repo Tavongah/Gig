@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { crossBorderEnabled, crossBorderPaymentLinksEnabled, crossBorderPaymentsEnabled } from "../src/modules/cross-border/flag.js";
+import { crossBorderEnabled, crossBorderManualPaymentsEnabled, crossBorderPaymentLinksEnabled, crossBorderPaymentsEnabled } from "../src/modules/cross-border/flag.js";
 import { duplicateFundsAction, paymentLinkBlockReason, planPaymentInitiation } from "../src/modules/cross-border/payment-policy.js";
 import {
   assertPublicProductUrl,
@@ -201,6 +201,7 @@ const savedFlags = {
   enabled: process.env.CROSS_BORDER_ENABLED,
   links: process.env.CROSS_BORDER_PAYMENT_LINKS_ENABLED,
   payments: process.env.CROSS_BORDER_PAYMENTS_ENABLED,
+  manual: process.env.CROSS_BORDER_MANUAL_PAYMENTS_ENABLED,
   nodeEnv: process.env.NODE_ENV,
   apiUrl: process.env.API_PUBLIC_URL,
   databaseUrl: process.env.DATABASE_URL
@@ -208,9 +209,11 @@ const savedFlags = {
 delete process.env.CROSS_BORDER_ENABLED;
 delete process.env.CROSS_BORDER_PAYMENT_LINKS_ENABLED;
 delete process.env.CROSS_BORDER_PAYMENTS_ENABLED;
+delete process.env.CROSS_BORDER_MANUAL_PAYMENTS_ENABLED;
 assert.equal(crossBorderEnabled(), false);
 assert.equal(crossBorderPaymentLinksEnabled(), false);
 assert.equal(crossBorderPaymentsEnabled(), false);
+assert.equal(crossBorderManualPaymentsEnabled(), false);
 process.env.CROSS_BORDER_ENABLED = "true";
 process.env.CROSS_BORDER_PAYMENT_LINKS_ENABLED = "true";
 assert.equal(crossBorderPaymentLinksEnabled(), true);
@@ -220,6 +223,13 @@ assert.equal(crossBorderPaymentsEnabled(), true);
 delete process.env.CROSS_BORDER_ENABLED;
 assert.equal(crossBorderPaymentsEnabled(), false);
 process.env.CROSS_BORDER_ENABLED = "true";
+process.env.CROSS_BORDER_MANUAL_PAYMENTS_ENABLED = "true";
+assert.equal(crossBorderManualPaymentsEnabled(), true);
+assert.equal(crossBorderPaymentsEnabled(), true);
+delete process.env.CROSS_BORDER_PAYMENTS_ENABLED;
+assert.equal(crossBorderPaymentsEnabled(), false);
+assert.equal(crossBorderManualPaymentsEnabled(), true);
+delete process.env.CROSS_BORDER_MANUAL_PAYMENTS_ENABLED;
 
 assert.equal(paymentLinkBlockReason({ linksEnabled: false, quoteStatus: "APPROVED", expiresAt: later, now }), "LINKS_DISABLED");
 assert.equal(paymentLinkBlockReason({ linksEnabled: true, quoteStatus: "APPROVED", expiresAt: later, now }), null);
@@ -261,6 +271,7 @@ assert.match(readFileSync(resolve(root, "prisma/migrations/20261114203000_cross_
 assert.doesNotMatch(readFileSync(resolve(root, "src/modules/commerce/payments/payments.routes.ts"), "utf8"), /crossBorderPayment|CBX-/);
 assert.match(readFileSync(resolve(root, "src/modules/cross-border/routes.ts"), "utf8"), /crossBorderPaymentsEnabled\(\)/);
 assert.match(readFileSync(resolve(root, "src/modules/cross-border/routes.ts"), "utf8"), /crossBorderPaymentLinksEnabled\(\)/);
+assert.doesNotMatch(readFileSync(resolve(root, "src/modules/cross-border/manual-payment.service.ts"), "utf8"), /zbPostJson|zb\.transport|express-checkout/);
 
 const { crossBorderCallbackUrl } = await import("../src/modules/cross-border/payment.service.js");
 const { buildZbCallbackUrl } = await import("../src/modules/commerce/payments/zb.config.js");
@@ -281,6 +292,7 @@ for (const [key, value] of Object.entries(savedFlags)) {
   const envKey = key === "enabled" ? "CROSS_BORDER_ENABLED"
     : key === "links" ? "CROSS_BORDER_PAYMENT_LINKS_ENABLED"
     : key === "payments" ? "CROSS_BORDER_PAYMENTS_ENABLED"
+    : key === "manual" ? "CROSS_BORDER_MANUAL_PAYMENTS_ENABLED"
     : key === "nodeEnv" ? "NODE_ENV"
     : key === "apiUrl" ? "API_PUBLIC_URL"
     : "DATABASE_URL";

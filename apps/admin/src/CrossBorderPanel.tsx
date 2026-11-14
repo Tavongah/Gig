@@ -26,8 +26,18 @@ type RequestRow = {
   deliveryAddress: string;
   localDeliveryCoverage?: string;
   lines: Line[];
-  quotes?: Array<{ id: string; version: number; status: string; totalCents: number; currency: string }>;
-  payments?: Array<{ id: string; status: string; amountCents: number; currency: string; paymentMethod: string; merchantReference?: string }>;
+  quotes?: Array<{ id: string; version: number; status: string; totalCents: number; currency: string; expiresAt?: string }>;
+  payments?: Array<{
+    id: string;
+    status: string;
+    amountCents: number;
+    currency: string;
+    paymentMethod: string;
+    provider?: string;
+    providerReference?: string | null;
+    confirmationMethod?: string | null;
+    merchantReference?: string;
+  }>;
 };
 
 function cents(raw: string): number {
@@ -190,12 +200,23 @@ export function CrossBorderPanel({ apiRequest }: { apiRequest: ApiRequest }) {
             </p>
           ) : null}
           <p className="muted">Send the payment link yourself. Quotation messages do not include it. Card checkout stays off.</p>
-          {(request.payments ?? []).map((payment) => (
-            <p key={payment.id}>
-              Payment {payment.status} · {(payment.amountCents / 100).toFixed(2)} {payment.currency} · {payment.paymentMethod}
-              <button type="button" onClick={() => void post(`/admin/cross-border/payments/${payment.id}/reconcile`)}>Check payment status</button>
-            </p>
-          ))}
+          <ConfirmExternalPayment
+            request={request}
+            onSubmit={(body) => post(`/admin/cross-border/requests/${request.id}/confirm-external-payment`, body)}
+          />
+          {(request.payments ?? []).map((payment) => {
+            const manual = payment.confirmationMethod === "MANUAL_ZB_PORTAL" || payment.provider === "MANUAL_ZB_PORTAL";
+            return (
+              <p key={payment.id}>
+                Payment {payment.status} · {(payment.amountCents / 100).toFixed(2)} {payment.currency} · {manual ? "Staff-attested ZB portal check" : payment.paymentMethod}
+                {payment.providerReference ? ` · ZB ${payment.providerReference}` : ""}
+                {manual ? null : <button type="button" onClick={() => void post(`/admin/cross-border/payments/${payment.id}/reconcile`)}>Check payment status</button>}
+                {manual && payment.status === "PAID" ? (
+                  <DisputeButton onSubmit={(reason) => post(`/admin/cross-border/payments/${payment.id}/dispute`, { reason })} />
+                ) : null}
+              </p>
+            );
+          })}
           <h3>Procurement</h3>
           <button type="button" onClick={() => void post(`/admin/cross-border/requests/${request.id}/status`, { status: "UNDER_REVIEW" })}>Mark under review</button>
           <PurchaseForm requestId={request.id} onSubmit={(body) => post(`/admin/cross-border/requests/${request.id}/purchase`, body)} />
@@ -208,6 +229,95 @@ export function CrossBorderPanel({ apiRequest }: { apiRequest: ApiRequest }) {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function DisputeButton({ onSubmit }: { onSubmit: (reason: string) => Promise<void> }) {
+  const [reason, setReason] = useState("WRONG_REFERENCE");
+  return (
+    <span>
+      <select value={reason} onChange={(event) => setReason(event.target.value)}>
+        <option value="WRONG_REFERENCE">Wrong reference</option>
+        <option value="INCORRECT_CONFIRMATION">Incorrect confirmation</option>
+        <option value="DUPLICATE_RECEIPT">Duplicate receipt</option>
+        <option value="REFUND_REQUIRED">Refund required</option>
+        <option value="REVERSAL_OR_DISPUTE">Reversal or dispute</option>
+      </select>
+      <button type="button" onClick={() => void onSubmit(reason)}>Open payment dispute</button>
+    </span>
+  );
+}
+
+function ConfirmExternalPayment({
+  request,
+  onSubmit
+}: {
+  request: RequestRow;
+  onSubmit: (body: Record<string, unknown>) => Promise<void>;
+}) {
+  const quote = [...(request.quotes ?? [])].sort((a, b) => b.version - a.version)[0];
+  const payable = quote && (quote.status === "APPROVED" || quote.status === "SENT" || quote.status === "ACCEPTED");
+  const [transactionReference, setTransactionReference] = useState("");
+  const [orderReference, setOrderReference] = useState("");
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState(quote?.currency ?? "USD");
+  const [confirmedAt, setConfirmedAt] = useState("");
+  const [attested, setAttested] = useState(false);
+  const [review, setReview] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  if (!payable || !quote) return null;
+  const shown = `${(quote.totalCents / 100).toFixed(2)} ${quote.currency}`;
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        setFormError(null);
+        if (!review) {
+          if (!attested) {
+            setFormError("Confirm that you verified this payment in the ZB portal.");
+            return;
+          }
+          setReview(true);
+          return;
+        }
+        const when = new Date(confirmedAt);
+        if (Number.isNaN(when.getTime())) {
+          setFormError("Enter the payment confirmation time.");
+          return;
+        }
+        let amountCents = 0;
+        try {
+          amountCents = cents(amount);
+        } catch (error) {
+          setFormError(error instanceof Error ? error.message : "Enter the confirmed amount.");
+          return;
+        }
+        void onSubmit({
+          quoteId: quote.id,
+          transactionReference,
+          orderReference: orderReference || null,
+          amountCents,
+          currency,
+          confirmedAt: when.toISOString(),
+          attested: true
+        }).finally(() => setReview(false));
+      }}
+    >
+      <h3>Confirm External Payment</h3>
+      <p className="muted">Approved quotation version {quote.version}: {shown}. DUTS does not create or send the ZB link. This records a staff check in the ZB merchant portal, not an automatic ZB status check.</p>
+      <label>ZB transaction reference <input value={transactionReference} onChange={(event) => { setTransactionReference(event.target.value); setReview(false); }} /></label>
+      <label>ZB order reference, if different <input value={orderReference} onChange={(event) => { setOrderReference(event.target.value); setReview(false); }} /></label>
+      <label>Confirmed amount USD <input value={amount} onChange={(event) => { setAmount(event.target.value); setReview(false); }} /></label>
+      <label>Currency <input value={currency} onChange={(event) => { setCurrency(event.target.value); setReview(false); }} /></label>
+      <label>Payment confirmation time <input type="datetime-local" value={confirmedAt} onChange={(event) => { setConfirmedAt(event.target.value); setReview(false); }} /></label>
+      <label>
+        <input type="checkbox" checked={attested} onChange={(event) => { setAttested(event.target.checked); setReview(false); }} />
+        I verified this successful payment in the ZB Smile&Pay merchant portal.
+      </label>
+      {review ? <p className="notice">Confirm {shown} for {request.reference}. ZB reference {transactionReference.trim()}.</p> : null}
+      {formError ? <p className="notice">{formError}</p> : null}
+      <button type="submit">{review ? "Confirm External Payment" : "Review confirmation"}</button>
+    </form>
   );
 }
 

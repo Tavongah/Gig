@@ -1871,6 +1871,10 @@ model CrossBorderPayment {
   payerPhone         String?
   paidAt             DateTime?
   failureReason      String?
+  confirmationMethod String?
+  externalOrderReference String?
+  confirmedById      String?
+  portalConfirmedAt  DateTime?
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
 

@@ -22,3 +22,11 @@ export function crossBorderPaymentLinksEnabled(): boolean {
 export function crossBorderPaymentsEnabled(): boolean {
   return crossBorderPaymentLinksEnabled() && flagOn("CROSS_BORDER_PAYMENTS_ENABLED");
 }
+
+/**
+ * Staff may record a payment they already verified in the ZB merchant portal.
+ * This does not call ZB and does not require customer payment initiation.
+ */
+export function crossBorderManualPaymentsEnabled(): boolean {
+  return crossBorderEnabled() && flagOn("CROSS_BORDER_MANUAL_PAYMENTS_ENABLED");
+}

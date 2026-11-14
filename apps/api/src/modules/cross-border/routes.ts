@@ -8,6 +8,7 @@ import { crossBorderEnabled, crossBorderPaymentLinksEnabled, crossBorderPayments
 import { createCrossBorderRequest, getCrossBorderRequest, listCrossBorderRequests, publicTracking } from "./request.service.js";
 import { approveCrossBorderQuote, createCrossBorderQuote } from "./quote.service.js";
 import { acceptAndPayEcoCash, applyCrossBorderProviderResult, generateCrossBorderPaymentLink, parseCrossBorderCallback, publicPaymentView, reconcileCrossBorderPayment } from "./payment.service.js";
+import { confirmManualCrossBorderPayment, openManualPaymentDispute } from "./manual-payment.service.js";
 import { sendCrossBorderQuote } from "./notify.service.js";
 import { recordCrossBorderPurchase, recordCrossBorderShipment } from "./fulfillment.service.js";
 import { changeCrossBorderStatus } from "./request.service.js";
@@ -191,6 +192,44 @@ crossBorderAdminRouter.post("/quotes/:id/approve", async (req, res, next) => {
 crossBorderAdminRouter.post("/quotes/:id/payment-link", async (req, res, next) => {
   try {
     res.status(201).json(await generateCrossBorderPaymentLink(routeParam(req.params.id), req.auth!.userId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+crossBorderAdminRouter.post("/requests/:id/confirm-external-payment", async (req, res, next) => {
+  try {
+    const body = z.object({
+      quoteId: z.string().uuid(),
+      transactionReference: z.string(),
+      orderReference: z.string().nullable().optional(),
+      amountCents: z.number().int(),
+      currency: z.string(),
+      confirmedAt: z.string(),
+      attested: z.literal(true)
+    }).parse(req.body);
+    res.status(201).json(await confirmManualCrossBorderPayment({
+      ...body,
+      requestId: routeParam(req.params.id),
+      actorId: req.auth!.userId
+    }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+crossBorderAdminRouter.post("/payments/:id/dispute", async (req, res, next) => {
+  try {
+    const body = z.object({
+      reason: z.string(),
+      note: z.string().max(300).nullable().optional()
+    }).parse(req.body);
+    res.json(await openManualPaymentDispute({
+      paymentId: routeParam(req.params.id),
+      actorId: req.auth!.userId,
+      reason: body.reason,
+      note: body.note
+    }));
   } catch (error) {
     next(error);
   }
