@@ -87,7 +87,11 @@ function CardQtyButton({
 }
 
 export function ProductCard({ product, onPress, onAdd, pricePrefix, width, variant = "grid" }: Props) {
-  const [imgFailed, setImgFailed] = useState(false);
+  const imageUrl = product.imageUrl;
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const imgFailed = imageUrl != null && failedUrl === imageUrl;
+  const imgLoaded = imageUrl != null && loadedUrl === imageUrl;
   const reduce = useReducedMotion();
   const purchasable = isProductCardPurchasable(product);
   const canRequestCatalog =
@@ -96,7 +100,7 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
   const offerCount = product.merchantOfferCount ?? product.offerCount ?? 0;
   const showFrom = purchasable ? pricePrefix ?? (offerCount > 1 ? "From " : "") : "";
   const price = purchasable ? `${showFrom}$${(product.fromPriceCents! / 100).toFixed(2)}` : "Price coming soon";
-  const showImage = Boolean(product.imageUrl) && !imgFailed;
+  const showImage = Boolean(imageUrl) && !imgFailed;
   const meta = productCardMeta(product.name, product.brand, product.sizeLabel);
   const rail = variant === "rail";
   const cardWidth: DimensionValue = width ?? (rail ? RAIL_CARD_WIDTH : "100%");
@@ -152,36 +156,55 @@ export function ProductCard({ product, onPress, onAdd, pricePrefix, width, varia
         }}
       >
         {showImage ? (
-          <Image
-            source={{ uri: product.imageUrl! }}
-            className="duts-product-card-image"
-            style={{ width: "85%", height: "85%" }}
-            resizeMode="contain"
-            accessibilityLabel={product.name}
-            {...({ loading: "lazy" } as object)}
-            onError={() => setImgFailed(true)}
-          />
+          <View style={{ width: "85%", height: "85%" }}>
+            {imgLoaded ? null : (
+              <View
+                pointerEvents="none"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  left: 0,
+                  borderRadius: 8,
+                  backgroundColor: "#F3F4F6"
+                }}
+              />
+            )}
+            <Image
+              source={{ uri: imageUrl! }}
+              className="duts-product-card-image"
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="contain"
+              accessibilityLabel={product.name}
+              {...({ loading: "lazy" } as object)}
+              onLoad={() => setLoadedUrl(imageUrl)}
+              onError={() => setFailedUrl(imageUrl)}
+            />
+          </View>
         ) : (
-          <View className="h-full w-full items-center justify-center rounded-lg" style={{ backgroundColor: "#F3F4F6" }}>
+          <View className="items-center justify-center rounded-lg" style={{ width: "85%", height: "85%", backgroundColor: "#F3F4F6" }}>
             <Ionicons name="image-outline" size={22} color={DUTS.placeholder} />
           </View>
         )}
       </View>
-      <View className="px-2.5 pb-2.5 pt-2">
-        <Text className="text-[13px] font-semibold leading-4 text-ink" numberOfLines={2} style={{ minHeight: 32 }}>
+      <View className="px-3 pb-3 pt-2.5">
+        <Text className="text-[13px] font-bold leading-[18px] text-ink" numberOfLines={2} style={{ minHeight: 36 }}>
           {product.name}
         </Text>
         {meta ? (
-          <Text className="mt-0.5 text-[11px] leading-4 text-muted" numberOfLines={1} style={{ minHeight: 16 }}>
+          <Text className="mt-1 text-[11px] leading-4 text-muted" numberOfLines={1} style={{ minHeight: 16 }}>
             {meta}
           </Text>
         ) : (
-          <View className="h-4" />
+          <View style={{ height: 16, marginTop: 4 }} />
         )}
-        <View className="mt-1.5 min-h-[32px] flex-row items-center justify-between gap-1">
+        <View className="mt-2 min-h-[32px] flex-row items-center justify-between gap-2">
           <Text
-            className={`flex-1 text-[13px] ${purchasable ? "font-extrabold text-ink" : "font-medium text-muted"}`}
-            numberOfLines={1}
+            className={`min-w-0 flex-1 text-[13px] leading-4 ${purchasable ? "font-extrabold text-ink" : "font-medium text-muted"}`}
+            numberOfLines={2}
           >
             {price}
           </Text>
@@ -236,10 +259,10 @@ export function ProductCardSkeleton({ width, variant = "grid" }: { width?: Dimen
       accessibilityLabel="Loading product"
     >
       <View className="duts-skeleton-shine duts-product-image-frame w-full" style={{ aspectRatio: 1, backgroundColor: "#F3F4F6" }} />
-      <View className="gap-2 px-2.5 py-2.5">
-        <View className="duts-skeleton-shine h-3 rounded bg-surface" />
+      <View className="gap-2 px-3 pb-3 pt-2.5">
+        <View className="duts-skeleton-shine h-3 rounded bg-surface" style={{ minHeight: 12 }} />
         <View className="duts-skeleton-shine h-3 w-2/3 rounded bg-surface" />
-        <View className="duts-skeleton-shine h-3 w-1/3 rounded bg-surface" />
+        <View className="duts-skeleton-shine mt-1 h-3 w-1/2 rounded bg-surface" />
       </View>
     </View>
   );
