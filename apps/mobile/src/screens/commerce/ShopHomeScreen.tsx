@@ -29,17 +29,21 @@ function CrossBorderHomeLink() {
   });
   if (!status.data?.enabled) return null;
   return (
-    <Pressable
-      onPress={() => navigation.navigate("ShopSouthAfrica")}
-      accessibilityRole="button"
-      accessibilityLabel="Shop from South Africa"
-      className="mt-4 rounded-2xl border border-border bg-card p-4"
-    >
+    <View className="mt-4 rounded-2xl border border-border bg-card px-4 py-3">
       <Text className="text-base font-extrabold text-ink">Shop from South Africa</Text>
-      <Text className="mt-1 text-sm text-muted">
-        Shop from SHEIN and your favorite South African stores. Send us your product links, get a quotation, pay securely and let DUTS handle delivery to Zimbabwe.
-      </Text>
-    </Pressable>
+      <Text className="mt-1 text-sm leading-5 text-muted">Shop from SHEIN and South African stores</Text>
+      <Pressable
+        onPress={() => navigation.navigate("ShopSouthAfrica")}
+        accessibilityRole="button"
+        accessibilityLabel="Shop Now"
+        className="mt-3 min-h-[44px] items-center justify-center self-stretch rounded-xl px-4 py-2.5"
+        style={({ pressed }) => ({ backgroundColor: DUTS.purple, opacity: pressed ? 0.92 : 1 })}
+      >
+        <Text className="text-center text-sm font-extrabold" style={{ color: "#FFFFFF" }}>
+          Shop Now
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
