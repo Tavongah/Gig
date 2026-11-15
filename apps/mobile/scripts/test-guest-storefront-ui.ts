@@ -43,9 +43,12 @@ assert.ok(home.includes("session") || home.includes("isGuest") || read("componen
 assert.ok(!home.includes("session!.token"), "home must not require session");
 
 const header = read("components/StoreHeader.tsx");
-assert.ok(header.includes("Shopping near"), "approximate area label");
-assert.ok(header.includes("Change area"), "manual area change");
-assert.ok(header.includes("Search DUTS"), "homepage search available");
+assert.ok(!header.includes("Shopping near"), "homepage does not show the area selector");
+assert.ok(!header.includes("Change area"), "homepage does not show the area modal");
+assert.ok(home.includes("timezoneAreaHint"), "default area still follows the existing hint");
+assert.ok(home.includes("setArea"), "saved area behavior remains");
+assert.ok(header.includes("StoreSearchField"), "homepage search remains in the header");
+assert.ok(read("components/StoreSearchField.tsx").includes("Search DUTS"), "homepage search available");
 
 const areaStore = read("stores/shop-area.store.ts");
 assert.ok(areaStore.includes("duts.shop.area"), "persists coarse area only");

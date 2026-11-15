@@ -1,28 +1,25 @@
-import { useState } from "react";
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { DUTS } from "../lib/theme";
 import { CountBadge } from "./motion/CountBadge";
+import { StoreSearchField } from "./StoreSearchField";
 import { STOREFRONT_GUTTER, categoryIcon, storefrontShellStyle, useStorefrontLayout } from "../lib/storefront-ui";
 import { headerChipCategories, isSmartBasketEnabled } from "../lib/storefront-categories";
 import { openStorefrontCategory } from "../lib/storefront-nav";
 import { useShopBrowse } from "../lib/shop-browse";
 import { useCommerceCartStore } from "../stores/commerce-cart.store";
 import { useDesiredBasketStore } from "../stores/desired-basket.store";
-import { useShopAreaStore } from "../stores/shop-area.store";
-import { api } from "../lib/api";
 import type { RootStackParamList } from "../navigation/types";
 import type { ReactNode } from "react";
 
-const FALLBACK_AREAS = [
-  { id: "harare", name: "Harare", shopCount: 0 },
-  { id: "bulawayo", name: "Bulawayo", shopCount: 0 },
-  { id: "gweru", name: "Gweru", shopCount: 0 }
-];
+function headerSupportsBlur() {
+  if (Platform.OS !== "web") return false;
+  const css = (globalThis as { CSS?: { supports?: (property: string, value: string) => boolean } }).CSS;
+  return Boolean(css?.supports?.("backdrop-filter", "blur(12px)") || css?.supports?.("-webkit-backdrop-filter", "blur(12px)"));
+}
 
 type Props = {
   categories?: string[];
@@ -34,27 +31,14 @@ type Props = {
 export function StoreHeader({ categories = [], initialQuery = "", showCategories = true, compact }: Props) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const browse = useShopBrowse();
-  const setArea = useShopAreaStore((s) => s.setArea);
   const merchantCount = useCommerceCartStore((s) => s.lines.reduce((n, l) => n + l.quantity, 0));
   const listCount = useDesiredBasketStore((s) => s.lines.reduce((n, l) => n + l.quantity, 0));
   const cartCount = merchantCount + (isSmartBasketEnabled() ? listCount : 0);
   const insets = useSafeAreaInsets();
   const { isDesktopNav } = useStorefrontLayout();
-  const [q, setQ] = useState(initialQuery);
-  const [areaOpen, setAreaOpen] = useState(false);
-  const useAreaPicker = browse.isGuest || !browse.exact;
-  const areasQuery = useQuery({
-    queryKey: ["commerce-shopping-areas"],
-    queryFn: () => api.commerceShoppingAreas(),
-    enabled: useAreaPicker
-  });
-  const areas = areasQuery.data?.areas.length ? areasQuery.data.areas : FALLBACK_AREAS;
+  const blur = headerSupportsBlur();
 
-  const areaName = useAreaPicker
-    ? (browse.area?.name ?? "your area")
-    : (browse.exact?.label ?? "your area");
-
-  function runSearch(value = q) {
+  function runSearch(value: string) {
     const next = value.trim();
     if (!next) {
       navigation.navigate("MainTabs", { screen: "Search" });
@@ -77,48 +61,19 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
     navigation.navigate("MainTabs", { screen: "Cart" });
   }
 
-  function onAreaPress() {
-    if (useAreaPicker) {
-      setAreaOpen(true);
-      return;
-    }
-    navigation.navigate("ShopLocation");
-  }
+  const searchField = <StoreSearchField initialQuery={initialQuery} onSubmit={runSearch} />;
 
-  const searchField = (
-    <View className={`flex-row items-center rounded-full border border-border bg-surface px-3.5 ${isDesktopNav ? "py-2.5" : "py-2"}`}>
-      <Ionicons name="search" size={18} color={DUTS.muted} />
-      <TextInput
-        value={q}
-        onChangeText={setQ}
-        placeholder="Search DUTS"
-        placeholderTextColor={DUTS.placeholder}
-        className="ml-2 flex-1 text-base text-ink"
-        returnKeyType="search"
-        onSubmitEditing={() => runSearch()}
-        accessibilityLabel="Search products"
-        accessibilityRole="search"
-      />
-    </View>
-  );
-
-  const areaControl = (
+  const accountControl = (
     <Pressable
-      onPress={onAreaPress}
+      onPress={openAccount}
       accessibilityRole="button"
-      accessibilityLabel={useAreaPicker ? "Change shopping area" : "Change delivery location"}
-      className="flex-row items-center"
-      hitSlop={6}
+      accessibilityLabel={browse.isGuest ? "Sign in" : "Account"}
+      className="duts-focus-ring min-h-[44px] min-w-[44px] items-center justify-center px-2"
+      hitSlop={4}
     >
-      <Ionicons name="location-outline" size={16} color={DUTS.purple} />
-      <View className="ml-1">
-        <Text className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-          {useAreaPicker ? "Shopping near" : "Deliver to"}
-        </Text>
-        <Text className="text-sm font-bold text-ink" numberOfLines={1}>
-          {areaName} ▾
-        </Text>
-      </View>
+      <Text className="text-sm font-bold" style={{ color: DUTS.purple }}>
+        {browse.isGuest ? "Sign in" : "Account"}
+      </Text>
     </Pressable>
   );
 
@@ -148,7 +103,7 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
         horizontal
         showsHorizontalScrollIndicator={false}
         className={`duts-chip-row ${isDesktopNav ? "mt-3" : "mt-2"}`}
-        style={{ marginHorizontal: -STOREFRONT_GUTTER }}
+        style={{ marginHorizontal: -STOREFRONT_GUTTER, zIndex: 0 }}
         contentContainerStyle={{
           gap: 8,
           paddingLeft: STOREFRONT_GUTTER,
@@ -189,10 +144,24 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
 
   return (
     <View
-      className="border-b border-border bg-background"
+      className="duts-store-header border-b border-border bg-background"
       style={[
-        { paddingTop: Math.max(insets.top, 8) },
-        isDesktopNav ? ({ position: "sticky", top: 0, zIndex: 30 } as object) : undefined
+        {
+          paddingTop: Math.max(insets.top, 8),
+          zIndex: 40,
+          backgroundColor: DUTS.background,
+          overflow: "visible"
+        },
+        Platform.OS === "web"
+          ? ({
+              position: "sticky",
+              top: 0,
+              backgroundColor: blur ? "rgba(255,255,255,0.85)" : DUTS.background,
+              backdropFilter: blur ? "blur(12px)" : "none",
+              transitionProperty: "background-color, border-color",
+              transitionDuration: "0s"
+            } as object)
+          : undefined
       ]}
     >
       <View className={`w-full self-center ${isDesktopNav ? "py-3" : "py-2"}`} style={storefrontShellStyle}>
@@ -203,7 +172,6 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
                 <Text className="text-2xl font-black text-ink">DUTS</Text>
               </Pressable>
               <View className="min-w-0 flex-1">{searchField}</View>
-              {areaControl}
               {browse.isGuest ? null : (
                 <Pressable onPress={openOrders} accessibilityRole="button" accessibilityLabel="Orders">
                   <Text className="text-sm font-bold" style={{ color: DUTS.purple }}>
@@ -211,11 +179,7 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
                   </Text>
                 </Pressable>
               )}
-              <Pressable onPress={openAccount} accessibilityRole="button" accessibilityLabel={browse.isGuest ? "Sign in" : "Account"}>
-                <Text className="text-sm font-bold" style={{ color: DUTS.purple }}>
-                  {browse.isGuest ? "Sign in" : "Account"}
-                </Text>
-              </Pressable>
+              {accountControl}
               {cartControl}
             </View>
             {compact ? null : categoryRow}
@@ -224,45 +188,13 @@ export function StoreHeader({ categories = [], initialQuery = "", showCategories
           <>
             <View className="flex-row items-center justify-between">
               <Text className="text-xl font-black text-ink">DUTS</Text>
-              <Pressable onPress={openAccount} accessibilityRole="button" accessibilityLabel={browse.isGuest ? "Sign in" : "Account"}>
-                <Text className="text-sm font-bold" style={{ color: DUTS.purple }}>
-                  {browse.isGuest ? "Sign in" : "Account"}
-                </Text>
-              </Pressable>
+              {accountControl}
             </View>
-            <View className="mt-2">{areaControl}</View>
             <View className="mt-2">{searchField}</View>
             {compact ? null : categoryRow}
           </>
         )}
       </View>
-
-      <Modal visible={areaOpen} transparent animationType="fade" onRequestClose={() => setAreaOpen(false)}>
-        <Pressable
-          className="flex-1 justify-end"
-          style={{ backgroundColor: "rgba(0,0,0,0.35)" }}
-          onPress={() => setAreaOpen(false)}
-        >
-          <Pressable className="rounded-t-3xl bg-background px-5 pb-10 pt-5" onPress={(e) => e.stopPropagation?.()}>
-            <Text className="text-lg font-extrabold text-ink">Change area</Text>
-            <Text className="mt-1 text-sm text-muted">Approximate shopping area for browsing DUTS.</Text>
-            {areas.map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => {
-                  void setArea({ id: item.id, name: item.name });
-                  setAreaOpen(false);
-                }}
-                className="mt-3 rounded-2xl border border-border bg-card px-4 py-3.5"
-                accessibilityRole="button"
-                accessibilityLabel={item.name}
-              >
-                <Text className="text-base font-bold text-ink">{item.name}</Text>
-              </Pressable>
-            ))}
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { CommonActions, useLinkProps, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,28 +22,49 @@ import { useShopAreaStore, timezoneAreaHint } from "../../stores/shop-area.store
 import { useCommerceCartStore } from "../../stores/commerce-cart.store";
 
 function CrossBorderHomeLink() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const status = useQuery({
     queryKey: ["cross-border-status"],
     queryFn: () => api.crossBorderStatus()
   });
+  const link = useLinkProps({
+    action: CommonActions.navigate("ShopSouthAfrica"),
+    href: "/shop-south-africa"
+  });
+  const anchor = Platform.OS === "web" && link.href ? { href: link.href } : {};
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   if (!status.data?.enabled) return null;
   return (
-    <View className="mt-4 rounded-2xl border border-border bg-card px-4 py-3">
+    <Pressable
+      {...anchor}
+      accessibilityRole="link"
+      accessibilityLabel="Shop from South Africa"
+      onPress={link.onPress}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      className="mt-4 rounded-2xl border border-border bg-card px-4 py-3"
+      style={({ pressed }) => ({
+        opacity: pressed ? 0.96 : 1,
+        backgroundColor: hovered && !pressed ? "#F8F5FE" : undefined,
+        borderColor: focused ? DUTS.purple : hovered ? "#E4D8F8" : undefined,
+        outlineStyle: "solid",
+        outlineWidth: focused ? 2 : 0,
+        outlineColor: DUTS.purple
+      })}
+    >
       <Text className="text-base font-extrabold text-ink">Shop from South Africa</Text>
       <Text className="mt-1 text-sm leading-5 text-muted">Shop from SHEIN and South African stores</Text>
-      <Pressable
-        onPress={() => navigation.navigate("ShopSouthAfrica")}
-        accessibilityRole="button"
-        accessibilityLabel="Shop Now"
+      <View
         className="mt-3 min-h-[44px] items-center justify-center self-stretch rounded-xl px-4 py-2.5"
-        style={({ pressed }) => ({ backgroundColor: DUTS.purple, opacity: pressed ? 0.92 : 1 })}
+        style={{ backgroundColor: DUTS.purple }}
       >
         <Text className="text-center text-sm font-extrabold" style={{ color: "#FFFFFF" }}>
           Shop Now
         </Text>
-      </Pressable>
-    </View>
+      </View>
+    </Pressable>
   );
 }
 

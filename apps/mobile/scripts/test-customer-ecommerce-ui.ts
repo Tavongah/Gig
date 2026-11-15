@@ -55,7 +55,8 @@ assert.ok(cart.includes("Different shop"), "one-store rule alert");
 assert.ok(cart.includes("productId"), "uses Product offer ids");
 
 const home = read("screens/commerce/ShopHomeScreen.tsx");
-assert.ok(read("components/StoreHeader.tsx").includes("Deliver to"), "location first");
+assert.ok(read("screens/commerce/CommerceCheckoutScreen.tsx").includes("Deliver to"), "delivery location remains at checkout");
+assert.ok(!read("components/StoreHeader.tsx").includes("Shopping near"), "homepage area selector stays removed");
 assert.ok(home.includes("Available now") || home.includes("Explore products") || home.includes("Shop DUTS") || home.includes("Products near you"), "product section heading");
 assert.ok(!home.includes("Nearby shops"), "nearby shops not on customer homepage");
 assert.ok(!home.includes("commerceNearbyShops"), "homepage does not fetch nearby shops for discovery");

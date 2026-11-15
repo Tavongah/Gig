@@ -32,8 +32,10 @@ assert.ok(grid.includes("columns"), "responsive columns");
 assert.ok(grid.includes("ProductCardSkeleton"), "skeleton loading");
 
 const header = read("components/StoreHeader.tsx");
-assert.ok(header.includes("Search DUTS"), "prominent search");
-assert.ok(header.includes("Shopping near"), "approximate area label");
+assert.ok(header.includes("StoreSearchField"), "prominent search stays in the header");
+assert.ok(read("components/StoreSearchField.tsx").includes("Search DUTS"), "prominent search");
+assert.ok(!header.includes("Shopping near"), "area selector removed from the header");
+assert.ok(read("stores/shop-area.store.ts").includes("setArea"), "area persistence remains");
 assert.ok(header.includes("Cart"), "desktop cart");
 assert.ok(header.includes("All categories"), "all categories chip");
 

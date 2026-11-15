@@ -29,9 +29,11 @@ assert.ok(card.includes("numberOfLines={2}"), "name clamp");
 assert.ok(card.includes("aspectRatio"), "stable image frame");
 
 const header = read("components/StoreHeader.tsx");
-assert.ok(header.includes("Search DUTS"));
-assert.ok(header.includes("Shopping near"));
-assert.ok(header.includes("Deliver to"));
+assert.ok(header.includes("StoreSearchField"));
+assert.ok(read("components/StoreSearchField.tsx").includes("Search DUTS"));
+assert.ok(!header.includes("Shopping near"));
+assert.ok(!header.includes("Deliver to"));
+assert.ok(read("screens/commerce/CommerceCheckoutScreen.tsx").includes("Deliver to"));
 assert.ok(header.includes("cartCount"));
 
 const home = read("screens/commerce/ShopHomeScreen.tsx");

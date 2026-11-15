@@ -42,7 +42,7 @@ const flags = readFileSync(join(root, "..", "..", "packages", "shared", "src", "
 assert.ok(!home.includes("getCurrentCoordinates"), "A homepage does not auto-request GPS");
 assert.ok(!home.includes("Use my location"), "A homepage does not request GPS");
 assert.ok(browse.includes("areaId"), "B signed-in users can browse by area without exact location");
-assert.ok(header.includes("useAreaPicker"), "B location is not forced before browse");
+assert.ok(!header.includes("Shopping near"), "B homepage does not force a city picker");
 assert.ok(card.includes("onAdd()"), "C one-tap add still calls existing cart add");
 assert.ok(cart.includes("Continue with WhatsApp"), "D cart CTA is Continue with WhatsApp");
 assert.ok(!cart.includes("Continue to order"), "D no Continue to order extra wording");
