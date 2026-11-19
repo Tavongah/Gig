@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { DUTS } from "../lib/theme";
 import { APP_NAME } from "../lib/brand";
@@ -25,11 +26,11 @@ export function AuthNavigator() {
       }}
     >
       <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="RegisterSelection" component={RegisterSelectionScreen} options={{ title: `Join ${APP_NAME}` }} />
-      <Stack.Screen name="CustomerRegister" component={CustomerRegisterScreen} options={{ title: "Customer sign up" }} />
+      <Stack.Screen name="RegisterSelection" component={RegisterSelectionScreen} options={{ title: `Join ${APP_NAME}`, headerShown: Platform.OS !== "web" }} />
+      <Stack.Screen name="CustomerRegister" component={CustomerRegisterScreen} options={{ title: "Customer sign up", headerShown: Platform.OS !== "web" }} />
       <Stack.Screen name="WorkerRegister" component={WorkerRegisterScreen} options={{ title: "Worker sign up" }} />
-      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: "Reset password" }} />
-      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ title: "Choose new password" }} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: "Reset password", headerShown: Platform.OS !== "web" }} />
+      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ title: "Choose new password", headerShown: Platform.OS !== "web" }} />
       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ title: "Privacy Policy" }} />
       <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ title: "Terms of Service" }} />
     </Stack.Navigator>

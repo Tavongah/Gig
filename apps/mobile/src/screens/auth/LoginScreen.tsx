@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, Text, TextInput, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { loginSchema, zodErrorsToFieldMap } from "@gigflow/shared";
@@ -12,6 +12,8 @@ import { AppButton } from "../../components/AppButton";
 import { AuthOrDivider } from "../../components/AuthOrDivider";
 import { SocialAuthButtons } from "../../components/SocialAuthButtons";
 import { DutsCard } from "../../components/DutsCard";
+import { BrandLogo } from "../../components/BrandLogo";
+import { WebAuthFrame } from "../../components/WebAuthFrame";
 import { useSessionStore } from "../../stores/session.store";
 import type { AuthStackParamList } from "../../navigation/auth-types";
 
@@ -50,6 +52,7 @@ export function LoginScreen({ navigation }: Props) {
 
   const isBusy = loginMutation.isPending;
 
+  if (Platform.OS !== "web") {
   return (
     <Screen>
       <View className="gap-6">
@@ -103,6 +106,86 @@ export function LoginScreen({ navigation }: Props) {
           </Text>
         </Pressable>
       </View>
+    </Screen>
+  );
+  }
+
+  return (
+    <Screen>
+      <WebAuthFrame>
+        <View className="gap-4">
+          <BrandLogo size={56} />
+          <View className="gap-1">
+            <Text className="text-3xl font-black leading-9 text-ink">Welcome back!</Text>
+            <Text className="text-base leading-6 text-muted">
+              Sign in to shop, place orders and track your deliveries.
+            </Text>
+          </View>
+
+          <View className="gap-3 rounded-3xl border border-border bg-card px-4 py-4">
+            <SocialAuthButtons intendedRole="CLIENT" disabled={isBusy} layout="row" />
+            <AuthOrDivider />
+            <View className="gap-2">
+              <Text className="text-sm font-bold text-ink">Email</Text>
+              <TextInput
+                className="duts-focus-ring min-h-[48px] rounded-2xl border border-border bg-card px-4 text-base text-ink"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor="#94A3B8"
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                editable={!isBusy}
+                accessibilityLabel="Email"
+                onSubmitEditing={handleSubmit}
+              />
+            </View>
+            <View className="gap-2">
+              <Text className="text-sm font-bold text-ink">Password</Text>
+              <TextInput
+                className="duts-focus-ring min-h-[48px] rounded-2xl border border-border bg-card px-4 text-base text-ink"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                placeholderTextColor="#94A3B8"
+                autoComplete="current-password"
+                secureTextEntry
+                editable={!isBusy}
+                accessibilityLabel="Password"
+                onSubmitEditing={handleSubmit}
+              />
+            </View>
+            {error ? <Text className="text-sm text-danger">{error}</Text> : null}
+            <AppButton
+              label={isBusy ? "Signing in..." : "Sign in"}
+              onPress={handleSubmit}
+              disabled={isBusy}
+              loading={isBusy}
+            />
+            <Pressable
+              onPress={() => navigation.navigate("ForgotPassword")}
+              disabled={isBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Forgot password?"
+              className="duts-focus-ring min-h-[44px] items-center justify-center"
+            >
+              <Text className="text-center text-sm font-semibold text-brand">Forgot password?</Text>
+            </Pressable>
+          </View>
+
+          <Pressable
+            onPress={() => navigation.navigate("RegisterSelection")}
+            disabled={isBusy}
+            accessibilityRole="button"
+            className="duts-focus-ring min-h-[44px] items-center justify-center"
+          >
+            <Text className="text-center text-muted">
+              New to {APP_NAME}? <Text className="font-bold text-brand">Create an account</Text>
+            </Text>
+          </Pressable>
+        </View>
+      </WebAuthFrame>
     </Screen>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, Text, View } from "react-native";
+import { Animated, Platform, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../../components/Screen";
@@ -8,6 +8,8 @@ import { SocialAuthButtons } from "../../components/SocialAuthButtons";
 import { AuthProgressHeader } from "../../components/AuthProgressHeader";
 import { APP_NAME } from "../../lib/brand";
 import { DUTS } from "../../lib/theme";
+import { BrandLogo } from "../../components/BrandLogo";
+import { WebAuthFrame } from "../../components/WebAuthFrame";
 import type { AuthStackParamList } from "../../navigation/auth-types";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "RegisterSelection">;
@@ -103,6 +105,7 @@ export function RegisterSelectionScreen({ navigation }: Props) {
     navigation.navigate(intendedRole === "WORKER" ? "WorkerRegister" : "CustomerRegister");
   }
 
+  if (Platform.OS !== "web") {
   return (
     <Screen>
       <View className="gap-5">
@@ -155,6 +158,102 @@ export function RegisterSelectionScreen({ navigation }: Props) {
           .
         </Text>
       </View>
+    </Screen>
+  );
+  }
+
+  const webOptions = [
+    {
+      role: "CLIENT" as const,
+      title: "Shop on DUTS",
+      subtitle: "Browse products, place orders and track deliveries."
+    },
+    {
+      role: "WORKER" as const,
+      title: "Work with DUTS",
+      subtitle: "Continue to the worker application."
+    }
+  ];
+
+  return (
+    <Screen>
+      <WebAuthFrame>
+        <View className="gap-5">
+          <BrandLogo size={72} />
+          <View className="gap-2">
+            <Text className="text-3xl font-black leading-9 text-ink">Join DUTS</Text>
+            <Text className="text-base leading-6 text-muted">
+              Create an account to shop, save your details and track your orders.
+            </Text>
+          </View>
+          <View className="gap-2">
+            {webOptions.map((option) => {
+              const selected = intendedRole === option.role;
+              const primary = option.role === "CLIENT";
+              return (
+                <Pressable
+                  key={option.role}
+                  onPress={() => {
+                    setIntendedRole(option.role);
+                    setSelectionError(null);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={option.title}
+                  className={`duts-focus-ring flex-row items-center rounded-3xl px-5 ${
+                    primary ? "min-h-[84px] py-4" : "min-h-[60px] border bg-card py-3"
+                  } ${primary ? "" : selected ? "border-brand" : "border-border"}`}
+                  style={primary ? { backgroundColor: DUTS.purple } : undefined}
+                >
+                  <View className="min-w-0 flex-1">
+                    <Text className={`${primary ? "text-lg font-black text-white" : "text-base font-bold text-ink"}`}>
+                      {option.title}
+                    </Text>
+                    <Text
+                      className={`mt-1 text-sm leading-5 ${primary ? "" : "text-muted"}`}
+                      style={primary ? { color: "rgba(255,255,255,0.9)" } : undefined}
+                    >
+                      {option.subtitle}
+                    </Text>
+                  </View>
+                  {selected ? (
+                    <Ionicons name="checkmark-circle" size={22} color={primary ? "#FFFFFF" : DUTS.purple} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+          {selectionError ? <Text className="text-sm font-semibold text-danger">{selectionError}</Text> : null}
+          {intendedRole ? (
+            <View className="gap-3 rounded-3xl border border-border bg-card px-5 py-5">
+              <SocialAuthButtons intendedRole={intendedRole} />
+            </View>
+          ) : null}
+          <Pressable onPress={continueWithEmail} accessibilityRole="button" className="duts-focus-ring">
+            <View className="min-h-[48px] items-center justify-center rounded-full px-4" style={{ backgroundColor: DUTS.purple }}>
+              <Text className="font-extrabold text-white">Continue with email</Text>
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={() => navigation.navigate("Login")}
+            accessibilityRole="button"
+            className="duts-focus-ring min-h-[44px] items-center justify-center"
+          >
+            <Text className="text-center text-sm font-semibold text-brand">Back to sign in</Text>
+          </Pressable>
+          <Text className="text-center text-sm leading-5 text-muted">
+            By continuing, you agree to our{" "}
+            <Text className="font-bold text-brand" onPress={() => navigation.navigate("TermsOfService")}>
+              Terms
+            </Text>{" "}
+            and{" "}
+            <Text className="font-bold text-brand" onPress={() => navigation.navigate("PrivacyPolicy")}>
+              Privacy Policy
+            </Text>
+            .
+          </Text>
+        </View>
+      </WebAuthFrame>
     </Screen>
   );
 }
