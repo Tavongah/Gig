@@ -14,6 +14,7 @@ import {
   type ResolvedStorefrontCategory
 } from "../../lib/storefront-categories";
 import { openStorefrontCategory } from "../../lib/storefront-nav";
+import { CustomerShoppingNav } from "../../navigation/CustomerNavBar";
 import type { RootStackParamList } from "../../navigation/types";
 
 export function AllCategoriesScreen() {
@@ -74,6 +75,7 @@ export function AllCategoriesScreen() {
           </Pressable>
         </StorePage>
       </ScrollView>
+      <CustomerShoppingNav />
     </View>
   );
 }

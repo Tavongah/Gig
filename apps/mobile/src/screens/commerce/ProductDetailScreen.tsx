@@ -16,6 +16,7 @@ import { pickMoreLikeThis, relatedSearchQuery } from "../../lib/storefront-relat
 import { ProductRail } from "../../components/ProductGrid";
 import type { ProductCardData } from "../../components/ProductCard";
 import { StoreHeader, StorePage } from "../../components/StoreHeader";
+import { CustomerShoppingNav } from "../../navigation/CustomerNavBar";
 import type { RootStackParamList } from "../../navigation/types";
 import { useDesiredBasketStore } from "../../stores/desired-basket.store";
 
@@ -406,6 +407,7 @@ export function ProductDetailScreen({ route, navigation }: Props) {
           ) : null}
         </StorePage>
       </ScrollView>
+      <CustomerShoppingNav />
     </View>
   );
 }

@@ -343,7 +343,7 @@ export function ShopSearchTabScreen() {
       <StoreHeader showCategories={false} compact />
       <StorePage>
         <Text className="mt-5 text-2xl font-black text-ink">Search</Text>
-        <View className="mt-4 flex-row items-center rounded-full border border-border bg-surface px-3.5 py-2.5">
+        <View className="duts-search-field mt-4 flex-row items-center rounded-full border border-border bg-surface px-3.5 py-2.5">
           <Ionicons name="search" size={18} color={DUTS.muted} />
           <TextInput
             value={q}
@@ -351,11 +351,22 @@ export function ShopSearchTabScreen() {
             placeholder="Search products"
             placeholderTextColor={DUTS.placeholder}
             className="ml-2 flex-1 text-base text-ink"
+            style={Platform.OS === "web" ? ({ outlineStyle: "none", outlineWidth: 0 } as object) : undefined}
             returnKeyType="search"
             onSubmitEditing={runSearch}
             accessibilityLabel="Search products"
             autoFocus
           />
+          {Platform.OS === "web" && q.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+              onPress={() => setQ("")}
+              className="ml-1 h-11 w-11 items-center justify-center"
+            >
+              <Ionicons name="close-circle" size={18} color={DUTS.muted} />
+            </Pressable>
+          ) : null}
         </View>
       </StorePage>
     </View>

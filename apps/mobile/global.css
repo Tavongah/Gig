@@ -134,9 +134,20 @@ body {
   transition-duration: 0s;
 }
 
-.duts-search-field:focus-within:has(:focus-visible) {
-  outline: 2px solid #7b3fe4;
-  outline-offset: 2px;
+.duts-search-field input,
+.duts-search-field textarea,
+.duts-search-field [role="search"],
+.duts-search-field :focus,
+.duts-search-field :focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+
+.duts-search-field:focus-within {
+  border-color: #7b3fe4;
+  box-shadow: 0 0 0 2px #7b3fe4;
+  outline: none;
 }
 
 .duts-focus-ring:focus-visible {

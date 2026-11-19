@@ -416,6 +416,7 @@ export function StoreSearchField({ initialQuery = "", onSubmit }: Props) {
           placeholder="Search DUTS"
           placeholderTextColor={DUTS.placeholder}
           className="ml-2 min-h-[44px] flex-1 text-base text-ink"
+          style={Platform.OS === "web" ? ({ outlineStyle: "none", outlineWidth: 0 } as object) : undefined}
           returnKeyType="search"
           onSubmitEditing={() => {
             if (active >= 0) choose(active);
@@ -425,6 +426,19 @@ export function StoreSearchField({ initialQuery = "", onSubmit }: Props) {
           accessibilityLabel="Search products"
           accessibilityRole="search"
         />
+        {Platform.OS === "web" && q.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+            onPress={() => {
+              setQ("");
+              setOpen(true);
+            }}
+            className="ml-1 h-11 w-11 items-center justify-center"
+          >
+            <Ionicons name="close-circle" size={18} color={DUTS.muted} />
+          </Pressable>
+        ) : null}
       </View>
       {open && Platform.OS !== "web" ? (
         <Pressable

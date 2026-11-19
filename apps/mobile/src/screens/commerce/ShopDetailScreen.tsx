@@ -11,6 +11,7 @@ import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import type { RootStackParamList } from "../../navigation/types";
 import { tryAddOfferToCart } from "../../lib/storefront-cart";
+import { CustomerShoppingNav } from "../../navigation/CustomerNavBar";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ShopDetail">;
 
@@ -32,6 +33,7 @@ export function ShopDetailScreen({ route, navigation }: Props) {
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-center text-muted">Loading shops near you…</Text>
         </View>
+        <CustomerShoppingNav />
       </View>
     );
   }
@@ -43,6 +45,7 @@ export function ShopDetailScreen({ route, navigation }: Props) {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={DUTS.purple} />
         </View>
+        <CustomerShoppingNav />
       </View>
     );
   }
@@ -101,6 +104,7 @@ export function ShopDetailScreen({ route, navigation }: Props) {
           {products.length === 0 ? <Text className="mt-4 text-sm text-muted">No products found. Try another search.</Text> : null}
         </StorePage>
       </ScrollView>
+      <CustomerShoppingNav />
     </View>
   );
 }

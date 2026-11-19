@@ -1,6 +1,7 @@
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createBottomTabNavigator, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
+import { WebCustomerTabBar, webCustomerTabBarHeight } from "./CustomerNavBar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ShopHomeScreen, ShopSearchTabScreen } from "../screens/commerce/ShopHomeScreen";
 import { CommerceOrdersScreen } from "../screens/commerce/CommerceOrdersScreen";
@@ -75,17 +76,28 @@ export function ClientTabs() {
 
   return (
     <Tab.Navigator
+      {...(Platform.OS === "web"
+        ? { tabBar: (props: BottomTabBarProps) => <WebCustomerTabBar {...props} /> }
+        : {})}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: isDesktopNav
           ? { display: "none", height: 0, overflow: "hidden" as const }
-          : {
-              backgroundColor: DUTS.card,
-              borderTopColor: DUTS.border,
-              height: 58 + bottomPad,
-              paddingBottom: bottomPad,
-              paddingTop: 6
-            },
+          : Platform.OS === "web"
+            ? {
+                backgroundColor: DUTS.card,
+                borderTopWidth: 0,
+                height: webCustomerTabBarHeight(insets.bottom, false),
+                paddingBottom: 0,
+                paddingTop: 0
+              }
+            : {
+                backgroundColor: DUTS.card,
+                borderTopColor: DUTS.border,
+                height: 58 + bottomPad,
+                paddingBottom: bottomPad,
+                paddingTop: 6
+              },
         tabBarShowLabel: false,
         tabBarItemStyle: {
           flex: 1,

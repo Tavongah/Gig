@@ -14,6 +14,7 @@ import {
   categoryIonicon,
   alcoholPurchaseAllowed
 } from "../../lib/storefront-categories";
+import { CustomerShoppingNav } from "../../navigation/CustomerNavBar";
 import type { RootStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<RootStackParamList, "MarketplaceCategory">;
@@ -99,6 +100,7 @@ export function MarketplaceCategoryScreen({ route, navigation }: Props) {
           ) : null}
         </StorePage>
       </ScrollView>
+      <CustomerShoppingNav />
     </View>
   );
 }

@@ -13,6 +13,7 @@ import { useShopBrowse } from "../../lib/shop-browse";
 import { DUTS } from "../../lib/theme";
 import { comingSoonFromQuery, destinationFor, isSmartBasketEnabled } from "../../lib/storefront-categories";
 import { openStorefrontCategory } from "../../lib/storefront-nav";
+import { CustomerShoppingNav } from "../../navigation/CustomerNavBar";
 import type { RootStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProductSearch">;
@@ -155,6 +156,7 @@ export function ProductSearchScreen({ route, navigation }: Props) {
           ) : null}
         </StorePage>
       </ScrollView>
+      <CustomerShoppingNav />
     </View>
   );
 }

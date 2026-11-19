@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Alert, Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Image, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { CompositeNavigationProp } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
@@ -207,6 +207,13 @@ export function ProfileScreen() {
         ) : null}
 
         <Section title="Account">
+          {Platform.OS === "web" && activeRole !== "WORKER" ? (
+            <ProfileRow
+              icon="receipt-outline"
+              label="Orders"
+              onPress={() => navigation.navigate("MainTabs", { screen: "Orders" })}
+            />
+          ) : null}
           <ProfileRow icon="person-outline" label="Personal Information" onPress={() => navigation.navigate("EditProfile")} />
           <ProfileRow icon="location-outline" label="Addresses" onPress={() => navigation.navigate("Addresses")} />
           <ProfileRow icon="card-outline" label="Payment Methods" onPress={() => navigation.navigate("PaymentMethods")} />
