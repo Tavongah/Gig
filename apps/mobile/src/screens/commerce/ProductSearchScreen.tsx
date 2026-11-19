@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { useEffect } from "react";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { ProductGrid } from "../../components/ProductGrid";
+import { RequestProductsPanel } from "../../components/RequestProductsPanel";
 import { StoreHeader, StorePage } from "../../components/StoreHeader";
 import type { ProductCardData } from "../../components/ProductCard";
 import { api } from "../../lib/api";
@@ -18,7 +19,7 @@ type Props = NativeStackScreenProps<RootStackParamList, "ProductSearch">;
 
 export function ProductSearchScreen({ route, navigation }: Props) {
   const browse = useShopBrowse();
-  const [q] = useState(route.params?.q ?? "");
+  const q = route.params?.q ?? "";
   const category = route.params?.category;
   const categoriesQuery = useQuery({
     queryKey: ["commerce-categories", ...browse.queryKey],
@@ -61,7 +62,16 @@ export function ProductSearchScreen({ route, navigation }: Props) {
   });
   const unlistedEnabled = configQuery.data?.unlistedItemRequestEnabled === true;
   const products = query.data?.pages.flatMap((page) => page.products) ?? [];
-  const title = category ?? (q.trim() ? `Results for “${q.trim()}”` : "Search");
+  const queryText = q.trim();
+  const webRequestReady =
+    Platform.OS === "web" &&
+    queryText.length > 0 &&
+    query.isSuccess &&
+    !query.isFetching &&
+    !query.isError &&
+    !skipCatalogFetch &&
+    products.length === 0;
+  const title = category ?? (queryText ? `Results for “${queryText}”` : "Search");
 
   function openProduct(p: ProductCardData) {
     navigation.navigate("ProductDetail", {
@@ -76,7 +86,9 @@ export function ProductSearchScreen({ route, navigation }: Props) {
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
         <StorePage>
           <Text className="mt-3 text-lg font-extrabold text-ink">{title}</Text>
-          {products.length === 0 && !query.isLoading && !skipCatalogFetch ? (
+          {webRequestReady ? (
+            <RequestProductsPanel key={queryText} searchQuery={queryText} />
+          ) : products.length === 0 && !query.isLoading && !skipCatalogFetch ? (
             <View className="mt-10 items-center px-6">
               <Ionicons name="search-outline" size={32} color={DUTS.placeholder} />
               <Text className="mt-3 text-center text-base font-bold text-ink">
