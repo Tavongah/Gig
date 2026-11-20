@@ -68,10 +68,9 @@ export function ProductSearchScreen({ route, navigation }: Props) {
     Platform.OS === "web" &&
     queryText.length > 0 &&
     query.isSuccess &&
-    !query.isFetching &&
+    !query.isLoading &&
     !query.isError &&
-    !skipCatalogFetch &&
-    products.length === 0;
+    !skipCatalogFetch;
   const title = category ?? (queryText ? `Results for “${queryText}”` : "Search");
 
   function openProduct(p: ProductCardData) {
@@ -87,9 +86,8 @@ export function ProductSearchScreen({ route, navigation }: Props) {
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
         <StorePage>
           <Text className="mt-3 text-lg font-extrabold text-ink">{title}</Text>
-          {webRequestReady ? (
-            <RequestProductsPanel key={queryText} searchQuery={queryText} />
-          ) : products.length === 0 && !query.isLoading && !skipCatalogFetch ? (
+          {webRequestReady ? <RequestProductsPanel key={queryText} searchQuery={queryText} /> : null}
+          {products.length === 0 && !query.isLoading && !skipCatalogFetch && !webRequestReady ? (
             <View className="mt-10 items-center px-6">
               <Ionicons name="search-outline" size={32} color={DUTS.placeholder} />
               <Text className="mt-3 text-center text-base font-bold text-ink">
@@ -109,7 +107,7 @@ export function ProductSearchScreen({ route, navigation }: Props) {
                 </Pressable>
               ) : null}
             </View>
-          ) : skipCatalogFetch ? null : (
+          ) : skipCatalogFetch || (webRequestReady && products.length === 0) ? null : (
             <View className="mt-3">
               <ProductGrid
                 products={products}

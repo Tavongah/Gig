@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { useSessionStore } from "../stores/session.store";
 import { useShopAreaStore } from "../stores/shop-area.store";
 import { DUTS } from "../lib/theme";
@@ -85,14 +85,16 @@ export function RequestProductsPanel({ searchQuery }: Props) {
     if (!opened) setOpenError("WhatsApp could not be opened. Allow pop-ups and try again.");
   }
 
-  return (
-    <View className="mt-8 w-full rounded-2xl border border-border bg-card px-4 py-5">
-      <Text className="text-center text-base font-extrabold text-ink">Can't find what you're looking for?</Text>
-      <Text className="mt-1 text-center text-sm leading-5 text-muted">
-        Tell us what you need and we'll help you find it.
-      </Text>
-      {open ? (
-        <View className="mt-5">
+  const stacked = useWindowDimensions().width < 768;
+  const summary = (
+    <View className={stacked ? "" : "min-w-0 flex-1 pr-3"}>
+      <Text className="text-sm font-extrabold text-ink">Can't find your product?</Text>
+      <Text className="mt-0.5 text-sm leading-5 text-muted">Tell us what you need. We'll help you find it.</Text>
+    </View>
+  );
+
+  const form = (
+        <View className="mt-4">
           {products.map((product, index) => {
             const fieldErrors = errors.products[product.id];
             return (
@@ -191,16 +193,41 @@ export function RequestProductsPanel({ searchQuery }: Props) {
             <Text className="text-center text-sm font-extrabold text-white">Send via WhatsApp</Text>
           </Pressable>
         </View>
-      ) : (
+  );
+
+  if (!open) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Can't find your product? Tell us what you need. We'll help you find it. Request product"
+        onPress={showForm}
+        className={`duts-focus-ring mt-3 min-h-11 w-full rounded-2xl border border-border bg-card px-3 py-3 ${stacked ? "" : "flex-row items-center"}`}
+      >
+        {summary}
+        <Text className={`text-sm font-extrabold text-brand ${stacked ? "mt-2" : ""}`} style={{ flexShrink: 0 }}>
+          Request product
+        </Text>
+      </Pressable>
+    );
+  }
+
+  return (
+    <View className="mt-3 w-full rounded-2xl border border-border bg-card px-3 py-3">
+      <View className="min-h-11 flex-row items-center">
+        <View className="min-w-0 flex-1">{summary}</View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Request Products"
-          onPress={showForm}
-          className="mt-5 min-h-11 items-center justify-center self-center rounded-full bg-ink px-5 py-3"
+          accessibilityLabel="Close"
+          onPress={() => {
+            setOpen(false);
+            setOpenError("");
+          }}
+          className="duts-focus-ring min-h-11 min-w-11 items-center justify-center px-2"
         >
-          <Text className="text-center text-sm font-extrabold text-white">Request Products</Text>
+          <Text className="text-sm font-extrabold text-brand">Close</Text>
         </Pressable>
-      )}
+      </View>
+      {form}
     </View>
   );
 }
