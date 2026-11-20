@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,9 +28,12 @@ export function ProductDetailScreen({ route, navigation }: Props) {
   const smartBasket = isSmartBasketEnabled();
   const [imgFailed, setImgFailed] = useState(false);
   const [addedKey, setAddedKey] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const pendingRef = useRef<string | null>(null);
   const [selectedFlavorId, setSelectedFlavorId] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
+  const webColumns = width >= 768;
 
   const detailQuery = useQuery({
     queryKey: [
@@ -187,11 +190,11 @@ export function ProductDetailScreen({ route, navigation }: Props) {
   }
 
   function addFromOffer(offer: (typeof offers)[number]) {
-    if (!product) return;
-    if (!alcoholPurchaseAllowed(product.category)) return;
+    if (!product) return Promise.resolve(false);
+    if (!alcoholPurchaseAllowed(product.category)) return Promise.resolve(false);
     if (browse.isGuest) logDutsFlow("GUEST_ADD_TO_CART");
     const flavor = selectedFlavor();
-    void tryAddOfferToCart(
+    return tryAddOfferToCart(
       {
         productId: offer.productId,
         catalogProductId: product.catalogProductId,
@@ -209,6 +212,17 @@ export function ProductDetailScreen({ route, navigation }: Props) {
       browse.token
     ).then((ok) => {
       if (ok) markAdded(offer.productId);
+      return ok;
+    });
+  }
+
+  function pressOffer(offer: (typeof offers)[number]) {
+    if (pendingRef.current) return;
+    pendingRef.current = offer.productId;
+    setPendingId(offer.productId);
+    void addFromOffer(offer).finally(() => {
+      if (pendingRef.current === offer.productId) pendingRef.current = null;
+      setPendingId((current) => (current === offer.productId ? null : current));
     });
   }
 
@@ -384,14 +398,195 @@ export function ProductDetailScreen({ route, navigation }: Props) {
     <Text className="text-base text-muted">This product is not available.</Text>
   ) : null;
 
+  if (Platform.OS !== "web") {
+    return (
+      <View className="flex-1 bg-background">
+        <StoreHeader compact showCategories={false} />
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+          <StorePage>
+            <View className={`mt-4 ${desktop ? "flex-row gap-8" : "gap-4"}`}>
+              <View style={desktop ? { width: "46%" } : undefined}>{imageCanvas}</View>
+              <View style={desktop ? { width: "50%", paddingTop: 8 } : undefined}>{info}</View>
+            </View>
+            {moreLikeThis.length > 0 ? (
+              <View className="mt-8">
+                <Text className="mb-2 text-lg font-extrabold text-ink">More like this</Text>
+                <ProductRail
+                  products={moreLikeThis}
+                  loading={relatedQuery.isLoading && moreLikeThis.length === 0}
+                  onPress={openRelated}
+                  onAdd={addRelated}
+                  pricePrefix={relatedPricePrefix}
+                />
+              </View>
+            ) : null}
+          </StorePage>
+        </ScrollView>
+        <CustomerShoppingNav />
+      </View>
+    );
+  }
+
+  const priced = Boolean(purchasable && fromPriceCents != null);
+  const webImage = (
+    <View
+      className="items-center justify-center overflow-hidden rounded-3xl border border-border bg-card"
+      style={{ aspectRatio: 1, width: "100%", maxHeight: webColumns ? 520 : undefined, backgroundColor: "#FFFFFF", padding: 16 }}
+    >
+      {detailQuery.isLoading ? (
+        <ActivityIndicator color={DUTS.purple} />
+      ) : showImage ? (
+        <Image
+          source={{ uri: heroImage! }}
+          style={{ width: "100%", height: "100%" }}
+          resizeMode="contain"
+          accessibilityLabel={product?.name ?? pilot?.productName}
+          {...({ loading: "lazy" } as object)}
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        <View className="items-center">
+          <Ionicons name="image-outline" size={36} color={DUTS.placeholder} />
+          <Text className="mt-2 text-sm text-muted">No photo</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const webFlavors = flavors.length ? (
+    <View className="gap-2">
+      <Text className="text-sm font-bold text-ink">Flavor (optional)</Text>
+      <View className="flex-row flex-wrap gap-2">
+        <Pressable
+          onPress={() => setSelectedFlavorId(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Any flavor"
+          className="min-h-[44px] items-center justify-center rounded-full border px-3"
+          style={{
+            borderColor: selectedFlavorId == null ? DUTS.purple : DUTS.border,
+            backgroundColor: selectedFlavorId == null ? DUTS.purple : DUTS.card
+          }}
+        >
+          <Text className="text-sm font-bold" style={{ color: selectedFlavorId == null ? "#FFFFFF" : DUTS.ink }}>
+            Any flavor
+          </Text>
+        </Pressable>
+        {flavors.map((flavor) => {
+          const on = selectedFlavorId === flavor.id;
+          return (
+            <Pressable
+              key={flavor.id}
+              onPress={() => setSelectedFlavorId(flavor.id)}
+              accessibilityRole="button"
+              accessibilityLabel={flavor.name}
+              className="min-h-[44px] items-center justify-center rounded-full border px-3"
+              style={{ borderColor: on ? DUTS.purple : DUTS.border, backgroundColor: on ? DUTS.purple : DUTS.card }}
+            >
+              <Text className="text-sm font-bold" style={{ color: on ? "#FFFFFF" : DUTS.ink }}>
+                {flavor.name}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  ) : null;
+
+  const webInfo = pilot ? (
+    <View className="gap-3">
+      <Text className="text-3xl font-black leading-9 text-ink">{pilot.productName}</Text>
+      {pilot.sizeLabel ? <Text className="text-base text-muted">{pilot.sizeLabel}</Text> : null}
+      <Text className="text-3xl font-black text-ink">${(pilot.unitPriceCents / 100).toFixed(2)}</Text>
+      <Text className="text-sm font-semibold text-ink">{pilot.available ? "Available to order" : "Unavailable"}</Text>
+      {pilot.available ? (
+        <Pressable
+          onPress={addPilotOffer}
+          accessibilityRole="button"
+          accessibilityLabel={`Add ${pilot.productName}`}
+          className="mt-1 h-12 items-center justify-center rounded-full px-4"
+          style={({ pressed }) => ({ backgroundColor: DUTS.purple, opacity: pressed ? 0.9 : 1 })}
+        >
+          <Text className="font-extrabold text-white">{addedKey === pilot.offerId ? "Added ✓" : "ADD TO CART"}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  ) : product ? (
+    <View className="gap-3">
+      <Text className="text-3xl font-black leading-9 text-ink">{product.name}</Text>
+      {meta ? <Text className="text-base text-muted">{meta}</Text> : null}
+      {product.category ? <Text className="text-sm font-semibold text-muted">{product.category}</Text> : null}
+      {priced ? (
+        <Text className="text-3xl font-black text-ink">
+          {smartBasket || offers.length > 1 ? "From " : ""}${(fromPriceCents! / 100).toFixed(2)}
+        </Text>
+      ) : (
+        <Text className="text-base font-semibold text-muted">Price coming soon</Text>
+      )}
+      {product.category && !alcoholOk ? (
+        <Text className="text-sm text-muted">Alcohol ordering is coming at launch.</Text>
+      ) : purchasable && smartBasket ? (
+        <Text className="text-sm font-semibold text-ink">Available nearby</Text>
+      ) : priced ? (
+        <Text className="text-sm font-semibold text-ink">
+          {offers.length > 1 ? `Available from ${offers.length} shops` : "Available to order"}
+        </Text>
+      ) : smartBasket && product.catalogProductId ? null : (
+        <Text className="text-sm text-muted">Not available to order yet.</Text>
+      )}
+      {webFlavors}
+      {smartBasket && product.catalogProductId && alcoholOk ? (
+        <Pressable
+          onPress={addToShoppingList}
+          accessibilityRole="button"
+          accessibilityLabel={`Add ${product.name} to shopping list`}
+          className="h-12 items-center justify-center rounded-full px-4"
+          style={({ pressed }) => ({ backgroundColor: DUTS.purple, opacity: pressed ? 0.9 : 1 })}
+        >
+          <Text className="font-extrabold text-white">{addedKey === "list" ? "Added ✓" : "ADD"}</Text>
+        </Pressable>
+      ) : null}
+      {purchasable ? (
+        <View className="gap-3">
+          <Text className="text-sm font-bold text-ink">{offers.length > 1 ? "Choose a shop" : "Sold by"}</Text>
+          {offers.map((offer) => {
+            const busy = pendingId === offer.productId;
+            return (
+              <View key={offer.productId} className="rounded-2xl border border-border bg-card px-4 py-4">
+                <Text className="text-base font-bold text-ink">{offer.merchantName}</Text>
+                {!browse.isGuest ? <Text className="mt-1 text-sm text-muted">{offer.distanceKm} km</Text> : null}
+                <Text className="mt-2 text-xl font-black text-ink">${(offer.priceCents / 100).toFixed(2)}</Text>
+                <Pressable
+                  onPress={() => pressOffer(offer)}
+                  disabled={pendingId != null}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add ${product.name} from ${offer.merchantName}`}
+                  accessibilityState={{ disabled: pendingId != null, busy }}
+                  className="mt-3 h-12 items-center justify-center rounded-full px-4"
+                  style={{ backgroundColor: DUTS.purple, opacity: pendingId != null && !busy ? 0.55 : 1 }}
+                >
+                  <Text className="font-extrabold text-white">
+                    {busy ? "Adding…" : addedKey === offer.productId ? "Added ✓" : "ADD TO CART"}
+                  </Text>
+                </Pressable>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+      {product.description ? <Text className="text-base leading-6 text-label">{product.description}</Text> : null}
+    </View>
+  ) : detailQuery.isError ? (
+    <Text className="text-base text-muted">This product is not available.</Text>
+  ) : null;
+
   return (
     <View className="flex-1 bg-background">
       <StoreHeader compact showCategories={false} />
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         <StorePage>
-          <View className={`mt-4 ${desktop ? "flex-row gap-8" : "gap-4"}`}>
-            <View style={desktop ? { width: "46%" } : undefined}>{imageCanvas}</View>
-            <View style={desktop ? { width: "50%", paddingTop: 8 } : undefined}>{info}</View>
+          <View className={webColumns ? "mt-6 flex-row items-start gap-10" : "mt-4 gap-5"}>
+            <View style={webColumns ? { width: "46%" } : undefined}>{webImage}</View>
+            <View style={webColumns ? { flex: 1, paddingTop: 4 } : undefined}>{webInfo}</View>
           </View>
           {moreLikeThis.length > 0 ? (
             <View className="mt-8">

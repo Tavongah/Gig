@@ -40,7 +40,10 @@ type CartState = {
   merchantName: string | null;
   hydrated: boolean;
   pendingCheckout: boolean;
-  addOffer: (line: Omit<CartLine, "quantity"> & { quantity?: number }, options?: { allowMulti?: boolean }) => boolean;
+  addOffer: (
+    line: Omit<CartLine, "quantity"> & { quantity?: number },
+    options?: { allowMulti?: boolean; replaceConfirmed?: boolean }
+  ) => boolean;
   addSellerPilot: (line: Omit<CartLine, "quantity"> & { sellerOfferId: string; sellableQuantity: number; quantity?: number }) => boolean;
   notice: string | null;
   clearNotice: () => void;
@@ -104,6 +107,15 @@ export const useCommerceCartStore = create<CartState>((set, get) => ({
     if (!input.productId || !input.merchantId) return false;
     const state = get();
     if (state.merchantId && state.merchantId !== input.merchantId && !options?.allowMulti) {
+      if (options?.replaceConfirmed) {
+        set({
+          merchantId: input.merchantId,
+          merchantName: input.merchantName,
+          lines: [{ ...input, quantity: input.quantity ?? 1 }],
+          notice: null
+        });
+        return true;
+      }
       Alert.alert(
         "Different shop",
         "This item is from another shop. Starting a new basket will replace your current basket.",

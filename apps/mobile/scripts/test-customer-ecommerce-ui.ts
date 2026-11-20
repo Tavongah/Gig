@@ -52,7 +52,18 @@ assert.ok(card.includes("accessibilityLabel"), "a11y labels");
 
 const cart = read("stores/commerce-cart.store.ts");
 assert.ok(cart.includes("Different shop"), "one-store rule alert");
+assert.ok(cart.includes("Keep current basket"), "native cancel keeps the current basket");
+assert.ok(cart.includes("replaceConfirmed"), "website confirmation uses the existing replace");
 assert.ok(cart.includes("productId"), "uses Product offer ids");
+
+const webConfirm = read("components/WebCartConfirm.tsx");
+assert.ok(webConfirm.includes("Start a new cart?"), "website shop switch title");
+assert.ok(webConfirm.includes("Your cart contains items from another shop."), "website shop switch message");
+assert.ok(webConfirm.includes(">Cancel<"), "website cancel action");
+assert.ok(webConfirm.includes(">Continue<"), "website continue action");
+assert.ok(!webConfirm.includes("window.confirm"), "website prompt is not the browser dialog");
+assert.ok(read("lib/storefront-cart.ts").includes('Platform.OS === "web"'), "shop switch prompt is website-only");
+assert.ok(read("../App.tsx").includes('Platform.OS === "web" ? <WebCartConfirm />'), "prompt is mounted on the website only");
 
 const home = read("screens/commerce/ShopHomeScreen.tsx");
 assert.ok(read("screens/commerce/CommerceCheckoutScreen.tsx").includes("Deliver to"), "delivery location remains at checkout");

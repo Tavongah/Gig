@@ -31,6 +31,7 @@ import { CompleteProfileScreen } from "./src/screens/auth/CompleteProfileScreen"
 import { appLinkingPrefixes } from "./src/lib/linking";
 import { claimCartAfterLogin, hydrateCommerceCart } from "./src/stores/commerce-cart.store";
 import { hydrateDesiredBasket } from "./src/stores/desired-basket.store";
+import { WebCartConfirm } from "./src/components/WebCartConfirm";
 
 const resetPasswordLink = {
   path: "reset-password",
@@ -254,6 +255,7 @@ export default function App() {
           <QueryClientProvider client={queryClient}>
             <View style={styles.root}>
               <Shell />
+              {Platform.OS === "web" ? <WebCartConfirm /> : null}
             </View>
           </QueryClientProvider>
         </GestureHandlerRootView>

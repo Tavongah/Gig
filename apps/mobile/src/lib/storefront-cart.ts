@@ -1,10 +1,12 @@
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
+import { merchantCartBlockedBySellerPilot } from "@gigflow/shared";
 import { api } from "./api";
 import { logDutsFlow } from "./flow-log";
 import { isProductCardPurchasable, type ProductCardData } from "../components/ProductCard";
 import { alcoholPurchaseAllowed, isSmartBasketEnabled } from "./storefront-categories";
 import type { CommerceBrowseGeo } from "./api";
 import { useCommerceCartStore, type CartLine } from "../stores/commerce-cart.store";
+import { requestNewCartConfirm } from "./web-cart-confirm";
 
 export function applyMerchantCatalogCart(
   result: {
@@ -87,6 +89,17 @@ export async function tryAddOfferToCart(
   const cart = useCommerceCartStore.getState();
   const currentIds = [...new Set(cart.lines.map((l) => l.merchantId))];
   const isNewShop = Boolean(cart.merchantId && cart.merchantId !== line.merchantId && !currentIds.includes(line.merchantId));
+
+  if (Platform.OS === "web" && isNewShop && !cfg.multiShopCheckoutEnabled) {
+    if (!line.productId || !line.merchantId) return false;
+    if (merchantCartBlockedBySellerPilot(cart.lines)) {
+      cart.addOffer(line);
+      return false;
+    }
+    const confirmed = await requestNewCartConfirm();
+    if (!confirmed) return false;
+    return useCommerceCartStore.getState().addOffer(line, { replaceConfirmed: true });
+  }
 
   if (!cfg.multiShopCheckoutEnabled || !isNewShop) {
     return cart.addOffer(line);

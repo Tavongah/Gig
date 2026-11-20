@@ -39,6 +39,10 @@ assert.ok(home.includes("addStorefrontProduct"), "home add uses existing cart he
 const search = read("screens/commerce/ProductSearchScreen.tsx");
 assert.ok(search.includes("<ProductGrid"), "search still uses ProductGrid");
 assert.ok(search.includes("addStorefrontProduct"), "search add uses existing cart helper");
+const addPath = read("lib/storefront-cart.ts");
+assert.ok(addPath.includes("tryAddOfferToCart"), "card and detail adds share the cart helper");
+assert.ok(addPath.includes("requestNewCartConfirm"), "different shop waits for confirmation");
+assert.ok(addPath.includes("replaceConfirmed: true"), "continue uses the existing cart replace");
 assert.ok(!search.includes("<ProductGrid>"), "search ProductGrid keeps props");
 
 console.log(JSON.stringify({ ok: true, addVisible: true, handlerPreserved: true }, null, 2));
