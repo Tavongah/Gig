@@ -134,6 +134,10 @@ export type ConversationContext = {
   budgetCents?: number;
   /** ISO timestamp when draft quote was last priced */
   draftQuotedAt?: string;
+  /** Delivery fee last shown to this customer. Confirmation authorizes only this exact fee. */
+  presentedDeliveryFeeCents?: number;
+  /** Order total last shown to this customer. A later quote must match before payment. */
+  presentedTotalCents?: number;
   /**
    * WhatsApp mobile-money payment phase (MVP).
    * SELECT_METHOD → ENTER_PAYMENT_PHONE → PENDING_PROVIDER → (RETRY / CASH fallback)

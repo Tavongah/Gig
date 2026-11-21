@@ -7,6 +7,7 @@ import {
   searchProductsNear
 } from "../commerce/merchant.service.js";
 import {
+  assertBasketTotalsCurrent,
   createConfirmedCommerceOrder,
   formatOrderTrackMessage,
   getCustomerActiveOrders,
@@ -543,6 +544,8 @@ export async function handleCustomerWhatsAppMessage(
     logDutsFlow("COMMERCE_CART_EXPIRED", { userId: customerId });
     ctx.draftLines = undefined;
     ctx.draftQuotedAt = undefined;
+    ctx.presentedDeliveryFeeCents = undefined;
+    ctx.presentedTotalCents = undefined;
     setExpected(ctx, ctx.requestedItems?.length ? "READY_TO_ORDER" : "PRODUCT_TEXT");
     await updateConversation(conv.id, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
     await wa.sendText(phone, "That price list expired. Tell me what you need and I'll check today's prices.");
@@ -1749,6 +1752,8 @@ async function buildAndPresentQuote(
   }
 
   ctx.previousMerchantId = basket.merchant.id;
+  ctx.presentedDeliveryFeeCents = totals.deliveryFeeCents;
+  ctx.presentedTotalCents = totals.totalCents;
   setExpected(ctx, "ORDER_CONFIRMATION");
 
   if (opts?.compact && !basket.switchedFromPreferred) {
@@ -1988,15 +1993,32 @@ async function confirmDraftOrder(
     logDutsFlow("COMMERCE_CART_EXPIRED", { userId: customerId });
     ctx.draftLines = undefined;
     ctx.draftQuotedAt = undefined;
+    ctx.presentedDeliveryFeeCents = undefined;
+    ctx.presentedTotalCents = undefined;
     await updateConversation(convId, { state: WhatsAppConversationState.BUILDING_CART, context: ctx });
     await wa.sendText(phone, "Those prices expired. Tell me what you need and I'll check again.");
     return { handled: true };
   }
 
-  const totals = await quoteBasketTotalsFromContext(ctx);
-  if (!totals) {
-    await wa.sendText(phone, "That expired. Tell me what you'd like to buy again.");
-    return { handled: true };
+  let totals;
+  try {
+    const priced = await assertBasketTotalsCurrent({
+      merchantId: ctx.merchantId,
+      lines: ctx.draftLines,
+      deliveryLabel: ctx.originalTypedAddress || ctx.deliveryLabel || "Shared location",
+      deliveryLatitude: ctx.deliveryLat,
+      deliveryLongitude: ctx.deliveryLng,
+      locationMode: ctx.pilotLocationMode,
+      deliveryPrecision: ctx.deliveryPrecision,
+      typedAddress: ctx.originalTypedAddress,
+      presented: presentedQuote(ctx)
+    });
+    ctx.draftLines = priced.lines;
+    ctx.presentedDeliveryFeeCents = priced.totals.deliveryFeeCents;
+    ctx.presentedTotalCents = priced.totals.totalCents;
+    totals = priced.totals;
+  } catch (error) {
+    return handleOrderCreateError(phone, customerId, convId, ctx, error);
   }
 
   ctx.paymentPhase = "SELECT_METHOD";
@@ -2228,7 +2250,8 @@ async function finalizeCashPayment(
       deliveryPrecision: ctx.deliveryPrecision,
       typedAddress: ctx.originalTypedAddress,
       customerWhatsAppPhone: phone,
-      paymentMethod: CommercePaymentMethod.CASH
+      paymentMethod: CommercePaymentMethod.CASH,
+      presented: presentedQuote(ctx)
     });
 
     ctx.activeOrderId = order.id;
@@ -2330,7 +2353,8 @@ async function startMobileMoneyWithPayerPhone(
         deliveryPrecision: ctx.deliveryPrecision,
         typedAddress: ctx.originalTypedAddress,
         customerWhatsAppPhone: phone,
-        paymentMethod: method
+        paymentMethod: method,
+        presented: presentedQuote(ctx)
       });
       orderId = order.id;
       ctx.draftLines = undefined;
@@ -2412,6 +2436,12 @@ async function handleOrderCreateError(
       ctx.paymentPhase = undefined;
       ctx.pendingPaymentOrderId = undefined;
       const totals = await quoteBasketTotalsFromContext(ctx);
+      const quotedDelivery = totals?.deliveryFeeCents ?? optionalPresentedCents(err.errors?.deliveryFeeCents);
+      const quotedTotal = totals?.totalCents ?? optionalPresentedCents(err.errors?.totalCents);
+      if (quotedDelivery != null && quotedTotal != null) {
+        ctx.presentedDeliveryFeeCents = quotedDelivery;
+        ctx.presentedTotalCents = quotedTotal;
+      }
       await updateConversation(convId, {
         state: WhatsAppConversationState.AWAITING_ORDER_CONFIRMATION,
         context: ctx
@@ -2421,15 +2451,13 @@ async function handleOrderCreateError(
         ""
       );
       const parsed = parsePriceChangeDetail(changeDetail);
-      const body =
-        parsed.length && totals
-          ? formatPriceChange({ changes: parsed, totalCents: totals.totalCents })
-          : formatPriceChange({
-              changes: parsed.length
-                ? parsed
-                : [{ name: "Item", oldCents: 0, newCents: totals?.totalCents ?? 0 }],
-              totalCents: totals?.totalCents ?? 0
-            });
+      const previousDeliveryFeeCents = optionalPresentedCents(err.errors?.previousDeliveryFeeCents);
+      const body = formatPriceChange({
+        changes: parsed,
+        totalCents: quotedTotal ?? 0,
+        deliveryFeeCents: quotedDelivery,
+        previousDeliveryFeeCents
+      });
       setExpected(ctx, "ORDER_CONFIRMATION");
       await sendOrderReview(phone, ctx, body);
       await updateConversation(convId, {
@@ -2455,6 +2483,20 @@ async function handleOrderCreateError(
   }
   await wa.sendText(phone, "Couldn't place your order. Please try again or say HELP.");
   return { handled: true };
+}
+
+function presentedQuote(ctx: ConversationContext) {
+  if (ctx.presentedDeliveryFeeCents == null || ctx.presentedTotalCents == null) return null;
+  return {
+    deliveryFeeCents: ctx.presentedDeliveryFeeCents,
+    totalCents: ctx.presentedTotalCents
+  };
+}
+
+function optionalPresentedCents(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 async function quoteBasketTotalsFromContext(ctx: ConversationContext) {

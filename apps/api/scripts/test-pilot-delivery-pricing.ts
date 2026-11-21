@@ -168,7 +168,8 @@ expectFee(3.0, "LARGE", 200, "O");
   const home = src("../../mobile/src/screens/commerce/ShopHomeScreen.tsx");
   const checkout = src("../../mobile/src/screens/commerce/CommerceCheckoutScreen.tsx");
   const copy = src("../src/modules/whatsapp/copy.ts");
-  assert.ok(home.includes("Delivery from $0.50"), "AD public copy");
+  assert.ok(home.includes("Delivery in Harare and Gweru from $1.19"), "AD public copy");
+  assert.ok(!home.includes("Delivery from $1.19"), "AD not a global minimum");
   assert.ok(!home.includes("calculatePilotDeliveryPrice"), "AD no homepage fee calc");
   assert.ok(cart.includes("Calculated at checkout"), "AE deferred copy");
   assert.ok(checkout.includes("quote.deliveryFeeCents"), "AF exact after location");
@@ -203,9 +204,9 @@ expectFee(3.0, "LARGE", 200, "O");
   assert.equal(PILOT_DELIVERY_MATRIX_CENTS["0_TO_1_KM"].SMALL, 50);
   assert.equal(PILOT_DELIVERY_MATRIX_CENTS["2_TO_3_KM"].LARGE, 200);
   assert.ok(engine.includes("PILOT_TYPED_ADDRESS_FEE_CENTS"), "typed table is central");
-  assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.SMALL, 100);
-  assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.MEDIUM, 130);
-  assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.LARGE, 170);
+  assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.SMALL, 119);
+  assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.MEDIUM, 239);
+  assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.LARGE, 359);
   const gpsSmall = calculatePilotDeliveryPrice({
     routeDistanceKm: 0.5,
     packageClass: "SMALL",

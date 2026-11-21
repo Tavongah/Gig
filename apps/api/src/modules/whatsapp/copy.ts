@@ -375,15 +375,26 @@ export function formatShopSwitch(input: {
 export function formatPriceChange(input: {
   changes: Array<{ name: string; oldCents: number; newCents: number }>;
   totalCents: number;
+  deliveryFeeCents?: number;
+  previousDeliveryFeeCents?: number;
 }): string {
-  const detail = input.changes
-    .map(
-      (c) =>
-        `The price of ${c.name} changed from ${money(c.oldCents)} to ${money(c.newCents)}.`
-    )
+  const itemChanges = input.changes.filter((c) => {
+    const name = c.name.toLowerCase();
+    return name !== "delivery" && name !== "total";
+  });
+  const deliveryChange = input.changes.find((c) => c.name.toLowerCase() === "delivery");
+  const previousDelivery = input.previousDeliveryFeeCents ?? deliveryChange?.oldCents;
+  const nextDelivery = input.deliveryFeeCents ?? deliveryChange?.newCents;
+  const detail = itemChanges
+    .map((c) => `The price of ${c.name} changed from ${money(c.oldCents)} to ${money(c.newCents)}.`)
     .join("\n");
+  const deliveryLine =
+    previousDelivery != null && nextDelivery != null && previousDelivery !== nextDelivery
+      ? `Delivery changed from ${money(previousDelivery)} to ${money(nextDelivery)}.`
+      : null;
   return [
-    detail,
+    detail || null,
+    deliveryLine,
     `Your new total is ${money(input.totalCents)}.`,
     "",
     "Confirm order?",
@@ -391,7 +402,9 @@ export function formatPriceChange(input: {
     "1. Confirm",
     "2. Change",
     "3. Cancel"
-  ].join("\n");
+  ]
+    .filter((part) => part != null && part !== "")
+    .join("\n");
 }
 
 /** Parse "Name: $1.00 → $1.20" style change strings from order.service. */

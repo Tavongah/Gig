@@ -55,7 +55,10 @@ export function GuestCheckoutChoiceScreen({ navigation }: Props) {
     setPendingCheckout(true);
     logDutsFlow("GUEST_CHECKOUT_STARTED", { channel: "account" });
     logDutsFlow("GUEST_AUTH_CHECKOUT", { itemCount: lines.length });
-    navigation.navigate("MainTabs", { screen: "SignIn" });
+    navigation.navigate("MainTabs", {
+      screen: "SignIn",
+      params: { screen: "Login", params: { customerOnly: true } }
+    });
   }
 
   if (!lines.length) {

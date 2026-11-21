@@ -3,7 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AppButton } from "../../components/AppButton";
-import { api } from "../../lib/api";
+import { api, ApiRequestError } from "../../lib/api";
 import { friendlyCheckoutError, moneyLabel } from "../../lib/checkout-flow";
 import { DUTS } from "../../lib/theme";
 import type { RootStackParamList } from "../../navigation/types";
@@ -17,6 +17,27 @@ import { SellerPilotCheckout } from "./SellerPilotCheckout";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CommerceCheckout">;
 type PayMethod = "CASH" | "ECOCASH";
+type ShownTotals = {
+  deliveryFeeCents: number;
+  totalCents: number;
+  subtotalCents: number;
+  serviceFeeCents: number;
+};
+
+function readUpdatedTotals(error: unknown): ShownTotals | null {
+  if (!(error instanceof ApiRequestError) || error.code !== "PRICE_CHANGED" || !error.errors) return null;
+  const deliveryFeeCents = Number(error.errors.deliveryFeeCents);
+  const totalCents = Number(error.errors.totalCents);
+  if (!Number.isInteger(deliveryFeeCents) || !Number.isInteger(totalCents)) return null;
+  const subtotalCents = Number(error.errors.subtotalCents);
+  const serviceFeeCents = Number(error.errors.serviceFeeCents);
+  return {
+    deliveryFeeCents,
+    totalCents,
+    subtotalCents: Number.isInteger(subtotalCents) ? subtotalCents : 0,
+    serviceFeeCents: Number.isInteger(serviceFeeCents) ? serviceFeeCents : 0
+  };
+}
 
 export function CommerceCheckoutScreen({ navigation }: Props) {
   const session = useSessionStore((s) => s.session);
@@ -35,6 +56,8 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
   const [method, setMethod] = useState<PayMethod>("CASH");
   const [ecoCashPhone, setEcoCashPhone] = useState(user?.phoneNumber ?? "");
   const [error, setError] = useState("");
+  const [updatedTotals, setUpdatedTotals] = useState<ShownTotals | null>(null);
+  const lineKey = lines.map((l) => `${cartLineKey(l)}:${l.quantity}`).join(",");
 
   useEffect(() => {
     if (!session) navigation.replace("GuestCheckoutChoice");
@@ -70,9 +93,13 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
   });
 
   useEffect(() => {
+    setUpdatedTotals(null);
+  }, [location?.latitude, location?.longitude, lineKey]);
+
+  useEffect(() => {
     if (prepQuery.error) setError(friendlyCheckoutError((prepQuery.error as Error).message));
-    else if (lines.length) setError("");
-  }, [prepQuery.error, lines.length]);
+    else if (lines.length && !updatedTotals) setError("");
+  }, [prepQuery.error, lines.length, updatedTotals]);
 
   useEffect(() => {
     if (!session || !token || !location || lines.length || !desired.length || sellerCart || demandOnce.current) return;
@@ -113,6 +140,10 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
       if (!token || !user) throw new Error("Sign in to check out.");
       if (!location) throw new Error("Tell us where to deliver.");
       if (!lines.length) throw new Error("Your cart is empty.");
+      const shown = updatedTotals ?? prepQuery.data;
+      if (!shown || !("deliveryFeeCents" in shown) || !("totalCents" in shown)) {
+        throw new Error("Review the delivery fee before placing the order.");
+      }
       return api.commerceCheckout(
         {
           lat: location.latitude,
@@ -121,7 +152,9 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
           locationMode: location.locationMode,
           lines: lines.map(toCheckoutLine),
           paymentMethod: method,
-          customerPhone: method === "ECOCASH" ? ecoCashPhone.trim() : user.phoneNumber ?? undefined
+          customerPhone: method === "ECOCASH" ? ecoCashPhone.trim() : user.phoneNumber ?? undefined,
+          confirmFeeCents: shown.deliveryFeeCents,
+          confirmTotalCents: shown.totalCents
         },
         token
       );
@@ -134,7 +167,15 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
       clear();
       navigation.replace("CommerceOrderDetail", { orderId: res.order.id });
     },
-    onError: (e: Error) => setError(friendlyCheckoutError(e.message))
+    onError: (e: Error) => {
+      const next = readUpdatedTotals(e);
+      if (next) {
+        setUpdatedTotals(next);
+        setError(e.message);
+        return;
+      }
+      setError(friendlyCheckoutError(e.message));
+    }
   });
 
   if (!session || !token || !user) {
@@ -205,11 +246,15 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
     : null;
   const placing = checkoutMut.isPending;
   const ready = Boolean(quote) && !prepQuery.isFetching && !placing;
-  const placeLabel = quote
-    ? placing
-      ? "Placing order…"
-      : `PLACE ORDER • ${moneyLabel(quote.totalCents)}`
-    : "PLACE ORDER";
+  const shownTotal = updatedTotals?.totalCents ?? quote?.totalCents;
+  const placeLabel =
+    quote && shownTotal != null
+      ? placing
+        ? "Placing order…"
+        : updatedTotals
+          ? `CONFIRM TOTAL • ${moneyLabel(updatedTotals.totalCents)}`
+          : `PLACE ORDER • ${moneyLabel(shownTotal)}`
+      : "PLACE ORDER";
 
   return (
     <View className="flex-1 bg-background">
@@ -276,12 +321,12 @@ export function CommerceCheckoutScreen({ navigation }: Props) {
 
         {quote ? (
           <View className="mt-4 gap-1 rounded-2xl border border-border bg-surface p-4">
-            <Text className="text-sm text-muted">Items          {moneyLabel(quote.subtotalCents)}</Text>
-            <Text className="text-sm text-muted">Delivery       {moneyLabel(quote.deliveryFeeCents)}</Text>
-            {quote.serviceFeeCents > 0 ? (
-              <Text className="text-sm text-muted">Service        {moneyLabel(quote.serviceFeeCents)}</Text>
+            <Text className="text-sm text-muted">Items          {moneyLabel(updatedTotals?.subtotalCents ?? quote.subtotalCents)}</Text>
+            <Text className="text-sm text-muted">Delivery       {moneyLabel(updatedTotals?.deliveryFeeCents ?? quote.deliveryFeeCents)}</Text>
+            {(updatedTotals?.serviceFeeCents ?? quote.serviceFeeCents) > 0 ? (
+              <Text className="text-sm text-muted">Service        {moneyLabel(updatedTotals?.serviceFeeCents ?? quote.serviceFeeCents)}</Text>
             ) : null}
-            <Text className="mt-2 text-lg font-black text-ink">Total          {moneyLabel(quote.totalCents)}</Text>
+            <Text className="mt-2 text-lg font-black text-ink">Total          {moneyLabel(updatedTotals?.totalCents ?? quote.totalCents)}</Text>
           </View>
         ) : null}
 

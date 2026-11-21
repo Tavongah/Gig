@@ -26,6 +26,12 @@ import {
 } from "./merchant.service.js";
 import { findMerchantsInShoppingArea } from "./shopping-areas.js";
 import { createConfirmedCommerceOrder, quoteBasketTotals } from "./order.service.js";
+import { priceChangeErrorFields } from "./presented-total.js";
+import { appCheckoutDecision } from "./displayed-delivery-quote.js";
+import {
+  readDisplayedDeliveryQuote,
+  rememberDisplayedDeliveryQuote
+} from "./displayed-delivery-quote-store.js";
 import { initiateMobileMoneyPaymentForOrder, cancelPendingPaymentAttempts } from "./payments/payment.service.js";
 import { ensureAppCommerceCustomer } from "./commerce-customer.service.js";
 import type { CommercePaymentMethod, OrderSource } from "@prisma/client";
@@ -670,6 +676,29 @@ export async function quoteCart(input: {
   };
 }
 
+/** Quote, then remember a final fee so a later checkout can prove what was shown. */
+export async function quoteAndRememberCart(
+  input: Parameters<typeof quoteCart>[0] & { userId?: string | null }
+) {
+  const quote = await quoteCart(input);
+  if (input.userId && input.lat != null && input.lng != null) {
+    await rememberDisplayedDeliveryQuote(
+      {
+        userId: input.userId,
+        lat: input.lat,
+        lng: input.lng,
+        deliveryLabel: input.deliveryLabel,
+        locationMode: input.locationMode,
+        deliveryPrecision: input.deliveryPrecision,
+        lines: input.lines,
+        quote
+      },
+      { replaceShown: true }
+    );
+  }
+  return quote;
+}
+
 const CHECKOUT_PREP_COPY: Record<string, string> = {
   LOCATION_REQUIRED: "Tell us where to deliver.",
   PRODUCT_UNAVAILABLE: "Some items are no longer available.",
@@ -701,6 +730,8 @@ export async function prepareCheckout(input: {
   deliveryPrecision?: string | null;
   deliveryLabel?: string | null;
   userId?: string | null;
+  /** False for checkout. Checkout must compare the fee already shown, not replace it. */
+  rememberShown?: boolean;
 }): Promise<Awaited<ReturnType<typeof quoteCart>> | AcceptedUnresolvedRequest> {
   if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) {
     throw new AppError("Tell us where to deliver.", 400, "LOCATION_REQUIRED");
@@ -712,14 +743,18 @@ export async function prepareCheckout(input: {
     throw new AppError("That's too many items for one order.", 400, "TOO_MANY_ITEMS");
   }
   try {
-    return await quoteCart({
+    const quoteInput = {
       lat: input.lat,
       lng: input.lng,
       lines: input.lines,
       locationMode: input.locationMode,
       deliveryPrecision: input.deliveryPrecision,
-      deliveryLabel: input.deliveryLabel
-    });
+      deliveryLabel: input.deliveryLabel,
+      userId: input.userId
+    };
+    const quoted =
+      input.rememberShown === false ? await quoteCart(quoteInput) : await quoteAndRememberCart(quoteInput);
+    return quoted;
   } catch (error) {
     if (error instanceof AppError && error.code === "SHOP_NOT_NEARBY" && input.userId) {
       const accepted = await acceptUnresolvedProductRequest({
@@ -735,6 +770,23 @@ export async function prepareCheckout(input: {
   }
 }
 
+/** Both cents, or neither. A partial confirmation is not a presented quote. */
+function presentedCheckoutTotals(input: {
+  confirmFeeCents?: number;
+  confirmTotalCents?: number;
+}): { deliveryFeeCents: number; totalCents: number } | null {
+  if (input.confirmFeeCents == null && input.confirmTotalCents == null) return null;
+  if (
+    !Number.isInteger(input.confirmFeeCents) ||
+    !Number.isInteger(input.confirmTotalCents) ||
+    input.confirmFeeCents! < 0 ||
+    input.confirmTotalCents! < 0
+  ) {
+    throw new AppError("Confirm the delivery fee and total together.", 400, "CONFIRM_TOTAL_REQUIRED");
+  }
+  return { deliveryFeeCents: input.confirmFeeCents!, totalCents: input.confirmTotalCents! };
+}
+
 export async function checkoutCart(input: {
   userId: string;
   lat: number;
@@ -745,6 +797,10 @@ export async function checkoutCart(input: {
   customerPhone?: string;
   locationMode?: string | null;
   deliveryPrecision?: string | null;
+  /** Exact delivery fee the customer is confirming. Server still quotes. */
+  confirmFeeCents?: number;
+  /** Exact order total the customer is confirming. */
+  confirmTotalCents?: number;
 }) {
   const prepared = await prepareCheckout({
     lat: input.lat,
@@ -753,7 +809,8 @@ export async function checkoutCart(input: {
     locationMode: input.locationMode,
     deliveryPrecision: input.deliveryPrecision,
     deliveryLabel: input.deliveryLabel,
-    userId: input.userId
+    userId: input.userId,
+    rememberShown: false
   });
   if (isAcceptedUnresolvedRequest(prepared)) {
     return {
@@ -770,6 +827,24 @@ export async function checkoutCart(input: {
     };
   }
   const quote = prepared;
+  const clientPresented = presentedCheckoutTotals(input);
+  const displayed = clientPresented
+    ? null
+    : await readDisplayedDeliveryQuote({
+        userId: input.userId,
+        lat: input.lat,
+        lng: input.lng,
+        deliveryLabel: input.deliveryLabel,
+        locationMode: input.locationMode,
+        deliveryPrecision: input.deliveryPrecision,
+        lines: input.lines
+      });
+  const presented =
+    clientPresented ??
+    (displayed
+      ? { deliveryFeeCents: displayed.deliveryFeeCents, totalCents: displayed.totalCents }
+      : null);
+  const unconfirmedDelivery = !clientPresented && !displayed;
 
   const commerceCustomer = await ensureAppCommerceCustomer(input.userId);
 
@@ -784,6 +859,28 @@ export async function checkoutCart(input: {
 
   const shopCount = quote.shopCount ?? 1;
   if (shopCount > 1) {
+    const decision = appCheckoutDecision({
+      clientPresented,
+      displayed,
+      fresh: {
+        subtotalCents: quote.subtotalCents,
+        deliveryFeeCents: quote.deliveryFeeCents,
+        serviceFeeCents: quote.serviceFeeCents,
+        totalCents: quote.totalCents
+      }
+    });
+    if (decision.confirm) {
+      throw new AppError(
+        decision.message,
+        409,
+        "PRICE_CHANGED",
+        priceChangeErrorFields({
+          changeDetail: decision.changeDetail,
+          fresh: decision.totals,
+          presented
+        })
+      );
+    }
     const { paymentStatusForMethod, resolveCommercePaymentMethod, assertCommercePaymentMethodAllowed } =
       await import("./payment-mode.js");
     const method = resolveCommercePaymentMethod(paymentMethod);
@@ -895,7 +992,10 @@ export async function checkoutCart(input: {
     typedAddress: input.deliveryLabel,
     customerWhatsAppPhone: input.customerPhone,
     paymentMethod,
-    orderSource: "APP" as OrderSource
+    orderSource: "APP" as OrderSource,
+    presented,
+    unconfirmedDelivery,
+    legacyReview: !clientPresented
   });
 
   if (paymentMethod === "ECOCASH") {

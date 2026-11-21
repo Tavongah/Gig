@@ -16,7 +16,7 @@ import {
   checkoutCatalogDemand,
   listCustomerCommerceOrders,
   prepareCheckout,
-  quoteCart,
+  quoteAndRememberCart,
   quoteTextBasket,
   type BrowseGeo
 } from "./customer-commerce.service.js";
@@ -180,9 +180,9 @@ const quoteSchema = z
     message: "lat and lng required unless delivery is deferred"
   });
 
-customerCommerceRouter.post("/cart/quote", validateBody(quoteSchema), async (req, res, next) => {
+customerCommerceRouter.post("/cart/quote", optionalAuth, validateBody(quoteSchema), async (req, res, next) => {
   try {
-    res.json(await quoteCart(req.body));
+    res.json(await quoteAndRememberCart({ ...req.body, userId: req.auth?.userId }));
   } catch (err) {
     next(err);
   }
@@ -264,6 +264,8 @@ const checkoutSchema = z.object({
   deliveryPrecision: z.string().max(24).optional(),
   paymentMethod: z.enum(["CASH", "ECOCASH", "ONEMONEY"]).optional(),
   customerPhone: z.string().min(7).max(24).optional(),
+  confirmFeeCents: z.number().int().nonnegative().optional(),
+  confirmTotalCents: z.number().int().nonnegative().optional(),
   lines: z
     .array(
       z.object({

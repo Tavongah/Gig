@@ -16,7 +16,7 @@ import type { AuthStackParamList } from "../../navigation/auth-types";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "CustomerRegister">;
 
-export function CustomerRegisterScreen({ navigation }: Props) {
+export function CustomerRegisterScreen({ navigation, route }: Props) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -237,7 +237,9 @@ export function CustomerRegisterScreen({ navigation }: Props) {
             />
           </View>
           <Pressable
-            onPress={() => navigation.navigate("Login")}
+            onPress={() =>
+              navigation.navigate("Login", route.params?.customerOnly ? { customerOnly: true } : undefined)
+            }
             accessibilityRole="button"
             className="duts-focus-ring min-h-[44px] items-center justify-center"
           >

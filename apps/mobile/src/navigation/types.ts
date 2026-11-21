@@ -1,5 +1,13 @@
 export type RootStackParamList = {
-  MainTabs: { screen?: keyof ClientTabParamList | keyof GuestTabParamList } | undefined;
+  MainTabs:
+    | {
+        screen?: keyof ClientTabParamList | keyof GuestTabParamList;
+        params?: {
+          screen?: string;
+          params?: { customerOnly?: boolean };
+        };
+      }
+    | undefined;
   PostGig: { serviceCategoryId?: string; preferredWorkerId?: string } | undefined;
   DeliveryRequest: undefined;
   DeliveryPins: {

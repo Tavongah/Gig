@@ -66,9 +66,9 @@ const LARGE_BASKET: PilotPackageItem[] = [
 const UNKNOWN_BASKET: PilotPackageItem[] = [{ quantity: 1 }, { quantity: 1 }];
 
 assert.equal(PILOT_TYPED_ADDRESS_ZONE, "MSU_GWERU");
-assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.SMALL, 100);
-assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.MEDIUM, 130);
-assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.LARGE, 170);
+assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.SMALL, 119);
+assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.MEDIUM, 239);
+assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.LARGE, 359);
 assert.equal(isMsuGweruTypedPilotAddress(ADDRESS), true);
 assert.equal(isMsuGweruTypedPilotAddress("34 Nehosho, senga Gweru"), true);
 assert.equal(isMsuGweruTypedPilotAddress("Senga"), true);
@@ -80,7 +80,7 @@ assert.equal(isMsuGweruTypedPilotAddress("Harare CBD"), false);
   assert.equal(classifyPackage(SMALL_BASKET), "SMALL");
   const priced = typedFee("SMALL");
   assert.equal(priced.eligible, true);
-  assert.equal(priced.deliveryFeeCents, 100);
+  assert.equal(priced.deliveryFeeCents, 119);
   assert.equal(priced.locationMode, "TYPED_PILOT");
   pass("A");
 }
@@ -88,21 +88,21 @@ assert.equal(isMsuGweruTypedPilotAddress("Harare CBD"), false);
 {
   assert.equal(classifyPackage(MEDIUM_BASKET), "MEDIUM");
   const priced = typedFee("MEDIUM");
-  assert.equal(priced.deliveryFeeCents, 130);
+  assert.equal(priced.deliveryFeeCents, 239);
   pass("B");
 }
 
 {
   assert.equal(classifyPackage(LARGE_BASKET), "LARGE");
   const priced = typedFee("LARGE");
-  assert.equal(priced.deliveryFeeCents, 170);
+  assert.equal(priced.deliveryFeeCents, 359);
   pass("C");
 }
 
 {
   const cls = classifyPackage(UNKNOWN_BASKET);
   assert.equal(cls, "MEDIUM", "unknown falls back to MEDIUM, not SMALL");
-  assert.equal(typedFee(cls).deliveryFeeCents, 130);
+  assert.equal(typedFee(cls).deliveryFeeCents, 239);
   pass("D");
 }
 
@@ -123,9 +123,9 @@ assert.equal(isMsuGweruTypedPilotAddress("Harare CBD"), false);
     packageClass: classifyPackage(LARGE_BASKET),
     locationMode: resolvePilotLocationMode({ typedAddress: address })
   });
-  assert.equal(small.deliveryFeeCents, 100);
-  assert.equal(medium.deliveryFeeCents, 130);
-  assert.equal(large.deliveryFeeCents, 170);
+  assert.equal(small.deliveryFeeCents, 119);
+  assert.equal(medium.deliveryFeeCents, 239);
+  assert.equal(large.deliveryFeeCents, 359);
   pass("E");
 }
 
@@ -133,7 +133,7 @@ assert.equal(isMsuGweruTypedPilotAddress("Harare CBD"), false);
   const priced = gpsFee(0.5, "SMALL");
   assert.equal(priced.eligible, true);
   assert.equal(priced.deliveryFeeCents, 50);
-  assert.notEqual(priced.deliveryFeeCents, 100);
+  assert.notEqual(priced.deliveryFeeCents, 119);
   assert.equal(priced.locationMode, "GPS");
   pass("F");
 }
@@ -141,14 +141,14 @@ assert.equal(isMsuGweruTypedPilotAddress("Harare CBD"), false);
 {
   const priced = gpsFee(1.5, "MEDIUM");
   assert.equal(priced.deliveryFeeCents, 100);
-  assert.notEqual(priced.deliveryFeeCents, 130);
+  assert.notEqual(priced.deliveryFeeCents, 239);
   pass("G");
 }
 
 {
   const priced = gpsFee(2.5, "LARGE");
   assert.equal(priced.deliveryFeeCents, 200);
-  assert.notEqual(priced.deliveryFeeCents, 170);
+  assert.notEqual(priced.deliveryFeeCents, 359);
   pass("H");
 }
 
@@ -196,9 +196,9 @@ assert.equal(isMsuGweruTypedPilotAddress("Harare CBD"), false);
   const engine = src("../../../packages/shared/src/pilot-delivery-pricing.ts");
   const wa = src("../src/modules/whatsapp/copy.ts");
   const checkout = src("../../mobile/src/screens/commerce/CommerceCheckoutScreen.tsx");
-  assert.ok(engine.includes("SMALL: 100"));
-  assert.ok(engine.includes("MEDIUM: 130"));
-  assert.ok(engine.includes("LARGE: 170"));
+  assert.ok(engine.includes("SMALL: 119"));
+  assert.ok(engine.includes("MEDIUM: 239"));
+  assert.ok(engine.includes("LARGE: 359"));
   assert.equal(wa.includes("100") && wa.includes("TYPED_ADDRESS"), false);
   assert.ok(!checkout.includes("PILOT_TYPED_ADDRESS_FEE_CENTS"), "frontend does not own cents");
   const quote = src("../src/modules/commerce/pilot-delivery.service.ts");

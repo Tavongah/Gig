@@ -175,7 +175,7 @@ export function ShopHomeScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
         <StorePage>
           <Text className="mt-3 text-sm text-muted">Need it? DUTS it. Shop local. Get it delivered.</Text>
-          <Text className="mt-1 text-sm text-muted">Delivery from $0.50</Text>
+          <Text className="mt-1 text-sm text-muted">Delivery in Harare and Gweru from $1.19</Text>
           <CrossBorderHomeLink />
 
           {shopBy.length > 0 ? (

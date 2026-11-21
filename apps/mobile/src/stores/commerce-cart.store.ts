@@ -1,7 +1,9 @@
 import { create } from "zustand";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { cartLineIdentity, merchantCartBlockedBySellerPilot, planSellerPilotCartAdd } from "@gigflow/shared";
+import { cartShopKey, cartsConflict, mergeSameShopCart, planCartClaim } from "../lib/cart-claim";
+import { requestNewCartConfirm } from "../lib/web-cart-confirm";
 
 export type CartLine = {
   productId: string;
@@ -260,10 +262,43 @@ export async function hydrateCommerceCart(): Promise<void> {
 export async function saveAccountCartSnapshot(userId: string): Promise<void> {
   if (!userId) return;
   try {
-    await AsyncStorage.setItem(ACCOUNT_KEY(userId), JSON.stringify(snapshot(useCommerceCartStore.getState())));
+    const next = snapshot(useCommerceCartStore.getState());
+    const saved = parseCart(await AsyncStorage.getItem(ACCOUNT_KEY(userId)));
+    if (saved && cartsConflict(saved, next)) return;
+    await AsyncStorage.setItem(ACCOUNT_KEY(userId), JSON.stringify(next));
   } catch {
     /* ignore */
   }
+}
+
+type ShopCartChoice = "guest" | "saved";
+
+/**
+ * Different-shop login. Website Alert.alert does nothing, so the website uses
+ * the mounted cart confirm. Dismiss or a missing host keeps the on-screen cart.
+ * Native keeps the two-choice basket prompt.
+ */
+function chooseDifferentShopCart(guest: PersistedCart, saved: PersistedCart): Promise<ShopCartChoice | null> {
+  if (Platform.OS === "web") {
+    return requestNewCartConfirm().then((confirmed) => (confirmed ? "saved" : null));
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (choice: ShopCartChoice | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(choice);
+    };
+    Alert.alert(
+      "Which basket should we keep?",
+      `Your account already has items from ${saved.merchantName ?? "another shop"}. You just added items from ${guest.merchantName ?? "a different shop"}.`,
+      [
+        { text: "Keep the basket I just made", onPress: () => settle("guest") },
+        { text: "Keep my saved basket", onPress: () => settle("saved") }
+      ],
+      { cancelable: true, onDismiss: () => settle(null) }
+    );
+  });
 }
 
 export async function claimCartAfterLogin(userId: string): Promise<void> {
@@ -272,44 +307,40 @@ export async function claimCartAfterLogin(userId: string): Promise<void> {
   const saved = parseCart(await AsyncStorage.getItem(ACCOUNT_KEY(userId)));
   const accountHasItems = Boolean(saved?.lines.length);
   const guestHasItems = Boolean(guest.lines.length);
-  const conflict =
-    guestHasItems &&
-    accountHasItems &&
-    Boolean(guest.merchantId) &&
-    Boolean(saved?.merchantId) &&
-    guest.merchantId !== saved!.merchantId;
+  const plan = planCartClaim({
+    guestHasItems,
+    savedHasItems: accountHasItems,
+    guestShopKey: cartShopKey(guest),
+    savedShopKey: saved ? cartShopKey(saved) : null
+  });
 
   const finish = async (keep: PersistedCart) => {
     useCommerceCartStore.getState().replaceCart(keep);
-    await saveAccountCartSnapshot(userId);
+    try {
+      await AsyncStorage.setItem(ACCOUNT_KEY(userId), JSON.stringify(keep));
+    } catch {
+      /* ignore */
+    }
     await persistWorking(keep);
   };
 
-  if (!conflict) {
+  if (plan === "guest") {
     if (guestHasItems) {
       await finish(guest);
-      return;
     }
+    return;
+  }
+  if (plan === "saved") {
     if (saved) await finish(saved);
     return;
   }
+  if (plan === "merge" && saved) {
+    await finish(mergeSameShopCart(saved, guest));
+    return;
+  }
+  if (!saved) return;
 
-  Alert.alert(
-    "Which basket should we keep?",
-    `Your account already has items from ${saved!.merchantName ?? "another shop"}. You just added items from ${guest.merchantName ?? "a different shop"}.`,
-    [
-      {
-        text: "Keep the basket I just made",
-        onPress: () => {
-          void finish(guest);
-        }
-      },
-      {
-        text: "Keep my saved basket",
-        onPress: () => {
-          void finish(saved!);
-        }
-      }
-    ]
-  );
+  const choice = await chooseDifferentShopCart(guest, saved);
+  if (choice === "saved") await finish(saved);
+  else if (choice === "guest") await finish(guest);
 }

@@ -181,9 +181,9 @@ async function main() {
 
   // WA13–15 typed package fees
   for (const [id, pkg, cents] of [
-    ["WA13", "SMALL", 100],
-    ["WA14", "MEDIUM", 130],
-    ["WA15", "LARGE", 170]
+    ["WA13", "SMALL", 119],
+    ["WA14", "MEDIUM", 239],
+    ["WA15", "LARGE", 359]
   ] as const) {
     const priced = calculatePilotDeliveryPrice({
       routeDistanceKm: 4.2,

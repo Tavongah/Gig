@@ -185,7 +185,22 @@ export function CartScreen() {
     setPendingCheckout(true);
     logDutsFlow("GUEST_CHECKOUT_STARTED", { channel: "account" });
     logDutsFlow("GUEST_AUTH_CHECKOUT", { itemCount: lines.length });
-    navigation.navigate("MainTabs", { screen: "SignIn" });
+    navigation.navigate("MainTabs", {
+      screen: "SignIn",
+      params: { screen: "Login", params: { customerOnly: true } }
+    });
+  }
+
+  async function continueWithWhatsApp() {
+    setQuoteError("");
+    setWorking(true);
+    try {
+      await startGuestWhatsApp();
+    } catch (e) {
+      setQuoteError(friendlyCheckoutError((e as Error).message));
+    } finally {
+      setWorking(false);
+    }
   }
 
   function shoppingListBlock() {
@@ -406,17 +421,36 @@ export function CartScreen() {
           ) : null}
         </ScrollView>
         <View className={`border-t border-border bg-background px-1 pb-5 pt-3${ctaCue ? " duts-cta-ready" : ""}`}>
-          <AppButton
-            label={primaryLabel}
-            onPress={() => void continuePrimary()}
-            disabled={!canContinue}
-            loading={working}
-          />
-          {browse.isGuest ? (
-            <Pressable onPress={chooseAccount} className="mt-3 items-center" accessibilityRole="button">
-              <Text className="text-sm font-semibold text-muted">Sign in or create account</Text>
-            </Pressable>
-          ) : null}
+          {Platform.OS === "web" && browse.isGuest && lines.length > 0 ? (
+            <View className="gap-3">
+              <AppButton
+                label={working ? "Opening WhatsApp…" : "Continue with WhatsApp"}
+                onPress={() => void continueWithWhatsApp()}
+                disabled={!canContinue}
+                loading={working}
+              />
+              <AppButton
+                label="Sign in / Create account"
+                variant="secondary"
+                onPress={chooseAccount}
+                disabled={working}
+              />
+            </View>
+          ) : (
+            <>
+              <AppButton
+                label={primaryLabel}
+                onPress={() => void continuePrimary()}
+                disabled={!canContinue}
+                loading={working}
+              />
+              {browse.isGuest ? (
+                <Pressable onPress={chooseAccount} className="mt-3 items-center" accessibilityRole="button">
+                  <Text className="text-sm font-semibold text-muted">Sign in or create account</Text>
+                </Pressable>
+              ) : null}
+            </>
+          )}
         </View>
       </TabScreen>
     </View>

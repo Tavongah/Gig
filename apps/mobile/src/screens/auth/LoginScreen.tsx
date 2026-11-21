@@ -22,7 +22,16 @@ type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 const inputClassName =
   "rounded-2xl border border-border bg-[#EFF6FF] px-4 py-4 text-base text-ink";
 
-export function LoginScreen({ navigation }: Props) {
+export function LoginScreen({ navigation, route }: Props) {
+  const customerOnly = route.params?.customerOnly === true;
+
+  function openCreateAccount(): void {
+    if (customerOnly) {
+      navigation.navigate("CustomerRegister", { customerOnly: true });
+      return;
+    }
+    navigation.navigate("RegisterSelection");
+  }
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +109,7 @@ export function LoginScreen({ navigation }: Props) {
           </Pressable>
         </DutsCard>
 
-        <Pressable onPress={() => navigation.navigate("RegisterSelection")} className="py-2" disabled={isBusy}>
+        <Pressable onPress={openCreateAccount} className="py-2" disabled={isBusy}>
           <Text className="text-center text-muted">
             New to {APP_NAME}? <Text className="font-bold text-brand">Create an account</Text>
           </Text>
@@ -175,7 +184,7 @@ export function LoginScreen({ navigation }: Props) {
           </View>
 
           <Pressable
-            onPress={() => navigation.navigate("RegisterSelection")}
+            onPress={openCreateAccount}
             disabled={isBusy}
             accessibilityRole="button"
             className="duts-focus-ring min-h-[44px] items-center justify-center"

@@ -48,6 +48,16 @@ import {
   resolveDeliveryClientUserId,
   ensureWhatsAppCommerceCustomer
 } from "./commerce-customer.service.js";
+import {
+  priceChangeErrorFields,
+  selectConfirmedTotals,
+  type CheckoutTotalCents,
+  type PresentedCheckoutTotal
+} from "./presented-total.js";
+import {
+  unseenDisplayedDeliveryDecision,
+  withLegacyReviewHint
+} from "./displayed-delivery-quote.js";
 
 /** True when value looks like a usable E.164 contact for delivery schema (min 7 chars). */
 export function isUsableDeliveryContactPhone(raw: string | null | undefined): boolean {
@@ -193,11 +203,47 @@ export async function quoteBasketTotals(input: {
   return { subtotalCents, deliveryFeeCents, serviceFeeCents, totalCents, currency: "usd" as const };
 }
 
-export async function createConfirmedCommerceOrder(input: {
-  /** Authenticated app User id (optional for WhatsApp / guest). */
-  customerId?: string;
-  /** Preferred commerce identity id. */
-  commerceCustomerId?: string;
+function storedCheckoutTotals(totals: {
+  subtotalCents: number;
+  deliveryFeeCents: number;
+  serviceFeeCents: number;
+  totalCents: number;
+}): CheckoutTotalCents {
+  return {
+    subtotalCents: totals.subtotalCents,
+    deliveryFeeCents: totals.deliveryFeeCents,
+    serviceFeeCents: totals.serviceFeeCents,
+    totalCents: totals.totalCents
+  };
+}
+
+function throwPriceChanged(input: {
+  message: string;
+  changeDetail: string;
+  fresh: CheckoutTotalCents;
+  presented?: PresentedCheckoutTotal | null;
+  lines: BasketLine[];
+  legacyReview?: boolean;
+}): never {
+  throw new AppError(
+    input.legacyReview ? withLegacyReviewHint(input.message) : input.message,
+    409,
+    "PRICE_CHANGED",
+    priceChangeErrorFields({
+      changeDetail: input.changeDetail,
+      fresh: input.fresh,
+      presented: input.presented,
+      lines: input.lines
+    })
+  );
+}
+
+/**
+ * Refresh merchandise prices and the delivery quote.
+ * Does not create an order or charge a payment.
+ * Stored totals skip the delivery re-quote. A presented fee that no longer matches throws PRICE_CHANGED.
+ */
+export async function assertBasketTotalsCurrent(input: {
   merchantId: string;
   lines: BasketLine[];
   deliveryLabel: string;
@@ -206,49 +252,25 @@ export async function createConfirmedCommerceOrder(input: {
   locationMode?: string | null;
   deliveryPrecision?: string | null;
   typedAddress?: string | null;
-  customerWhatsAppPhone?: string;
-  paymentMethod?: CommercePaymentMethod | string;
-  paymentStatus?: CommercePaymentStatus;
-  orderSource?: OrderSource;
-  checkoutId?: string;
-  fulfillmentLabel?: string;
-  /** When set, the order insert joins the caller's transaction. */
   db?: Prisma.TransactionClient;
-  /** When set, skip per-shop delivery quoting (child fulfillments of a parent checkout). */
-  totals?: {
-    subtotalCents: number;
-    deliveryFeeCents: number;
-    serviceFeeCents: number;
-    totalCents: number;
-    currency?: "usd";
-  };
-}) {
+  merchantLat?: number;
+  merchantLng?: number;
+  storedTotals?: CheckoutTotalCents | null;
+  presented?: PresentedCheckoutTotal | null;
+  /** Legacy checkout with no stored quote and no client confirmation. Never creates the order. */
+  unconfirmedDelivery?: boolean;
+  /** Older app checkout. PRICE_CHANGED tells them to review the total on screen. */
+  legacyReview?: boolean;
+}): Promise<{ lines: BasketLine[]; totals: CheckoutTotalCents & { currency: "usd" } }> {
   if (input.lines.length === 0) {
     throw new AppError("Basket is empty.", 400, "EMPTY_BASKET");
   }
   const db = input.db ?? prisma;
-  const paymentMethod = resolveCommercePaymentMethod(input.paymentMethod);
-  assertCommercePaymentMethodAllowed(paymentMethod);
-  const paymentStatus = input.paymentStatus ?? paymentStatusForMethod(paymentMethod);
-
-  const identity = await resolveCommerceCustomerForOrder({
-    commerceCustomerId: input.commerceCustomerId,
-    customerId: input.customerId
-  });
-  const customerId = identity.customerId;
-  const commerceCustomerId = identity.commerceCustomerId;
-  const orderSource = input.orderSource ?? OrderSource.WHATSAPP;
-
-  const merchant = await db.merchant.findUniqueOrThrow({ where: { id: input.merchantId } });
-  if (!merchant.isActive || !merchant.acceptsOrders) {
-    throw new AppError("This shop is not available right now.", 409, "MERCHANT_CLOSED");
-  }
-
   const priceChanges: Array<{ name: string; oldCents: number; newCents: number }> = [];
   const unavailable: string[] = [];
   const refreshedLines: BasketLine[] = [];
-
   const alcoholEnabled = parseAlcoholCommerceEnabled(process.env.ALCOHOL_COMMERCE_ENABLED);
+
   for (const line of input.lines) {
     const product = await db.product.findFirst({
       where: { id: line.productId, merchantId: input.merchantId, archived: false },
@@ -292,44 +314,195 @@ export async function createConfirmedCommerceOrder(input: {
     );
   }
 
-  if (priceChanges.length > 0) {
-    const detail = priceChanges
-      .map(
-        (c) =>
-          `${c.name}: $${(c.oldCents / 100).toFixed(2)} → $${(c.newCents / 100).toFixed(2)}`
-      )
-      .join("; ");
-    throw new AppError(
-      `One price changed since your quote. ${detail}`,
-      409,
-      "PRICE_CHANGED",
-      {
-        changes: detail,
-        lines: JSON.stringify(refreshedLines)
-      }
-    );
+  const lines = refreshedLines;
+  if (input.storedTotals) {
+    const stored = storedCheckoutTotals(input.storedTotals);
+    const decision = selectConfirmedTotals({
+      storedTotals: stored,
+      merchandiseChanges: priceChanges
+    });
+    if (decision.confirm) {
+      throwPriceChanged({
+        message: decision.message,
+        changeDetail: decision.changeDetail,
+        fresh: stored,
+        presented: null,
+        lines,
+        legacyReview: input.legacyReview
+      });
+    }
+    return { lines, totals: { ...decision.totals, currency: "usd" } };
   }
 
-  const lines = refreshedLines;
-  const totals = input.totals
-    ? {
-        subtotalCents: input.totals.subtotalCents,
-        deliveryFeeCents: input.totals.deliveryFeeCents,
-        serviceFeeCents: input.totals.serviceFeeCents,
-        totalCents: input.totals.totalCents,
-        currency: "usd" as const
-      }
-    : await quoteBasketTotals({
-        merchantLat: Number(merchant.latitude),
-        merchantLng: Number(merchant.longitude),
-        customerLat: input.deliveryLatitude,
-        customerLng: input.deliveryLongitude,
-        lines,
-        locationMode: input.locationMode,
-        deliveryPrecision: input.deliveryPrecision,
-        typedAddress: input.typedAddress ?? input.deliveryLabel,
-        deliveryLabel: input.deliveryLabel
+  let merchantLat = input.merchantLat;
+  let merchantLng = input.merchantLng;
+  if (!Number.isFinite(merchantLat) || !Number.isFinite(merchantLng)) {
+    const merchant = await db.merchant.findUniqueOrThrow({ where: { id: input.merchantId } });
+    merchantLat = Number(merchant.latitude);
+    merchantLng = Number(merchant.longitude);
+  }
+
+  let fresh: CheckoutTotalCents;
+  try {
+    const quoted = await quoteBasketTotals({
+      merchantLat: merchantLat!,
+      merchantLng: merchantLng!,
+      customerLat: input.deliveryLatitude,
+      customerLng: input.deliveryLongitude,
+      lines,
+      locationMode: input.locationMode,
+      deliveryPrecision: input.deliveryPrecision,
+      typedAddress: input.typedAddress ?? input.deliveryLabel,
+      deliveryLabel: input.deliveryLabel
+    });
+    if (quoted.deliveryFeeCents == null) {
+      throw new AppError("We can't deliver this order to this location yet.", 409, "SHOP_NOT_NEARBY");
+    }
+    fresh = {
+      subtotalCents: quoted.subtotalCents,
+      deliveryFeeCents: quoted.deliveryFeeCents,
+      serviceFeeCents: quoted.serviceFeeCents,
+      totalCents: quoted.totalCents
+    };
+  } catch (error) {
+    if (priceChanges.length > 0) {
+      const decision = selectConfirmedTotals({
+        presented: null,
+        fresh: {
+          subtotalCents: lines.reduce((sum, line) => sum + line.lineTotalCents, 0),
+          deliveryFeeCents: input.presented?.deliveryFeeCents ?? 0,
+          serviceFeeCents: 0,
+          totalCents: lines.reduce((sum, line) => sum + line.lineTotalCents, 0)
+        },
+        merchandiseChanges: priceChanges
       });
+      if (decision.confirm) {
+        throwPriceChanged({
+          message: decision.message,
+          changeDetail: decision.changeDetail,
+          fresh: decision.totals,
+          presented: null,
+          lines,
+          legacyReview: input.legacyReview
+        });
+      }
+    }
+    throw error;
+  }
+
+  if (input.unconfirmedDelivery && !input.presented) {
+    const unseen = unseenDisplayedDeliveryDecision({
+      fresh,
+      merchandiseChanges: priceChanges
+    });
+    throwPriceChanged({
+      message: unseen.message,
+      changeDetail: unseen.changeDetail,
+      fresh,
+      presented: null,
+      lines,
+      legacyReview: input.legacyReview
+    });
+  }
+
+  const decision = selectConfirmedTotals({
+    presented: input.presented ?? null,
+    fresh,
+    merchandiseChanges: priceChanges
+  });
+  if (decision.confirm) {
+    throwPriceChanged({
+      message: decision.message,
+      changeDetail: decision.changeDetail,
+      fresh,
+      presented: input.presented ?? null,
+      lines,
+      legacyReview: input.legacyReview
+    });
+  }
+  return { lines, totals: { ...decision.totals, currency: "usd" } };
+}
+
+export async function createConfirmedCommerceOrder(input: {
+  /** Authenticated app User id (optional for WhatsApp / guest). */
+  customerId?: string;
+  /** Preferred commerce identity id. */
+  commerceCustomerId?: string;
+  merchantId: string;
+  lines: BasketLine[];
+  deliveryLabel: string;
+  deliveryLatitude: number;
+  deliveryLongitude: number;
+  locationMode?: string | null;
+  deliveryPrecision?: string | null;
+  typedAddress?: string | null;
+  customerWhatsAppPhone?: string;
+  paymentMethod?: CommercePaymentMethod | string;
+  paymentStatus?: CommercePaymentStatus;
+  orderSource?: OrderSource;
+  checkoutId?: string;
+  fulfillmentLabel?: string;
+  /** When set, the order insert joins the caller's transaction. */
+  db?: Prisma.TransactionClient;
+  /** When set, skip per-shop delivery quoting (child fulfillments of a parent checkout). */
+  totals?: {
+    subtotalCents: number;
+    deliveryFeeCents: number;
+    serviceFeeCents: number;
+    totalCents: number;
+    currency?: "usd";
+  };
+  /**
+   * Delivery fee and total already shown to this customer.
+   * Ignored when `totals` is set so an approved quote cannot be replaced.
+   * When set, the fresh quote must match both cents or the order is not created.
+   */
+  presented?: PresentedCheckoutTotal | null;
+  /** Set only for an app checkout that sent no presented fee and has no stored quote. */
+  unconfirmedDelivery?: boolean;
+  /** Set for app checkouts that did not send confirmFeeCents. WhatsApp leaves this unset. */
+  legacyReview?: boolean;
+}) {
+  if (input.lines.length === 0) {
+    throw new AppError("Basket is empty.", 400, "EMPTY_BASKET");
+  }
+  const db = input.db ?? prisma;
+  const paymentMethod = resolveCommercePaymentMethod(input.paymentMethod);
+  assertCommercePaymentMethodAllowed(paymentMethod);
+  const paymentStatus = input.paymentStatus ?? paymentStatusForMethod(paymentMethod);
+
+  const identity = await resolveCommerceCustomerForOrder({
+    commerceCustomerId: input.commerceCustomerId,
+    customerId: input.customerId
+  });
+  const customerId = identity.customerId;
+  const commerceCustomerId = identity.commerceCustomerId;
+  const orderSource = input.orderSource ?? OrderSource.WHATSAPP;
+
+  const merchant = await db.merchant.findUniqueOrThrow({ where: { id: input.merchantId } });
+  if (!merchant.isActive || !merchant.acceptsOrders) {
+    throw new AppError("This shop is not available right now.", 409, "MERCHANT_CLOSED");
+  }
+
+  const priced = await assertBasketTotalsCurrent({
+    merchantId: input.merchantId,
+    lines: input.lines,
+    deliveryLabel: input.deliveryLabel,
+    deliveryLatitude: input.deliveryLatitude,
+    deliveryLongitude: input.deliveryLongitude,
+    locationMode: input.locationMode,
+    deliveryPrecision: input.deliveryPrecision,
+    typedAddress: input.typedAddress ?? input.deliveryLabel,
+    db,
+    storedTotals: input.totals ?? null,
+    presented: input.totals ? null : (input.presented ?? null),
+    unconfirmedDelivery: input.totals ? false : Boolean(input.unconfirmedDelivery),
+    legacyReview: input.totals ? false : Boolean(input.legacyReview),
+    merchantLat: Number(merchant.latitude),
+    merchantLng: Number(merchant.longitude)
+  });
+  const lines = priced.lines;
+  const totals = priced.totals;
 
   const isMobileMoney =
     paymentMethod === CommercePaymentMethod.ECOCASH ||

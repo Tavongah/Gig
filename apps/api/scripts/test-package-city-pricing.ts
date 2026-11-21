@@ -49,9 +49,9 @@ function expectPackage(
 }
 
 for (const [pkg, cents] of [
-  ["SMALL", 100],
-  ["MEDIUM", 130],
-  ["LARGE", 170]
+  ["SMALL", 119],
+  ["MEDIUM", 239],
+  ["LARGE", 359]
 ] as const) {
   expectPackage(`gweru typed ${pkg}`, { km: 4.2, pkg, mode: "TYPED_PILOT", label: "Senga Gweru" }, cents);
   expectPackage(`gweru gps ${pkg}`, { km: 2, pkg, mode: "GPS", lat: gweru.latitude, lng: gweru.longitude }, cents);
@@ -59,14 +59,14 @@ for (const [pkg, cents] of [
   expectPackage(`harare gps ${pkg}`, { km: 0.5, pkg, mode: "GPS", lat: harare.latitude, lng: harare.longitude }, cents);
 }
 
-assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.SMALL, 100);
-assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.MEDIUM, 130);
-assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.LARGE, 170);
+assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.SMALL, 119);
+assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.MEDIUM, 239);
+assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.LARGE, 359);
 
 {
   const cls = classifyPackage([{ quantity: 1 }, { quantity: 2 }]);
   assert.equal(cls, "MEDIUM");
-  expectPackage("unknown", { km: 5, pkg: cls, label: "Gweru" }, 130);
+  expectPackage("unknown", { km: 5, pkg: cls, label: "Gweru" }, 239);
 }
 
 {
@@ -81,9 +81,9 @@ assert.equal(PILOT_TYPED_ADDRESS_FEE_CENTS.LARGE, 170);
   const near = fee({ km: 0.5, pkg: "MEDIUM", label: "Nehosho Gweru" });
   const mid = fee({ km: 2, pkg: "MEDIUM", lat: gweru.latitude, lng: gweru.longitude });
   const far = fee({ km: 5, pkg: "MEDIUM", label: "MSU Gweru", lat: gweru.latitude + 0.04, lng: gweru.longitude });
-  assert.equal(near.deliveryFeeCents, 130);
-  assert.equal(mid.deliveryFeeCents, 130);
-  assert.equal(far.deliveryFeeCents, 130);
+  assert.equal(near.deliveryFeeCents, 239);
+  assert.equal(mid.deliveryFeeCents, 239);
+  assert.equal(far.deliveryFeeCents, 239);
 }
 
 {
@@ -128,9 +128,9 @@ assert.equal(parseSellerMarketplaceEnabled("false"), false);
 
 console.log(JSON.stringify({
   ok: true,
-  small: 100,
-  medium: 130,
-  large: 170,
-  unknown: 130,
+  small: 119,
+  medium: 239,
+  large: 359,
+  unknown: 239,
   distanceAffectsSupportedPrice: false
 }));

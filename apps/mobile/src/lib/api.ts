@@ -377,6 +377,18 @@ export class ApiValidationError extends Error {
   }
 }
 
+export class ApiRequestError extends Error {
+  readonly code?: string;
+  readonly errors?: Record<string, string>;
+
+  constructor(message: string, code?: string, errors?: Record<string, string>) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.code = code;
+    this.errors = errors;
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
   let response: Response;
   try {
@@ -400,6 +412,10 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
       errors?: Record<string, string>;
       details?: { fieldErrors?: Record<string, string[]>; formErrors?: string[] };
     } | null;
+
+    if (body?.code && body.code !== "VALIDATION_ERROR") {
+      throw new ApiRequestError(body.error || `Request failed with status ${response.status}`, body.code, body.errors);
+    }
 
     if (body?.errors && Object.keys(body.errors).length > 0) {
       throw new ApiValidationError(body.errors);
@@ -1298,6 +1314,8 @@ export const api = {
       }>;
       paymentMethod?: "CASH" | "ECOCASH" | "ONEMONEY";
       customerPhone?: string;
+      confirmFeeCents?: number;
+      confirmTotalCents?: number;
     },
     token: string
   ) =>

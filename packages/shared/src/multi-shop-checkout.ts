@@ -10,7 +10,7 @@
  *
  * V1 delivery fee: ONE fee from quotePilotCommerceDelivery (combined basket).
  * GPS: calculatePilotDeliveryPrice(combinedRouteKm, packageClass).
- * Typed MSU/Gweru: package class table ($1.00 / $1.30 / $1.70).
+ * Typed MSU/Gweru: package class table ($1.19 / $2.39 / $3.59).
  * combinedRouteKm = shortest haversine permutation of pickups then the customer.
  * Not fee × shop count. No hidden surcharge.
  *

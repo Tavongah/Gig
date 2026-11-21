@@ -1,7 +1,7 @@
 /**
  * DUTS commerce pilot delivery pricing V1.
  *
- * Supported Gweru and Harare deliveries: package class only → $1.00 / $1.30 / $1.70.
+ * Supported Gweru and Harare deliveries: package class only → $1.19 / $2.39 / $3.59.
  * Distance does not choose that customer fee. Other GPS routes keep the distance matrix.
  *
  * Does NOT apply to legacy gig/P2P calculateDeliveryPrice.
@@ -41,9 +41,9 @@ export type PilotLocationMode = (typeof PILOT_LOCATION_MODES)[number];
 export const PILOT_TYPED_ADDRESS_ZONE = "MSU_GWERU" as const;
 
 export const PILOT_TYPED_ADDRESS_FEE_CENTS: Record<PilotPackageClass, number> = {
-  SMALL: 100,
-  MEDIUM: 130,
-  LARGE: 170
+  SMALL: 119,
+  MEDIUM: 239,
+  LARGE: 359
 };
 
 /** Senga / MSU Gweru centroid used when a typed address is recognized without exact geocoding. */
